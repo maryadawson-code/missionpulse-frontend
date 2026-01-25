@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 - M4 RFP Shredder</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+    .animate-slideIn { animation: slideIn 0.4s ease-out forwards; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-shimmer { 
+      background: linear-gradient(90deg, transparent, rgba(0,229,250,0.1), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+    }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DESIGN TOKENS
+    // ═══════════════════════════════════════════════════════════════════════════
+    const COLORS = {
+      primary: '#00E5FA',
+      deepNavy: '#00050F',
+      success: '#22C55E',
+      warning: '#F59E0B',
+      error: '#EF4444',
+      purple: '#A855F7',
+      pink: '#EC4899',
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ICONS
+    // ═══════════════════════════════════════════════════════════════════════════
+    const Icons = {
+      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      upload: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      filter: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+      table: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+      grid: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+      list: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>,
+      link: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
+      arrowRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>,
+      book: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
+      sparkles: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // COMPLIANCE STATUS CONFIG
+    // ═══════════════════════════════════════════════════════════════════════════
+    const COMPLIANCE_STATUS = {
+      compliant: { label: 'COMPLIANT', color: '#22C55E', icon: 'check', bg: 'bg-emerald-500/20', border: 'border-emerald-500/30' },
+      partial: { label: 'REVIEW NEEDED', color: '#F59E0B', icon: 'alert', bg: 'bg-amber-500/20', border: 'border-amber-500/30' },
+      gap: { label: 'GAP', color: '#EF4444', icon: 'x', bg: 'bg-red-500/20', border: 'border-red-500/30' },
+      pending: { label: 'PENDING', color: '#6B7280', icon: 'clipboard', bg: 'bg-slate-500/20', border: 'border-slate-500/30' },
+      na: { label: 'N/A', color: '#64748B', icon: 'x', bg: 'bg-slate-600/20', border: 'border-slate-600/30' },
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REQUIREMENT TYPES CONFIG
+    // ═══════════════════════════════════════════════════════════════════════════
+    const REQ_TYPES = {
+      SHALL: { label: 'SHALL (Mandatory)', color: '#EF4444', priority: 'CRITICAL' },
+      MUST: { label: 'MUST (Mandatory)', color: '#EF4444', priority: 'CRITICAL' },
+      WILL: { label: 'WILL (Mandatory)', color: '#F59E0B', priority: 'HIGH' },
+      SHOULD: { label: 'SHOULD (Evaluated)', color: '#22C55E', priority: 'MEDIUM' },
+      MAY: { label: 'MAY (Optional)', color: '#6B7280', priority: 'LOW' },
+      EVAL: { label: 'EVALUATED', color: '#A855F7', priority: 'HIGH' },
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DEMO RFP CONTENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    const DEMO_RFP_TEXT = `SECTION L - INSTRUCTIONS TO OFFERORS
+
+L.1 GENERAL INSTRUCTIONS
+The Contractor shall provide all personnel, equipment, supplies, facilities, transportation, tools, materials, supervision, and other items necessary to perform healthcare IT modernization services as defined in the Performance Work Statement (PWS).
+
+L.2 PROPOSAL SUBMISSION REQUIREMENTS
+L.2.1 The offeror shall submit a Technical Proposal not to exceed 50 pages.
+L.2.2 The offeror must include a staffing plan identifying all key personnel.
+L.2.3 The offeror should demonstrate experience with at least three (3) similar healthcare IT projects.
+L.2.4 The contractor will provide monthly progress reports in accordance with CDRL A001.
+
+L.3 TECHNICAL REQUIREMENTS
+L.3.1 The contractor shall maintain FedRAMP High authorization for all cloud services.
+L.3.2 All systems must comply with HIPAA Security Rule requirements.
+L.3.3 The contractor shall implement MFA for all user accounts within 30 days of contract award.
+L.3.4 The system should support integration with MHS GENESIS via HL7 FHIR APIs.
+L.3.5 The contractor may propose alternative technical approaches that meet or exceed stated requirements.
+
+SECTION M - EVALUATION CRITERIA
+
+M.1 EVALUATION FACTORS
+Proposals will be evaluated based on the following factors listed in descending order of importance:
+M.1.1 Technical Approach (40%)
+M.1.2 Past Performance (30%)
+M.1.3 Management Approach (20%)
+M.1.4 Price (10%)
+
+M.2 TECHNICAL EVALUATION
+M.2.1 The Government will evaluate the offeror's understanding of requirements.
+M.2.2 The Government shall assess the feasibility of the proposed technical solution.
+M.2.3 Innovation and efficiency improvements will be considered favorably.
+
+APPLICABLE REGULATIONS
+FAR 52.204-21 Basic Safeguarding of Covered Contractor Information
+FAR 52.227-14 Rights in Data
+DFARS 252.204-7012 Safeguarding Covered Defense Information
+DFARS 252.239-7010 Cloud Computing Services`;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DEMO EXTRACTED REQUIREMENTS
+    // ═══════════════════════════════════════════════════════════════════════════
+    const DEMO_REQUIREMENTS = [
+      { id: 'L.1', section: 'L', sectionRef: 'L.1', type: 'SHALL', priority: 'CRITICAL', text: 'The Contractor shall provide all personnel, equipment, supplies, facilities, transportation, tools, materials, supervision, and other items necessary to perform healthcare IT modernization services.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'pending', far: null },
+      { id: 'L.2.1', section: 'L', sectionRef: 'L.2.1', type: 'SHALL', priority: 'CRITICAL', text: 'The offeror shall submit a Technical Proposal not to exceed 50 pages.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'compliant', far: null },
+      { id: 'L.2.2', section: 'L', sectionRef: 'L.2.2', type: 'MUST', priority: 'CRITICAL', text: 'The offeror must include a staffing plan identifying all key personnel.', proposalSection: 'Vol II - Management', volume: 'Management', status: 'partial', far: null },
+      { id: 'L.2.3', section: 'L', sectionRef: 'L.2.3', type: 'SHOULD', priority: 'MEDIUM', text: 'The offeror should demonstrate experience with at least three (3) similar healthcare IT projects.', proposalSection: 'Vol III - Past Perf', volume: 'Past Performance', status: 'compliant', far: null },
+      { id: 'L.2.4', section: 'L', sectionRef: 'L.2.4', type: 'WILL', priority: 'HIGH', text: 'The contractor will provide monthly progress reports in accordance with CDRL A001.', proposalSection: 'Vol II - Management', volume: 'Management', status: 'pending', far: null },
+      { id: 'L.3.1', section: 'L', sectionRef: 'L.3.1', type: 'SHALL', priority: 'CRITICAL', text: 'The contractor shall maintain FedRAMP High authorization for all cloud services.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'compliant', far: 'FAR 52.204-21' },
+      { id: 'L.3.2', section: 'L', sectionRef: 'L.3.2', type: 'MUST', priority: 'CRITICAL', text: 'All systems must comply with HIPAA Security Rule requirements.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'compliant', far: null },
+      { id: 'L.3.3', section: 'L', sectionRef: 'L.3.3', type: 'SHALL', priority: 'CRITICAL', text: 'The contractor shall implement MFA for all user accounts within 30 days of contract award.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'gap', far: 'DFARS 252.204-7012' },
+      { id: 'L.3.4', section: 'L', sectionRef: 'L.3.4', type: 'SHOULD', priority: 'MEDIUM', text: 'The system should support integration with MHS GENESIS via HL7 FHIR APIs.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'partial', far: null },
+      { id: 'L.3.5', section: 'L', sectionRef: 'L.3.5', type: 'MAY', priority: 'LOW', text: 'The contractor may propose alternative technical approaches that meet or exceed stated requirements.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'compliant', far: null },
+      { id: 'M.1.1', section: 'M', sectionRef: 'M.1.1', type: 'EVAL', priority: 'HIGH', text: 'Technical Approach (40%) - Primary evaluation factor', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'pending', far: null },
+      { id: 'M.1.2', section: 'M', sectionRef: 'M.1.2', type: 'EVAL', priority: 'HIGH', text: 'Past Performance (30%) - Second evaluation factor', proposalSection: 'Vol III - Past Perf', volume: 'Past Performance', status: 'compliant', far: null },
+      { id: 'M.1.3', section: 'M', sectionRef: 'M.1.3', type: 'EVAL', priority: 'MEDIUM', text: 'Management Approach (20%) - Third evaluation factor', proposalSection: 'Vol II - Management', volume: 'Management', status: 'partial', far: null },
+      { id: 'M.2.1', section: 'M', sectionRef: 'M.2.1', type: 'EVAL', priority: 'HIGH', text: 'The Government will evaluate the offeror\'s understanding of requirements.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'pending', far: null },
+      { id: 'M.2.2', section: 'M', sectionRef: 'M.2.2', type: 'SHALL', priority: 'CRITICAL', text: 'The Government shall assess the feasibility of the proposed technical solution.', proposalSection: 'Vol I - Technical', volume: 'Technical', status: 'partial', far: null },
+    ];
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BUTTON COMPONENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    const Button = ({ children, variant = 'primary', size = 'md', icon, onClick, disabled, className = '' }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-cyan-400 text-slate-900 hover:from-cyan-400 hover:to-cyan-300 shadow-lg shadow-cyan-500/25',
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-800',
+        danger: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30',
+      };
+      const sizes = {
+        sm: 'px-3 py-1.5 text-xs',
+        md: 'px-4 py-2 text-sm',
+        lg: 'px-6 py-3 text-base',
+      };
+      return (
+        <button
+          onClick={onClick}
+          disabled={disabled}
+          className={`${variants[variant]} ${sizes[size]} rounded-lg font-medium transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        >
+          {icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BADGE COMPONENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    const Badge = ({ children, color = '#00E5FA', variant = 'filled' }) => {
+      if (variant === 'outline') {
+        return (
+          <span className="px-2 py-0.5 rounded text-xs font-semibold border" style={{ color, borderColor: color }}>
+            {children}
+          </span>
+        );
+      }
+      return (
+        <span className="px-2 py-0.5 rounded text-xs font-semibold" style={{ backgroundColor: `${color}20`, color }}>
+          {children}
+        </span>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STAT CARD COMPONENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    const StatCard = ({ label, value, icon, color = '#00E5FA', trend }) => (
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs text-slate-400 mb-1">{label}</p>
+            <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+            {trend && (
+              <p className={`text-xs mt-1 ${trend > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
+              </p>
+            )}
+          </div>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}20` }}>
+            <Icon name={icon} className="w-5 h-5" style={{ color }} />
+          </div>
+        </div>
+      </div>
+    );
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STATUS BADGE COMPONENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    const StatusBadge = ({ status }) => {
+      const config = COMPLIANCE_STATUS[status] || COMPLIANCE_STATUS.pending;
+      return (
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${config.bg} ${config.border} border`} style={{ color: config.color }}>
+          <Icon name={config.icon} className="w-3 h-3" />
+          {config.label}
+        </span>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TYPE BADGE COMPONENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    const TypeBadge = ({ type }) => {
+      const config = REQ_TYPES[type] || REQ_TYPES.SHALL;
+      return (
+        <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ backgroundColor: `${config.color}20`, color: config.color }}>
+          {type}
+        </span>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PRIORITY INDICATOR
+    // ═══════════════════════════════════════════════════════════════════════════
+    const PriorityIndicator = ({ priority }) => {
+      const colors = {
+        CRITICAL: '#EF4444',
+        HIGH: '#F59E0B',
+        MEDIUM: '#22C55E',
+        LOW: '#6B7280',
+      };
+      return (
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[priority] }} />
+          <span className="text-xs text-slate-400">{priority}</span>
+        </div>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // UPLOAD ZONE COMPONENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    const UploadZone = ({ onUpload, onPaste, isProcessing }) => {
+      const [isDragging, setIsDragging] = useState(false);
+      const [pasteMode, setPasteMode] = useState(false);
+      const [pasteText, setPasteText] = useState('');
+      const fileInputRef = useRef(null);
+
+      const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      };
+
+      const handleDragLeave = () => {
+        setIsDragging(false);
+      };
+
+      const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          onUpload(files[0]);
+        }
+      };
+
+      const handleFileSelect = (e) => {
+        if (e.target.files.length > 0) {
+          onUpload(e.target.files[0]);
+        }
+      };
+
+      const handlePasteSubmit = () => {
+        if (pasteText.trim()) {
+          onPaste(pasteText);
+          setPasteText('');
+          setPasteMode(false);
+        }
+      };
+
+      const loadDemo = () => {
+        onPaste(DEMO_RFP_TEXT);
+        setPasteMode(false);
+      };
+
+      if (pasteMode) {
+        return (
+          <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Icon name="clipboard" className="w-4 h-4 text-cyan-400" />
+                Paste RFP Text
+              </h3>
+              <Button variant="ghost" size="sm" onClick={() => setPasteMode(false)}>Cancel</Button>
+            </div>
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder="Paste Section L/M requirements here..."
+              className="w-full h-48 bg-slate-800/50 border border-slate-700 rounded-lg p-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 resize-none scrollbar-thin"
+            />
+            <div className="flex justify-between mt-4">
+              <Button variant="ghost" size="sm" onClick={loadDemo} icon="sparkles">Load Demo RFP</Button>
+              <Button variant="primary" onClick={handlePasteSubmit} disabled={!pasteText.trim()} icon="zap">
+                Extract Requirements
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+              isDragging ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-600 hover:border-cyan-500/50 hover:bg-slate-800/30'
+            }`}
+          >
+            {isProcessing ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-cyan-400 font-medium">Processing RFP...</p>
+                <p className="text-xs text-slate-500">AI is extracting requirements</p>
+              </div>
+            ) : (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-800 flex items-center justify-center">
+                  <Icon name="upload" className="w-8 h-8 text-cyan-400" />
+                </div>
+                <p className="text-white font-medium mb-1">Drop your RFP document here</p>
+                <p className="text-sm text-slate-400 mb-4">Supports PDF, DOCX, TXT</p>
+                <div className="flex justify-center gap-3">
+                  <Button variant="secondary" size="sm">Browse Files</Button>
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setPasteMode(true); }} icon="clipboard">
+                    Paste Text
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.doc,.txt"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <div className="mt-4 flex justify-center">
+            <Button variant="ghost" size="sm" onClick={loadDemo} icon="sparkles">
+              Load Demo RFP for Testing
+            </Button>
+          </div>
+        </div>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REQUIREMENT ROW COMPONENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    const RequirementRow = ({ req, onStatusChange, onSelect, isSelected }) => {
+      const [expanded, setExpanded] = useState(false);
+
+      return (
+        <div className={`border rounded-lg transition-all ${isSelected ? 'border-cyan-500 bg-cyan-500/5' : 'border-slate-700/50 hover:border-slate-600'}`}>
+          <div className="p-4">
+            <div className="flex items-start gap-4">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => onSelect(req.id)}
+                className="mt-1 w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-900"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-0.5 rounded bg-slate-700 text-xs font-mono text-cyan-400">{req.sectionRef}</span>
+                  <TypeBadge type={req.type} />
+                  <PriorityIndicator priority={req.priority} />
+                  {req.far && (
+                    <Badge color="#A855F7" variant="outline">{req.far}</Badge>
+                  )}
+                </div>
+                <p className={`text-sm text-slate-300 ${expanded ? '' : 'line-clamp-2'}`}>{req.text}</p>
+                {req.text.length > 150 && (
+                  <button onClick={() => setExpanded(!expanded)} className="text-xs text-cyan-400 hover:text-cyan-300 mt-1">
+                    {expanded ? 'Show less' : 'Show more'}
+                  </button>
+                )}
+                <div className="flex items-center gap-4 mt-3">
+                  <div className="flex items-center gap-1 text-xs text-slate-500">
+                    <Icon name="arrowRight" className="w-3 h-3" />
+                    <span>{req.proposalSection}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <select
+                  value={req.status}
+                  onChange={(e) => onStatusChange(req.id, e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500/50"
+                  style={{ color: COMPLIANCE_STATUS[req.status]?.color }}
+                >
+                  {Object.entries(COMPLIANCE_STATUS).map(([key, val]) => (
+                    <option key={key} value={key}>{val.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // COMPLIANCE MATRIX TABLE VIEW
+    // ═══════════════════════════════════════════════════════════════════════════
+    const MatrixTableView = ({ requirements, onStatusChange }) => (
+      <div className="overflow-x-auto scrollbar-thin">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-800/50">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 border-b border-slate-700">Req ID</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 border-b border-slate-700">Section Ref</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 border-b border-slate-700 w-1/3">Requirement Text</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 border-b border-slate-700">Type</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 border-b border-slate-700">Proposal Section</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 border-b border-slate-700">FAR/DFARS</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 border-b border-slate-700">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-700/50">
+            {requirements.map((req) => (
+              <tr key={req.id} className="hover:bg-slate-800/30 transition-colors">
+                <td className="px-4 py-3 font-mono text-cyan-400 text-xs">{req.id}</td>
+                <td className="px-4 py-3 text-slate-300">{req.sectionRef}</td>
+                <td className="px-4 py-3 text-slate-300 text-xs leading-relaxed">{req.text}</td>
+                <td className="px-4 py-3"><TypeBadge type={req.type} /></td>
+                <td className="px-4 py-3 text-slate-400 text-xs">{req.proposalSection}</td>
+                <td className="px-4 py-3">
+                  {req.far ? <Badge color="#A855F7" variant="outline">{req.far}</Badge> : <span className="text-slate-600">—</span>}
+                </td>
+                <td className="px-4 py-3">
+                  <select
+                    value={req.status}
+                    onChange={(e) => onStatusChange(req.id, e.target.value)}
+                    className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white focus:outline-none focus:border-cyan-500/50"
+                    style={{ color: COMPLIANCE_STATUS[req.status]?.color }}
+                  >
+                    {Object.entries(COMPLIANCE_STATUS).map(([key, val]) => (
+                      <option key={key} value={key}>{val.label}</option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MAIN APPLICATION
+    // ═══════════════════════════════════════════════════════════════════════════
+    const App = () => {
+      const [rfpText, setRfpText] = useState('');
+      const [requirements, setRequirements] = useState([]);
+      const [isProcessing, setIsProcessing] = useState(false);
+      const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
+      const [filterSection, setFilterSection] = useState('ALL');
+      const [filterType, setFilterType] = useState('ALL');
+      const [filterStatus, setFilterStatus] = useState('ALL');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedIds, setSelectedIds] = useState([]);
+      const [showExportMenu, setShowExportMenu] = useState(false);
+
+      // Process RFP text and extract requirements
+      const processRFP = async (text) => {
+        setIsProcessing(true);
+        setRfpText(text);
+        
+        // Simulate AI processing delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        setRequirements(DEMO_REQUIREMENTS);
+        setIsProcessing(false);
+      };
+
+      // Handle file upload
+      const handleUpload = (file) => {
+        // In production, this would read the file content
+        // For demo, we'll use the demo text
+        processRFP(DEMO_RFP_TEXT);
+      };
+
+      // Handle paste
+      const handlePaste = (text) => {
+        processRFP(text);
+      };
+
+      // Update requirement status
+      const handleStatusChange = (id, status) => {
+        setRequirements(prev => prev.map(req => 
+          req.id === id ? { ...req, status } : req
+        ));
+      };
+
+      // Toggle selection
+      const handleSelect = (id) => {
+        setSelectedIds(prev => 
+          prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+      };
+
+      // Select all visible
+      const selectAll = () => {
+        setSelectedIds(filteredRequirements.map(r => r.id));
+      };
+
+      // Clear selection
+      const clearSelection = () => {
+        setSelectedIds([]);
+      };
+
+      // Export functions
+      const exportToCSV = () => {
+        const headers = ['Req ID', 'Section', 'Type', 'Priority', 'Requirement Text', 'Proposal Section', 'FAR/DFARS', 'Status'];
+        const rows = (selectedIds.length > 0 ? requirements.filter(r => selectedIds.includes(r.id)) : requirements)
+          .map(r => [r.id, r.sectionRef, r.type, r.priority, `"${r.text.replace(/"/g, '""')}"`, r.proposalSection, r.far || '', r.status]);
+        
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'compliance_matrix.csv';
+        a.click();
+        setShowExportMenu(false);
+      };
+
+      // Filter requirements
+      const filteredRequirements = useMemo(() => {
+        return requirements.filter(req => {
+          if (filterSection !== 'ALL' && req.section !== filterSection) return false;
+          if (filterType !== 'ALL' && req.type !== filterType) return false;
+          if (filterStatus !== 'ALL' && req.status !== filterStatus) return false;
+          if (searchQuery && !req.text.toLowerCase().includes(searchQuery.toLowerCase()) && !req.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+          return true;
+        });
+      }, [requirements, filterSection, filterType, filterStatus, searchQuery]);
+
+      // Calculate stats
+      const stats = useMemo(() => ({
+        total: requirements.length,
+        sectionL: requirements.filter(r => r.section === 'L').length,
+        sectionM: requirements.filter(r => r.section === 'M').length,
+        mandatory: requirements.filter(r => ['SHALL', 'MUST', 'WILL'].includes(r.type)).length,
+        compliant: requirements.filter(r => r.status === 'compliant').length,
+        gaps: requirements.filter(r => r.status === 'gap').length,
+        pending: requirements.filter(r => r.status === 'pending').length,
+        farRefs: requirements.filter(r => r.far).length,
+      }), [requirements]);
+
+      // Reset function
+      const handleReset = () => {
+        setRfpText('');
+        setRequirements([]);
+        setSelectedIds([]);
+        setFilterSection('ALL');
+        setFilterType('ALL');
+        setFilterStatus('ALL');
+        setSearchQuery('');
+      };
+
+      return (
+        <div className="min-h-screen bg-[#00050F] flex flex-col">
+          {/* Header */}
+          <header className="bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-50">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                  <Icon name="fileText" className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="font-bold text-white flex items-center gap-2">
+                    RFP Shredder
+                    <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-xs font-medium">M4</span>
+                  </h1>
+                  <p className="text-xs text-slate-400">AI-Powered Compliance Matrix Generator</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {requirements.length > 0 && (
+                  <>
+                    <div className="relative">
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        icon="download"
+                        onClick={() => setShowExportMenu(!showExportMenu)}
+                      >
+                        Export
+                      </Button>
+                      {showExportMenu && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50">
+                          <button onClick={exportToCSV} className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2">
+                            <Icon name="table" className="w-4 h-4 text-emerald-400" />
+                            Export to CSV
+                          </button>
+                          <button className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2">
+                            <Icon name="fileText" className="w-4 h-4 text-blue-400" />
+                            Export to Word
+                          </button>
+                          <button className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2">
+                            <Icon name="grid" className="w-4 h-4 text-amber-400" />
+                            Export to Excel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="sm" icon="refresh" onClick={handleReset}>
+                      New Analysis
+                    </Button>
+                  </>
+                )}
+                <Button variant="secondary" size="sm" icon="link">
+                  Link to M6 Iron Dome
+                </Button>
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 p-6">
+            {requirements.length === 0 ? (
+              // Upload State
+              <div className="max-w-3xl mx-auto">
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-bold text-white mb-2">Extract Requirements from RFP</h2>
+                  <p className="text-slate-400">Upload or paste your RFP document to automatically extract and categorize all Section L/M requirements</p>
+                </div>
+                <UploadZone onUpload={handleUpload} onPaste={handlePaste} isProcessing={isProcessing} />
+                
+                {/* Features List */}
+                <div className="grid grid-cols-3 gap-4 mt-8">
+                  <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 text-center">
+                    <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                      <Icon name="zap" className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-white mb-1">AI Extraction</h3>
+                    <p className="text-xs text-slate-400">Automatically identifies SHALL, MUST, SHOULD requirements</p>
+                  </div>
+                  <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 text-center">
+                    <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                      <Icon name="shield" className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-white mb-1">FAR/DFARS Detection</h3>
+                    <p className="text-xs text-slate-400">Identifies applicable regulatory references</p>
+                  </div>
+                  <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 text-center">
+                    <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                      <Icon name="table" className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-white mb-1">Compliance Matrix</h3>
+                    <p className="text-xs text-slate-400">Maps requirements to proposal sections</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Results State
+              <div className="animate-fadeIn">
+                {/* Stats Row */}
+                <div className="grid grid-cols-8 gap-4 mb-6">
+                  <StatCard label="Total Requirements" value={stats.total} icon="fileText" color="#00E5FA" />
+                  <StatCard label="Section L" value={stats.sectionL} icon="book" color="#3B82F6" />
+                  <StatCard label="Section M" value={stats.sectionM} icon="sparkles" color="#A855F7" />
+                  <StatCard label="Mandatory (SHALL)" value={stats.mandatory} icon="alert" color="#EF4444" />
+                  <StatCard label="Compliant" value={stats.compliant} icon="check" color="#22C55E" />
+                  <StatCard label="Gaps Found" value={stats.gaps} icon="x" color="#EF4444" />
+                  <StatCard label="Pending Review" value={stats.pending} icon="clipboard" color="#F59E0B" />
+                  <StatCard label="FAR/DFARS Refs" value={stats.farRefs} icon="shield" color="#A855F7" />
+                </div>
+
+                {/* Filters Bar */}
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 mb-6">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Search requirements..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                      />
+                    </div>
+
+                    {/* Section Filter */}
+                    <select
+                      value={filterSection}
+                      onChange={(e) => setFilterSection(e.target.value)}
+                      className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50"
+                    >
+                      <option value="ALL">All Sections</option>
+                      <option value="L">Section L</option>
+                      <option value="M">Section M</option>
+                    </select>
+
+                    {/* Type Filter */}
+                    <select
+                      value={filterType}
+                      onChange={(e) => setFilterType(e.target.value)}
+                      className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50"
+                    >
+                      <option value="ALL">All Types</option>
+                      <option value="SHALL">SHALL</option>
+                      <option value="MUST">MUST</option>
+                      <option value="WILL">WILL</option>
+                      <option value="SHOULD">SHOULD</option>
+                      <option value="MAY">MAY</option>
+                      <option value="EVAL">EVALUATED</option>
+                    </select>
+
+                    {/* Status Filter */}
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50"
+                    >
+                      <option value="ALL">All Status</option>
+                      <option value="compliant">Compliant</option>
+                      <option value="partial">Review Needed</option>
+                      <option value="gap">Gap</option>
+                      <option value="pending">Pending</option>
+                    </select>
+
+                    {/* View Toggle */}
+                    <div className="flex bg-slate-900/50 rounded-lg border border-slate-700 p-1">
+                      <button
+                        onClick={() => setViewMode('cards')}
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${viewMode === 'cards' ? 'bg-cyan-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        <Icon name="list" className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('table')}
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${viewMode === 'table' ? 'bg-cyan-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        <Icon name="table" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Selection Actions */}
+                  {viewMode === 'cards' && (
+                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-700/50">
+                      <span className="text-xs text-slate-400">
+                        {selectedIds.length > 0 ? `${selectedIds.length} selected` : `${filteredRequirements.length} requirements`}
+                      </span>
+                      <button onClick={selectAll} className="text-xs text-cyan-400 hover:text-cyan-300">Select All</button>
+                      {selectedIds.length > 0 && (
+                        <>
+                          <button onClick={clearSelection} className="text-xs text-slate-400 hover:text-white">Clear</button>
+                          <span className="text-slate-700">|</span>
+                          <button className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+                            <Icon name="check" className="w-3 h-3" />
+                            Mark Compliant
+                          </button>
+                          <button className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1">
+                            <Icon name="eye" className="w-3 h-3" />
+                            Mark Review Needed
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Requirements List/Table */}
+                <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl overflow-hidden">
+                  {viewMode === 'cards' ? (
+                    <div className="p-4 space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto scrollbar-thin">
+                      {filteredRequirements.map((req, index) => (
+                        <div key={req.id} className="animate-slideIn" style={{ animationDelay: `${index * 30}ms` }}>
+                          <RequirementRow
+                            req={req}
+                            onStatusChange={handleStatusChange}
+                            onSelect={handleSelect}
+                            isSelected={selectedIds.includes(req.id)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <MatrixTableView requirements={filteredRequirements} onStatusChange={handleStatusChange} />
+                  )}
+                </div>
+
+                {/* Gap Summary Panel */}
+                {stats.gaps > 0 && (
+                  <div className="mt-6 bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                        <Icon name="alert" className="w-4 h-4 text-red-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-red-400 mb-1">Compliance Gaps Detected</h3>
+                        <p className="text-xs text-slate-400 mb-3">
+                          {stats.gaps} requirement{stats.gaps > 1 ? 's' : ''} currently not addressed in the proposal. Address these before submission.
+                        </p>
+                        <div className="flex gap-2">
+                          <Button variant="danger" size="sm" icon="eye">View All Gaps</Button>
+                          <Button variant="ghost" size="sm" icon="link">Open in M6 Iron Dome</Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+
+          {/* Footer */}
+          <footer className="bg-slate-900/95 border-t border-slate-700/50 px-6 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-slate-500">MissionPulse • M4 RFP Shredder v12</span>
+              <span className="text-xs text-slate-600">|</span>
+              <span className="text-xs text-slate-500">Compliance Agent Connected</span>
+            </div>
+            <span className="text-xs text-amber-400 font-medium">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+          </footer>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
