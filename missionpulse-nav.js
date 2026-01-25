@@ -37,7 +37,7 @@
         { id: 'M7', name: 'Black Hat Intel', icon: '🎩', phase: 'strategy', url: 'missionpulse-m7-blackhat-enhanced.html', isPrivate: true },
         { id: 'M8', name: 'Pricing Intelligence', icon: '💰', phase: 'pricing', url: 'missionpulse-m8-pricing.html', isPrivate: true },
         { id: 'M9', name: 'HITL Review', icon: '👁️', phase: 'review', url: 'missionpulse-m9-hitl-enhanced.html' },
-        { id: 'M10', name: 'Orals Simulator', icon: '🎤', phase: 'orals', url: 'm10-orals-studio-enhanced.jsx' },
+        { id: 'M10', name: 'Orals Simulator', icon: '🎤', phase: 'orals', url: 'missionpulse-m10-orals-studio.html' },
         { id: 'M11', name: 'Frenemy Protocol', icon: '🤝', phase: 'capture', url: 'missionpulse-m11-frenemy-protocol.html' },
         { id: 'M13', name: 'ROI Dashboard', icon: '📈', phase: 'analytics', url: 'missionpulse-m13-launch-roi.html' },
         { id: 'M14', name: 'Post-Award', icon: '🏆', phase: 'post-award', url: 'missionpulse-m14-post-award.html' }
