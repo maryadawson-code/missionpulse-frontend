@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse M7 - Black Hat Intel</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes glowRed { 0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); } 50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.5); } }
+    @keyframes threatPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+    .animate-slideIn { animation: slideIn 0.4s ease-out; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+    .animate-glowRed { animation: glowRed 2s ease-in-out infinite; }
+    .animate-threat { animation: threatPulse 2s ease-in-out infinite; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // ============================================================================
+    // DESIGN TOKENS - Shield & Pulse UX v8.0
+    // ============================================================================
+    const TOKENS = {
+      colors: {
+        primary: '#00E5FA',
+        secondary: '#0891B2',
+        success: '#10B981',
+        warning: '#F59E0B',
+        danger: '#EF4444',
+        navy: '#00050F',
+        surface: 'rgba(15, 23, 42, 0.8)',
+        border: 'rgba(51, 65, 85, 0.5)'
+      }
+    };
+
+    // ============================================================================
+    // RBAC ROLES - 11-Role System
+    // ============================================================================
+    const ROLES = {
+      CEO: { name: 'CEO', label: 'Chief Executive', color: '#F59E0B', access: 'full', description: 'Final Go/No-Go decisions' },
+      COO: { name: 'COO', label: 'Operations Lead', color: '#8B5CF6', access: 'restricted', description: 'Capture oversight' },
+      CAP: { name: 'CAP', label: 'Capture Manager', color: '#EC4899', access: 'full', description: 'Win strategy lead' },
+      PM: { name: 'PM', label: 'Proposal Manager', color: '#3B82F6', access: 'restricted', description: 'Schedule management' },
+      SA: { name: 'SA', label: 'Solution Architect', color: '#06B6D4', access: 'restricted', description: 'Tech approach' },
+      FIN: { name: 'FIN', label: 'Pricing Lead', color: '#10B981', access: 'restricted', description: 'Pricing strategy' },
+      CON: { name: 'CON', label: 'Contracts Lead', color: '#00E5FA', access: 'restricted', description: 'FAR/DFARS compliance' },
+      DEL: { name: 'DEL', label: 'Staffing Lead', color: '#F97316', access: 'restricted', description: 'Resource allocation' },
+      SME: { name: 'SME', label: 'Subject Expert', color: '#A855F7', access: 'restricted', description: 'Domain expertise' },
+      LEGAL: { name: 'LEGAL', label: 'Legal Counsel', color: '#EF4444', access: 'restricted', description: 'Legal review' },
+      ADMIN: { name: 'ADMIN', label: 'Administrator', color: '#64748B', access: 'full', description: 'System admin' }
+    };
+
+    // ============================================================================
+    // COMPETITOR DATA
+    // ============================================================================
+    const COMPETITORS = [
+      {
+        id: 'incumbent',
+        name: 'HealthTech Systems',
+        abbr: 'HTS',
+        logo: 'H',
+        logoColor: '#EF4444',
+        type: 'Large Business (Incumbent)',
+        threat: 'CRITICAL',
+        incumbentYears: 7,
+        winProbability: 40,
+        strengths: [
+          'Incumbent advantage - 7 years of contract history',
+          'Deep relationships with key government stakeholders',
+          'Established infrastructure and processes',
+          'Strong past performance record on this vehicle',
+          'Large cleared workforce (500+ FTEs)'
+        ],
+        weaknesses: [
+          'Legacy technology stack (Java/.NET circa 2018)',
+          'Recent CPARS ratings trending downward (Satisfactory)',
+          'Key PM left for competitor last quarter',
+          'Slow to adopt cloud-native approaches',
+          'Higher overhead rates than market average'
+        ],
+        ghostingStrategy: 'Emphasize modern cloud-native architecture and DevSecOps velocity. Highlight innovation without naming competitor. Question whether "status quo" meets evolving mission needs.',
+        priceEstimate: { low: 42.5, likely: 48.2, high: 54.0 },
+        gsaSchedule: 'GS-35F-0XXX',
+        recentWins: ['VA EHRM Support', 'CMS Data Analytics', 'HHS Cloud Migration'],
+        keyPersonnel: [
+          { name: 'J. Morrison', role: 'Account Lead', risk: 'Medium - 15 years at HTS' },
+          { name: 'S. Patel', role: 'Technical Director', risk: 'Low - Recently promoted' }
+        ]
+      },
+      {
+        id: 'techrise',
+        name: 'TechRise Federal',
+        abbr: 'TRF',
+        logo: 'T',
+        logoColor: '#3B82F6',
+        type: 'Mid-size Business',
+        threat: 'HIGH',
+        incumbentYears: 0,
+        winProbability: 25,
+        strengths: [
+          'Strong DevSecOps and cloud capabilities',
+          'Recent major contract wins (VA, CMS)',
+          'Modern tech stack and methodologies',
+          'Aggressive pricing strategy',
+          'Growing cleared workforce (150 FTEs)'
+        ],
+        weaknesses: [
+          'Limited DHA-specific experience',
+          'No established relationships with DHA leadership',
+          'Smaller bench for surge requirements',
+          'Single geographic location (risk)',
+          'Less mature PM processes'
+        ],
+        ghostingStrategy: 'Question ability to scale for enterprise healthcare requirements. Emphasize importance of DHA domain expertise and mission-critical healthcare experience.',
+        priceEstimate: { low: 38.0, likely: 42.5, high: 47.0 },
+        gsaSchedule: 'GS-35F-0YYY',
+        recentWins: ['VA Modernization', 'CMS Cloud', 'IRS Analytics'],
+        keyPersonnel: [
+          { name: 'M. Chen', role: 'CEO', risk: 'Low - Founder, committed' },
+          { name: 'R. Johnson', role: 'Federal Lead', risk: 'High - New to company' }
+        ]
+      },
+      {
+        id: 'fedsolutions',
+        name: 'FedSolutions',
+        abbr: 'FSI',
+        logo: 'F',
+        logoColor: '#10B981',
+        type: 'Small Business (8(a))',
+        threat: 'MEDIUM',
+        incumbentYears: 0,
+        winProbability: 15,
+        strengths: [
+          '8(a) set-aside eligibility advantage',
+          'Most competitive labor rates in market',
+          'Strong subcontractor network',
+          'Hungry to win marquee contracts',
+          'Flexible and responsive'
+        ],
+        weaknesses: [
+          'Limited prime contract experience',
+          'Small team (75 FTEs total)',
+          'Thin past performance portfolio',
+          'Management depth concerns',
+          'Financial stability questions (D&B: 2C2)'
+        ],
+        ghostingStrategy: 'Emphasize critical importance of proven prime contract experience on healthcare IT. Reference scale and complexity requirements that exceed their demonstrated capabilities.',
+        priceEstimate: { low: 32.0, likely: 36.5, high: 41.0 },
+        gsaSchedule: 'GS-35F-0ZZZ',
+        recentWins: ['DOS Support', 'USDA Analytics (sub)'],
+        keyPersonnel: [
+          { name: 'A. Williams', role: 'President', risk: 'Medium - Seeking exit in 3 years' },
+          { name: 'D. Park', role: 'BD Lead', risk: 'High - Frequent job changes' }
+        ]
+      },
+      {
+        id: 'globaldefense',
+        name: 'Global Defense Tech',
+        abbr: 'GDT',
+        logo: 'G',
+        logoColor: '#8B5CF6',
+        type: 'Large Business',
+        threat: 'HIGH',
+        incumbentYears: 0,
+        winProbability: 20,
+        strengths: [
+          'Strong DoD relationships across services',
+          'Deep cleared workforce (2000+ FTEs)',
+          'Established CMMC Level 3 certification',
+          'Robust financial backing',
+          'Cross-contract synergies possible'
+        ],
+        weaknesses: [
+          'Healthcare IT not core competency',
+          'Higher overhead from corporate structure',
+          'Slower decision-making processes',
+          'May not prioritize this size contract',
+          'Recent negative press on other programs'
+        ],
+        ghostingStrategy: 'Highlight specialized healthcare mission focus vs. generalist approach. Question whether healthcare IT is truly a priority for a defense-focused firm.',
+        priceEstimate: { low: 45.0, likely: 51.0, high: 58.0 },
+        gsaSchedule: 'GS-35F-0AAA',
+        recentWins: ['Army ITES-3S', 'DISA Cloud', 'Navy NGEN'],
+        keyPersonnel: [
+          { name: 'T. Anderson', role: 'VP Health', risk: 'Medium - New division' },
+          { name: 'L. Kim', role: 'Program Director', risk: 'Low - 20 year veteran' }
+        ]
+      }
+    ];
+
+    // ============================================================================
+    // TEAMING PARTNER RECOMMENDATIONS
+    // ============================================================================
+    const TEAMING_PARTNERS = [
+      {
+        id: 'cloudforce',
+        name: 'CloudForce Solutions',
+        type: 'SDVOSB',
+        specialty: 'Cloud Migration & DevSecOps',
+        gsaRate: 165,
+        fit: 'HIGH',
+        rationale: 'Strong AWS/Azure certifications, FedRAMP experience, complements our application development focus.'
+      },
+      {
+        id: 'healthdata',
+        name: 'HealthData Analytics',
+        type: 'WOSB',
+        specialty: 'Healthcare Data & FHIR',
+        gsaRate: 145,
+        fit: 'HIGH',
+        rationale: 'Deep FHIR/HL7 expertise, MHS GENESIS experience, addresses our healthcare interoperability gap.'
+      },
+      {
+        id: 'cybershield',
+        name: 'CyberShield Federal',
+        type: 'HUBZone',
+        specialty: 'Cybersecurity & CMMC',
+        gsaRate: 155,
+        fit: 'MEDIUM',
+        rationale: 'CMMC Level 3 certified, can bolster our security narrative, HUBZone adds evaluation credit.'
+      }
+    ];
+
+    // ============================================================================
+    // ICONS
+    // ============================================================================
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      skull: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2C7.03 2 3 6.03 3 11c0 2.76 1.24 5.23 3.19 6.88V21h2.31l1-2h5l1 2h2.31v-3.12C19.76 16.23 21 13.76 21 11c0-4.97-4.03-9-9-9zM9 13a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm6 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      eyeOff: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+      unlock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      chart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      alertTriangle: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      lightbulb: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
+      trophy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      handshake: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================================
+    // UI COMPONENTS
+    // ============================================================================
+    const Card = ({ children, className = '', glow = false, onClick, variant = 'default' }) => {
+      const variants = {
+        default: 'bg-slate-800/50 border-slate-700/50',
+        danger: 'bg-red-500/10 border-red-500/30',
+        warning: 'bg-amber-500/10 border-amber-500/30',
+        success: 'bg-emerald-500/10 border-emerald-500/30'
+      };
+      return (
+        <div 
+          onClick={onClick} 
+          className={`
+            backdrop-blur-sm border rounded-xl transition-all duration-300 
+            ${variants[variant]}
+            ${onClick ? 'cursor-pointer hover:border-cyan-500/50' : ''} 
+            ${glow ? 'shadow-lg shadow-red-500/20 animate-glowRed' : ''} 
+            ${className}
+          `}
+        >
+          {children}
+        </div>
+      );
+    };
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, className = '', disabled = false, ...props }) => {
+      const variants = { 
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400 shadow-lg shadow-cyan-500/25', 
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600', 
+        danger: 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-400 hover:to-red-500 shadow-lg shadow-red-500/25',
+        ghost: 'bg-transparent text-slate-400 hover:text-white hover:bg-slate-700/50'
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button 
+          className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all duration-200 ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`} 
+          disabled={disabled} 
+          {...props}
+        >
+          {icon && <Icon name={icon} className="w-4 h-4" />}{children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm', icon, pulse = false }) => {
+      const variants = { 
+        default: 'bg-slate-700 text-slate-300', 
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30', 
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', 
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30', 
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        critical: 'bg-red-600/30 text-red-300 border border-red-500/50',
+        purple: 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full font-medium ${variants[variant]} ${sizes[size]} ${pulse ? 'animate-pulse' : ''}`}>
+          {icon && <Icon name={icon} className="w-3 h-3" />}{children}
+        </span>
+      );
+    };
+
+    // ============================================================================
+    // ROLE SELECTOR COMPONENT
+    // ============================================================================
+    const RoleSelector = ({ currentRole, onRoleChange }) => {
+      const [isOpen, setIsOpen] = useState(false);
+      const role = ROLES[currentRole];
+      
+      return (
+        <div className="relative">
+          <button 
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex items-center gap-3 px-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl hover:border-cyan-500/50 transition-all"
+          >
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: role.color }}>
+              {currentRole.slice(0, 2)}
+            </div>
+            <div className="text-left">
+              <div className="text-sm font-semibold text-white">{role.label}</div>
+              <div className="text-xs text-slate-400">{role.access === 'full' ? '🔓 Full Intel Access' : '🔒 Restricted View'}</div>
+            </div>
+            <Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {isOpen && (
+            <div className="absolute top-full left-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-slideIn">
+              <div className="p-3 border-b border-slate-700 bg-slate-800/50">
+                <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Switch Role</div>
+              </div>
+              <div className="max-h-80 overflow-auto p-2">
+                {Object.entries(ROLES).map(([key, r]) => (
+                  <button
+                    key={key}
+                    onClick={() => { onRoleChange(key); setIsOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                      currentRole === key ? 'bg-cyan-500/20 border border-cyan-500/30' : 'hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: r.color }}>
+                      {key.slice(0, 2)}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium text-white">{r.label}</div>
+                      <div className="text-xs text-slate-400">{r.description}</div>
+                    </div>
+                    {r.access === 'full' && <Badge variant="success" size="xs">Full</Badge>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ============================================================================
+    // THREAT METER COMPONENT
+    // ============================================================================
+    const ThreatMeter = ({ competitors }) => {
+      const avgThreat = competitors.reduce((acc, c) => acc + c.winProbability, 0) / competitors.length;
+      const ourPwin = 100 - competitors.reduce((acc, c) => acc + c.winProbability, 0);
+      
+      return (
+        <Card className="p-4 mb-6" variant="danger">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Icon name="target" className="w-5 h-5 text-red-400" />
+              <h3 className="font-semibold text-white">Competitive Threat Assessment</h3>
+            </div>
+            <Badge variant="critical" pulse>ACTIVE PURSUIT</Badge>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-cyan-400">{ourPwin}%</div>
+              <div className="text-xs text-slate-400">Our pWin</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-red-400">{competitors.length}</div>
+              <div className="text-xs text-slate-400">Known Competitors</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-amber-400">{competitors.filter(c => c.threat === 'CRITICAL' || c.threat === 'HIGH').length}</div>
+              <div className="text-xs text-slate-400">High Threats</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-emerald-400">{competitors.filter(c => c.incumbentYears > 0).length}</div>
+              <div className="text-xs text-slate-400">Incumbents</div>
+            </div>
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================================================
+    // COMPETITOR CARD COMPONENT
+    // ============================================================================
+    const CompetitorCard = ({ competitor, isSelected, onSelect, hasFullAccess }) => {
+      const [expanded, setExpanded] = useState(false);
+      
+      const threatColors = {
+        CRITICAL: { badge: 'critical', border: 'border-red-500/50', bg: 'bg-red-500/5' },
+        HIGH: { badge: 'danger', border: 'border-amber-500/50', bg: 'bg-amber-500/5' },
+        MEDIUM: { badge: 'warning', border: 'border-yellow-500/50', bg: 'bg-yellow-500/5' },
+        LOW: { badge: 'success', border: 'border-emerald-500/50', bg: 'bg-emerald-500/5' }
+      };
+      const colors = threatColors[competitor.threat] || threatColors.MEDIUM;
+
+      return (
+        <Card 
+          className={`overflow-hidden transition-all ${colors.border} ${isSelected ? 'ring-2 ring-cyan-500' : ''}`}
+          onClick={() => onSelect(competitor.id)}
+        >
+          <div className={`p-4 ${colors.bg}`}>
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg"
+                  style={{ backgroundColor: competitor.logoColor }}
+                >
+                  {competitor.logo}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white">{competitor.name}</h3>
+                  <p className="text-xs text-slate-400">{competitor.type}</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <Badge variant={colors.badge} pulse={competitor.threat === 'CRITICAL'}>
+                  {competitor.threat} THREAT
+                </Badge>
+                {competitor.incumbentYears > 0 && (
+                  <Badge variant="purple" size="xs" icon="trophy">
+                    Incumbent ({competitor.incumbentYears}yr)
+                  </Badge>
+                )}
+              </div>
+            </div>
+            
+            {/* Win Probability Bar */}
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-slate-400 mb-1">
+                <span>Est. Win Probability</span>
+                <span className="text-red-400 font-semibold">{competitor.winProbability}%</span>
+              </div>
+              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-red-500 to-red-400 rounded-full transition-all duration-500"
+                  style={{ width: `${competitor.winProbability}%` }}
+                />
+              </div>
+            </div>
+            
+            {/* Expand Toggle */}
+            <button 
+              onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+              className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-sm text-slate-400 hover:text-cyan-400 transition-colors"
+            >
+              {expanded ? 'Collapse' : 'View Intelligence'}
+              <Icon name={expanded ? 'chevronDown' : 'chevronRight'} className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+          
+          {/* Expanded Details */}
+          {expanded && (
+            <div className="border-t border-slate-700/50 animate-slideIn">
+              {/* SWOT */}
+              <div className="p-4 grid grid-cols-2 gap-3">
+                <div className="bg-emerald-500/10 rounded-lg p-3 border border-emerald-500/20">
+                  <div className="text-xs font-semibold text-emerald-400 uppercase mb-2">Strengths</div>
+                  <ul className="space-y-1">
+                    {competitor.strengths.slice(0, 3).map((s, i) => (
+                      <li key={i} className="text-xs text-slate-300 flex items-start gap-1">
+                        <span className="text-emerald-400">+</span> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/20">
+                  <div className="text-xs font-semibold text-red-400 uppercase mb-2">Weaknesses</div>
+                  <ul className="space-y-1">
+                    {competitor.weaknesses.slice(0, 3).map((w, i) => (
+                      <li key={i} className="text-xs text-slate-300 flex items-start gap-1">
+                        <span className="text-red-400">−</span> {w}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              
+              {/* Ghost Pricing - Only visible with full access */}
+              {hasFullAccess ? (
+                <div className="px-4 pb-4">
+                  <div className="bg-slate-900/80 rounded-lg p-4 border border-amber-500/30">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Icon name="dollar" className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-semibold text-amber-400 uppercase">Ghost Pricing Estimate</span>
+                      <Badge variant="warning" size="xs">CONFIDENTIAL</Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div className="text-lg font-bold text-emerald-400">${competitor.priceEstimate.low}M</div>
+                        <div className="text-xs text-slate-500">Low</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-amber-400">${competitor.priceEstimate.likely}M</div>
+                        <div className="text-xs text-slate-500">Likely</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-red-400">${competitor.priceEstimate.high}M</div>
+                        <div className="text-xs text-slate-500">High</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-xs text-slate-400">
+                      GSA Schedule: <span className="font-mono text-cyan-400">{competitor.gsaSchedule}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="px-4 pb-4">
+                  <div className="bg-slate-900/80 rounded-lg p-4 border border-slate-700 flex items-center gap-3">
+                    <Icon name="lock" className="w-5 h-5 text-slate-500" />
+                    <div>
+                      <p className="text-sm text-slate-400">Ghost pricing data restricted</p>
+                      <p className="text-xs text-slate-500">Contact Capture Manager (CAP) or CEO for access</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Ghosting Strategy */}
+              <div className="px-4 pb-4">
+                <div className="bg-purple-500/10 rounded-lg p-4 border border-purple-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon name="lightbulb" className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-purple-400 uppercase">Ghosting Strategy</span>
+                  </div>
+                  <p className="text-sm text-slate-300">{competitor.ghostingStrategy}</p>
+                </div>
+              </div>
+              
+              {/* Recent Wins */}
+              <div className="px-4 pb-4">
+                <div className="text-xs font-semibold text-slate-400 uppercase mb-2">Recent Contract Wins</div>
+                <div className="flex flex-wrap gap-2">
+                  {competitor.recentWins.map((win, i) => (
+                    <Badge key={i} variant="default" size="xs">{win}</Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      );
+    };
+
+    // ============================================================================
+    // TEAMING RECOMMENDATIONS COMPONENT
+    // ============================================================================
+    const TeamingRecommendations = () => {
+      return (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Icon name="handshake" className="w-5 h-5 text-cyan-400" />
+            <h3 className="font-semibold text-white">Teaming Recommendations</h3>
+          </div>
+          
+          <div className="space-y-3">
+            {TEAMING_PARTNERS.map(partner => (
+              <div 
+                key={partner.id}
+                className="p-3 bg-slate-900/50 rounded-lg border border-slate-700/50 hover:border-cyan-500/30 transition-all"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h4 className="font-medium text-white">{partner.name}</h4>
+                    <p className="text-xs text-slate-400">{partner.specialty}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant={partner.fit === 'HIGH' ? 'success' : 'warning'} size="xs">
+                      {partner.fit} FIT
+                    </Badge>
+                    <Badge variant="purple" size="xs">{partner.type}</Badge>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">{partner.rationale}</p>
+                <div className="mt-2 text-xs text-cyan-400">
+                  GSA Rate: ${partner.gsaRate}/hr
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================================================
+    // INCUMBENCY RISK PANEL
+    // ============================================================================
+    const IncumbencyRisk = ({ competitors }) => {
+      const incumbent = competitors.find(c => c.incumbentYears > 0);
+      if (!incumbent) return null;
+      
+      return (
+        <Card className="p-4" variant="danger">
+          <div className="flex items-center gap-2 mb-4">
+            <Icon name="alertTriangle" className="w-5 h-5 text-red-400" />
+            <h3 className="font-semibold text-white">Incumbency Risk Assessment</h3>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+              <div>
+                <div className="text-sm font-medium text-white">{incumbent.name}</div>
+                <div className="text-xs text-slate-400">Current Incumbent</div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-red-400">{incumbent.incumbentYears} Years</div>
+                <div className="text-xs text-slate-500">Contract History</div>
+              </div>
+            </div>
+            
+            <div className="text-sm text-slate-300">
+              <span className="text-red-400 font-semibold">Risk Factors:</span>
+              <ul className="mt-2 space-y-1 text-xs">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400">•</span>
+                  Established relationships with key stakeholders
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400">•</span>
+                  Knowledge of internal processes and requirements
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400">•</span>
+                  Transition risk concerns favor status quo
+                </li>
+              </ul>
+            </div>
+            
+            <div className="text-sm text-slate-300">
+              <span className="text-emerald-400 font-semibold">Our Counter:</span>
+              <ul className="mt-2 space-y-1 text-xs">
+                {incumbent.weaknesses.slice(0, 3).map((w, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-emerald-400">✓</span>
+                    Exploit: {w}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================================================
+    // MAIN APP COMPONENT
+    // ============================================================================
+    const BlackHatIntel = () => {
+      const [currentRole, setCurrentRole] = useState('CAP');
+      const [selectedCompetitor, setSelectedCompetitor] = useState(null);
+      const [filterThreat, setFilterThreat] = useState('all');
+      
+      const role = ROLES[currentRole];
+      const hasFullAccess = role.access === 'full';
+      
+      const filteredCompetitors = useMemo(() => {
+        if (filterThreat === 'all') return COMPETITORS;
+        return COMPETITORS.filter(c => c.threat === filterThreat);
+      }, [filterThreat]);
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-6 py-4 sticky top-0 z-40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 animate-threat">
+                  <Icon name="skull" className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">MissionPulse <span className="text-red-400">Black Hat Intel</span></h1>
+                  <p className="text-slate-400 text-sm">M7 • Competitor Analysis • Ghost Pricing • Win Strategy</p>
+                </div>
+              </div>
+              <RoleSelector currentRole={currentRole} onRoleChange={setCurrentRole} />
+            </div>
+          </header>
+
+          {/* RBAC Status Bar */}
+          <div className={`px-6 py-2 border-b ${hasFullAccess ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icon name={hasFullAccess ? 'unlock' : 'lock'} className={`w-4 h-4 ${hasFullAccess ? 'text-emerald-400' : 'text-amber-400'}`} />
+                <span className={`text-sm font-medium ${hasFullAccess ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {hasFullAccess ? 'Full Intel Access' : 'Restricted View'} — {role.label}
+                </span>
+              </div>
+              {!hasFullAccess && (
+                <span className="text-xs text-slate-400">
+                  Ghost pricing hidden. Contact CAP or CEO for full competitive intelligence.
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6">
+            {/* Threat Overview */}
+            <ThreatMeter competitors={COMPETITORS} />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Competitors List */}
+              <div className="lg:col-span-2 space-y-4">
+                {/* Filter Bar */}
+                <Card className="p-4">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-slate-400">Filter by Threat:</span>
+                    <div className="flex gap-2">
+                      {['all', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(level => (
+                        <button
+                          key={level}
+                          onClick={() => setFilterThreat(level)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            filterThreat === level 
+                              ? 'bg-cyan-500 text-white' 
+                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                          }`}
+                        >
+                          {level === 'all' ? 'All' : level}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+                
+                {/* Competitor Cards */}
+                <div className="space-y-4">
+                  {filteredCompetitors.map(competitor => (
+                    <CompetitorCard
+                      key={competitor.id}
+                      competitor={competitor}
+                      isSelected={selectedCompetitor === competitor.id}
+                      onSelect={setSelectedCompetitor}
+                      hasFullAccess={hasFullAccess}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              {/* Sidebar */}
+              <div className="space-y-6">
+                <IncumbencyRisk competitors={COMPETITORS} />
+                <TeamingRecommendations />
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <footer className="mt-8 px-6 py-4 border-t border-slate-800">
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                MissionPulse M7 • Black Hat Intel v12.0
+              </div>
+              <div className="font-medium text-amber-500">AI GENERATED - REQUIRES HUMAN REVIEW</div>
+              <div>© 2026 Mission Meets Tech</div>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<BlackHatIntel />, document.getElementById('root'));
+  </script>
+</body>
+</html>
