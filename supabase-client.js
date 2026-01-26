@@ -1,17 +1,16 @@
 /**
  * MissionPulse Supabase Client Module
- * Sprint 2-3: Shared client with CRUD operations and real-time subscriptions
+ * Sprint 8: Enhanced with Activity Logging and Bulk Operations
  * 
  * Provides MissionPulse namespace with:
- * - getOpportunities() - Fetch all opportunities
- * - getPipelineStats() - Aggregate statistics
- * - subscribeToOpportunities(callback) - Real-time updates
- * - createOpportunity(data) - Create new opportunity
- * - updateOpportunity(id, data) - Update existing opportunity
- * - deleteOpportunity(id) - Delete opportunity
- * - getOpportunitiesByPhase() - Grouped by Shipley phase
+ * - CRUD Operations: getOpportunities, createOpportunity, updateOpportunity, deleteOpportunity
+ * - Bulk Operations: bulkUpdateOpportunities, bulkDeleteOpportunities
+ * - Activity Logging: logActivity, getActivities, getRecentActivities
+ * - Stats & Grouping: getPipelineStats, getOpportunitiesByPhase, getUniqueAgencies
+ * - Real-time: subscribeToOpportunities, subscribeToActivities
+ * - Utilities: formatCurrency, getPhaseInfo, getShipleyPhases
  * 
- * Â© 2026 Mission Meets Tech
+ * © 2026 Mission Meets Tech
  */
 
 (function(global) {
@@ -307,6 +306,13 @@
 
       if (error) throw error;
 
+      // Log activity
+      await logActivity({
+        opportunityId: data.id,
+        action: 'created',
+        userId: 'system'
+      });
+
       return { data: mapToFrontend(data), error: null };
     } catch (error) {
       console.error('[MissionPulse] Error creating opportunity:', error);
@@ -328,6 +334,13 @@
     }
 
     try {
+      // Get current opportunity for activity logging
+      const { data: currentOpp } = await supabase
+        .from('opportunities')
+        .select('*')
+        .eq('id', id)
+        .single();
+
       // Map to database format
       const dbData = mapToDatabase(updates);
       
@@ -342,6 +355,27 @@
         .single();
 
       if (error) throw error;
+
+      // Log activity for phase changes
+      if (updates.shipleyPhase && currentOpp && currentOpp.shipley_phase !== updates.shipleyPhase) {
+        await logActivity({
+          opportunityId: id,
+          action: 'phase_changed',
+          fieldChanged: 'shipley_phase',
+          oldValue: currentOpp.shipley_phase,
+          newValue: updates.shipleyPhase,
+          userId: 'system'
+        });
+      } else if (Object.keys(updates).length > 0) {
+        // Log general update
+        const changedFields = Object.keys(updates).filter(k => k !== 'updatedAt');
+        await logActivity({
+          opportunityId: id,
+          action: 'updated',
+          fieldChanged: changedFields.join(', '),
+          userId: 'system'
+        });
+      }
 
       return { data: mapToFrontend(data), error: null };
     } catch (error) {
@@ -363,6 +397,13 @@
     }
 
     try {
+      // Get opportunity name before deletion for activity log
+      const { data: opp } = await supabase
+        .from('opportunities')
+        .select('name')
+        .eq('id', id)
+        .single();
+
       const { error } = await supabase
         .from('opportunities')
         .delete()
@@ -370,7 +411,9 @@
 
       if (error) throw error;
 
-      return { data: { success: true, id }, error: null };
+      // Note: Activity log entry will be deleted via CASCADE
+
+      return { data: { success: true, id, name: opp?.name }, error: null };
     } catch (error) {
       console.error('[MissionPulse] Error deleting opportunity:', error);
       return { data: null, error };
@@ -395,7 +438,7 @@
     }
 
     if (!ids || ids.length === 0) {
-      return { data: null, error: new Error('No IDs provided') };
+      return { data: { success: true, count: 0 }, error: null };
     }
 
     try {
@@ -413,13 +456,22 @@
 
       // Log activity for each updated opportunity
       for (const id of ids) {
-        await logActivity({
-          opportunityId: id,
-          action: 'updated',
-          fieldChanged: Object.keys(updates).join(', '),
-          newValue: JSON.stringify(updates),
-          userId: 'system'
-        });
+        if (updates.shipleyPhase) {
+          await logActivity({
+            opportunityId: id,
+            action: 'phase_changed',
+            fieldChanged: 'shipley_phase',
+            newValue: updates.shipleyPhase,
+            userId: 'system'
+          });
+        } else {
+          await logActivity({
+            opportunityId: id,
+            action: 'updated',
+            fieldChanged: Object.keys(updates).join(', '),
+            userId: 'system'
+          });
+        }
       }
 
       return { data: { success: true, count: data?.length || 0 }, error: null };
@@ -442,7 +494,7 @@
     }
 
     if (!ids || ids.length === 0) {
-      return { data: null, error: new Error('No IDs provided') };
+      return { data: { success: true, count: 0 }, error: null };
     }
 
     try {
@@ -452,6 +504,8 @@
         .in('id', ids);
 
       if (error) throw error;
+
+      // Note: Activity logs cascade deleted automatically
 
       return { data: { success: true, count: ids.length }, error: null };
     } catch (error) {
@@ -465,17 +519,17 @@
   // ============================================================
 
   /**
-   * Log an activity event
-   * @param {Object} data - Activity data
-   * @param {string} data.opportunityId - Opportunity ID
-   * @param {string} data.action - Action type (created, updated, phase_changed, deleted)
-   * @param {string} data.fieldChanged - Field that changed (optional)
-   * @param {string} data.oldValue - Previous value (optional)
-   * @param {string} data.newValue - New value (optional)
-   * @param {string} data.userId - User ID (default: 'system')
+   * Log an activity
+   * @param {Object} activityData - Activity data
+   * @param {string} activityData.opportunityId - Related opportunity ID (optional for deleted items)
+   * @param {string} activityData.action - Action type: 'created', 'updated', 'phase_changed', 'deleted'
+   * @param {string} activityData.fieldChanged - Field that was changed (optional)
+   * @param {string} activityData.oldValue - Previous value (optional)
+   * @param {string} activityData.newValue - New value (optional)
+   * @param {string} activityData.userId - User who performed action
    * @returns {Promise<{data: Object, error: Error|null}>}
    */
-  async function logActivity(data) {
+  async function logActivity(activityData) {
     if (!supabase) {
       if (!initSupabase()) {
         return { data: null, error: new Error('Supabase not initialized') };
@@ -483,40 +537,35 @@
     }
 
     try {
-      const activityData = {
-        opportunity_id: data.opportunityId,
-        action: data.action,
-        field_changed: data.fieldChanged || null,
-        old_value: data.oldValue || null,
-        new_value: data.newValue || null,
-        user_id: data.userId || 'system',
+      const dbData = {
+        opportunity_id: activityData.opportunityId || null,
+        action: activityData.action,
+        field_changed: activityData.fieldChanged || null,
+        old_value: activityData.oldValue || null,
+        new_value: activityData.newValue || null,
+        user_id: activityData.userId || 'system',
         created_at: new Date().toISOString()
       };
 
-      const { data: result, error } = await supabase
+      const { data, error } = await supabase
         .from('activity_log')
-        .insert([activityData])
+        .insert([dbData])
         .select()
         .single();
 
-      if (error) {
-        // Silently fail if activity_log table doesn't exist
-        console.warn('[MissionPulse] Activity logging failed:', error.message);
-        return { data: null, error: null };
-      }
+      if (error) throw error;
 
-      return { data: result, error: null };
+      return { data, error: null };
     } catch (error) {
-      console.warn('[MissionPulse] Activity logging error:', error);
-      return { data: null, error: null };
+      console.error('[MissionPulse] Error logging activity:', error);
+      return { data: null, error };
     }
   }
 
   /**
-   * Get activities for an opportunity
+   * Get activities for a specific opportunity
    * @param {string} opportunityId - Opportunity ID
    * @param {Object} options - Query options
-   * @param {number} options.limit - Max results (default: 50)
    * @returns {Promise<{data: Array, error: Error|null}>}
    */
   async function getActivities(opportunityId, options = {}) {
@@ -528,10 +577,10 @@
 
     try {
       const limit = options.limit || 50;
-      
+
       const { data, error } = await supabase
         .from('activity_log')
-        .select('*')
+        .select('*, opportunities(name)')
         .eq('opportunity_id', opportunityId)
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -540,65 +589,99 @@
 
       return { data: data || [], error: null };
     } catch (error) {
-      console.warn('[MissionPulse] Error fetching activities:', error);
-      return { data: [], error: null };
+      console.error('[MissionPulse] Error fetching activities:', error);
+      return { data: null, error };
     }
   }
 
   /**
    * Get recent activities across all opportunities
    * @param {Object} options - Query options
-   * @param {number} options.limit - Max results (default: 20)
-   * @returns {Promise<{data: Array, error: Error|null}>}
+   * @param {number} options.limit - Max activities to return (default 20)
+   * @param {number} options.offset - Offset for pagination
+   * @param {string} options.action - Filter by action type
+   * @param {string} options.since - Filter activities since timestamp (ISO string)
+   * @returns {Promise<{data: Array, hasMore: boolean, error: Error|null}>}
    */
   async function getRecentActivities(options = {}) {
     if (!supabase) {
       if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
+        return { data: null, hasMore: false, error: new Error('Supabase not initialized') };
       }
     }
 
     try {
       const limit = options.limit || 20;
-      
-      const { data, error } = await supabase
+      const offset = options.offset || 0;
+
+      let query = supabase
         .from('activity_log')
-        .select('*, opportunities(name)')
+        .select('*, opportunities(id, name)', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(limit);
+        .range(offset, offset + limit - 1);
+
+      // Filter by action type
+      if (options.action) {
+        query = query.eq('action', options.action);
+      }
+
+      // Filter by time
+      if (options.since) {
+        query = query.gte('created_at', options.since);
+      }
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
 
-      return { data: data || [], error: null };
+      const hasMore = count ? (offset + limit) < count : false;
+
+      // Map data to include opportunity name
+      const mappedData = (data || []).map(activity => ({
+        id: activity.id,
+        opportunityId: activity.opportunity_id,
+        opportunityName: activity.opportunities?.name || 'Deleted Opportunity',
+        action: activity.action,
+        fieldChanged: activity.field_changed,
+        oldValue: activity.old_value,
+        newValue: activity.new_value,
+        userId: activity.user_id,
+        createdAt: activity.created_at,
+        isDeleted: !activity.opportunities
+      }));
+
+      return { data: mappedData, hasMore, error: null };
     } catch (error) {
-      console.warn('[MissionPulse] Error fetching recent activities:', error);
-      return { data: [], error: null };
+      console.error('[MissionPulse] Error fetching recent activities:', error);
+      return { data: null, hasMore: false, error };
     }
   }
 
   /**
-   * Get unique agencies from opportunities
-   * @returns {Promise<{data: Array<string>, error: Error|null}>}
+   * Get count of activities in the last 24 hours
+   * @returns {Promise<{data: number, error: Error|null}>}
    */
-  async function getUniqueAgencies() {
+  async function getActivityCount24h() {
     if (!supabase) {
       if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
+        return { data: 0, error: new Error('Supabase not initialized') };
       }
     }
 
     try {
-      const { data, error } = await supabase
-        .from('opportunities')
-        .select('agency');
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      const { count, error } = await supabase
+        .from('activity_log')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', since);
 
       if (error) throw error;
 
-      const agencies = [...new Set((data || []).map(d => d.agency).filter(Boolean))].sort();
-      return { data: agencies, error: null };
+      return { data: count || 0, error: null };
     } catch (error) {
-      console.error('[MissionPulse] Error fetching agencies:', error);
-      return { data: [], error: null };
+      console.error('[MissionPulse] Error counting activities:', error);
+      return { data: 0, error };
     }
   }
 
@@ -608,6 +691,8 @@
 
   let opportunitySubscription = null;
   let opportunityCallbacks = [];
+  let activitySubscription = null;
+  let activityCallbacks = [];
 
   /**
    * Subscribe to real-time opportunity changes
@@ -661,6 +746,53 @@
       if (opportunityCallbacks.length === 0 && opportunitySubscription) {
         opportunitySubscription.unsubscribe();
         opportunitySubscription = null;
+      }
+    };
+  }
+
+  /**
+   * Subscribe to real-time activity log changes
+   * @param {Function} callback - Called on any new activity
+   * @returns {Function} Unsubscribe function
+   */
+  function subscribeToActivities(callback) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        console.error('[MissionPulse] Cannot subscribe - Supabase not initialized');
+        return () => {};
+      }
+    }
+
+    activityCallbacks.push(callback);
+
+    // Create subscription if this is the first subscriber
+    if (!activitySubscription) {
+      activitySubscription = supabase
+        .channel('activity-changes')
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'activity_log' },
+          async (payload) => {
+            // Fetch the full activity with opportunity name
+            const { data } = await getRecentActivities({ limit: 1 });
+            if (data && data[0]) {
+              activityCallbacks.forEach(cb => cb(data[0]));
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    // Return unsubscribe function
+    return () => {
+      const index = activityCallbacks.indexOf(callback);
+      if (index > -1) {
+        activityCallbacks.splice(index, 1);
+      }
+      
+      // Clean up subscription if no more callbacks
+      if (activityCallbacks.length === 0 && activitySubscription) {
+        activitySubscription.unsubscribe();
+        activitySubscription = null;
       }
     };
   }
@@ -733,6 +865,34 @@
       .sort((a, b) => a.order - b.order);
   }
 
+  /**
+   * Get unique agencies from opportunities
+   * @returns {Promise<{data: Array<string>, error: Error|null}>}
+   */
+  async function getUniqueAgencies() {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: [], error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('agency');
+
+      if (error) throw error;
+
+      // Get unique agencies
+      const agencies = [...new Set((data || []).map(d => d.agency).filter(Boolean))].sort();
+      
+      return { data: agencies, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error fetching agencies:', error);
+      return { data: [], error };
+    }
+  }
+
   // ============================================================
   // EXPORT MissionPulse NAMESPACE
   // ============================================================
@@ -753,9 +913,11 @@
     logActivity,
     getActivities,
     getRecentActivities,
+    getActivityCount24h,
 
     // Real-time
     subscribeToOpportunities,
+    subscribeToActivities,
     onConnectionChange,
     getConnectionStatus,
 
