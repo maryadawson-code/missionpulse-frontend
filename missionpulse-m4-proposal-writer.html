@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse M4 - Proposal Writer</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    
+    /* Shield & Pulse Design System v8.0 */
+    :root {
+      --deep-navy: #00050F;
+      --navy-900: #0A1628;
+      --navy-800: #111C2E;
+      --navy-700: #1A2942;
+      --navy-600: #243656;
+      --primary-cyan: #00E5FA;
+      --primary-cyan-glow: rgba(0, 229, 250, 0.25);
+      --success-teal: #00BDAE;
+      --warning-amber: #F59E0B;
+      --risk-coral: #EF4444;
+      --text-primary: #FFFFFF;
+      --text-secondary: #94A3B8;
+      --text-tertiary: #64748B;
+    }
+    
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes typewriter { from { width: 0; } to { width: 100%; } }
+    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+    @keyframes glowPulse { 0%, 100% { box-shadow: 0 0 5px var(--primary-cyan-glow); } 50% { box-shadow: 0 0 20px var(--primary-cyan-glow), 0 0 40px rgba(0, 229, 250, 0.1); } }
+    
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out forwards; }
+    .shimmer { background: linear-gradient(90deg, transparent 0%, rgba(0,229,250,0.1) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 2s infinite; }
+    .glow-pulse { animation: glowPulse 2s ease-in-out infinite; }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--navy-900); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--navy-600); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary-cyan); }
+    
+    /* Editor styling */
+    .editor-content { min-height: 400px; line-height: 1.8; }
+    .editor-content:focus { outline: none; }
+    .win-theme-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: rgba(0, 229, 250, 0.15); border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 4px; font-size: 12px; color: #00E5FA; cursor: pointer; }
+    .compliance-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; font-size: 12px; color: #F59E0B; cursor: pointer; }
+    .risk-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; font-size: 12px; color: #EF4444; cursor: pointer; }
+    
+    /* Typing animation */
+    .typing-cursor::after { content: '|'; animation: blink 1s step-end infinite; color: var(--primary-cyan); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ============================================
+    // ICON LIBRARY
+    // ============================================
+    const Icons = {
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      sparkles: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      save: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      chevronLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      book: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      menu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+      home: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
+      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      loader: () => <svg className="w-full h-full animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      info: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================
+    // DEMO DATA
+    // ============================================
+    const DEMO_OPPORTUNITY = {
+      name: "DHA MHS GENESIS Cloud Migration & Modernization",
+      solicitation: "HT0011-26-R-0042",
+      agency: "Defense Health Agency (DHA)",
+      dueDate: "March 1, 2026",
+      pWin: 72
+    };
+
+    const WIN_THEMES = [
+      { id: 'wt1', label: 'FedRAMP High', color: '#00E5FA', proof: 'Active FedRAMP High P-ATO #FR2200847' },
+      { id: 'wt2', label: 'EHR Scale', color: '#00D29F', proof: '4.2M records migrated at VA' },
+      { id: 'wt3', label: 'DHA Expertise', color: '#8B5CF6', proof: 'Dr. Reyes - Former DHA Deputy CIO' },
+      { id: 'wt4', label: 'Zero Trust', color: '#F59E0B', proof: 'NIST 800-207 compliant architecture' },
+    ];
+
+    const COMPLIANCE_REFS = [
+      { id: 'far1', label: 'FAR 52.204-21', text: 'Basic Safeguarding', risk: 'low' },
+      { id: 'dfar1', label: 'DFARS 252.204-7012', text: 'Safeguarding CDI', risk: 'medium' },
+      { id: 'pws1', label: 'PWS 4.3.1', text: 'FHIR R4 Standards', risk: 'high' },
+      { id: 'pws2', label: 'PWS 4.5.2', text: 'FedRAMP High Auth', risk: 'low' },
+    ];
+
+    const SECTIONS = [
+      { id: 'sec-1', number: '1.0', title: 'Executive Summary', status: 'complete', wordCount: 1250 },
+      { id: 'sec-2', number: '2.0', title: 'Understanding of Requirements', status: 'complete', wordCount: 2100 },
+      { id: 'sec-3', number: '3.0', title: 'Technical Approach', status: 'in-progress', wordCount: 0, subsections: [
+        { id: 'sec-3.1', number: '3.1', title: 'Cloud Migration Strategy', status: 'complete', wordCount: 1800 },
+        { id: 'sec-3.2', number: '3.2', title: 'Data Interoperability', status: 'drafting', wordCount: 450 },
+        { id: 'sec-3.3', number: '3.3', title: 'Security Architecture', status: 'not-started', wordCount: 0 },
+      ]},
+      { id: 'sec-4', number: '4.0', title: 'Management Approach', status: 'not-started', wordCount: 0 },
+      { id: 'sec-5', number: '5.0', title: 'Past Performance', status: 'not-started', wordCount: 0 },
+    ];
+
+    const SAMPLE_DRAFT = `The rockITdata team will ensure all clinical data exchanges comply with HL7 FHIR Release 4 standards, enabling seamless bidirectional integration with MHS GENESIS, legacy AHLTA interfaces, and the Joint Health Information Exchange (JHIE).
+
+Our approach leverages our proven FHIR Implementation Framework, which has been successfully deployed across 9 VA VISN facilities. Key elements include:
+
+**Interoperability Architecture**
+- Native FHIR R4 resource support with full US Core IG compliance
+- Real-time CDS Hooks integration for clinical decision support
+- SMART on FHIR authorization for secure third-party app access
+
+**Data Migration Methodology**
+Our phased migration approach minimizes operational disruption while maintaining 99.97% data fidelity—the same standard achieved during our VA VistA-to-Cerner migration involving 4.2 million veteran health records.`;
+
+    // ============================================
+    // UI COMPONENTS
+    // ============================================
+    const Badge = ({ children, variant = 'default', size = 'sm', icon, pulse }) => {
+      const variants = {
+        default: 'bg-slate-700/50 text-slate-300 border-slate-600',
+        primary: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border-red-500/30',
+        purple: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-[10px]', sm: 'px-2 py-0.5 text-xs', md: 'px-3 py-1 text-sm' };
+      return (
+        <span className={`inline-flex items-center gap-1 rounded font-medium border ${variants[variant]} ${sizes[size]} ${pulse ? 'animate-pulse' : ''}`}>
+          {icon && <Icon name={icon} className="w-3 h-3" />}
+          {children}
+        </span>
+      );
+    };
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, onClick, disabled, className = '', pulse }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-white shadow-lg shadow-cyan-500/25',
+        secondary: 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600',
+        ghost: 'bg-transparent hover:bg-slate-800 text-slate-300 hover:text-white',
+        danger: 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30',
+        success: 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30',
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${pulse ? 'glow-pulse' : ''} ${className}`}>
+          {icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    const Card = ({ children, className = '', glow, hover }) => (
+      <div className={`bg-slate-800/50 border border-slate-700/50 rounded-xl ${glow ? 'shadow-lg shadow-cyan-500/10' : ''} ${hover ? 'hover:border-cyan-500/30 transition-all duration-200' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    // ============================================
+    // SIDEBAR NAVIGATION
+    // ============================================
+    const Sidebar = ({ isOpen, onToggle }) => {
+      const navItems = [
+        { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'index.html' },
+        { id: 'pipeline', label: 'Pipeline Intel', icon: 'target', href: 'missionpulse-m1-enhanced.html' },
+        { id: 'warroom', label: 'War Room', icon: 'shield', href: 'missionpulse-m2-warroom-enhanced.html' },
+        { id: 'swimlane', label: 'Swimlane Board', icon: 'clipboard', href: 'missionpulse-m3-swimlane-board.html' },
+        { id: 'writer', label: 'Proposal Writer', icon: 'edit', href: 'missionpulse-m4-proposal-writer.html', active: true },
+        { id: 'contracts', label: 'Contract Scanner', icon: 'fileText', href: 'missionpulse-m5-contracts-enhanced.html' },
+        { id: 'irondome', label: 'Iron Dome', icon: 'shield', href: 'missionpulse-m6-iron-dome.html', badge: 'CUI' },
+        { id: 'blackhat', label: 'Black Hat', icon: 'eye', href: 'missionpulse-m7-blackhat-enhanced.html', badge: 'PRIVATE' },
+        { id: 'pricing', label: 'Pricing Engine', icon: 'zap', href: 'missionpulse-m8-pricing.html', badge: 'CUI' },
+        { id: 'orals', label: 'Orals Coach', icon: 'sparkles', href: 'missionpulse-m9-hitl-enhanced.html', badge: 'PRIVATE' },
+        { id: 'partners', label: 'Partner Wall', icon: 'shield', href: 'missionpulse-m11-frenemy-protocol.html' },
+        { id: 'launch', label: 'Launch & ROI', icon: 'zap', href: 'missionpulse-m13-launch-roi.html' },
+        { id: 'postaward', label: 'Post-Award', icon: 'check', href: 'missionpulse-m14-post-award.html' },
+        { id: 'lessons', label: 'Lessons Playbook', icon: 'book', href: 'missionpulse-m15-lessons-playbook.html' },
+      ];
+
+      return (
+        <>
+          {/* Mobile overlay */}
+          {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onToggle} />}
+          
+          {/* Sidebar */}
+          <aside className={`fixed top-0 left-0 h-full bg-slate-900/95 border-r border-slate-700/50 z-50 transition-all duration-300 ${isOpen ? 'w-64' : 'w-16'} flex flex-col`}>
+            {/* Logo */}
+            <div className="p-4 border-b border-slate-700/50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                  <Icon name="shield" className="w-5 h-5 text-white" />
+                </div>
+                {isOpen && <span className="font-bold text-white">MissionPulse</span>}
+              </div>
+            </div>
+
+            {/* Nav items */}
+            <nav className="flex-1 overflow-y-auto py-4">
+              {navItems.map(item => (
+                <a
+                  key={item.id}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg transition-all duration-200 ${item.active ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                >
+                  <Icon name={item.icon} className="w-5 h-5 flex-shrink-0" />
+                  {isOpen && (
+                    <>
+                      <span className="flex-1 text-sm">{item.label}</span>
+                      {item.badge === 'CUI' && <Badge variant="warning" size="xs">CUI</Badge>}
+                      {item.badge === 'PRIVATE' && <Badge variant="danger" size="xs">PRIVATE</Badge>}
+                    </>
+                  )}
+                </a>
+              ))}
+            </nav>
+
+            {/* Toggle button */}
+            <div className="p-4 border-t border-slate-700/50">
+              <button onClick={onToggle} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+                <Icon name={isOpen ? 'chevronLeft' : 'chevronRight'} className="w-4 h-4" />
+                {isOpen && <span className="text-sm">Collapse</span>}
+              </button>
+            </div>
+          </aside>
+        </>
+      );
+    };
+
+    // ============================================
+    // SECTION TREE
+    // ============================================
+    const SectionTree = ({ sections, selectedSection, onSelect }) => {
+      const getStatusIcon = (status) => {
+        switch(status) {
+          case 'complete': return <span className="w-2 h-2 rounded-full bg-emerald-400" />;
+          case 'in-progress': return <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />;
+          case 'drafting': return <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />;
+          default: return <span className="w-2 h-2 rounded-full bg-slate-600" />;
+        }
+      };
+
+      return (
+        <div className="space-y-1">
+          {sections.map(section => (
+            <div key={section.id}>
+              <button
+                onClick={() => onSelect(section)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all ${selectedSection?.id === section.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                {getStatusIcon(section.status)}
+                <span className="text-xs text-slate-500 font-mono">{section.number}</span>
+                <span className="flex-1 text-sm truncate">{section.title}</span>
+                {section.wordCount > 0 && <span className="text-xs text-slate-500">{section.wordCount}w</span>}
+              </button>
+              {section.subsections && (
+                <div className="ml-6 mt-1 space-y-1">
+                  {section.subsections.map(sub => (
+                    <button
+                      key={sub.id}
+                      onClick={() => onSelect(sub)}
+                      className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-lg text-left transition-all ${selectedSection?.id === sub.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+                    >
+                      {getStatusIcon(sub.status)}
+                      <span className="text-xs text-slate-500 font-mono">{sub.number}</span>
+                      <span className="flex-1 text-sm truncate">{sub.title}</span>
+                      {sub.wordCount > 0 && <span className="text-xs text-slate-500">{sub.wordCount}w</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    // ============================================
+    // WIN THEME PALETTE
+    // ============================================
+    const WinThemePalette = ({ themes, onInsert }) => (
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Icon name="target" className="w-4 h-4 text-cyan-400" />
+          <span className="font-semibold text-white text-sm">Win Themes</span>
+        </div>
+        <div className="space-y-2">
+          {themes.map(theme => (
+            <button
+              key={theme.id}
+              onClick={() => onInsert(theme)}
+              className="w-full p-3 rounded-lg text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ backgroundColor: `${theme.color}15`, border: `1px solid ${theme.color}40` }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.color }} />
+                <span className="text-sm font-medium" style={{ color: theme.color }}>{theme.label}</span>
+              </div>
+              <p className="text-xs text-slate-400 truncate">{theme.proof}</p>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500 mt-3">Click to insert at cursor</p>
+      </Card>
+    );
+
+    // ============================================
+    // COMPLIANCE PANEL
+    // ============================================
+    const CompliancePanel = ({ refs, onInsert }) => (
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Icon name="clipboard" className="w-4 h-4 text-amber-400" />
+          <span className="font-semibold text-white text-sm">Compliance Tags</span>
+        </div>
+        <div className="space-y-2">
+          {refs.map(ref => {
+            const riskColor = ref.risk === 'high' ? 'text-red-400 bg-red-500/10 border-red-500/30' : ref.risk === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+            return (
+              <button
+                key={ref.id}
+                onClick={() => onInsert(ref)}
+                className={`w-full p-2 rounded-lg text-left border transition-all hover:scale-[1.02] ${riskColor}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-mono font-semibold">{ref.label}</span>
+                  <Badge variant={ref.risk === 'high' ? 'danger' : ref.risk === 'medium' ? 'warning' : 'success'} size="xs">
+                    {ref.risk.toUpperCase()}
+                  </Badge>
+                </div>
+                <p className="text-xs opacity-80">{ref.text}</p>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+    );
+
+    // ============================================
+    // AI ASSISTANT PANEL
+    // ============================================
+    const AIAssistant = ({ section, onAction }) => {
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [suggestion, setSuggestion] = useState(null);
+
+      const handleGenerate = (action) => {
+        setIsGenerating(true);
+        setSuggestion(null);
+        
+        setTimeout(() => {
+          setIsGenerating(false);
+          if (action === 'draft') {
+            setSuggestion({
+              type: 'draft',
+              content: SAMPLE_DRAFT
+            });
+          } else if (action === 'improve') {
+            setSuggestion({
+              type: 'improve',
+              content: 'Consider adding quantified metrics from the VA past performance (99.97% data fidelity, 4.2M records) earlier in the section to strengthen your opening paragraph.'
+            });
+          }
+        }, 2000);
+      };
+
+      return (
+        <Card className="p-4" glow>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
+              <Icon name="sparkles" className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="font-semibold text-white text-sm">AI Proposal Writer</span>
+            <Badge variant="primary" size="xs">Claude 4.5</Badge>
+          </div>
+
+          {section ? (
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700">
+                <p className="text-xs text-slate-400 mb-1">Current Section</p>
+                <p className="text-sm text-white font-medium">{section.number} {section.title}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="secondary" size="sm" icon="edit" onClick={() => handleGenerate('draft')} disabled={isGenerating}>
+                  Draft Section
+                </Button>
+                <Button variant="secondary" size="sm" icon="sparkles" onClick={() => handleGenerate('improve')} disabled={isGenerating}>
+                  Improve
+                </Button>
+              </div>
+
+              {isGenerating && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+                  <Icon name="loader" className="w-4 h-4 text-cyan-400" />
+                  <span className="text-sm text-cyan-400">Generating content...</span>
+                </div>
+              )}
+
+              {suggestion && (
+                <div className="animate-fadeIn">
+                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="primary" size="xs" icon="sparkles">AI Suggestion</Badge>
+                      <div className="flex gap-1">
+                        <button onClick={() => onAction('accept', suggestion)} className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400" title="Accept">
+                          <Icon name="check" className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setSuggestion(null)} className="p-1 rounded hover:bg-red-500/20 text-red-400" title="Dismiss">
+                          <Icon name="x" className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{suggestion.content}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">Select a section to begin drafting</p>
+          )}
+        </Card>
+      );
+    };
+
+    // ============================================
+    // MAIN EDITOR
+    // ============================================
+    const ProposalEditor = ({ section, content, onChange, onInsertTheme, onInsertCompliance }) => {
+      const editorRef = useRef(null);
+
+      if (!section) {
+        return (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <Icon name="fileText" className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-400 mb-2">No Section Selected</h3>
+              <p className="text-sm text-slate-500">Choose a section from the outline to begin drafting</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="h-full flex flex-col">
+          {/* Section Header */}
+          <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm text-slate-500 font-mono">{section.number}</span>
+                <h2 className="text-lg font-semibold text-white">{section.title}</h2>
+                <Badge variant={section.status === 'complete' ? 'success' : section.status === 'drafting' ? 'primary' : 'default'} size="xs">
+                  {section.status.replace('-', ' ').toUpperCase()}
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-500">Word count: {content.split(/\s+/).filter(w => w).length} / 2,000 target</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" icon="save">Save Draft</Button>
+              <Button variant="secondary" size="sm" icon="download">Export</Button>
+            </div>
+          </div>
+
+          {/* Editor Toolbar */}
+          <div className="flex items-center gap-2 p-3 border-b border-slate-700/50 bg-slate-900/30">
+            <div className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 border border-slate-700">
+              <span className="text-xs text-slate-400">Insert:</span>
+              {WIN_THEMES.slice(0, 2).map(theme => (
+                <button
+                  key={theme.id}
+                  onClick={() => onInsertTheme(theme)}
+                  className="px-2 py-0.5 rounded text-xs font-medium transition-all hover:scale-105"
+                  style={{ backgroundColor: `${theme.color}20`, color: theme.color }}
+                >
+                  {theme.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 border border-slate-700">
+              {COMPLIANCE_REFS.slice(0, 2).map(ref => (
+                <button
+                  key={ref.id}
+                  onClick={() => onInsertCompliance(ref)}
+                  className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-all"
+                >
+                  {ref.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Editor Area */}
+          <div className="flex-1 overflow-auto p-6">
+            <div
+              ref={editorRef}
+              contentEditable
+              className="editor-content text-slate-200 prose prose-invert prose-sm max-w-none focus:outline-none"
+              onInput={(e) => onChange(e.currentTarget.textContent)}
+              dangerouslySetInnerHTML={{ __html: content.replace(/\n\n/g, '</p><p>').replace(/^/, '<p>').replace(/$/, '</p>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}
+            />
+          </div>
+
+          {/* Status Bar */}
+          <div className="flex items-center justify-between px-4 py-2 border-t border-slate-700/50 bg-slate-900/50">
+            <div className="flex items-center gap-4 text-xs text-slate-500">
+              <span>Last saved: 2 min ago</span>
+              <span>•</span>
+              <span>Version 3</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="success" size="xs" icon="check">Auto-saved</Badge>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // MAIN APP
+    // ============================================
+    function ProposalWriterApp() {
+      const [sidebarOpen, setSidebarOpen] = useState(true);
+      const [selectedSection, setSelectedSection] = useState(SECTIONS[2].subsections[1]); // Section 3.2
+      const [editorContent, setEditorContent] = useState(SAMPLE_DRAFT);
+      const [showToast, setShowToast] = useState(false);
+      const [toastMessage, setToastMessage] = useState('');
+
+      const handleInsertTheme = (theme) => {
+        const tag = `[WIN: ${theme.label}]`;
+        setEditorContent(prev => prev + '\n\n' + tag);
+        setToastMessage(`Win theme "${theme.label}" inserted`);
+        setShowToast(true);
+      };
+
+      const handleInsertCompliance = (ref) => {
+        const tag = `[REF: ${ref.label}]`;
+        setEditorContent(prev => prev + '\n\n' + tag);
+        setToastMessage(`Compliance ref "${ref.label}" inserted`);
+        setShowToast(true);
+      };
+
+      const handleAIAction = (action, suggestion) => {
+        if (action === 'accept') {
+          if (suggestion.type === 'draft') {
+            setEditorContent(suggestion.content);
+          }
+          setToastMessage('AI suggestion applied');
+          setShowToast(true);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Sidebar */}
+          <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+
+          {/* Main Content */}
+          <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'}`}>
+            {/* Top Bar */}
+            <header className="sticky top-0 z-30 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/50">
+              <div className="flex items-center justify-between px-6 py-3">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400">
+                    <Icon name="menu" className="w-5 h-5" />
+                  </button>
+                  <div>
+                    <h1 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Icon name="edit" className="w-5 h-5 text-cyan-400" />
+                      Proposal Writer
+                    </h1>
+                    <p className="text-xs text-slate-500">{DEMO_OPPORTUNITY.name}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="warning" size="sm" icon="alert">Due: {DEMO_OPPORTUNITY.dueDate}</Badge>
+                  <Badge variant="primary" size="sm">pWin: {DEMO_OPPORTUNITY.pWin}%</Badge>
+                </div>
+              </div>
+            </header>
+
+            {/* Content Grid */}
+            <div className="flex h-[calc(100vh-64px)]">
+              {/* Left Panel - Outline */}
+              <div className="w-72 border-r border-slate-700/50 bg-slate-900/30 overflow-y-auto p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-white text-sm">Volume I - Technical</h3>
+                  <Badge variant="primary" size="xs">12 sections</Badge>
+                </div>
+                <SectionTree 
+                  sections={SECTIONS} 
+                  selectedSection={selectedSection}
+                  onSelect={setSelectedSection}
+                />
+              </div>
+
+              {/* Center Panel - Editor */}
+              <div className="flex-1 bg-slate-800/20">
+                <ProposalEditor
+                  section={selectedSection}
+                  content={editorContent}
+                  onChange={setEditorContent}
+                  onInsertTheme={handleInsertTheme}
+                  onInsertCompliance={handleInsertCompliance}
+                />
+              </div>
+
+              {/* Right Panel - Tools */}
+              <div className="w-80 border-l border-slate-700/50 bg-slate-900/30 overflow-y-auto p-4 space-y-4">
+                <AIAssistant 
+                  section={selectedSection}
+                  onAction={handleAIAction}
+                />
+                <WinThemePalette 
+                  themes={WIN_THEMES}
+                  onInsert={handleInsertTheme}
+                />
+                <CompliancePanel 
+                  refs={COMPLIANCE_REFS}
+                  onInsert={handleInsertCompliance}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-700/50 px-6 py-2 z-20" style={{ marginLeft: sidebarOpen ? '16rem' : '4rem' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-slate-500">Mission Meets Tech</span>
+                  <span className="text-xs text-slate-600">•</span>
+                  <span className="text-xs text-slate-500">MissionPulse v12.0</span>
+                </div>
+                <span className="text-xs text-amber-500 font-medium">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+              </div>
+            </footer>
+          </div>
+
+          {/* Toast */}
+          {showToast && (
+            <div className="fixed top-4 right-4 z-50 animate-fadeIn">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-emerald-500/20 border border-emerald-500/50 shadow-lg">
+                <Icon name="check" className="w-5 h-5 text-emerald-400" />
+                <span className="text-white text-sm font-medium">{toastMessage}</span>
+                <button onClick={() => setShowToast(false)} className="text-slate-400 hover:text-white">
+                  <Icon name="x" className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ProposalWriterApp />);
+  </script>
+</body>
+</html>
