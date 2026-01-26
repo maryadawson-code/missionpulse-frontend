@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 - Pricing Engine & BOE Calculator</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0a1628; }
+    ::-webkit-scrollbar-thumb { background: #00E5FA; border-radius: 4px; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-slide-in { animation: slideIn 0.3s ease-out; }
+    .animate-pulse-slow { animation: pulse 3s ease-in-out infinite; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback } = React;
+
+    // ========== DESIGN SYSTEM (Shield & Pulse UX v8.0) ==========
+    const COLORS = {
+      primary: '#00E5FA',
+      primaryDark: '#00B8C9',
+      navy: '#00050F',
+      navyLight: '#0a1628',
+      navyMid: '#132337',
+      success: '#10B981',
+      warning: '#F59E0B',
+      danger: '#EF4444',
+      info: '#3B82F6',
+      white: '#FFFFFF',
+      gray: {
+        100: '#F3F4F6',
+        200: '#E5E7EB',
+        300: '#D1D5DB',
+        400: '#9CA3AF',
+        500: '#6B7280',
+        600: '#4B5563',
+      }
+    };
+
+    // ========== GSA LABOR RATE CARD (from BOE Model) ==========
+    const GSA_RATE_CARD = [
+      { id: 'PM-1', family: 'Program Management', level: 'Associate', lcat: 'Program Analyst I', minRate: 51.74, targetRate: 63.64, maxRate: 75.54 },
+      { id: 'PM-2', family: 'Program Management', level: 'Sr Associate', lcat: 'Project Manager I', minRate: 60.36, targetRate: 72.67, maxRate: 84.99 },
+      { id: 'PM-3', family: 'Program Management', level: 'Manager', lcat: 'Project Manager II', minRate: 77.61, targetRate: 95.46, maxRate: 113.32 },
+      { id: 'PM-4', family: 'Program Management', level: 'Sr Manager', lcat: 'Program Manager I', minRate: 103.48, targetRate: 122.56, maxRate: 141.65 },
+      { id: 'PM-5', family: 'Program Management', level: 'Director', lcat: 'Program Manager II', minRate: 142.59, targetRate: 168.55, maxRate: 194.51 },
+      { id: 'AC-1', family: 'Analytics & Cloud', level: 'Associate', lcat: 'Data Analyst I', minRate: 48.92, targetRate: 65.89, maxRate: 82.86 },
+      { id: 'AC-2', family: 'Analytics & Cloud', level: 'Sr Associate', lcat: 'Data Scientist', minRate: 89.31, targetRate: 118.66, maxRate: 148.01 },
+      { id: 'AC-3', family: 'Analytics & Cloud', level: 'Manager', lcat: 'Sr Data Scientist', minRate: 116.28, targetRate: 154.38, maxRate: 192.48 },
+      { id: 'AC-4', family: 'Analytics & Cloud', level: 'Sr Manager', lcat: 'Chief Data Architect', minRate: 155.75, targetRate: 198.45, maxRate: 241.15 },
+      { id: 'TC-1', family: 'Technical Consulting', level: 'Associate', lcat: 'Systems Analyst I', minRate: 42.18, targetRate: 56.77, maxRate: 71.36 },
+      { id: 'TC-2', family: 'Technical Consulting', level: 'Sr Associate', lcat: 'Systems Analyst II', minRate: 65.25, targetRate: 86.92, maxRate: 108.59 },
+      { id: 'TC-3', family: 'Technical Consulting', level: 'Manager', lcat: 'Sr Systems Analyst', minRate: 95.67, targetRate: 125.88, maxRate: 156.09 },
+      { id: 'TC-4', family: 'Technical Consulting', level: 'Sr Manager', lcat: 'Technical Director', minRate: 168.75, targetRate: 225.00, maxRate: 281.25 },
+      { id: 'CI-1', family: 'Clinical Informatics', level: 'Associate', lcat: 'Clinical Analyst I', minRate: 52.45, targetRate: 72.35, maxRate: 92.25 },
+      { id: 'CI-2', family: 'Clinical Informatics', level: 'Sr Associate', lcat: 'Clinical Analyst II', minRate: 71.28, targetRate: 96.50, maxRate: 121.72 },
+      { id: 'CI-3', family: 'Clinical Informatics', level: 'Manager', lcat: 'Clinical SME', minRate: 90.30, targetRate: 120.40, maxRate: 150.50 },
+      { id: 'CI-4', family: 'Clinical Informatics', level: 'Sr Manager', lcat: 'Chief Clinical Officer', minRate: 145.60, targetRate: 185.75, maxRate: 225.90 },
+    ];
+
+    // ========== INDIRECT COST RATES (from BOE Model) ==========
+    const INDIRECT_RATES = {
+      overhead: 0.15,      // 15% Overhead
+      ganda: 0.10,         // 10% G&A
+      fee: 0.08,           // 8% Fee
+      escalation: 0.03     // 3% annual escalation
+    };
+
+    // ========== CONTRACT PERIODS ==========
+    const PERIODS = [
+      { id: 'TRANS', name: 'Transition', months: 3, hours: 513, escalation: 1.0 },
+      { id: 'BASE', name: 'Base Period', months: 12, hours: 2080, escalation: 1.0 },
+      { id: 'OY1', name: 'Option Year 1', months: 12, hours: 2080, escalation: 1.03 },
+      { id: 'OY2', name: 'Option Year 2', months: 12, hours: 2080, escalation: 1.0609 },
+      { id: 'OY3', name: 'Option Year 3', months: 12, hours: 2080, escalation: 1.092727 },
+      { id: 'OY4', name: 'Option Year 4', months: 12, hours: 2080, escalation: 1.125509 },
+    ];
+
+    // ========== ENTITY TYPES ==========
+    const ENTITIES = [
+      { id: 'prime', name: 'Prime (rockITdata)', type: 'prime', sbStatus: 'SDVOSB' },
+      { id: 'sb-sub', name: 'Small Biz Sub', type: 'subcontractor', sbStatus: 'Small' },
+      { id: 'lb-sub', name: 'Large Biz Sub', type: 'subcontractor', sbStatus: 'Large' },
+    ];
+
+    // ========== DEMO STAFFING DATA (DHA MHS GENESIS) ==========
+    const DEMO_STAFFING = [
+      { id: 1, entity: 'prime', role: 'Program Manager', rateId: 'PM-5', fteTransition: 1, fteBase: 1, fteOY1: 1, fteOY2: 1, fteOY3: 1, fteOY4: 1 },
+      { id: 2, entity: 'prime', role: 'Technical Lead', rateId: 'AC-3', fteTransition: 1, fteBase: 1, fteOY1: 1, fteOY2: 1, fteOY3: 1, fteOY4: 1 },
+      { id: 3, entity: 'prime', role: 'Data Scientist Sr', rateId: 'AC-2', fteTransition: 1, fteBase: 2, fteOY1: 2, fteOY2: 2, fteOY3: 2, fteOY4: 2 },
+      { id: 4, entity: 'prime', role: 'Clinical SME', rateId: 'CI-3', fteTransition: 0.5, fteBase: 0.5, fteOY1: 0.5, fteOY2: 0.5, fteOY3: 0.5, fteOY4: 0.5 },
+      { id: 5, entity: 'sb-sub', role: 'Program Analyst', rateId: 'PM-3', fteTransition: 0.5, fteBase: 2, fteOY1: 2, fteOY2: 2, fteOY3: 2, fteOY4: 2 },
+      { id: 6, entity: 'sb-sub', role: 'Systems Analyst', rateId: 'TC-2', fteTransition: 0.25, fteBase: 1, fteOY1: 1, fteOY2: 1, fteOY3: 1, fteOY4: 1 },
+      { id: 7, entity: 'lb-sub', role: 'Legacy SME', rateId: 'TC-4', fteTransition: 0.25, fteBase: 0, fteOY1: 0, fteOY2: 0, fteOY3: 0, fteOY4: 0 },
+    ];
+
+    // ========== HELPER FUNCTIONS ==========
+    const formatCurrency = (value) => {
+      if (value === null || value === undefined) return '-';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+    };
+
+    const formatPercent = (value) => {
+      if (value === null || value === undefined) return '-';
+      return `${(value * 100).toFixed(1)}%`;
+    };
+
+    const formatNumber = (value, decimals = 2) => {
+      if (value === null || value === undefined) return '-';
+      return new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value);
+    };
+
+    // ========== PRICING CALCULATION ENGINE ==========
+    const calculatePricing = (staffing, rateCard, periods, indirectRates) => {
+      const results = {
+        byPeriod: {},
+        byEntity: {},
+        totals: { directLabor: 0, overhead: 0, ganda: 0, fee: 0, totalPrice: 0 },
+        compliance: { far52_219_14: { primeSmallPercent: 0, largePercent: 0, compliant: false } }
+      };
+
+      // Initialize periods
+      periods.forEach(period => {
+        results.byPeriod[period.id] = {
+          directLabor: 0, overhead: 0, ganda: 0, fee: 0, totalPrice: 0,
+          byEntity: { prime: 0, 'sb-sub': 0, 'lb-sub': 0 }
+        };
+      });
+
+      // Initialize entities
+      ENTITIES.forEach(entity => {
+        results.byEntity[entity.id] = { directLabor: 0, overhead: 0, ganda: 0, fee: 0, totalPrice: 0 };
+      });
+
+      // Calculate labor costs
+      staffing.forEach(staff => {
+        const rate = rateCard.find(r => r.id === staff.rateId);
+        if (!rate) return;
+
+        const hourlyRate = rate.targetRate;
+
+        periods.forEach(period => {
+          const fteProp = `fte${period.id === 'TRANS' ? 'Transition' : period.id}`;
+          const fte = staff[fteProp] || 0;
+          const hours = period.hours * fte;
+          const escalatedRate = hourlyRate * period.escalation;
+          const laborCost = hours * escalatedRate;
+
+          results.byPeriod[period.id].directLabor += laborCost;
+          results.byPeriod[period.id].byEntity[staff.entity] += laborCost;
+          results.byEntity[staff.entity].directLabor += laborCost;
+          results.totals.directLabor += laborCost;
+        });
+      });
+
+      // Calculate indirect costs per period
+      periods.forEach(period => {
+        const dl = results.byPeriod[period.id].directLabor;
+        const oh = dl * indirectRates.overhead;
+        const withOh = dl + oh;
+        const ga = withOh * indirectRates.ganda;
+        const withGa = withOh + ga;
+        const fee = withGa * indirectRates.fee;
+        const total = withGa + fee;
+
+        results.byPeriod[period.id].overhead = oh;
+        results.byPeriod[period.id].ganda = ga;
+        results.byPeriod[period.id].fee = fee;
+        results.byPeriod[period.id].totalPrice = total;
+
+        results.totals.overhead += oh;
+        results.totals.ganda += ga;
+        results.totals.fee += fee;
+        results.totals.totalPrice += total;
+      });
+
+      // Calculate indirect costs per entity
+      ENTITIES.forEach(entity => {
+        const dl = results.byEntity[entity.id].directLabor;
+        results.byEntity[entity.id].overhead = dl * indirectRates.overhead;
+        results.byEntity[entity.id].ganda = (dl + results.byEntity[entity.id].overhead) * indirectRates.ganda;
+        results.byEntity[entity.id].fee = (dl + results.byEntity[entity.id].overhead + results.byEntity[entity.id].ganda) * indirectRates.fee;
+        results.byEntity[entity.id].totalPrice = dl + results.byEntity[entity.id].overhead + results.byEntity[entity.id].ganda + results.byEntity[entity.id].fee;
+      });
+
+      // FAR 52.219-14 Compliance Check
+      const primeLabor = results.byEntity['prime'].directLabor;
+      const sbLabor = results.byEntity['sb-sub'].directLabor;
+      const lbLabor = results.byEntity['lb-sub'].directLabor;
+      const totalLabor = results.totals.directLabor;
+
+      const primeSmallPercent = totalLabor > 0 ? (primeLabor + sbLabor) / totalLabor : 0;
+      const largePercent = totalLabor > 0 ? lbLabor / totalLabor : 0;
+
+      results.compliance.far52_219_14 = {
+        primeSmallPercent,
+        largePercent,
+        compliant: primeSmallPercent > 0.50
+      };
+
+      return results;
+    };
+
+    // ========== ICONS ==========
+    const Icons = {
+      calculator: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      warning: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      chart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      settings: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+      ai: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+    };
+
+    // ========== COMPONENTS ==========
+
+    // Metric Card
+    const MetricCard = ({ title, value, subtitle, icon, trend, color = 'primary' }) => {
+      const colorClasses = {
+        primary: 'border-cyan-500/30 bg-cyan-500/5',
+        success: 'border-emerald-500/30 bg-emerald-500/5',
+        warning: 'border-amber-500/30 bg-amber-500/5',
+        danger: 'border-red-500/30 bg-red-500/5',
+      };
+
+      const iconColors = {
+        primary: 'text-cyan-400',
+        success: 'text-emerald-400',
+        warning: 'text-amber-400',
+        danger: 'text-red-400',
+      };
+
+      return (
+        <div className={`rounded-xl border p-5 ${colorClasses[color]} animate-slide-in`}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-gray-400 text-sm font-medium">{title}</p>
+              <p className="text-2xl font-bold text-white mt-1">{value}</p>
+              {subtitle && <p className="text-gray-500 text-xs mt-1">{subtitle}</p>}
+              {trend && (
+                <p className={`text-xs mt-2 ${trend > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}% vs. target
+                </p>
+              )}
+            </div>
+            <div className={`w-10 h-10 ${iconColors[color]}`}>
+              {icon}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Period Summary Table
+    const PeriodSummaryTable = ({ pricing }) => {
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-400 border-b border-gray-700">
+                <th className="pb-3 font-medium">Cost Element</th>
+                {PERIODS.map(p => (
+                  <th key={p.id} className="pb-3 font-medium text-right">{p.id}</th>
+                ))}
+                <th className="pb-3 font-medium text-right text-cyan-400">TOTAL</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-300">
+              <tr className="border-b border-gray-800">
+                <td className="py-3 font-medium">Direct Labor</td>
+                {PERIODS.map(p => (
+                  <td key={p.id} className="py-3 text-right font-mono">{formatCurrency(pricing.byPeriod[p.id]?.directLabor)}</td>
+                ))}
+                <td className="py-3 text-right font-mono text-cyan-400 font-semibold">{formatCurrency(pricing.totals.directLabor)}</td>
+              </tr>
+              <tr className="border-b border-gray-800 text-gray-400">
+                <td className="py-3">+ Overhead (15%)</td>
+                {PERIODS.map(p => (
+                  <td key={p.id} className="py-3 text-right font-mono">{formatCurrency(pricing.byPeriod[p.id]?.overhead)}</td>
+                ))}
+                <td className="py-3 text-right font-mono">{formatCurrency(pricing.totals.overhead)}</td>
+              </tr>
+              <tr className="border-b border-gray-800 text-gray-400">
+                <td className="py-3">+ G&A (10%)</td>
+                {PERIODS.map(p => (
+                  <td key={p.id} className="py-3 text-right font-mono">{formatCurrency(pricing.byPeriod[p.id]?.ganda)}</td>
+                ))}
+                <td className="py-3 text-right font-mono">{formatCurrency(pricing.totals.ganda)}</td>
+              </tr>
+              <tr className="border-b border-gray-800 text-gray-400">
+                <td className="py-3">+ Fee (8%)</td>
+                {PERIODS.map(p => (
+                  <td key={p.id} className="py-3 text-right font-mono">{formatCurrency(pricing.byPeriod[p.id]?.fee)}</td>
+                ))}
+                <td className="py-3 text-right font-mono">{formatCurrency(pricing.totals.fee)}</td>
+              </tr>
+              <tr className="bg-cyan-500/10">
+                <td className="py-3 font-bold text-white">Total Evaluated Price</td>
+                {PERIODS.map(p => (
+                  <td key={p.id} className="py-3 text-right font-mono font-bold text-white">{formatCurrency(pricing.byPeriod[p.id]?.totalPrice)}</td>
+                ))}
+                <td className="py-3 text-right font-mono font-bold text-cyan-400 text-lg">{formatCurrency(pricing.totals.totalPrice)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    };
+
+    // Staffing Table
+    const StaffingTable = ({ staffing, setStaffing, rateCard }) => {
+      const handleFteChange = (id, field, value) => {
+        setStaffing(prev => prev.map(s => 
+          s.id === id ? { ...s, [field]: parseFloat(value) || 0 } : s
+        ));
+      };
+
+      const handleRateChange = (id, rateId) => {
+        setStaffing(prev => prev.map(s => 
+          s.id === id ? { ...s, rateId } : s
+        ));
+      };
+
+      const handleEntityChange = (id, entity) => {
+        setStaffing(prev => prev.map(s => 
+          s.id === id ? { ...s, entity } : s
+        ));
+      };
+
+      const handleRoleChange = (id, role) => {
+        setStaffing(prev => prev.map(s => 
+          s.id === id ? { ...s, role } : s
+        ));
+      };
+
+      const addStaff = () => {
+        const newId = Math.max(...staffing.map(s => s.id), 0) + 1;
+        setStaffing(prev => [...prev, {
+          id: newId, entity: 'prime', role: 'New Position', rateId: 'PM-1',
+          fteTransition: 0, fteBase: 1, fteOY1: 1, fteOY2: 1, fteOY3: 1, fteOY4: 1
+        }]);
+      };
+
+      const removeStaff = (id) => {
+        setStaffing(prev => prev.filter(s => s.id !== id));
+      };
+
+      const getRate = (rateId) => rateCard.find(r => r.id === rateId);
+
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-400 border-b border-gray-700">
+                <th className="pb-3 font-medium">Entity</th>
+                <th className="pb-3 font-medium">Role</th>
+                <th className="pb-3 font-medium">LCAT</th>
+                <th className="pb-3 font-medium text-right">Rate/Hr</th>
+                <th className="pb-3 font-medium text-center">TRANS</th>
+                <th className="pb-3 font-medium text-center">BASE</th>
+                <th className="pb-3 font-medium text-center">OY1</th>
+                <th className="pb-3 font-medium text-center">OY2</th>
+                <th className="pb-3 font-medium text-center">OY3</th>
+                <th className="pb-3 font-medium text-center">OY4</th>
+                <th className="pb-3 font-medium text-center">Status</th>
+                <th className="pb-3"></th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-300">
+              {staffing.map(staff => {
+                const rate = getRate(staff.rateId);
+                const isOutOfBand = rate && (rate.targetRate < rate.minRate || rate.targetRate > rate.maxRate);
+                return (
+                  <tr key={staff.id} className="border-b border-gray-800 hover:bg-cyan-500/5">
+                    <td className="py-2">
+                      <select 
+                        value={staff.entity}
+                        onChange={(e) => handleEntityChange(staff.id, e.target.value)}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs w-full"
+                      >
+                        {ENTITIES.map(e => (
+                          <option key={e.id} value={e.id}>{e.name}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2">
+                      <input 
+                        type="text"
+                        value={staff.role}
+                        onChange={(e) => handleRoleChange(staff.id, e.target.value)}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs w-32"
+                      />
+                    </td>
+                    <td className="py-2">
+                      <select 
+                        value={staff.rateId}
+                        onChange={(e) => handleRateChange(staff.id, e.target.value)}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs w-full"
+                      >
+                        {rateCard.map(r => (
+                          <option key={r.id} value={r.id}>{r.id}: {r.lcat}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2 text-right font-mono text-cyan-400">
+                      ${rate?.targetRate.toFixed(2)}
+                    </td>
+                    {['fteTransition', 'fteBase', 'fteOY1', 'fteOY2', 'fteOY3', 'fteOY4'].map(field => (
+                      <td key={field} className="py-2 text-center">
+                        <input 
+                          type="number"
+                          step="0.25"
+                          min="0"
+                          value={staff[field]}
+                          onChange={(e) => handleFteChange(staff.id, field, e.target.value)}
+                          className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs w-14 text-center"
+                        />
+                      </td>
+                    ))}
+                    <td className="py-2 text-center">
+                      <span className={`px-2 py-1 rounded text-xs ${isOutOfBand ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                        {isOutOfBand ? '⚠ OOB' : '✓ OK'}
+                      </span>
+                    </td>
+                    <td className="py-2">
+                      <button 
+                        onClick={() => removeStaff(staff.id)}
+                        className="text-gray-500 hover:text-red-400 p-1"
+                      >
+                        <div className="w-4 h-4"><Icons.trash /></div>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <button 
+            onClick={addStaff}
+            className="mt-4 flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm font-medium transition-colors"
+          >
+            <div className="w-4 h-4"><Icons.plus /></div>
+            Add Position
+          </button>
+        </div>
+      );
+    };
+
+    // FAR Compliance Panel
+    const FARCompliancePanel = ({ compliance }) => {
+      const { primeSmallPercent, largePercent, compliant } = compliance.far52_219_14;
+      
+      return (
+        <div className={`rounded-xl border p-5 ${compliant ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`w-8 h-8 ${compliant ? 'text-emerald-400' : 'text-red-400'}`}>
+              {compliant ? <Icons.shield /> : <Icons.warning />}
+            </div>
+            <div>
+              <h3 className="text-white font-semibold">FAR 52.219-14 Compliance</h3>
+              <p className="text-gray-400 text-xs">Small Business Subcontracting Limitation</p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-400">Prime + Small Business</span>
+                <span className={`font-mono ${primeSmallPercent >= 0.5 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {formatPercent(primeSmallPercent)}
+                </span>
+              </div>
+              <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${primeSmallPercent >= 0.5 ? 'bg-emerald-500' : 'bg-red-500'}`}
+                  style={{ width: `${Math.min(primeSmallPercent * 100, 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Must be &gt;50% of personnel cost</p>
+            </div>
+            
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-400">Large Business Sub</span>
+                <span className={`font-mono ${largePercent < 0.49 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {formatPercent(largePercent)}
+                </span>
+              </div>
+              <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${largePercent < 0.49 ? 'bg-emerald-500' : 'bg-red-500'}`}
+                  style={{ width: `${Math.min(largePercent * 100, 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Must be &lt;49% of personnel cost</p>
+            </div>
+          </div>
+
+          <div className={`mt-4 p-3 rounded-lg ${compliant ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+            <p className={`text-sm font-medium ${compliant ? 'text-emerald-400' : 'text-red-400'}`}>
+              {compliant 
+                ? '✓ Compliant with FAR 52.219-14' 
+                : '⚠ Non-compliant: Adjust labor mix to meet small business requirement'}
+            </p>
+          </div>
+        </div>
+      );
+    };
+
+    // Indirect Rates Editor
+    const IndirectRatesEditor = ({ rates, setRates }) => {
+      return (
+        <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-5">
+          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <div className="w-5 h-5 text-cyan-400"><Icons.settings /></div>
+            Indirect Cost Rates
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Overhead (OH)</label>
+              <div className="relative">
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={(rates.overhead * 100).toFixed(1)}
+                  onChange={(e) => setRates(prev => ({ ...prev, overhead: parseFloat(e.target.value) / 100 || 0 }))}
+                  className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm w-full pr-8"
+                />
+                <span className="absolute right-3 top-2 text-gray-500">%</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">G&A</label>
+              <div className="relative">
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={(rates.ganda * 100).toFixed(1)}
+                  onChange={(e) => setRates(prev => ({ ...prev, ganda: parseFloat(e.target.value) / 100 || 0 }))}
+                  className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm w-full pr-8"
+                />
+                <span className="absolute right-3 top-2 text-gray-500">%</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Fee</label>
+              <div className="relative">
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={(rates.fee * 100).toFixed(1)}
+                  onChange={(e) => setRates(prev => ({ ...prev, fee: parseFloat(e.target.value) / 100 || 0 }))}
+                  className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm w-full pr-8"
+                />
+                <span className="absolute right-3 top-2 text-gray-500">%</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Escalation</label>
+              <div className="relative">
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={(rates.escalation * 100).toFixed(1)}
+                  onChange={(e) => setRates(prev => ({ ...prev, escalation: parseFloat(e.target.value) / 100 || 0 }))}
+                  className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm w-full pr-8"
+                />
+                <span className="absolute right-3 top-2 text-gray-500">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // AI Pricing Analyst Panel
+    const AIPricingAnalyst = ({ pricing, staffing, rateCard }) => {
+      const [analysis, setAnalysis] = useState(null);
+      const [loading, setLoading] = useState(false);
+
+      const runAnalysis = () => {
+        setLoading(true);
+        
+        // Simulate AI analysis
+        setTimeout(() => {
+          const issues = [];
+          const recommendations = [];
+
+          // Check for rate ceiling violations
+          staffing.forEach(staff => {
+            const rate = rateCard.find(r => r.id === staff.rateId);
+            if (rate && rate.targetRate > rate.maxRate * 0.97) {
+              issues.push(`${staff.role} (${staff.rateId}) rate is near GSA ceiling - consider lower LCAT`);
+            }
+          });
+
+          // Check labor mix
+          if (!pricing.compliance.far52_219_14.compliant) {
+            issues.push('FAR 52.219-14 non-compliant: Increase prime/small business labor mix');
+          }
+
+          // Check margin
+          const marginPercent = pricing.totals.fee / (pricing.totals.totalPrice - pricing.totals.fee);
+          if (marginPercent < 0.07) {
+            recommendations.push(`Margin at ${formatPercent(marginPercent)} - consider increasing fee rate or reducing costs`);
+          } else if (marginPercent > 0.10) {
+            recommendations.push(`Strong margin at ${formatPercent(marginPercent)} - competitive pricing achieved`);
+          }
+
+          // Check FTE utilization
+          const totalFteBase = staffing.reduce((sum, s) => sum + s.fteBase, 0);
+          if (totalFteBase < 3) {
+            recommendations.push('Consider increasing team size for contract scalability');
+          }
+
+          setAnalysis({
+            issues,
+            recommendations,
+            summary: issues.length === 0 
+              ? 'Pricing model passes all validation checks. Ready for Green Team review.'
+              : `Found ${issues.length} issue(s) requiring attention before submission.`
+          });
+          setLoading(false);
+        }, 1500);
+      };
+
+      return (
+        <div className="rounded-xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/5 to-blue-500/5 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                <div className="w-6 h-6 text-cyan-400"><Icons.ai /></div>
+              </div>
+              <div>
+                <h3 className="text-white font-semibold">Pricing Analyst Agent</h3>
+                <p className="text-gray-400 text-xs">AI-powered BOE validation & recommendations</p>
+              </div>
+            </div>
+            <button 
+              onClick={runAnalysis}
+              disabled={loading}
+              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-600 text-gray-900 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-gray-900/30 border-t-gray-900 rounded-full animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <div className="w-4 h-4"><Icons.chart /></div>
+                  Run Analysis
+                </>
+              )}
+            </button>
+          </div>
+
+          {analysis && (
+            <div className="space-y-4 mt-4 animate-slide-in">
+              <div className={`p-3 rounded-lg ${analysis.issues.length === 0 ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}>
+                <p className={`text-sm font-medium ${analysis.issues.length === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {analysis.summary}
+                </p>
+              </div>
+
+              {analysis.issues.length > 0 && (
+                <div>
+                  <h4 className="text-red-400 text-sm font-medium mb-2">⚠ Issues Found</h4>
+                  <ul className="space-y-1">
+                    {analysis.issues.map((issue, i) => (
+                      <li key={i} className="text-gray-300 text-sm flex items-start gap-2">
+                        <span className="text-red-400">•</span> {issue}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {analysis.recommendations.length > 0 && (
+                <div>
+                  <h4 className="text-cyan-400 text-sm font-medium mb-2">💡 Recommendations</h4>
+                  <ul className="space-y-1">
+                    {analysis.recommendations.map((rec, i) => (
+                      <li key={i} className="text-gray-300 text-sm flex items-start gap-2">
+                        <span className="text-cyan-400">•</span> {rec}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ========== MAIN APP ==========
+    const PricingEngine = () => {
+      const [staffing, setStaffing] = useState(DEMO_STAFFING);
+      const [indirectRates, setIndirectRates] = useState(INDIRECT_RATES);
+      const [activeTab, setActiveTab] = useState('summary');
+      
+      // Calculate pricing whenever inputs change
+      const pricing = useMemo(() => {
+        return calculatePricing(staffing, GSA_RATE_CARD, PERIODS, indirectRates);
+      }, [staffing, indirectRates]);
+
+      // Calculate derived metrics
+      const totalFTE = staffing.reduce((sum, s) => sum + s.fteBase, 0);
+      const marginPercent = pricing.totals.fee / (pricing.totals.totalPrice - pricing.totals.fee);
+
+      const tabs = [
+        { id: 'summary', name: 'Price Summary', icon: <Icons.dollar /> },
+        { id: 'staffing', name: 'Staff Needed', icon: <Icons.users /> },
+        { id: 'rates', name: 'Rate Card', icon: <Icons.chart /> },
+        { id: 'compliance', name: 'Compliance', icon: <Icons.shield /> },
+      ];
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Header */}
+          <header className="border-b border-gray-800 bg-[#0a1628]/80 backdrop-blur-sm sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
+                  <div className="w-6 h-6 text-white"><Icons.calculator /></div>
+                </div>
+                <div>
+                  <h1 className="text-white font-bold text-xl">Pricing Engine</h1>
+                  <p className="text-gray-400 text-sm">BOE Calculator · Green Team Module</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-xs font-medium">
+                  DHA MHS GENESIS
+                </span>
+                <button className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-gray-900 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
+                  <div className="w-4 h-4"><Icons.download /></div>
+                  Export BOE
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-6 py-8">
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <MetricCard 
+                title="Total Evaluated Price"
+                value={formatCurrency(pricing.totals.totalPrice)}
+                subtitle="5-year contract value"
+                icon={<Icons.dollar />}
+                color="primary"
+              />
+              <MetricCard 
+                title="Direct Labor Cost"
+                value={formatCurrency(pricing.totals.directLabor)}
+                subtitle={`${totalFTE.toFixed(1)} FTEs in Base Period`}
+                icon={<Icons.users />}
+                color="success"
+              />
+              <MetricCard 
+                title="Profit Margin"
+                value={formatPercent(marginPercent)}
+                subtitle={`${formatCurrency(pricing.totals.fee)} total fee`}
+                icon={<Icons.chart />}
+                trend={marginPercent >= 0.08 ? 2.5 : -1.5}
+                color={marginPercent >= 0.08 ? 'success' : 'warning'}
+              />
+              <MetricCard 
+                title="FAR 52.219-14"
+                value={pricing.compliance.far52_219_14.compliant ? 'Compliant' : 'Review'}
+                subtitle={`${formatPercent(pricing.compliance.far52_219_14.primeSmallPercent)} Prime+SB`}
+                icon={<Icons.shield />}
+                color={pricing.compliance.far52_219_14.compliant ? 'success' : 'danger'}
+              />
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex gap-2 mb-6 border-b border-gray-800 pb-4">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                    activeTab === tab.id 
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
+                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  }`}
+                >
+                  <div className="w-4 h-4">{tab.icon}</div>
+                  {tab.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'summary' && (
+              <div className="space-y-6 animate-slide-in">
+                <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-6">
+                  <h2 className="text-white font-semibold text-lg mb-4">Price Summary by Period</h2>
+                  <PeriodSummaryTable pricing={pricing} />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <IndirectRatesEditor rates={indirectRates} setRates={setIndirectRates} />
+                  <AIPricingAnalyst pricing={pricing} staffing={staffing} rateCard={GSA_RATE_CARD} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'staffing' && (
+              <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-6 animate-slide-in">
+                <h2 className="text-white font-semibold text-lg mb-4">Labor Staffing Plan</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  Map positions to GSA LCATs and set FTE levels by period. Values represent Full-Time Equivalents (1.0 = 2,080 hours/year).
+                </p>
+                <StaffingTable staffing={staffing} setStaffing={setStaffing} rateCard={GSA_RATE_CARD} />
+              </div>
+            )}
+
+            {activeTab === 'rates' && (
+              <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-6 animate-slide-in">
+                <h2 className="text-white font-semibold text-lg mb-4">GSA Labor Rate Card</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  GSA Schedule 70 aligned rates. Red highlight indicates rates outside acceptable band.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-400 border-b border-gray-700">
+                        <th className="pb-3 font-medium">ID</th>
+                        <th className="pb-3 font-medium">Family</th>
+                        <th className="pb-3 font-medium">Level</th>
+                        <th className="pb-3 font-medium">GSA LCAT</th>
+                        <th className="pb-3 font-medium text-right">Min Rate</th>
+                        <th className="pb-3 font-medium text-right">Target Rate</th>
+                        <th className="pb-3 font-medium text-right">Max Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-gray-300">
+                      {GSA_RATE_CARD.map(rate => (
+                        <tr key={rate.id} className="border-b border-gray-800 hover:bg-cyan-500/5">
+                          <td className="py-3 font-mono text-cyan-400">{rate.id}</td>
+                          <td className="py-3">{rate.family}</td>
+                          <td className="py-3">{rate.level}</td>
+                          <td className="py-3">{rate.lcat}</td>
+                          <td className="py-3 text-right font-mono text-gray-500">${rate.minRate.toFixed(2)}</td>
+                          <td className="py-3 text-right font-mono text-white font-semibold">${rate.targetRate.toFixed(2)}</td>
+                          <td className="py-3 text-right font-mono text-gray-500">${rate.maxRate.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'compliance' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-slide-in">
+                <FARCompliancePanel compliance={pricing.compliance} />
+                
+                <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-5">
+                  <h3 className="text-white font-semibold mb-4">Labor Mix by Entity</h3>
+                  <div className="space-y-4">
+                    {ENTITIES.map(entity => {
+                      const entityData = pricing.byEntity[entity.id];
+                      const percent = pricing.totals.directLabor > 0 
+                        ? entityData.directLabor / pricing.totals.directLabor 
+                        : 0;
+                      return (
+                        <div key={entity.id}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-300">{entity.name}</span>
+                            <span className="font-mono text-cyan-400">{formatPercent(percent)}</span>
+                          </div>
+                          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-cyan-500 rounded-full transition-all duration-500"
+                              style={{ width: `${percent * 100}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{formatCurrency(entityData.directLabor)} direct labor</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-gray-800 bg-[#0a1628]/50 mt-12">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+              <p className="text-gray-500 text-xs">
+                MissionPulse v12.0 · Pricing Engine · Shield & Pulse UX v8.0
+              </p>
+              <p className="text-amber-500/80 text-xs font-medium">
+                ⚠ AI GENERATED - REQUIRES HUMAN REVIEW
+              </p>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<PricingEngine />, document.getElementById('root'));
+  </script>
+</body>
+</html>
