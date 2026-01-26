@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Pipeline Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-slide-in { animation: slideIn 0.4s ease-out forwards; }
+    .glow-cyan { box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); }
+    .phase-badge { font-size: 10px; padding: 2px 8px; border-radius: 9999px; font-weight: 600; text-transform: uppercase; }
+  </style>
+</head>
+<body class="text-white">
+  <div id="app">
+    <!-- Loading State -->
+    <div id="loading-state" class="min-h-screen flex items-center justify-center">
+      <div class="text-center">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center animate-pulse">
+          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold text-white mb-2">Loading MissionPulse...</h2>
+        <p id="loading-status" class="text-slate-400 text-sm">Connecting to database...</p>
+      </div>
+    </div>
+
+    <!-- Main Dashboard (hidden until loaded) -->
+    <div id="dashboard" class="hidden">
+      <!-- Header -->
+      <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+              </div>
+              <div>
+                <h1 class="text-xl font-bold text-white">MissionPulse</h1>
+                <p class="text-xs text-slate-400">Pipeline Command Center</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <span id="connection-status" class="flex items-center gap-2 text-xs text-emerald-400">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                Connected
+              </span>
+              <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                <svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Stats Bar -->
+      <div class="bg-slate-900/30 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="text-center">
+              <p class="text-2xl font-bold text-white" id="stat-total">0</p>
+              <p class="text-xs text-slate-400">Total Opportunities</p>
+            </div>
+            <div class="text-center">
+              <p class="text-2xl font-bold text-emerald-400" id="stat-value">$0</p>
+              <p class="text-xs text-slate-400">Pipeline Value</p>
+            </div>
+            <div class="text-center">
+              <p class="text-2xl font-bold text-cyan-400" id="stat-active">0</p>
+              <p class="text-xs text-slate-400">Active Pursuits</p>
+            </div>
+            <div class="text-center">
+              <p class="text-2xl font-bold text-amber-400" id="stat-avgpwin">0%</p>
+              <p class="text-xs text-slate-400">Avg Win Probability</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Pipeline Cards -->
+        <div class="mb-6 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-white">Active Pipeline</h2>
+          <button onclick="refreshData()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-sm rounded-lg transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Refresh
+          </button>
+        </div>
+
+        <div id="opportunities-grid" class="grid gap-4">
+          <!-- Cards will be injected here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-16">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-800 flex items-center justify-center">
+            <svg class="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-white mb-2">No opportunities found</h3>
+          <p class="text-slate-400 text-sm">Your pipeline is empty. Add opportunities to get started.</p>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer class="border-t border-slate-800 mt-auto">
+        <div class="max-w-7xl mx-auto px-6 py-4 text-center">
+          <p class="text-xs text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+          <p class="text-xs text-slate-600 mt-1">Mission Meets Tech © 2025 | MissionPulse v1.0</p>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="hidden min-h-screen flex items-center justify-center p-6">
+      <div class="text-center max-w-md">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-500/20 flex items-center justify-center">
+          <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold text-white mb-2">Connection Error</h2>
+        <p id="error-message" class="text-slate-400 text-sm mb-4">Unable to connect to database.</p>
+        <button onclick="location.reload()" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-semibold transition-colors">
+          Try Again
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===========================================
+    // SUPABASE CONFIGURATION
+    // ===========================================
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+    
+    let supabaseClient = null;
+    let opportunities = [];
+
+    // ===========================================
+    // UTILITY FUNCTIONS
+    // ===========================================
+    function formatCurrency(value) {
+      if (!value) return '$0';
+      if (value >= 1000000000) return '$' + (value / 1000000000).toFixed(1) + 'B';
+      if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+      if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'K';
+      return '$' + value.toLocaleString();
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return 'TBD';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function getPhaseConfig(phase) {
+      const phases = {
+        'Opportunity': { color: 'bg-slate-500', text: 'text-slate-100' },
+        'Qualification': { color: 'bg-blue-500', text: 'text-blue-100' },
+        'Capture': { color: 'bg-purple-500', text: 'text-purple-100' },
+        'Proposal': { color: 'bg-amber-500', text: 'text-amber-100' },
+        'Submitted': { color: 'bg-cyan-500', text: 'text-cyan-100' },
+        'Won': { color: 'bg-emerald-500', text: 'text-emerald-100' },
+        'Lost': { color: 'bg-red-500', text: 'text-red-100' }
+      };
+      return phases[phase] || phases['Opportunity'];
+    }
+
+    function getPwinColor(pwin) {
+      if (pwin >= 70) return 'text-emerald-400';
+      if (pwin >= 50) return 'text-cyan-400';
+      if (pwin >= 30) return 'text-amber-400';
+      return 'text-red-400';
+    }
+
+    // ===========================================
+    // UI STATE MANAGEMENT
+    // ===========================================
+    function showLoading(message = 'Loading...') {
+      document.getElementById('loading-state').classList.remove('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('error-state').classList.add('hidden');
+      document.getElementById('loading-status').textContent = message;
+    }
+
+    function showDashboard() {
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      document.getElementById('error-state').classList.add('hidden');
+    }
+
+    function showError(message) {
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('error-state').classList.remove('hidden');
+      document.getElementById('error-message').textContent = message;
+    }
+
+    // ===========================================
+    // DATA RENDERING
+    // ===========================================
+    function renderStats() {
+      const total = opportunities.length;
+      const totalValue = opportunities.reduce((sum, o) => sum + (o.estimated_value || 0), 0);
+      const active = opportunities.filter(o => !['Won', 'Lost'].includes(o.phase)).length;
+      const avgPwin = total > 0 
+        ? Math.round(opportunities.reduce((sum, o) => sum + (o.pwin || 0), 0) / total) 
+        : 0;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-value').textContent = formatCurrency(totalValue);
+      document.getElementById('stat-active').textContent = active;
+      document.getElementById('stat-avgpwin').textContent = avgPwin + '%';
+    }
+
+    function renderOpportunities() {
+      const grid = document.getElementById('opportunities-grid');
+      const emptyState = document.getElementById('empty-state');
+
+      if (opportunities.length === 0) {
+        grid.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      grid.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      grid.innerHTML = opportunities.map((opp, index) => {
+        const phaseConfig = getPhaseConfig(opp.phase);
+        const pwinColor = getPwinColor(opp.pwin || 0);
+        
+        return `
+          <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 hover:border-cyan-500/50 transition-all cursor-pointer animate-slide-in" style="animation-delay: ${index * 50}ms">
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="phase-badge ${phaseConfig.color} ${phaseConfig.text}">${opp.phase || 'Opportunity'}</span>
+                  ${opp.priority === 'High' ? '<span class="phase-badge bg-red-500/20 text-red-400 border border-red-500/30">HIGH PRIORITY</span>' : ''}
+                </div>
+                <h3 class="text-base font-semibold text-white">${opp.nickname || opp.title}</h3>
+                <p class="text-sm text-slate-400">${opp.agency || 'Agency TBD'}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-bold text-white">${formatCurrency(opp.estimated_value)}</p>
+                <p class="text-xs text-slate-400">${opp.contract_type || 'Contract Type TBD'}</p>
+              </div>
+            </div>
+            
+            <p class="text-sm text-slate-300 mb-4 line-clamp-2">${opp.description || 'No description available.'}</p>
+            
+            <div class="flex items-center justify-between pt-3 border-t border-slate-700">
+              <div class="flex items-center gap-4">
+                <div>
+                  <p class="text-xs text-slate-400">Win Probability</p>
+                  <p class="text-sm font-semibold ${pwinColor}">${opp.pwin || 0}%</p>
+                </div>
+                <div>
+                  <p class="text-xs text-slate-400">Due Date</p>
+                  <p class="text-sm font-semibold text-white">${formatDate(opp.proposal_due)}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                ${opp.go_no_go === 'Go' ? '<span class="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full font-semibold">GO</span>' : ''}
+                ${opp.go_no_go === 'No-Go' ? '<span class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full font-semibold">NO-GO</span>' : ''}
+                <button class="p-2 hover:bg-slate-700 rounded-lg transition-colors" title="View Details">
+                  <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ===========================================
+    // DATA FETCHING
+    // ===========================================
+    async function fetchOpportunities() {
+      try {
+        const { data, error } = await supabaseClient
+          .from('opportunities')
+          .select('*')
+          .eq('is_archived', false)
+          .order('estimated_value', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
+      }
+    }
+
+    async function refreshData() {
+      try {
+        opportunities = await fetchOpportunities();
+        renderStats();
+        renderOpportunities();
+      } catch (error) {
+        console.error('Refresh error:', error);
+      }
+    }
+
+    // ===========================================
+    // INITIALIZATION
+    // ===========================================
+    async function init() {
+      showLoading('Connecting to database...');
+
+      try {
+        // Initialize Supabase client
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        showLoading('Loading pipeline data...');
+        
+        // Fetch opportunities
+        opportunities = await fetchOpportunities();
+        
+        // Render UI
+        renderStats();
+        renderOpportunities();
+        
+        // Show dashboard
+        showDashboard();
+        
+        console.log('MissionPulse initialized successfully');
+        console.log(`Loaded ${opportunities.length} opportunities`);
+        
+      } catch (error) {
+        console.error('Initialization error:', error);
+        showError(error.message || 'Failed to connect to database. Please try again.');
+      }
+    }
+
+    // Start the app
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
