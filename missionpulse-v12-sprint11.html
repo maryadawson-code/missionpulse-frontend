@@ -1,0 +1,2918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 - Sprint 11</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #475569; }
+    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    .animate-slideIn { animation: slideIn 0.2s ease-out; }
+    .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .dragging { opacity: 0.5; transform: scale(1.02); }
+    .drag-over { background: rgba(0, 229, 250, 0.1); border: 2px dashed #00E5FA; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+    // =================================================================
+    // SUPABASE CLIENT CONFIGURATION
+    // =================================================================
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // =================================================================
+    // CONSTANTS & FIELD MAPPING
+    // =================================================================
+    const SHIPLEY_PHASES = [
+      { key: 'gate_1', name: 'Gate 1', color: '#94a3b8', order: 1 },
+      { key: 'blue_team', name: 'Blue Team', color: '#60a5fa', order: 2 },
+      { key: 'pink_team', name: 'Pink Team', color: '#f472b6', order: 3 },
+      { key: 'red_team', name: 'Red Team', color: '#ef4444', order: 4 },
+      { key: 'gold_team', name: 'Gold Team', color: '#fbbf24', order: 5 },
+      { key: 'submitted', name: 'Submitted', color: '#22c55e', order: 6 },
+      { key: 'awarded', name: 'Awarded', color: '#8b5cf6', order: 7 },
+      { key: 'lost', name: 'Lost', color: '#64748b', order: 8 }
+    ];
+
+    const PRIORITIES = [
+      { key: 'P-0', name: 'P-0 Critical', color: '#ef4444' },
+      { key: 'P-1', name: 'P-1 High', color: '#f97316' },
+      { key: 'P-2', name: 'P-2 Medium', color: '#eab308' },
+      { key: 'P-3', name: 'P-3 Low', color: '#6b7280' }
+    ];
+
+    const AGENCIES = ['DHA', 'VA', 'CMS', 'IHS', 'CDC', 'NIH', 'FDA', 'HHS', 'DoD', 'GSA'];
+
+    const mapToFrontend = (record) => {
+      if (!record) return null;
+      return {
+        id: record.id,
+        name: record.name,
+        agency: record.agency,
+        contractValue: record.contract_value,
+        priority: record.priority,
+        shipleyPhase: record.shipley_phase,
+        winProbability: record.win_probability,
+        dueDate: record.due_date,
+        solicitationNumber: record.solicitation_number,
+        description: record.description,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at
+      };
+    };
+
+    const mapToDatabase = (data) => {
+      const mapped = {};
+      if (data.name !== undefined) mapped.name = data.name;
+      if (data.agency !== undefined) mapped.agency = data.agency;
+      if (data.contractValue !== undefined) mapped.contract_value = data.contractValue;
+      if (data.priority !== undefined) mapped.priority = data.priority;
+      if (data.shipleyPhase !== undefined) mapped.shipley_phase = data.shipleyPhase;
+      if (data.winProbability !== undefined) mapped.win_probability = data.winProbability;
+      if (data.dueDate !== undefined) mapped.due_date = data.dueDate;
+      if (data.solicitationNumber !== undefined) mapped.solicitation_number = data.solicitationNumber;
+      if (data.description !== undefined) mapped.description = data.description;
+      return mapped;
+    };
+
+    const formatCurrency = (value) => {
+      if (!value) return '$0';
+      if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+      if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+      if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+      return `$${value.toLocaleString()}`;
+    };
+
+    const formatDate = (date) => {
+      if (!date) return '';
+      return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    const getDaysRemaining = (dueDate) => {
+      if (!dueDate) return null;
+      const due = new Date(dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      due.setHours(0, 0, 0, 0);
+      return Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+    };
+
+    const getPhaseInfo = (phaseKey) => SHIPLEY_PHASES.find(p => p.key === phaseKey) || SHIPLEY_PHASES[0];
+    const getPriorityInfo = (priorityKey) => PRIORITIES.find(p => p.key === priorityKey) || PRIORITIES[3];
+
+    // =================================================================
+    // ICONS
+    // =================================================================
+    const Icons = {
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>,
+      chevronLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>,
+      kanban: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>,
+      table: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>,
+      calendar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
+      bell: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>,
+      settings: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
+      activity: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>,
+      filter: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>,
+      copy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>,
+      moreVertical: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+      alertCircle: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+      arrowUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>,
+      arrowDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>,
+      arrowRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>,
+      command: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 3a3 3 0 00-3 3v12a3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3H6a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3V6a3 3 0 00-3-3 3 3 0 00-3 3 3 3 0 003 3h12a3 3 0 003-3 3 3 0 00-3-3z"/></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-flex items-center justify-center ${className}`}><IconComponent /></span> : null;
+    };
+
+    // =================================================================
+    // TOAST COMPONENT
+    // =================================================================
+    const Toast = ({ message, type = 'info', onClose }) => {
+      useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+      }, [onClose]);
+
+      const bgColors = {
+        success: 'bg-green-500/20 border-green-500/50',
+        error: 'bg-red-500/20 border-red-500/50',
+        info: 'bg-cyan-500/20 border-cyan-500/50',
+        warning: 'bg-amber-500/20 border-amber-500/50'
+      };
+
+      return (
+        <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg border ${bgColors[type]} text-white animate-slideIn z-50`}>
+          <div className="flex items-center gap-2">
+            <span>{message}</span>
+            <button onClick={onClose} className="text-white/60 hover:text-white">
+              <Icon name="x" className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    // =================================================================
+    // DEFAULT SETTINGS
+    // =================================================================
+    const DEFAULT_SETTINGS = {
+      defaultView: 'board',
+      cardsPerRow: 'auto',
+      showCompleted: true,
+      compactMode: false,
+      notifications: {
+        dueSoon: true,
+        phaseStuck: true,
+        highValue: true,
+        dueDaysThreshold: 3,
+        soundEnabled: false,
+      },
+    };
+
+    // =================================================================
+    // MAIN APP COMPONENT
+    // =================================================================
+    const App = () => {
+      // State
+      const [opportunities, setOpportunities] = useState([]);
+      const [activities, setActivities] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [view, setView] = useState(() => {
+        const saved = localStorage.getItem('MP_SETTINGS');
+        if (saved) {
+          const settings = JSON.parse(saved);
+          return settings.defaultView || 'board';
+        }
+        return 'board';
+      });
+      const [filters, setFilters] = useState({
+        search: '',
+        agencies: [],
+        priorities: [],
+        phases: [],
+        pWinMin: 0,
+        pWinMax: 100,
+        dueDateStart: null,
+        dueDateEnd: null
+      });
+      const [drawerOpen, setDrawerOpen] = useState(false);
+      const [selectedOpportunity, setSelectedOpportunity] = useState(null);
+      const [activityPanelOpen, setActivityPanelOpen] = useState(false);
+      const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+      const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+      const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+      const [toast, setToast] = useState(null);
+      const [draggingId, setDraggingId] = useState(null);
+      const [selectedIds, setSelectedIds] = useState(new Set());
+      const [lastSelectedId, setLastSelectedId] = useState(null);
+      const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+      const [calendarDate, setCalendarDate] = useState(new Date());
+      const [notifications, setNotifications] = useState([]);
+      const [dismissedNotifications, setDismissedNotifications] = useState(() => {
+        const saved = localStorage.getItem('MP_DISMISSED_NOTIFICATIONS');
+        return saved ? JSON.parse(saved) : [];
+      });
+      const [settings, setSettings] = useState(() => {
+        const saved = localStorage.getItem('MP_SETTINGS');
+        return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+      });
+      const [recentlyViewed, setRecentlyViewed] = useState(() => {
+        const saved = localStorage.getItem('MP_RECENTLY_VIEWED');
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      // =================================================================
+      // DATA FETCHING & SUBSCRIPTIONS
+      // =================================================================
+      const fetchOpportunities = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('opportunities')
+            .select('*')
+            .order('due_date', { ascending: true });
+
+          if (error) throw error;
+          setOpportunities((data || []).map(mapToFrontend));
+        } catch (err) {
+          console.error('Error fetching opportunities:', err);
+          showToast('Failed to load opportunities', 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const fetchActivities = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('activity_log')
+            .select('*, opportunities(name)')
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+          if (error) throw error;
+          setActivities(data || []);
+        } catch (err) {
+          console.error('Error fetching activities:', err);
+        }
+      };
+
+      const logActivity = async (opportunityId, action, fieldChanged = null, oldValue = null, newValue = null) => {
+        try {
+          await supabase.from('activity_log').insert([{
+            opportunity_id: opportunityId,
+            action,
+            field_changed: fieldChanged,
+            old_value: oldValue?.toString(),
+            new_value: newValue?.toString(),
+            user_id: 'system'
+          }]);
+          fetchActivities();
+        } catch (err) {
+          console.error('Error logging activity:', err);
+        }
+      };
+
+      useEffect(() => {
+        fetchOpportunities();
+        fetchActivities();
+
+        // Real-time subscription
+        const channel = supabase
+          .channel('opportunities-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, (payload) => {
+            if (payload.eventType === 'INSERT') {
+              setOpportunities(prev => [...prev, mapToFrontend(payload.new)]);
+            } else if (payload.eventType === 'UPDATE') {
+              setOpportunities(prev => prev.map(o => o.id === payload.new.id ? mapToFrontend(payload.new) : o));
+            } else if (payload.eventType === 'DELETE') {
+              setOpportunities(prev => prev.filter(o => o.id !== payload.old.id));
+            }
+          })
+          .subscribe();
+
+        return () => supabase.removeChannel(channel);
+      }, []);
+
+      // Save settings to localStorage
+      useEffect(() => {
+        localStorage.setItem('MP_SETTINGS', JSON.stringify(settings));
+      }, [settings]);
+
+      // Generate notifications
+      useEffect(() => {
+        const generateNotifications = () => {
+          const newNotifications = [];
+          const now = new Date();
+
+          opportunities.forEach(opp => {
+            // Due Soon notifications
+            if (settings.notifications.dueSoon && opp.dueDate) {
+              const daysRemaining = getDaysRemaining(opp.dueDate);
+              if (daysRemaining !== null && daysRemaining <= settings.notifications.dueDaysThreshold && daysRemaining >= 0) {
+                const id = `due-soon-${opp.id}`;
+                if (!dismissedNotifications.includes(id)) {
+                  newNotifications.push({
+                    id,
+                    type: 'dueSoon',
+                    opportunityId: opp.id,
+                    title: 'Due Soon',
+                    message: `${opp.name} is due in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`,
+                    timestamp: now,
+                    color: '#ef4444'
+                  });
+                }
+              }
+            }
+
+            // Phase Stuck notifications
+            if (settings.notifications.phaseStuck && opp.updatedAt) {
+              const daysSinceUpdate = Math.floor((now - new Date(opp.updatedAt)) / (1000 * 60 * 60 * 24));
+              if (daysSinceUpdate >= 7 && !['awarded', 'lost', 'submitted'].includes(opp.shipleyPhase)) {
+                const id = `phase-stuck-${opp.id}`;
+                if (!dismissedNotifications.includes(id)) {
+                  newNotifications.push({
+                    id,
+                    type: 'phaseStuck',
+                    opportunityId: opp.id,
+                    title: 'Phase Stuck',
+                    message: `${opp.name} hasn't progressed in ${daysSinceUpdate} days`,
+                    timestamp: now,
+                    color: '#f59e0b'
+                  });
+                }
+              }
+            }
+
+            // High Value Alert notifications
+            if (settings.notifications.highValue && opp.priority === 'P-0') {
+              const daysRemaining = getDaysRemaining(opp.dueDate);
+              if (daysRemaining !== null && daysRemaining <= 14 && daysRemaining >= 0) {
+                const id = `high-value-${opp.id}`;
+                if (!dismissedNotifications.includes(id)) {
+                  newNotifications.push({
+                    id,
+                    type: 'highValue',
+                    opportunityId: opp.id,
+                    title: 'P-0 Alert',
+                    message: `Critical opportunity ${opp.name} needs attention`,
+                    timestamp: now,
+                    color: '#00E5FA'
+                  });
+                }
+              }
+            }
+          });
+
+          setNotifications(newNotifications);
+        };
+
+        generateNotifications();
+        const interval = setInterval(generateNotifications, 300000); // 5 minutes
+        return () => clearInterval(interval);
+      }, [opportunities, settings.notifications, dismissedNotifications]);
+
+      // =================================================================
+      // CRUD OPERATIONS
+      // =================================================================
+      const createOpportunity = async (data) => {
+        try {
+          const dbData = mapToDatabase(data);
+          const { data: newOpp, error } = await supabase
+            .from('opportunities')
+            .insert([dbData])
+            .select()
+            .single();
+
+          if (error) throw error;
+          await logActivity(newOpp.id, 'created');
+          showToast('Opportunity created', 'success');
+          return mapToFrontend(newOpp);
+        } catch (err) {
+          console.error('Error creating opportunity:', err);
+          showToast('Failed to create opportunity', 'error');
+          return null;
+        }
+      };
+
+      const updateOpportunity = async (id, updates, logChanges = true) => {
+        try {
+          const dbData = mapToDatabase(updates);
+          dbData.updated_at = new Date().toISOString();
+
+          // Get old values for logging
+          const oldOpp = opportunities.find(o => o.id === id);
+
+          const { data, error } = await supabase
+            .from('opportunities')
+            .update(dbData)
+            .eq('id', id)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          if (logChanges && oldOpp) {
+            Object.keys(updates).forEach(key => {
+              if (oldOpp[key] !== updates[key]) {
+                logActivity(id, 'updated', key, oldOpp[key], updates[key]);
+              }
+            });
+          }
+
+          showToast('Opportunity updated', 'success');
+          return mapToFrontend(data);
+        } catch (err) {
+          console.error('Error updating opportunity:', err);
+          showToast('Failed to update opportunity', 'error');
+          return null;
+        }
+      };
+
+      const deleteOpportunity = async (id) => {
+        try {
+          const { error } = await supabase
+            .from('opportunities')
+            .delete()
+            .eq('id', id);
+
+          if (error) throw error;
+          showToast('Opportunity deleted', 'success');
+        } catch (err) {
+          console.error('Error deleting opportunity:', err);
+          showToast('Failed to delete opportunity', 'error');
+        }
+      };
+
+      const duplicateOpportunity = async (opp) => {
+        const newOpp = {
+          ...opp,
+          name: `${opp.name} (Copy)`,
+          id: undefined,
+          createdAt: undefined,
+          updatedAt: undefined
+        };
+        return createOpportunity(newOpp);
+      };
+
+      // =================================================================
+      // UI HELPERS
+      // =================================================================
+      const showToast = (message, type = 'info') => {
+        setToast({ message, type });
+      };
+
+      const openDrawer = (opp) => {
+        setSelectedOpportunity(opp);
+        setDrawerOpen(true);
+        
+        // Track recently viewed
+        setRecentlyViewed(prev => {
+          const filtered = prev.filter(id => id !== opp.id);
+          const updated = [opp.id, ...filtered].slice(0, 5);
+          localStorage.setItem('MP_RECENTLY_VIEWED', JSON.stringify(updated));
+          return updated;
+        });
+      };
+
+      const closeDrawer = () => {
+        setDrawerOpen(false);
+        setSelectedOpportunity(null);
+      };
+
+      const dismissNotification = (id) => {
+        setDismissedNotifications(prev => {
+          const updated = [...prev, id];
+          localStorage.setItem('MP_DISMISSED_NOTIFICATIONS', JSON.stringify(updated));
+          return updated;
+        });
+      };
+
+      const dismissAllNotifications = () => {
+        const ids = notifications.map(n => n.id);
+        setDismissedNotifications(prev => {
+          const updated = [...prev, ...ids];
+          localStorage.setItem('MP_DISMISSED_NOTIFICATIONS', JSON.stringify(updated));
+          return updated;
+        });
+      };
+
+      // =================================================================
+      // FILTERING
+      // =================================================================
+      const filteredOpportunities = useMemo(() => {
+        let result = opportunities;
+
+        // Hide completed if setting is off
+        if (!settings.showCompleted) {
+          result = result.filter(o => !['awarded', 'lost'].includes(o.shipleyPhase));
+        }
+
+        // Search
+        if (filters.search) {
+          const search = filters.search.toLowerCase();
+          result = result.filter(o => 
+            o.name?.toLowerCase().includes(search) ||
+            o.agency?.toLowerCase().includes(search) ||
+            o.solicitationNumber?.toLowerCase().includes(search)
+          );
+        }
+
+        // Agency filter
+        if (filters.agencies.length > 0) {
+          result = result.filter(o => filters.agencies.includes(o.agency));
+        }
+
+        // Priority filter
+        if (filters.priorities.length > 0) {
+          result = result.filter(o => filters.priorities.includes(o.priority));
+        }
+
+        // Phase filter
+        if (filters.phases.length > 0) {
+          result = result.filter(o => filters.phases.includes(o.shipleyPhase));
+        }
+
+        // pWin filter
+        result = result.filter(o => {
+          const pWin = o.winProbability || 0;
+          return pWin >= filters.pWinMin && pWin <= filters.pWinMax;
+        });
+
+        // Date range filter
+        if (filters.dueDateStart) {
+          result = result.filter(o => o.dueDate && new Date(o.dueDate) >= new Date(filters.dueDateStart));
+        }
+        if (filters.dueDateEnd) {
+          result = result.filter(o => o.dueDate && new Date(o.dueDate) <= new Date(filters.dueDateEnd));
+        }
+
+        return result;
+      }, [opportunities, filters, settings.showCompleted]);
+
+      // =================================================================
+      // KEYBOARD SHORTCUTS
+      // =================================================================
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          // Ignore if typing in input
+          if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+          // Command Palette: Cmd/Ctrl + K
+          if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            setCommandPaletteOpen(true);
+            return;
+          }
+
+          // Escape closes panels
+          if (e.key === 'Escape') {
+            if (commandPaletteOpen) setCommandPaletteOpen(false);
+            else if (drawerOpen) closeDrawer();
+            else if (activityPanelOpen) setActivityPanelOpen(false);
+            else if (notificationPanelOpen) setNotificationPanelOpen(false);
+            else if (settingsPanelOpen) setSettingsPanelOpen(false);
+            return;
+          }
+
+          // View shortcuts: 1, 2, 3
+          if (e.key === '1') setView('board');
+          if (e.key === '2') setView('table');
+          if (e.key === '3') setView('calendar');
+
+          // N for new opportunity
+          if (e.key === 'n' || e.key === 'N') {
+            e.preventDefault();
+            openDrawer(null);
+          }
+
+          // F for filters toggle
+          if (e.key === 'f' || e.key === 'F') {
+            e.preventDefault();
+            // Toggle filter visibility (could add filter panel state)
+          }
+
+          // / for search focus
+          if (e.key === '/') {
+            e.preventDefault();
+            document.querySelector('input[type="text"]')?.focus();
+          }
+
+          // ? for help
+          if (e.key === '?' && e.shiftKey) {
+            showToast('Shortcuts: 1/2/3=Views, N=New, /=Search, Cmd+K=Command', 'info');
+          }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [commandPaletteOpen, drawerOpen, activityPanelOpen, notificationPanelOpen, settingsPanelOpen]);
+
+      // =================================================================
+      // DRAG AND DROP
+      // =================================================================
+      const handleDragStart = (e, id) => {
+        setDraggingId(id);
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.classList.add('dragging');
+      };
+
+      const handleDragEnd = (e) => {
+        setDraggingId(null);
+        e.target.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      };
+
+      const handleDragOver = (e) => {
+        e.preventDefault();
+        e.currentTarget.classList.add('drag-over');
+      };
+
+      const handleDragLeave = (e) => {
+        e.currentTarget.classList.remove('drag-over');
+      };
+
+      const handleDrop = async (e, targetPhase) => {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        
+        if (!draggingId) return;
+
+        const opp = opportunities.find(o => o.id === draggingId);
+        if (opp && opp.shipleyPhase !== targetPhase) {
+          // Optimistic update
+          setOpportunities(prev => prev.map(o => 
+            o.id === draggingId ? { ...o, shipleyPhase: targetPhase } : o
+          ));
+
+          // Actually update
+          const result = await updateOpportunity(draggingId, { shipleyPhase: targetPhase });
+          if (!result) {
+            // Rollback on error
+            setOpportunities(prev => prev.map(o => 
+              o.id === draggingId ? opp : o
+            ));
+          } else {
+            await logActivity(draggingId, 'phase_changed', 'shipleyPhase', opp.shipleyPhase, targetPhase);
+          }
+        }
+        setDraggingId(null);
+      };
+
+      // =================================================================
+      // EXPORT FUNCTIONS
+      // =================================================================
+      const exportToCSV = () => {
+        const headers = ['Name', 'Agency', 'Contract Value', 'Priority', 'Phase', 'Win Probability', 'Due Date', 'Solicitation'];
+        const rows = filteredOpportunities.map(o => [
+          o.name,
+          o.agency,
+          o.contractValue,
+          o.priority,
+          getPhaseInfo(o.shipleyPhase).name,
+          o.winProbability,
+          o.dueDate,
+          o.solicitationNumber
+        ]);
+
+        const csv = [headers, ...rows].map(row => row.map(cell => `"${cell || ''}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `missionpulse-export-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Exported to CSV', 'success');
+      };
+
+      const exportToJSON = () => {
+        const json = JSON.stringify(filteredOpportunities, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `missionpulse-export-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Exported to JSON', 'success');
+      };
+
+      // =================================================================
+      // STATS
+      // =================================================================
+      const stats = useMemo(() => {
+        const total = filteredOpportunities.length;
+        const totalValue = filteredOpportunities.reduce((sum, o) => sum + (o.contractValue || 0), 0);
+        const avgPwin = total > 0 
+          ? Math.round(filteredOpportunities.reduce((sum, o) => sum + (o.winProbability || 0), 0) / total)
+          : 0;
+        
+        const now = new Date();
+        const dueThisMonth = filteredOpportunities.filter(o => {
+          if (!o.dueDate) return false;
+          const due = new Date(o.dueDate);
+          return due.getMonth() === now.getMonth() && due.getFullYear() === now.getFullYear();
+        }).length;
+
+        const activity24h = activities.filter(a => {
+          const created = new Date(a.created_at);
+          return (now - created) < 24 * 60 * 60 * 1000;
+        }).length;
+
+        return { total, totalValue, avgPwin, dueThisMonth, activity24h };
+      }, [filteredOpportunities, activities]);
+
+      // =================================================================
+      // RENDER
+      // =================================================================
+      return (
+        <div className="min-h-screen bg-[#00050F] text-white">
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 sticky top-0 z-40">
+            <div className="max-w-[1800px] mx-auto px-4 py-3">
+              <div className="flex items-center justify-between">
+                {/* Logo & Title */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                    <Icon name="shield" className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-lg font-bold text-white">MissionPulse</h1>
+                    <p className="text-xs text-slate-400">Sprint 11</p>
+                  </div>
+                </div>
+
+                {/* Stats Bar */}
+                <div className="hidden md:flex items-center gap-6">
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-cyan-400">{stats.total}</p>
+                    <p className="text-xs text-slate-400">Opportunities</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-green-400">{formatCurrency(stats.totalValue)}</p>
+                    <p className="text-xs text-slate-400">Pipeline</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-amber-400">{stats.avgPwin}%</p>
+                    <p className="text-xs text-slate-400">Avg pWin</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-purple-400">{stats.dueThisMonth}</p>
+                    <p className="text-xs text-slate-400">Due This Month</p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  {/* Command Palette Hint */}
+                  <button
+                    onClick={() => setCommandPaletteOpen(true)}
+                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white text-sm"
+                  >
+                    <Icon name="search" className="w-4 h-4" />
+                    <span>Search...</span>
+                    <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-xs">⌘K</kbd>
+                  </button>
+
+                  {/* Activity Button */}
+                  <button
+                    onClick={() => setActivityPanelOpen(true)}
+                    className="relative p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white"
+                    title="Activity Log"
+                  >
+                    <Icon name="activity" className="w-5 h-5" />
+                    {stats.activity24h > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-cyan-500 rounded-full text-[10px] font-bold flex items-center justify-center">
+                        {stats.activity24h}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Notification Button */}
+                  <button
+                    onClick={() => setNotificationPanelOpen(true)}
+                    className="relative p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white"
+                    title="Notifications"
+                  >
+                    <Icon name="bell" className="w-5 h-5" />
+                    {notifications.length > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center">
+                        {notifications.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Settings Button */}
+                  <button
+                    onClick={() => setSettingsPanelOpen(true)}
+                    className="p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white"
+                    title="Settings"
+                  >
+                    <Icon name="settings" className="w-5 h-5" />
+                  </button>
+
+                  {/* New Opportunity */}
+                  <button
+                    onClick={() => openDrawer(null)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-medium hover:opacity-90"
+                  >
+                    <Icon name="plus" className="w-4 h-4" />
+                    <span className="hidden sm:inline">New</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Toolbar */}
+          <div className="bg-slate-900/50 border-b border-slate-700/30 sticky top-[73px] z-30">
+            <div className="max-w-[1800px] mx-auto px-4 py-2">
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* View Toggle */}
+                <div className="flex bg-slate-800 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setView('board')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                      view === 'board' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Icon name="kanban" className="w-4 h-4" />
+                    <span className="hidden sm:inline">Board</span>
+                    <kbd className="hidden md:inline text-[10px] text-slate-500 ml-1">1</kbd>
+                  </button>
+                  <button
+                    onClick={() => setView('table')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                      view === 'table' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Icon name="table" className="w-4 h-4" />
+                    <span className="hidden sm:inline">Table</span>
+                    <kbd className="hidden md:inline text-[10px] text-slate-500 ml-1">2</kbd>
+                  </button>
+                  <button
+                    onClick={() => setView('calendar')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                      view === 'calendar' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Icon name="calendar" className="w-4 h-4" />
+                    <span className="hidden sm:inline">Calendar</span>
+                    <kbd className="hidden md:inline text-[10px] text-slate-500 ml-1">3</kbd>
+                  </button>
+                </div>
+
+                {/* Search */}
+                <div className="relative flex-1 max-w-md">
+                  <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search opportunities..."
+                    value={filters.search}
+                    onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Filter Dropdowns */}
+                <FilterDropdown
+                  label="Agency"
+                  options={AGENCIES}
+                  selected={filters.agencies}
+                  onChange={(agencies) => setFilters(f => ({ ...f, agencies }))}
+                />
+                <FilterDropdown
+                  label="Priority"
+                  options={PRIORITIES.map(p => p.key)}
+                  selected={filters.priorities}
+                  onChange={(priorities) => setFilters(f => ({ ...f, priorities }))}
+                  renderOption={(key) => {
+                    const p = getPriorityInfo(key);
+                    return (
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+                        {p.name}
+                      </span>
+                    );
+                  }}
+                />
+                <FilterDropdown
+                  label="Phase"
+                  options={SHIPLEY_PHASES.map(p => p.key)}
+                  selected={filters.phases}
+                  onChange={(phases) => setFilters(f => ({ ...f, phases }))}
+                  renderOption={(key) => {
+                    const p = getPhaseInfo(key);
+                    return (
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+                        {p.name}
+                      </span>
+                    );
+                  }}
+                />
+
+                {/* Clear Filters */}
+                {(filters.search || filters.agencies.length || filters.priorities.length || filters.phases.length || filters.pWinMin > 0 || filters.pWinMax < 100) && (
+                  <button
+                    onClick={() => setFilters({
+                      search: '',
+                      agencies: [],
+                      priorities: [],
+                      phases: [],
+                      pWinMin: 0,
+                      pWinMax: 100,
+                      dueDateStart: null,
+                      dueDateEnd: null
+                    })}
+                    className="flex items-center gap-1 px-3 py-2 text-sm text-slate-400 hover:text-white"
+                  >
+                    <Icon name="x" className="w-4 h-4" />
+                    Clear All
+                    <span className="ml-1 px-1.5 py-0.5 bg-slate-700 rounded text-xs">
+                      {[
+                        filters.search ? 1 : 0,
+                        filters.agencies.length,
+                        filters.priorities.length,
+                        filters.phases.length,
+                        (filters.pWinMin > 0 || filters.pWinMax < 100) ? 1 : 0
+                      ].reduce((a, b) => a + b, 0)}
+                    </span>
+                  </button>
+                )}
+
+                {/* Export Dropdown */}
+                <ExportDropdown onExportCSV={exportToCSV} onExportJSON={exportToJSON} />
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <main className="max-w-[1800px] mx-auto px-4 py-6">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : view === 'board' ? (
+              <BoardView
+                opportunities={filteredOpportunities}
+                onCardClick={openDrawer}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                draggingId={draggingId}
+                settings={settings}
+                onUpdateOpportunity={updateOpportunity}
+                onDeleteOpportunity={deleteOpportunity}
+                onDuplicateOpportunity={duplicateOpportunity}
+              />
+            ) : view === 'table' ? (
+              <TableView
+                opportunities={filteredOpportunities}
+                onRowClick={openDrawer}
+                sortConfig={sortConfig}
+                setSortConfig={setSortConfig}
+                selectedIds={selectedIds}
+                setSelectedIds={setSelectedIds}
+                lastSelectedId={lastSelectedId}
+                setLastSelectedId={setLastSelectedId}
+                onBulkDelete={async (ids) => {
+                  for (const id of ids) {
+                    await deleteOpportunity(id);
+                  }
+                  setSelectedIds(new Set());
+                }}
+                onBulkPhaseChange={async (ids, phase) => {
+                  for (const id of ids) {
+                    await updateOpportunity(id, { shipleyPhase: phase });
+                  }
+                  setSelectedIds(new Set());
+                }}
+                settings={settings}
+              />
+            ) : (
+              <CalendarView
+                opportunities={filteredOpportunities}
+                calendarDate={calendarDate}
+                setCalendarDate={setCalendarDate}
+                onDayClick={(date) => {
+                  setSelectedOpportunity({ dueDate: date.toISOString().split('T')[0] });
+                  setDrawerOpen(true);
+                }}
+                onOpportunityClick={openDrawer}
+              />
+            )}
+          </main>
+
+          {/* Drawer */}
+          {drawerOpen && (
+            <OpportunityDrawer
+              opportunity={selectedOpportunity}
+              onClose={closeDrawer}
+              onSave={async (data) => {
+                if (selectedOpportunity?.id) {
+                  await updateOpportunity(selectedOpportunity.id, data);
+                } else {
+                  await createOpportunity(data);
+                }
+                closeDrawer();
+              }}
+              onDelete={async () => {
+                if (selectedOpportunity?.id) {
+                  await deleteOpportunity(selectedOpportunity.id);
+                  closeDrawer();
+                }
+              }}
+              activities={activities.filter(a => a.opportunity_id === selectedOpportunity?.id)}
+            />
+          )}
+
+          {/* Activity Panel */}
+          {activityPanelOpen && (
+            <ActivityPanel
+              activities={activities}
+              opportunities={opportunities}
+              onClose={() => setActivityPanelOpen(false)}
+              onOpportunityClick={(id) => {
+                const opp = opportunities.find(o => o.id === id);
+                if (opp) openDrawer(opp);
+              }}
+            />
+          )}
+
+          {/* Notification Panel */}
+          {notificationPanelOpen && (
+            <NotificationPanel
+              notifications={notifications}
+              onClose={() => setNotificationPanelOpen(false)}
+              onDismiss={dismissNotification}
+              onDismissAll={dismissAllNotifications}
+              onNotificationClick={(notification) => {
+                const opp = opportunities.find(o => o.id === notification.opportunityId);
+                if (opp) {
+                  openDrawer(opp);
+                  setNotificationPanelOpen(false);
+                }
+              }}
+            />
+          )}
+
+          {/* Settings Panel */}
+          {settingsPanelOpen && (
+            <SettingsPanel
+              settings={settings}
+              onClose={() => setSettingsPanelOpen(false)}
+              onSave={(newSettings) => {
+                setSettings(newSettings);
+                setSettingsPanelOpen(false);
+                showToast('Settings saved', 'success');
+              }}
+              onReset={() => {
+                setSettings(DEFAULT_SETTINGS);
+                showToast('Settings reset to defaults', 'info');
+              }}
+              onExportAll={exportToJSON}
+            />
+          )}
+
+          {/* Command Palette */}
+          {commandPaletteOpen && (
+            <CommandPalette
+              opportunities={opportunities}
+              recentlyViewed={recentlyViewed}
+              onClose={() => setCommandPaletteOpen(false)}
+              onSelectOpportunity={(opp) => {
+                openDrawer(opp);
+                setCommandPaletteOpen(false);
+              }}
+              onAction={(action) => {
+                setCommandPaletteOpen(false);
+                switch (action) {
+                  case 'new': openDrawer(null); break;
+                  case 'export-csv': exportToCSV(); break;
+                  case 'export-json': exportToJSON(); break;
+                  case 'settings': setSettingsPanelOpen(true); break;
+                  case 'board': setView('board'); break;
+                  case 'table': setView('table'); break;
+                  case 'calendar': setView('calendar'); break;
+                }
+              }}
+            />
+          )}
+
+          {/* Toast */}
+          {toast && (
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast(null)}
+            />
+          )}
+
+          {/* Liability Footer */}
+          <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/90 border-t border-slate-700/50 py-1 px-4 text-center">
+            <p className="text-xs text-slate-500">
+              AI GENERATED - REQUIRES HUMAN REVIEW | © 2026 Mission Meets Tech
+            </p>
+          </footer>
+        </div>
+      );
+    };
+
+    // =================================================================
+    // FILTER DROPDOWN COMPONENT
+    // =================================================================
+    const FilterDropdown = ({ label, options, selected, onChange, renderOption }) => {
+      const [open, setOpen] = useState(false);
+      const ref = useRef(null);
+
+      useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, []);
+
+      const toggle = (option) => {
+        if (selected.includes(option)) {
+          onChange(selected.filter(s => s !== option));
+        } else {
+          onChange([...selected, option]);
+        }
+      };
+
+      return (
+        <div ref={ref} className="relative">
+          <button
+            onClick={() => setOpen(!open)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm ${
+              selected.length > 0 
+                ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' 
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
+            }`}
+          >
+            {label}
+            {selected.length > 0 && (
+              <span className="px-1.5 py-0.5 bg-cyan-500/20 rounded text-xs">{selected.length}</span>
+            )}
+            <Icon name="chevronDown" className="w-4 h-4" />
+          </button>
+          {open && (
+            <div className="absolute top-full mt-1 left-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[180px] py-1 animate-fadeIn">
+              {options.map(option => (
+                <button
+                  key={option}
+                  onClick={() => toggle(option)}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2"
+                >
+                  <span className={`w-4 h-4 border rounded flex items-center justify-center ${
+                    selected.includes(option) ? 'bg-cyan-500 border-cyan-500' : 'border-slate-600'
+                  }`}>
+                    {selected.includes(option) && <Icon name="check" className="w-3 h-3 text-white" />}
+                  </span>
+                  {renderOption ? renderOption(option) : option}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // =================================================================
+    // EXPORT DROPDOWN COMPONENT
+    // =================================================================
+    const ExportDropdown = ({ onExportCSV, onExportJSON }) => {
+      const [open, setOpen] = useState(false);
+      const ref = useRef(null);
+
+      useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, []);
+
+      return (
+        <div ref={ref} className="relative">
+          <button
+            onClick={() => setOpen(!open)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:border-slate-600 text-sm"
+          >
+            <Icon name="download" className="w-4 h-4" />
+            Export
+            <Icon name="chevronDown" className="w-4 h-4" />
+          </button>
+          {open && (
+            <div className="absolute top-full mt-1 right-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 animate-fadeIn">
+              <button
+                onClick={() => { onExportCSV(); setOpen(false); }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300"
+              >
+                Export as CSV
+              </button>
+              <button
+                onClick={() => { onExportJSON(); setOpen(false); }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300"
+              >
+                Export as JSON
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // =================================================================
+    // BOARD VIEW COMPONENT
+    // =================================================================
+    const BoardView = ({ opportunities, onCardClick, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop, draggingId, settings, onUpdateOpportunity, onDeleteOpportunity, onDuplicateOpportunity }) => {
+      const groupedByPhase = useMemo(() => {
+        const grouped = {};
+        SHIPLEY_PHASES.forEach(phase => {
+          grouped[phase.key] = opportunities.filter(o => o.shipleyPhase === phase.key);
+        });
+        return grouped;
+      }, [opportunities]);
+
+      return (
+        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
+          {SHIPLEY_PHASES.map(phase => (
+            <div
+              key={phase.key}
+              className="flex-shrink-0 w-72 bg-slate-900/50 rounded-xl border border-slate-700/50"
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={(e) => onDrop(e, phase.key)}
+            >
+              {/* Column Header */}
+              <div className="p-3 border-b border-slate-700/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ background: phase.color }} />
+                  <span className="font-medium text-white">{phase.name}</span>
+                </div>
+                <span className="px-2 py-0.5 bg-slate-800 rounded text-xs text-slate-400">
+                  {groupedByPhase[phase.key]?.length || 0}
+                </span>
+              </div>
+
+              {/* Cards */}
+              <div className="p-2 space-y-2 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto scrollbar-thin">
+                {groupedByPhase[phase.key]?.map(opp => (
+                  <OpportunityCard
+                    key={opp.id}
+                    opportunity={opp}
+                    onClick={() => onCardClick(opp)}
+                    onDragStart={(e) => onDragStart(e, opp.id)}
+                    onDragEnd={onDragEnd}
+                    isDragging={draggingId === opp.id}
+                    compact={settings.compactMode}
+                    onUpdateOpportunity={onUpdateOpportunity}
+                    onDeleteOpportunity={onDeleteOpportunity}
+                    onDuplicateOpportunity={onDuplicateOpportunity}
+                  />
+                ))}
+                {groupedByPhase[phase.key]?.length === 0 && (
+                  <div className="py-8 text-center text-slate-500 text-sm">
+                    No opportunities
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    // =================================================================
+    // OPPORTUNITY CARD COMPONENT
+    // =================================================================
+    const OpportunityCard = ({ opportunity, onClick, onDragStart, onDragEnd, isDragging, compact, onUpdateOpportunity, onDeleteOpportunity, onDuplicateOpportunity }) => {
+      const [menuOpen, setMenuOpen] = useState(false);
+      const [phaseMenuOpen, setPhaseMenuOpen] = useState(false);
+      const [priorityMenuOpen, setPriorityMenuOpen] = useState(false);
+      const menuRef = useRef(null);
+
+      const daysRemaining = getDaysRemaining(opportunity.dueDate);
+      const priorityInfo = getPriorityInfo(opportunity.priority);
+      const phaseInfo = getPhaseInfo(opportunity.shipleyPhase);
+
+      useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (menuRef.current && !menuRef.current.contains(e.target)) {
+            setMenuOpen(false);
+            setPhaseMenuOpen(false);
+            setPriorityMenuOpen(false);
+          }
+        };
+        if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, [menuOpen]);
+
+      const getUrgencyColor = () => {
+        if (daysRemaining === null) return 'bg-slate-500';
+        if (daysRemaining < 0) return 'bg-slate-600';
+        if (daysRemaining <= 3) return 'bg-red-500 animate-pulse';
+        if (daysRemaining <= 7) return 'bg-amber-500';
+        if (daysRemaining <= 14) return 'bg-yellow-500';
+        return 'bg-green-500';
+      };
+
+      const handlePhaseForward = async (e) => {
+        e.stopPropagation();
+        const currentIndex = SHIPLEY_PHASES.findIndex(p => p.key === opportunity.shipleyPhase);
+        if (currentIndex < SHIPLEY_PHASES.length - 1) {
+          await onUpdateOpportunity(opportunity.id, { shipleyPhase: SHIPLEY_PHASES[currentIndex + 1].key });
+        }
+      };
+
+      return (
+        <div
+          draggable
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onClick={onClick}
+          className={`group bg-slate-800/80 rounded-lg border border-slate-700/50 hover:border-cyan-500/50 cursor-pointer transition ${
+            isDragging ? 'opacity-50' : ''
+          } ${compact ? 'p-2' : 'p-3'}`}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                {/* Urgency Dot */}
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getUrgencyColor()}`} />
+                <h3 className={`font-medium text-white truncate ${compact ? 'text-xs' : 'text-sm'}`}>
+                  {opportunity.name}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400">{opportunity.agency}</p>
+            </div>
+
+            {/* Quick Actions Menu */}
+            <div ref={menuRef} className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+                className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white opacity-0 group-hover:opacity-100 transition"
+              >
+                <Icon name="moreVertical" className="w-4 h-4" />
+              </button>
+
+              {menuOpen && (
+                <div className="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 w-40 animate-fadeIn">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onClick(); setMenuOpen(false); }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <Icon name="edit" className="w-4 h-4" /> Edit
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPhaseMenuOpen(!phaseMenuOpen); }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2 justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon name="arrowRight" className="w-4 h-4" /> Phase
+                    </span>
+                    <Icon name="chevronRight" className="w-3 h-3" />
+                  </button>
+                  {phaseMenuOpen && (
+                    <div className="absolute left-full top-0 ml-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 w-36">
+                      {SHIPLEY_PHASES.map(phase => (
+                        <button
+                          key={phase.key}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await onUpdateOpportunity(opportunity.id, { shipleyPhase: phase.key });
+                            setMenuOpen(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2"
+                        >
+                          <span className="w-2 h-2 rounded-full" style={{ background: phase.color }} />
+                          {phase.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPriorityMenuOpen(!priorityMenuOpen); }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2 justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon name="alertCircle" className="w-4 h-4" /> Priority
+                    </span>
+                    <Icon name="chevronRight" className="w-3 h-3" />
+                  </button>
+                  {priorityMenuOpen && (
+                    <div className="absolute left-full top-8 ml-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 w-36">
+                      {PRIORITIES.map(p => (
+                        <button
+                          key={p.key}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await onUpdateOpportunity(opportunity.id, { priority: p.key });
+                            setMenuOpen(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2"
+                        >
+                          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await onDuplicateOpportunity(opportunity);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <Icon name="copy" className="w-4 h-4" /> Duplicate
+                  </button>
+                  <div className="border-t border-slate-700 my-1" />
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm('Delete this opportunity?')) {
+                        await onDeleteOpportunity(opportunity.id);
+                      }
+                      setMenuOpen(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-red-500/10 text-red-400 flex items-center gap-2"
+                  >
+                    <Icon name="trash" className="w-4 h-4" /> Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Content */}
+          {!compact && (
+            <div className="mt-3 space-y-2">
+              {/* Value & pWin */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">{formatCurrency(opportunity.contractValue)}</span>
+                <div className="flex items-center gap-2">
+                  {/* pWin Mini Bar */}
+                  <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${opportunity.winProbability || 0}%`,
+                        background: opportunity.winProbability >= 70 ? '#22c55e' : opportunity.winProbability >= 40 ? '#eab308' : '#ef4444'
+                      }}
+                    />
+                  </div>
+                  <span className="text-slate-400">{opportunity.winProbability || 0}%</span>
+                </div>
+              </div>
+
+              {/* Due Date & Priority */}
+              <div className="flex items-center justify-between">
+                <span className={`text-xs ${
+                  daysRemaining !== null && daysRemaining <= 3 ? 'text-red-400' :
+                  daysRemaining !== null && daysRemaining <= 7 ? 'text-amber-400' : 'text-slate-400'
+                }`}>
+                  {opportunity.dueDate ? (
+                    daysRemaining !== null && daysRemaining < 0 
+                      ? 'Overdue' 
+                      : `${daysRemaining}d left`
+                  ) : 'No date'}
+                </span>
+                <span
+                  className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                  style={{ background: `${priorityInfo.color}20`, color: priorityInfo.color }}
+                >
+                  {opportunity.priority}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Phase Forward Button */}
+          <button
+            onClick={handlePhaseForward}
+            className="absolute bottom-2 right-2 p-1 rounded bg-slate-700/50 text-cyan-400 opacity-0 group-hover:opacity-100 hover:bg-cyan-500/20 transition"
+            title="Advance Phase"
+          >
+            <Icon name="arrowRight" className="w-3 h-3" />
+          </button>
+        </div>
+      );
+    };
+
+    // =================================================================
+    // TABLE VIEW COMPONENT
+    // =================================================================
+    const TableView = ({ opportunities, onRowClick, sortConfig, setSortConfig, selectedIds, setSelectedIds, lastSelectedId, setLastSelectedId, onBulkDelete, onBulkPhaseChange, settings }) => {
+      const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key) {
+          if (sortConfig.direction === 'asc') direction = 'desc';
+          else if (sortConfig.direction === 'desc') direction = null;
+        }
+        setSortConfig({ key: direction ? key : null, direction });
+      };
+
+      const sortedOpportunities = useMemo(() => {
+        if (!sortConfig.key) return opportunities;
+
+        return [...opportunities].sort((a, b) => {
+          let aVal = a[sortConfig.key];
+          let bVal = b[sortConfig.key];
+
+          // Custom sort for priority
+          if (sortConfig.key === 'priority') {
+            const order = { 'P-0': 0, 'P-1': 1, 'P-2': 2, 'P-3': 3 };
+            aVal = order[aVal] ?? 99;
+            bVal = order[bVal] ?? 99;
+          }
+
+          // Custom sort for phase
+          if (sortConfig.key === 'shipleyPhase') {
+            aVal = SHIPLEY_PHASES.findIndex(p => p.key === aVal);
+            bVal = SHIPLEY_PHASES.findIndex(p => p.key === bVal);
+          }
+
+          if (aVal === bVal) return 0;
+          if (aVal == null) return 1;
+          if (bVal == null) return -1;
+
+          const result = aVal < bVal ? -1 : 1;
+          return sortConfig.direction === 'desc' ? -result : result;
+        });
+      }, [opportunities, sortConfig]);
+
+      const handleSelectAll = (e) => {
+        if (e.target.checked) {
+          setSelectedIds(new Set(opportunities.map(o => o.id)));
+        } else {
+          setSelectedIds(new Set());
+        }
+      };
+
+      const handleSelectRow = (e, id) => {
+        e.stopPropagation();
+        const newSelected = new Set(selectedIds);
+
+        if (e.shiftKey && lastSelectedId) {
+          // Range selection
+          const ids = sortedOpportunities.map(o => o.id);
+          const lastIndex = ids.indexOf(lastSelectedId);
+          const currentIndex = ids.indexOf(id);
+          const [start, end] = [Math.min(lastIndex, currentIndex), Math.max(lastIndex, currentIndex)];
+          ids.slice(start, end + 1).forEach(i => newSelected.add(i));
+        } else {
+          if (newSelected.has(id)) {
+            newSelected.delete(id);
+          } else {
+            newSelected.add(id);
+          }
+        }
+
+        setSelectedIds(newSelected);
+        setLastSelectedId(id);
+      };
+
+      const SortIcon = ({ column }) => {
+        if (sortConfig.key !== column) return null;
+        return (
+          <Icon
+            name={sortConfig.direction === 'asc' ? 'arrowUp' : 'arrowDown'}
+            className="w-3 h-3 ml-1 inline-block"
+          />
+        );
+      };
+
+      return (
+        <div className="bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-hidden">
+          {/* Bulk Action Bar */}
+          {selectedIds.size > 0 && (
+            <div className="bg-cyan-500/10 border-b border-cyan-500/30 px-4 py-2 flex items-center gap-4">
+              <span className="text-sm text-cyan-400">{selectedIds.size} selected</span>
+              <div className="flex items-center gap-2">
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      onBulkPhaseChange(Array.from(selectedIds), e.target.value);
+                      e.target.value = '';
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-sm text-white"
+                >
+                  <option value="">Change Phase...</option>
+                  {SHIPLEY_PHASES.map(p => (
+                    <option key={p.key} value={p.key}>{p.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    if (confirm(`Delete ${selectedIds.size} opportunities?`)) {
+                      onBulkDelete(Array.from(selectedIds));
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-sm hover:bg-red-500/30"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === opportunities.length && opportunities.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-slate-600"
+                    />
+                  </th>
+                  <th
+                    onClick={() => handleSort('name')}
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer hover:text-white"
+                  >
+                    Name <SortIcon column="name" />
+                  </th>
+                  <th
+                    onClick={() => handleSort('agency')}
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer hover:text-white"
+                  >
+                    Agency <SortIcon column="agency" />
+                  </th>
+                  <th
+                    onClick={() => handleSort('contractValue')}
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer hover:text-white"
+                  >
+                    Value <SortIcon column="contractValue" />
+                  </th>
+                  <th
+                    onClick={() => handleSort('priority')}
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer hover:text-white"
+                  >
+                    Priority <SortIcon column="priority" />
+                  </th>
+                  <th
+                    onClick={() => handleSort('shipleyPhase')}
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer hover:text-white"
+                  >
+                    Phase <SortIcon column="shipleyPhase" />
+                  </th>
+                  <th
+                    onClick={() => handleSort('winProbability')}
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer hover:text-white"
+                  >
+                    pWin <SortIcon column="winProbability" />
+                  </th>
+                  <th
+                    onClick={() => handleSort('dueDate')}
+                    className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer hover:text-white"
+                  >
+                    Due Date <SortIcon column="dueDate" />
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {sortedOpportunities.map(opp => {
+                  const priorityInfo = getPriorityInfo(opp.priority);
+                  const phaseInfo = getPhaseInfo(opp.shipleyPhase);
+                  const daysRemaining = getDaysRemaining(opp.dueDate);
+
+                  return (
+                    <tr
+                      key={opp.id}
+                      onClick={() => onRowClick(opp)}
+                      className={`hover:bg-slate-800/50 cursor-pointer ${
+                        selectedIds.has(opp.id) ? 'bg-cyan-500/5' : ''
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(opp.id)}
+                          onChange={(e) => handleSelectRow(e, opp.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border-slate-600"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-white">{opp.name}</div>
+                        {opp.solicitationNumber && (
+                          <div className="text-xs text-slate-500">{opp.solicitationNumber}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">{opp.agency}</td>
+                      <td className="px-4 py-3 text-slate-300">{formatCurrency(opp.contractValue)}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="px-2 py-1 rounded text-xs font-medium"
+                          style={{ background: `${priorityInfo.color}20`, color: priorityInfo.color }}
+                        >
+                          {opp.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ background: phaseInfo.color }} />
+                          <span className="text-slate-300">{phaseInfo.name}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${opp.winProbability || 0}%`,
+                                background: opp.winProbability >= 70 ? '#22c55e' : opp.winProbability >= 40 ? '#eab308' : '#ef4444'
+                              }}
+                            />
+                          </div>
+                          <span className="text-slate-400 text-sm">{opp.winProbability || 0}%</span>
+                        </div>
+                      </td>
+                      <td className={`px-4 py-3 ${
+                        daysRemaining !== null && daysRemaining <= 3 ? 'text-red-400' :
+                        daysRemaining !== null && daysRemaining <= 7 ? 'text-amber-400' : 'text-slate-300'
+                      }`}>
+                        {formatDate(opp.dueDate)}
+                        {daysRemaining !== null && (
+                          <span className="ml-2 text-xs">
+                            ({daysRemaining < 0 ? 'Overdue' : `${daysRemaining}d`})
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {sortedOpportunities.length === 0 && (
+            <div className="py-12 text-center text-slate-500">
+              No opportunities match your filters
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // =================================================================
+    // CALENDAR VIEW COMPONENT
+    // =================================================================
+    const CalendarView = ({ opportunities, calendarDate, setCalendarDate, onDayClick, onOpportunityClick }) => {
+      const year = calendarDate.getFullYear();
+      const month = calendarDate.getMonth();
+
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstDayOfMonth = new Date(year, month, 1).getDay();
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+      // Group opportunities by date
+      const oppsByDate = useMemo(() => {
+        const map = {};
+        opportunities.forEach(opp => {
+          if (opp.dueDate) {
+            const dateKey = opp.dueDate.split('T')[0];
+            if (!map[dateKey]) map[dateKey] = [];
+            map[dateKey].push(opp);
+          }
+        });
+        return map;
+      }, [opportunities]);
+
+      // Calculate month stats
+      const monthStats = useMemo(() => {
+        let count = 0;
+        let value = 0;
+        opportunities.forEach(opp => {
+          if (opp.dueDate) {
+            const dueDate = new Date(opp.dueDate);
+            if (dueDate.getMonth() === month && dueDate.getFullYear() === year) {
+              count++;
+              value += opp.contractValue || 0;
+            }
+          }
+        });
+        return { count, value };
+      }, [opportunities, month, year]);
+
+      const goToPrevMonth = () => {
+        setCalendarDate(new Date(year, month - 1, 1));
+      };
+
+      const goToNextMonth = () => {
+        setCalendarDate(new Date(year, month + 1, 1));
+      };
+
+      const goToToday = () => {
+        setCalendarDate(new Date());
+      };
+
+      const renderDay = (day) => {
+        if (!day) return <div className="p-2 min-h-[100px]" />;
+
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayDate = new Date(year, month, day);
+        dayDate.setHours(0, 0, 0, 0);
+
+        const isToday = dayDate.getTime() === today.getTime();
+        const isPast = dayDate < today;
+        const opps = oppsByDate[dateStr] || [];
+
+        return (
+          <div
+            onClick={() => onDayClick(dayDate)}
+            className={`p-2 min-h-[100px] border border-slate-700/30 hover:bg-slate-800/30 cursor-pointer transition ${
+              isToday ? 'border-cyan-500 bg-cyan-500/5' : ''
+            } ${isPast ? 'opacity-60' : ''}`}
+          >
+            <div className={`text-sm font-medium mb-1 ${isToday ? 'text-cyan-400' : 'text-slate-400'}`}>
+              {day}
+            </div>
+            <div className="space-y-1">
+              {opps.slice(0, 3).map(opp => {
+                const priorityInfo = getPriorityInfo(opp.priority);
+                return (
+                  <div
+                    key={opp.id}
+                    onClick={(e) => { e.stopPropagation(); onOpportunityClick(opp); }}
+                    className="flex items-center gap-1 group"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ background: priorityInfo.color }}
+                    />
+                    <span className="text-xs text-slate-300 truncate group-hover:text-cyan-400 transition">
+                      {opp.name}
+                    </span>
+                  </div>
+                );
+              })}
+              {opps.length > 3 && (
+                <div className="text-xs text-slate-500">
+                  +{opps.length - 3} more
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      // Build calendar grid
+      const calendarDays = [];
+      for (let i = 0; i < firstDayOfMonth; i++) {
+        calendarDays.push(null);
+      }
+      for (let day = 1; day <= daysInMonth; day++) {
+        calendarDays.push(day);
+      }
+
+      return (
+        <div className="bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-hidden">
+          {/* Header */}
+          <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={goToPrevMonth}
+                className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <Icon name="chevronLeft" className="w-5 h-5" />
+              </button>
+              <h2 className="text-lg font-semibold text-white">
+                {monthNames[month]} {year}
+              </h2>
+              <button
+                onClick={goToNextMonth}
+                className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <Icon name="chevronRight" className="w-5 h-5" />
+              </button>
+            </div>
+            <button
+              onClick={goToToday}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 text-sm"
+            >
+              Today
+            </button>
+          </div>
+
+          {/* Day Headers */}
+          <div className="grid grid-cols-7 border-b border-slate-700/50">
+            {dayNames.map(day => (
+              <div key={day} className="p-2 text-center text-xs font-medium text-slate-400 uppercase">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day, index) => (
+              <div key={index}>{renderDay(day)}</div>
+            ))}
+          </div>
+
+          {/* Mini Stats */}
+          <div className="p-4 border-t border-slate-700/50 bg-slate-800/30">
+            <p className="text-sm text-slate-400">
+              <span className="text-cyan-400 font-medium">{monthStats.count}</span> opportunities due this month | 
+              <span className="text-green-400 font-medium ml-1">{formatCurrency(monthStats.value)}</span> pipeline value
+            </p>
+          </div>
+        </div>
+      );
+    };
+
+    // =================================================================
+    // OPPORTUNITY DRAWER COMPONENT
+    // =================================================================
+    const OpportunityDrawer = ({ opportunity, onClose, onSave, onDelete, activities }) => {
+      const [activeTab, setActiveTab] = useState('details');
+      const [formData, setFormData] = useState({
+        name: opportunity?.name || '',
+        agency: opportunity?.agency || '',
+        contractValue: opportunity?.contractValue || '',
+        priority: opportunity?.priority || 'P-2',
+        shipleyPhase: opportunity?.shipleyPhase || 'gate_1',
+        winProbability: opportunity?.winProbability || 50,
+        dueDate: opportunity?.dueDate?.split('T')[0] || '',
+        solicitationNumber: opportunity?.solicitationNumber || '',
+        description: opportunity?.description || ''
+      });
+      const [notes, setNotes] = useState('');
+
+      const isNew = !opportunity?.id;
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave({
+          ...formData,
+          contractValue: formData.contractValue ? parseInt(formData.contractValue) : null,
+          winProbability: parseInt(formData.winProbability)
+        });
+      };
+
+      const phaseInfo = getPhaseInfo(formData.shipleyPhase);
+      const priorityInfo = getPriorityInfo(formData.priority);
+
+      return (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={onClose}
+          />
+
+          {/* Drawer */}
+          <div className="relative w-full max-w-lg bg-slate-900 border-l border-slate-700 animate-slideIn overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-700 px-6 py-4 z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">
+                  {isNew ? 'New Opportunity' : 'Edit Opportunity'}
+                </h2>
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                >
+                  <Icon name="x" className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Quick Stats (for existing) */}
+              {!isNew && (
+                <div className="flex items-center gap-4 mt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full" style={{ background: phaseInfo.color }} />
+                    <span className="text-sm text-slate-300">{phaseInfo.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="px-2 py-0.5 rounded text-xs font-medium"
+                      style={{ background: `${priorityInfo.color}20`, color: priorityInfo.color }}
+                    >
+                      {formData.priority}
+                    </span>
+                  </div>
+                  <div className="text-sm text-slate-400">
+                    {formData.winProbability}% pWin
+                  </div>
+                </div>
+              )}
+
+              {/* Tabs */}
+              {!isNew && (
+                <div className="flex gap-4 mt-4 border-b border-slate-700 -mb-4 -mx-6 px-6">
+                  {['details', 'activity', 'notes'].map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`pb-2 px-1 text-sm font-medium capitalize border-b-2 transition ${
+                        activeTab === tab
+                          ? 'border-cyan-500 text-cyan-400'
+                          : 'border-transparent text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              {activeTab === 'details' && (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">
+                      Opportunity Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">
+                        Agency *
+                      </label>
+                      <select
+                        required
+                        value={formData.agency}
+                        onChange={(e) => setFormData(f => ({ ...f, agency: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        <option value="">Select...</option>
+                        {AGENCIES.map(a => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">
+                        Contract Value ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.contractValue}
+                        onChange={(e) => setFormData(f => ({ ...f, contractValue: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">
+                        Priority
+                      </label>
+                      <select
+                        value={formData.priority}
+                        onChange={(e) => setFormData(f => ({ ...f, priority: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        {PRIORITIES.map(p => (
+                          <option key={p.key} value={p.key}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">
+                        Phase
+                      </label>
+                      <select
+                        value={formData.shipleyPhase}
+                        onChange={(e) => setFormData(f => ({ ...f, shipleyPhase: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        {SHIPLEY_PHASES.map(p => (
+                          <option key={p.key} value={p.key}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">
+                        Win Probability: {formData.winProbability}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={formData.winProbability}
+                        onChange={(e) => setFormData(f => ({ ...f, winProbability: e.target.value }))}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">
+                        Due Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.dueDate}
+                        onChange={(e) => setFormData(f => ({ ...f, dueDate: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">
+                      Solicitation Number
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.solicitationNumber}
+                      onChange={(e) => setFormData(f => ({ ...f, solicitationNumber: e.target.value }))}
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={formData.description}
+                      onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500 resize-none"
+                    />
+                  </div>
+
+                  {/* Phase Stepper */}
+                  {!isNew && (
+                    <div className="pt-4 border-t border-slate-700">
+                      <label className="block text-sm font-medium text-slate-400 mb-3">
+                        Phase Progress
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {SHIPLEY_PHASES.map((phase, index) => {
+                          const currentIndex = SHIPLEY_PHASES.findIndex(p => p.key === formData.shipleyPhase);
+                          const isActive = index <= currentIndex;
+                          return (
+                            <div
+                              key={phase.key}
+                              className={`flex-1 h-2 rounded ${isActive ? '' : 'bg-slate-700'}`}
+                              style={{ background: isActive ? phase.color : undefined }}
+                              title={phase.name}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-700">
+                    {!isNew && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm('Delete this opportunity?')) onDelete();
+                        }}
+                        className="px-4 py-2 text-red-400 hover:bg-red-500/10 rounded-lg"
+                      >
+                        Delete
+                      </button>
+                    )}
+                    <div className="flex items-center gap-2 ml-auto">
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 text-slate-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-medium hover:opacity-90"
+                      >
+                        {isNew ? 'Create' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {activeTab === 'activity' && (
+                <div className="space-y-4">
+                  {activities.length === 0 ? (
+                    <p className="text-slate-500 text-center py-8">No activity yet</p>
+                  ) : (
+                    activities.map(activity => (
+                      <div key={activity.id} className="flex gap-3 pb-3 border-b border-slate-700/50">
+                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
+                          <Icon name="activity" className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-white">
+                            {activity.action === 'created' && 'Created'}
+                            {activity.action === 'updated' && `Updated ${activity.field_changed}`}
+                            {activity.action === 'phase_changed' && `Phase changed to ${activity.new_value}`}
+                            {activity.action === 'deleted' && 'Deleted'}
+                          </p>
+                          {activity.old_value && activity.new_value && (
+                            <p className="text-xs text-slate-500">
+                              {activity.old_value} → {activity.new_value}
+                            </p>
+                          )}
+                          <p className="text-xs text-slate-500 mt-1">
+                            {new Date(activity.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'notes' && (
+                <div>
+                  <textarea
+                    rows={10}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add notes about this opportunity..."
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-2">
+                    Notes are stored locally in your browser
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // =================================================================
+    // ACTIVITY PANEL COMPONENT
+    // =================================================================
+    const ActivityPanel = ({ activities, opportunities, onClose, onOpportunityClick }) => {
+      const [filter, setFilter] = useState('all');
+
+      const filteredActivities = useMemo(() => {
+        if (filter === 'all') return activities;
+        if (filter === 'phase') return activities.filter(a => a.action === 'phase_changed');
+        if (filter === 'created') return activities.filter(a => a.action === 'created');
+        if (filter === 'deleted') return activities.filter(a => a.action === 'deleted');
+        return activities;
+      }, [activities, filter]);
+
+      const formatRelativeTime = (date) => {
+        const now = new Date();
+        const then = new Date(date);
+        const diff = Math.floor((now - then) / 1000);
+
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return `${Math.floor(diff / 86400)}d ago`;
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+          <div className="relative w-full max-w-md bg-slate-900 border-l border-slate-700 animate-slideIn overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-700 px-6 py-4 z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Activity Log</h2>
+                <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                  <Icon name="x" className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex gap-2 mt-4">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'phase', label: 'Phase Changes' },
+                  { key: 'created', label: 'Created' },
+                  { key: 'deleted', label: 'Deleted' }
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setFilter(tab.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                      filter === tab.key
+                        ? 'bg-cyan-500/20 text-cyan-400'
+                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Activity List */}
+            <div className="p-4 space-y-3">
+              {filteredActivities.length === 0 ? (
+                <p className="text-slate-500 text-center py-8">No activity</p>
+              ) : (
+                filteredActivities.map(activity => {
+                  const oppName = activity.opportunities?.name || 'Unknown';
+                  return (
+                    <div
+                      key={activity.id}
+                      onClick={() => activity.opportunity_id && onOpportunityClick(activity.opportunity_id)}
+                      className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-cyan-500/30 cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            activity.action === 'created' ? 'bg-green-500' :
+                            activity.action === 'deleted' ? 'bg-red-500' :
+                            activity.action === 'phase_changed' ? 'bg-cyan-500' : 'bg-slate-500'
+                          }`} />
+                          <span className="text-sm font-medium text-white">{oppName}</span>
+                        </div>
+                        <span className="text-xs text-slate-500">{formatRelativeTime(activity.created_at)}</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 ml-4">
+                        {activity.action === 'created' && 'Created'}
+                        {activity.action === 'updated' && `Updated ${activity.field_changed}: ${activity.old_value} → ${activity.new_value}`}
+                        {activity.action === 'phase_changed' && `Phase: ${activity.old_value} → ${activity.new_value}`}
+                        {activity.action === 'deleted' && 'Deleted'}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // =================================================================
+    // NOTIFICATION PANEL COMPONENT
+    // =================================================================
+    const NotificationPanel = ({ notifications, onClose, onDismiss, onDismissAll, onNotificationClick }) => {
+      const formatRelativeTime = (date) => {
+        const now = new Date();
+        const then = new Date(date);
+        const diff = Math.floor((now - then) / 1000);
+
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return `${Math.floor(diff / 86400)}d ago`;
+      };
+
+      const getIcon = (type) => {
+        switch (type) {
+          case 'dueSoon': return 'clock';
+          case 'phaseStuck': return 'alertCircle';
+          case 'highValue': return 'shield';
+          default: return 'bell';
+        }
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+          <div className="relative w-[360px] bg-slate-900 border-l border-slate-700 animate-slideIn overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-700 px-6 py-4 z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Notifications</h2>
+                <div className="flex items-center gap-2">
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={onDismissAll}
+                      className="text-xs text-slate-400 hover:text-white"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                  <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Notifications List */}
+            <div className="p-4 space-y-3">
+              {notifications.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-2">🎉</div>
+                  <p className="text-slate-400">All caught up!</p>
+                </div>
+              ) : (
+                notifications.map(notification => (
+                  <div
+                    key={notification.id}
+                    className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-cyan-500/30 cursor-pointer group"
+                  >
+                    <div className="flex gap-3">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: `${notification.color}20` }}
+                      >
+                        <Icon name={getIcon(notification.type)} className="w-4 h-4" style={{ color: notification.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0" onClick={() => onNotificationClick(notification)}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-white">{notification.title}</span>
+                          <span className="text-xs text-slate-500">{formatRelativeTime(notification.timestamp)}</span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1 truncate">{notification.message}</p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDismiss(notification.id); }}
+                        className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <Icon name="x" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // =================================================================
+    // SETTINGS PANEL COMPONENT
+    // =================================================================
+    const SettingsPanel = ({ settings, onClose, onSave, onReset, onExportAll }) => {
+      const [localSettings, setLocalSettings] = useState(settings);
+
+      const handleSave = () => {
+        onSave(localSettings);
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+          <div className="relative w-full max-w-md bg-slate-900 rounded-xl border border-slate-700 animate-fadeIn overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">Settings</h2>
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+              {/* Display Preferences */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-300 mb-3">Display Preferences</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-slate-400">Default View</label>
+                    <select
+                      value={localSettings.defaultView}
+                      onChange={(e) => setLocalSettings(s => ({ ...s, defaultView: e.target.value }))}
+                      className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-sm text-white"
+                    >
+                      <option value="board">Board</option>
+                      <option value="table">Table</option>
+                      <option value="calendar">Calendar</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-slate-400">Cards Per Row</label>
+                    <select
+                      value={localSettings.cardsPerRow}
+                      onChange={(e) => setLocalSettings(s => ({ ...s, cardsPerRow: e.target.value }))}
+                      className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-sm text-white"
+                    >
+                      <option value="auto">Auto</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-slate-400">Show Completed (Awarded/Lost)</label>
+                    <button
+                      onClick={() => setLocalSettings(s => ({ ...s, showCompleted: !s.showCompleted }))}
+                      className={`w-10 h-6 rounded-full transition ${localSettings.showCompleted ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white transition transform ${localSettings.showCompleted ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-slate-400">Compact Mode</label>
+                    <button
+                      onClick={() => setLocalSettings(s => ({ ...s, compactMode: !s.compactMode }))}
+                      className={`w-10 h-6 rounded-full transition ${localSettings.compactMode ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white transition transform ${localSettings.compactMode ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notifications */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-300 mb-3">Notifications</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-slate-400">Due Soon Alerts</label>
+                    <button
+                      onClick={() => setLocalSettings(s => ({ 
+                        ...s, 
+                        notifications: { ...s.notifications, dueSoon: !s.notifications.dueSoon }
+                      }))}
+                      className={`w-10 h-6 rounded-full transition ${localSettings.notifications.dueSoon ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white transition transform ${localSettings.notifications.dueSoon ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-slate-400">Phase Stuck Alerts</label>
+                    <button
+                      onClick={() => setLocalSettings(s => ({ 
+                        ...s, 
+                        notifications: { ...s.notifications, phaseStuck: !s.notifications.phaseStuck }
+                      }))}
+                      className={`w-10 h-6 rounded-full transition ${localSettings.notifications.phaseStuck ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white transition transform ${localSettings.notifications.phaseStuck ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-slate-400">P-0 Alerts</label>
+                    <button
+                      onClick={() => setLocalSettings(s => ({ 
+                        ...s, 
+                        notifications: { ...s.notifications, highValue: !s.notifications.highValue }
+                      }))}
+                      className={`w-10 h-6 rounded-full transition ${localSettings.notifications.highValue ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white transition transform ${localSettings.notifications.highValue ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-slate-400">Due Warning (days)</label>
+                    <select
+                      value={localSettings.notifications.dueDaysThreshold}
+                      onChange={(e) => setLocalSettings(s => ({ 
+                        ...s, 
+                        notifications: { ...s.notifications, dueDaysThreshold: parseInt(e.target.value) }
+                      }))}
+                      className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-sm text-white"
+                    >
+                      <option value="1">1 day</option>
+                      <option value="3">3 days</option>
+                      <option value="5">5 days</option>
+                      <option value="7">7 days</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Data */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-300 mb-3">Data</h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={onExportAll}
+                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:bg-slate-700 text-left flex items-center gap-2"
+                  >
+                    <Icon name="download" className="w-4 h-4" />
+                    Export All Data (JSON)
+                  </button>
+                  <button
+                    onClick={onReset}
+                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:bg-slate-700 text-left"
+                  >
+                    Reset to Default Settings
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-700 flex justify-end gap-2">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-medium hover:opacity-90"
+              >
+                Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // =================================================================
+    // COMMAND PALETTE COMPONENT
+    // =================================================================
+    const CommandPalette = ({ opportunities, recentlyViewed, onClose, onSelectOpportunity, onAction }) => {
+      const [query, setQuery] = useState('');
+      const [selectedIndex, setSelectedIndex] = useState(0);
+      const inputRef = useRef(null);
+
+      useEffect(() => {
+        inputRef.current?.focus();
+      }, []);
+
+      const quickActions = [
+        { id: 'new', label: 'New Opportunity', icon: 'plus', shortcut: 'N' },
+        { id: 'export-csv', label: 'Export as CSV', icon: 'download' },
+        { id: 'export-json', label: 'Export as JSON', icon: 'download' },
+        { id: 'settings', label: 'Open Settings', icon: 'settings' }
+      ];
+
+      const navigation = [
+        { id: 'board', label: 'Go to Board', icon: 'kanban', shortcut: '1' },
+        { id: 'table', label: 'Go to Table', icon: 'table', shortcut: '2' },
+        { id: 'calendar', label: 'Go to Calendar', icon: 'calendar', shortcut: '3' }
+      ];
+
+      // Search results
+      const searchResults = useMemo(() => {
+        if (!query) return [];
+        const q = query.toLowerCase();
+        return opportunities
+          .filter(o => 
+            o.name?.toLowerCase().includes(q) ||
+            o.agency?.toLowerCase().includes(q) ||
+            o.solicitationNumber?.toLowerCase().includes(q)
+          )
+          .slice(0, 5);
+      }, [query, opportunities]);
+
+      // Recent opportunities
+      const recentOpportunities = useMemo(() => {
+        return recentlyViewed
+          .map(id => opportunities.find(o => o.id === id))
+          .filter(Boolean)
+          .slice(0, 5);
+      }, [recentlyViewed, opportunities]);
+
+      // All results combined
+      const allResults = useMemo(() => {
+        const results = [];
+        
+        if (query) {
+          results.push({ type: 'header', label: 'Opportunities' });
+          searchResults.forEach(o => results.push({ type: 'opportunity', data: o }));
+          if (searchResults.length === 0) {
+            results.push({ type: 'empty', label: 'No opportunities found' });
+          }
+        } else {
+          if (recentOpportunities.length > 0) {
+            results.push({ type: 'header', label: 'Recent' });
+            recentOpportunities.forEach(o => results.push({ type: 'opportunity', data: o }));
+          }
+        }
+
+        // Filter quick actions by query
+        const filteredActions = query
+          ? quickActions.filter(a => a.label.toLowerCase().includes(query.toLowerCase()))
+          : quickActions;
+        
+        if (filteredActions.length > 0) {
+          results.push({ type: 'header', label: 'Quick Actions' });
+          filteredActions.forEach(a => results.push({ type: 'action', data: a }));
+        }
+
+        // Filter navigation by query
+        const filteredNav = query
+          ? navigation.filter(n => n.label.toLowerCase().includes(query.toLowerCase()))
+          : navigation;
+
+        if (filteredNav.length > 0) {
+          results.push({ type: 'header', label: 'Navigation' });
+          filteredNav.forEach(n => results.push({ type: 'nav', data: n }));
+        }
+
+        return results;
+      }, [query, searchResults, recentOpportunities, quickActions, navigation]);
+
+      // Selectable items (excluding headers and empty)
+      const selectableResults = allResults.filter(r => !['header', 'empty'].includes(r.type));
+
+      useEffect(() => {
+        setSelectedIndex(0);
+      }, [query]);
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setSelectedIndex(i => Math.min(i + 1, selectableResults.length - 1));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setSelectedIndex(i => Math.max(i - 1, 0));
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const selected = selectableResults[selectedIndex];
+          if (selected) {
+            if (selected.type === 'opportunity') {
+              onSelectOpportunity(selected.data);
+            } else if (selected.type === 'action' || selected.type === 'nav') {
+              onAction(selected.data.id);
+            }
+          }
+        } else if (e.key === 'Escape') {
+          onClose();
+        }
+      };
+
+      let selectableIndex = -1;
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+          <div className="relative w-full max-w-xl bg-slate-900 rounded-xl border border-slate-700 shadow-2xl animate-fadeIn overflow-hidden">
+            {/* Search Input */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700">
+              <Icon name="search" className="w-5 h-5 text-slate-400" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Search opportunities, actions, or type a command..."
+                className="flex-1 bg-transparent text-white placeholder-slate-500 focus:outline-none"
+              />
+              <kbd className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-400">ESC</kbd>
+            </div>
+
+            {/* Results */}
+            <div className="max-h-[400px] overflow-y-auto py-2">
+              {allResults.map((result, index) => {
+                if (result.type === 'header') {
+                  return (
+                    <div key={`${result.type}-${index}`} className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase">
+                      {result.label}
+                    </div>
+                  );
+                }
+
+                if (result.type === 'empty') {
+                  return (
+                    <div key={`${result.type}-${index}`} className="px-4 py-3 text-sm text-slate-500">
+                      {result.label}
+                    </div>
+                  );
+                }
+
+                selectableIndex++;
+                const isSelected = selectableIndex === selectedIndex;
+
+                if (result.type === 'opportunity') {
+                  const opp = result.data;
+                  return (
+                    <div
+                      key={opp.id}
+                      onClick={() => onSelectOpportunity(opp)}
+                      className={`px-4 py-2 cursor-pointer flex items-center gap-3 ${
+                        isSelected ? 'bg-cyan-500/10' : 'hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                        <span className="text-sm">{opp.agency?.charAt(0) || '?'}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white truncate">
+                          {query ? highlightMatch(opp.name, query) : opp.name}
+                        </div>
+                        <div className="text-xs text-slate-500">{opp.agency} • {formatCurrency(opp.contractValue)}</div>
+                      </div>
+                      {isSelected && <Icon name="arrowRight" className="w-4 h-4 text-cyan-400" />}
+                    </div>
+                  );
+                }
+
+                if (result.type === 'action' || result.type === 'nav') {
+                  const item = result.data;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => onAction(item.id)}
+                      className={`px-4 py-2 cursor-pointer flex items-center gap-3 ${
+                        isSelected ? 'bg-cyan-500/10' : 'hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                        <Icon name={item.icon} className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-sm text-white">{item.label}</span>
+                      </div>
+                      {item.shortcut && (
+                        <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-xs text-slate-400">{item.shortcut}</kbd>
+                      )}
+                      {isSelected && <Icon name="arrowRight" className="w-4 h-4 text-cyan-400" />}
+                    </div>
+                  );
+                }
+
+                return null;
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2 border-t border-slate-700 flex items-center gap-4 text-xs text-slate-500">
+              <span className="flex items-center gap-1"><kbd className="px-1 bg-slate-800 rounded">↑↓</kbd> Navigate</span>
+              <span className="flex items-center gap-1"><kbd className="px-1 bg-slate-800 rounded">↵</kbd> Select</span>
+              <span className="flex items-center gap-1"><kbd className="px-1 bg-slate-800 rounded">ESC</kbd> Close</span>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Helper function to highlight matching text
+    const highlightMatch = (text, query) => {
+      if (!query || !text) return text;
+      const index = text.toLowerCase().indexOf(query.toLowerCase());
+      if (index === -1) return text;
+      return (
+        <>
+          {text.slice(0, index)}
+          <span className="text-cyan-400 font-medium">{text.slice(index, index + query.length)}</span>
+          {text.slice(index + query.length)}
+        </>
+      );
+    };
+
+    // =================================================================
+    // RENDER APP
+    // =================================================================
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

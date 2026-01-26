@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 - Sprint 10</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'pulse-cyan': '#00E5FA',
+            'shield-navy': '#00050F',
+            'shield-dark': '#0a0f1a',
+            'shield-panel': '#0d1526',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes urgentPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+    .animate-urgent { animation: urgentPulse 1s ease-in-out infinite; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #00E5FA; }
+    
+    /* Drag and Drop Styles */
+    .dragging { opacity: 0.5; transform: rotate(2deg); }
+    .drag-over { border-color: #00E5FA !important; background: rgba(0,229,250,0.1) !important; }
+    .drop-indicator { 
+      height: 3px; 
+      background: #00E5FA; 
+      border-radius: 2px; 
+      margin: 4px 0;
+      animation: pulse 0.5s ease-in-out infinite;
+    }
+    
+    /* Quick Actions Menu */
+    .quick-menu { 
+      z-index: 50;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .quick-menu-item:hover { background: rgba(0,229,250,0.1); }
+    .submenu { 
+      left: 100%; 
+      top: 0; 
+      animation: fadeIn 0.15s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+    // ============================================================
+    // SUPABASE CLIENT INITIALIZATION
+    // ============================================================
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+    
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================================
+    // CONSTANTS
+    // ============================================================
+    const SHIPLEY_PHASES = [
+      { key: 'gate_1', name: 'Gate 1', color: '#94a3b8', order: 1 },
+      { key: 'blue_team', name: 'Blue Team', color: '#60a5fa', order: 2 },
+      { key: 'pink_team', name: 'Pink Team', color: '#f472b6', order: 3 },
+      { key: 'red_team', name: 'Red Team', color: '#ef4444', order: 4 },
+      { key: 'gold_team', name: 'Gold Team', color: '#fbbf24', order: 5 },
+      { key: 'submitted', name: 'Submitted', color: '#22c55e', order: 6 },
+      { key: 'awarded', name: 'Awarded', color: '#8b5cf6', order: 7 },
+      { key: 'lost', name: 'Lost', color: '#64748b', order: 8 },
+    ];
+
+    const PRIORITIES = ['P-0', 'P-1', 'P-2', 'P-3'];
+    const PRIORITY_COLORS = {
+      'P-0': { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500' },
+      'P-1': { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500' },
+      'P-2': { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500' },
+      'P-3': { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500' },
+    };
+
+    const AGENCIES = ['DHA', 'VA', 'CMS', 'IHS', 'CDC', 'NIH', 'FDA', 'HHS'];
+
+    // ============================================================
+    // ICONS
+    // ============================================================
+    const Icons = {
+      grid: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+      list: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      filter: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      chevronUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      copy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+      moreVertical: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>,
+      activity: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>,
+      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      arrowRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      calendar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      alertCircle: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" /></svg>,
+      checkCircle: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      info: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16v-4m0-4h.01" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      grip: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>,
+      externalLink: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>,
+      stickyNote: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================
+    // UTILITY FUNCTIONS
+    // ============================================================
+    const formatCurrency = (value) => {
+      if (!value) return '$0';
+      if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+      if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+      if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+      return `$${value.toLocaleString()}`;
+    };
+
+    const formatDate = (dateStr) => {
+      if (!dateStr) return 'No date';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    const getDaysUntil = (dateStr) => {
+      if (!dateStr) return null;
+      const date = new Date(dateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffTime = date - today;
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    };
+
+    const getUrgencyClass = (days) => {
+      if (days === null) return { dot: 'bg-slate-500', text: 'text-slate-400' };
+      if (days < 0) return { dot: 'bg-red-500 animate-urgent', text: 'text-red-400' };
+      if (days <= 3) return { dot: 'bg-red-500 animate-urgent', text: 'text-red-400' };
+      if (days <= 7) return { dot: 'bg-amber-500', text: 'text-amber-400' };
+      return { dot: 'bg-green-500', text: 'text-green-400' };
+    };
+
+    const getPwinColor = (pwin) => {
+      if (pwin >= 70) return 'bg-green-500';
+      if (pwin >= 40) return 'bg-amber-500';
+      return 'bg-red-500';
+    };
+
+    const mapToFrontend = (record) => {
+      if (!record) return null;
+      return {
+        id: record.id,
+        name: record.name,
+        agency: record.agency,
+        contractValue: record.contract_value,
+        priority: record.priority,
+        shipleyPhase: record.shipley_phase,
+        winProbability: record.win_probability,
+        dueDate: record.due_date,
+        solicitationNumber: record.solicitation_number,
+        description: record.description,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at,
+      };
+    };
+
+    const mapToDatabase = (data) => {
+      if (!data) return null;
+      const mapped = {};
+      if (data.name !== undefined) mapped.name = data.name;
+      if (data.agency !== undefined) mapped.agency = data.agency;
+      if (data.contractValue !== undefined) mapped.contract_value = data.contractValue;
+      if (data.priority !== undefined) mapped.priority = data.priority;
+      if (data.shipleyPhase !== undefined) mapped.shipley_phase = data.shipleyPhase;
+      if (data.winProbability !== undefined) mapped.win_probability = data.winProbability;
+      if (data.dueDate !== undefined) mapped.due_date = data.dueDate;
+      if (data.solicitationNumber !== undefined) mapped.solicitation_number = data.solicitationNumber;
+      if (data.description !== undefined) mapped.description = data.description;
+      mapped.updated_at = new Date().toISOString();
+      return mapped;
+    };
+
+    // ============================================================
+    // TOAST COMPONENT
+    // ============================================================
+    const Toast = ({ message, type = 'success', onClose }) => {
+      useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+      }, [onClose]);
+
+      const colors = {
+        success: 'bg-green-500/20 border-green-500 text-green-400',
+        error: 'bg-red-500/20 border-red-500 text-red-400',
+        info: 'bg-blue-500/20 border-blue-500 text-blue-400',
+      };
+
+      return (
+        <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg border ${colors[type]} animate-slideIn z-50`}>
+          <div className="flex items-center gap-2">
+            <Icon name={type === 'success' ? 'checkCircle' : type === 'error' ? 'alertCircle' : 'info'} className="w-5 h-5" />
+            <span>{message}</span>
+            <button onClick={onClose} className="ml-2 hover:opacity-70">
+              <Icon name="x" className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // QUICK ACTIONS MENU COMPONENT
+    // ============================================================
+    const QuickActionsMenu = ({ opportunity, position, onClose, onEdit, onChangePhase, onChangePriority, onDuplicate, onDelete }) => {
+      const [activeSubmenu, setActiveSubmenu] = useState(null);
+      const menuRef = useRef(null);
+
+      useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (menuRef.current && !menuRef.current.contains(e.target)) {
+            onClose();
+          }
+        };
+        const handleEscape = (e) => {
+          if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+          document.removeEventListener('mousedown', handleClickOutside);
+          document.removeEventListener('keydown', handleEscape);
+        };
+      }, [onClose]);
+
+      const menuItems = [
+        { id: 'edit', label: 'Edit', icon: 'edit', action: () => { onEdit(opportunity); onClose(); } },
+        { id: 'phase', label: 'Change Phase', icon: 'arrowRight', submenu: 'phase' },
+        { id: 'priority', label: 'Change Priority', icon: 'target', submenu: 'priority' },
+        { id: 'duplicate', label: 'Duplicate', icon: 'copy', action: () => { onDuplicate(opportunity); onClose(); } },
+        { id: 'delete', label: 'Delete', icon: 'trash', action: () => { onDelete(opportunity); onClose(); }, danger: true },
+      ];
+
+      return (
+        <div
+          ref={menuRef}
+          className="quick-menu absolute bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[180px]"
+          style={{ top: position.y, left: position.x }}
+        >
+          {menuItems.map((item) => (
+            <div key={item.id} className="relative">
+              <button
+                onClick={item.action}
+                onMouseEnter={() => setActiveSubmenu(item.submenu || null)}
+                className={`quick-menu-item w-full px-3 py-2 flex items-center justify-between text-sm ${item.danger ? 'text-red-400 hover:bg-red-500/10' : 'text-slate-300 hover:text-white'}`}
+              >
+                <span className="flex items-center gap-2">
+                  <Icon name={item.icon} className="w-4 h-4" />
+                  {item.label}
+                </span>
+                {item.submenu && <Icon name="chevronRight" className="w-3 h-3" />}
+              </button>
+              
+              {/* Phase Submenu */}
+              {item.submenu === 'phase' && activeSubmenu === 'phase' && (
+                <div className="submenu absolute bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[160px]">
+                  {SHIPLEY_PHASES.map((phase) => (
+                    <button
+                      key={phase.key}
+                      onClick={() => { onChangePhase(opportunity.id, phase.key); onClose(); }}
+                      className={`w-full px-3 py-2 flex items-center gap-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 ${opportunity.shipleyPhase === phase.key ? 'bg-slate-700/30' : ''}`}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: phase.color }} />
+                      {phase.name}
+                      {opportunity.shipleyPhase === phase.key && <Icon name="check" className="w-3 h-3 ml-auto text-cyan-400" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {/* Priority Submenu */}
+              {item.submenu === 'priority' && activeSubmenu === 'priority' && (
+                <div className="submenu absolute bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[120px]">
+                  {PRIORITIES.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => { onChangePriority(opportunity.id, p); onClose(); }}
+                      className={`w-full px-3 py-2 flex items-center gap-2 text-sm hover:bg-slate-700/50 ${PRIORITY_COLORS[p].text} ${opportunity.priority === p ? 'bg-slate-700/30' : ''}`}
+                    >
+                      {p}
+                      {opportunity.priority === p && <Icon name="check" className="w-3 h-3 ml-auto text-cyan-400" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    // ============================================================
+    // OPPORTUNITY CARD COMPONENT (Enhanced with Drag & Quick Actions)
+    // ============================================================
+    const OpportunityCard = ({ 
+      opportunity, 
+      onEdit, 
+      onChangePhase, 
+      onChangePriority, 
+      onDuplicate, 
+      onDelete,
+      onQuickPhaseForward,
+      isDragging,
+      onDragStart,
+      onDragEnd,
+      drawerOpen
+    }) => {
+      const [showQuickMenu, setShowQuickMenu] = useState(false);
+      const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+      const [showHoverPreview, setShowHoverPreview] = useState(false);
+      const hoverTimeout = useRef(null);
+      const cardRef = useRef(null);
+
+      const days = getDaysUntil(opportunity.dueDate);
+      const urgency = getUrgencyClass(days);
+      const pwin = opportunity.winProbability || 0;
+      const currentPhaseIndex = SHIPLEY_PHASES.findIndex(p => p.key === opportunity.shipleyPhase);
+      const nextPhase = currentPhaseIndex < SHIPLEY_PHASES.length - 1 ? SHIPLEY_PHASES[currentPhaseIndex + 1] : null;
+
+      const handleMenuClick = (e) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setMenuPosition({ x: rect.right - 180, y: rect.bottom + 4 });
+        setShowQuickMenu(true);
+      };
+
+      const handleMouseEnter = () => {
+        hoverTimeout.current = setTimeout(() => setShowHoverPreview(true), 500);
+      };
+
+      const handleMouseLeave = () => {
+        if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+        setShowHoverPreview(false);
+      };
+
+      const handleDragStart = (e) => {
+        if (drawerOpen) {
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.setData('text/plain', opportunity.id);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart(opportunity.id);
+      };
+
+      return (
+        <div
+          ref={cardRef}
+          draggable={!drawerOpen}
+          onDragStart={handleDragStart}
+          onDragEnd={onDragEnd}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onClick={() => onEdit(opportunity)}
+          className={`group relative bg-slate-800/80 border border-slate-700 rounded-lg p-3 cursor-pointer transition-all duration-200 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10 ${isDragging ? 'dragging' : ''}`}
+        >
+          {/* Priority Badge & Quick Menu */}
+          <div className="flex items-start justify-between mb-2">
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${PRIORITY_COLORS[opportunity.priority]?.bg} ${PRIORITY_COLORS[opportunity.priority]?.text}`}>
+              {opportunity.priority}
+            </span>
+            <button
+              onClick={handleMenuClick}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-700 transition-opacity"
+            >
+              <Icon name="moreVertical" className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Title */}
+          <h4 className="text-white font-medium text-sm mb-2 line-clamp-2">{opportunity.name}</h4>
+
+          {/* Agency & Value */}
+          <div className="flex items-center justify-between text-xs mb-3">
+            <span className="text-slate-400">{opportunity.agency}</span>
+            <span className="text-cyan-400 font-medium">{formatCurrency(opportunity.contractValue)}</span>
+          </div>
+
+          {/* Win Probability Mini Bar */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-slate-500">Win Probability</span>
+              <span className={pwin >= 70 ? 'text-green-400' : pwin >= 40 ? 'text-amber-400' : 'text-red-400'}>
+                {pwin}%
+              </span>
+            </div>
+            <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all ${getPwinColor(pwin)}`}
+                style={{ width: `${pwin}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Footer: Due Date & Quick Phase Forward */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${urgency.dot}`} />
+              <span className={`text-xs ${urgency.text}`}>
+                {days === null ? 'No date' : days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : `${days}d`}
+              </span>
+            </div>
+            {nextPhase && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onQuickPhaseForward(opportunity.id, nextPhase.key); }}
+                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded text-xs text-cyan-400 hover:bg-cyan-500/10 transition-all"
+                title={`Move to ${nextPhase.name}`}
+              >
+                <Icon name="arrowRight" className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Hover Preview Tooltip */}
+          {showHoverPreview && (
+            <div className="absolute left-full ml-2 top-0 z-40 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl w-64 animate-fadeIn">
+              <h5 className="text-white font-medium text-sm mb-2">{opportunity.name}</h5>
+              {opportunity.description && (
+                <p className="text-slate-400 text-xs mb-2 line-clamp-3">{opportunity.description}</p>
+              )}
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Solicitation:</span>
+                  <span className="text-slate-300">{opportunity.solicitationNumber || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Created:</span>
+                  <span className="text-slate-300">{formatDate(opportunity.createdAt)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Actions Menu */}
+          {showQuickMenu && (
+            <QuickActionsMenu
+              opportunity={opportunity}
+              position={menuPosition}
+              onClose={() => setShowQuickMenu(false)}
+              onEdit={onEdit}
+              onChangePhase={onChangePhase}
+              onChangePriority={onChangePriority}
+              onDuplicate={onDuplicate}
+              onDelete={onDelete}
+            />
+          )}
+        </div>
+      );
+    };
+
+    // ============================================================
+    // PHASE COLUMN COMPONENT (Droppable)
+    // ============================================================
+    const PhaseColumn = ({ 
+      phase, 
+      opportunities, 
+      onEdit, 
+      onChangePhase, 
+      onChangePriority, 
+      onDuplicate, 
+      onDelete,
+      onQuickPhaseForward,
+      draggingId,
+      onDragStart,
+      onDragEnd,
+      onDrop,
+      drawerOpen
+    }) => {
+      const [isDragOver, setIsDragOver] = useState(false);
+      const [dropIndex, setDropIndex] = useState(null);
+
+      const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setIsDragOver(true);
+      };
+
+      const handleDragLeave = () => {
+        setIsDragOver(false);
+        setDropIndex(null);
+      };
+
+      const handleDrop = (e) => {
+        e.preventDefault();
+        const opportunityId = e.dataTransfer.getData('text/plain');
+        onDrop(opportunityId, phase.key);
+        setIsDragOver(false);
+        setDropIndex(null);
+      };
+
+      const totalValue = opportunities.reduce((sum, opp) => sum + (opp.contractValue || 0), 0);
+
+      return (
+        <div 
+          className={`flex-shrink-0 w-72 bg-slate-900/50 rounded-lg border transition-all ${isDragOver ? 'drag-over border-cyan-500' : 'border-slate-800'}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Column Header */}
+          <div className="p-3 border-b border-slate-800">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
+                <h3 className="text-white font-medium text-sm">{phase.name}</h3>
+              </div>
+              <span className="text-slate-400 text-xs bg-slate-800 px-2 py-0.5 rounded-full">
+                {opportunities.length}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500">{formatCurrency(totalValue)}</div>
+          </div>
+
+          {/* Cards Container */}
+          <div className="p-2 space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-thin">
+            {isDragOver && opportunities.length === 0 && (
+              <div className="drop-indicator" />
+            )}
+            {opportunities.map((opp, index) => (
+              <React.Fragment key={opp.id}>
+                {isDragOver && dropIndex === index && <div className="drop-indicator" />}
+                <OpportunityCard
+                  opportunity={opp}
+                  onEdit={onEdit}
+                  onChangePhase={onChangePhase}
+                  onChangePriority={onChangePriority}
+                  onDuplicate={onDuplicate}
+                  onDelete={onDelete}
+                  onQuickPhaseForward={onQuickPhaseForward}
+                  isDragging={draggingId === opp.id}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                  drawerOpen={drawerOpen}
+                />
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // PHASE STEPPER COMPONENT
+    // ============================================================
+    const PhaseStepper = ({ currentPhase, onPhaseClick }) => {
+      const currentIndex = SHIPLEY_PHASES.findIndex(p => p.key === currentPhase);
+
+      return (
+        <div className="flex items-center gap-1 overflow-x-auto pb-2">
+          {SHIPLEY_PHASES.map((phase, index) => {
+            const isCurrent = phase.key === currentPhase;
+            const isPast = index < currentIndex;
+            
+            return (
+              <React.Fragment key={phase.key}>
+                <button
+                  onClick={() => onPhaseClick(phase.key)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-all ${
+                    isCurrent 
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' 
+                      : isPast 
+                        ? 'bg-slate-700/50 text-slate-400' 
+                        : 'bg-slate-800/50 text-slate-500 hover:bg-slate-700/50 hover:text-slate-400'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: phase.color }} />
+                  <span className="whitespace-nowrap">{phase.name}</span>
+                  {isPast && <Icon name="check" className="w-3 h-3 text-green-400" />}
+                </button>
+                {index < SHIPLEY_PHASES.length - 1 && (
+                  <Icon name="chevronRight" className={`w-3 h-3 flex-shrink-0 ${index < currentIndex ? 'text-slate-500' : 'text-slate-700'}`} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      );
+    };
+
+    // ============================================================
+    // ACTIVITY TIMELINE COMPONENT
+    // ============================================================
+    const ActivityTimeline = ({ activities, loading }) => {
+      if (loading) {
+        return (
+          <div className="flex items-center justify-center py-8">
+            <Icon name="refresh" className="w-6 h-6 text-cyan-400 animate-spin" />
+          </div>
+        );
+      }
+
+      if (!activities || activities.length === 0) {
+        return (
+          <div className="text-center py-8 text-slate-500">
+            <Icon name="activity" className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p>No activity recorded yet</p>
+          </div>
+        );
+      }
+
+      const formatActivityTime = (timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleString('en-US', { 
+          month: 'short', 
+          day: 'numeric', 
+          hour: 'numeric', 
+          minute: '2-digit' 
+        });
+      };
+
+      const getActionIcon = (action) => {
+        switch (action) {
+          case 'created': return 'plus';
+          case 'updated': return 'edit';
+          case 'phase_changed': return 'arrowRight';
+          case 'deleted': return 'trash';
+          default: return 'activity';
+        }
+      };
+
+      const getActionColor = (action) => {
+        switch (action) {
+          case 'created': return 'text-green-400';
+          case 'updated': return 'text-blue-400';
+          case 'phase_changed': return 'text-cyan-400';
+          case 'deleted': return 'text-red-400';
+          default: return 'text-slate-400';
+        }
+      };
+
+      return (
+        <div className="space-y-3">
+          {activities.map((activity, index) => (
+            <div key={activity.id || index} className="flex gap-3">
+              <div className={`flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center ${getActionColor(activity.action)}`}>
+                <Icon name={getActionIcon(activity.action)} className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-sm font-medium capitalize ${getActionColor(activity.action)}`}>
+                    {activity.action.replace('_', ' ')}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {formatActivityTime(activity.created_at)}
+                  </span>
+                </div>
+                {activity.field_changed && (
+                  <div className="text-xs text-slate-400">
+                    <span className="text-slate-500">{activity.field_changed}:</span>{' '}
+                    {activity.old_value && <span className="line-through text-red-400/70">{activity.old_value}</span>}
+                    {activity.old_value && activity.new_value && ' → '}
+                    {activity.new_value && <span className="text-green-400">{activity.new_value}</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    // ============================================================
+    // ENHANCED OPPORTUNITY DRAWER COMPONENT
+    // ============================================================
+    const OpportunityDrawer = ({ 
+      opportunity, 
+      isOpen, 
+      onClose, 
+      onSave, 
+      onDelete,
+      onChangePhase 
+    }) => {
+      const [activeTab, setActiveTab] = useState('details');
+      const [formData, setFormData] = useState({});
+      const [activities, setActivities] = useState([]);
+      const [loadingActivities, setLoadingActivities] = useState(false);
+      const [isSaving, setIsSaving] = useState(false);
+
+      const isNew = !opportunity?.id;
+
+      useEffect(() => {
+        if (opportunity) {
+          setFormData({
+            name: opportunity.name || '',
+            agency: opportunity.agency || '',
+            contractValue: opportunity.contractValue || '',
+            priority: opportunity.priority || 'P-2',
+            shipleyPhase: opportunity.shipleyPhase || 'gate_1',
+            winProbability: opportunity.winProbability || 50,
+            dueDate: opportunity.dueDate || '',
+            solicitationNumber: opportunity.solicitationNumber || '',
+            description: opportunity.description || '',
+          });
+          
+          // Fetch activities for this opportunity
+          if (opportunity.id) {
+            fetchActivities(opportunity.id);
+          }
+        }
+        setActiveTab('details');
+      }, [opportunity]);
+
+      const fetchActivities = async (opportunityId) => {
+        setLoadingActivities(true);
+        try {
+          const { data, error } = await supabaseClient
+            .from('activity_log')
+            .select('*')
+            .eq('opportunity_id', opportunityId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          if (error) throw error;
+          setActivities(data || []);
+        } catch (err) {
+          console.error('Error fetching activities:', err);
+        } finally {
+          setLoadingActivities(false);
+        }
+      };
+
+      const handleSubmit = async () => {
+        setIsSaving(true);
+        try {
+          await onSave(formData);
+        } finally {
+          setIsSaving(false);
+        }
+      };
+
+      const handlePhaseChange = (newPhase) => {
+        if (opportunity?.id && newPhase !== opportunity.shipleyPhase) {
+          onChangePhase(opportunity.id, newPhase);
+          setFormData(prev => ({ ...prev, shipleyPhase: newPhase }));
+        }
+      };
+
+      if (!isOpen) return null;
+
+      const days = getDaysUntil(formData.dueDate);
+      const urgency = getUrgencyClass(days);
+      const pwin = formData.winProbability || 0;
+      const currentPhase = SHIPLEY_PHASES.find(p => p.key === formData.shipleyPhase);
+
+      const tabs = [
+        { id: 'details', label: 'Details', icon: 'fileText' },
+        { id: 'activity', label: 'Activity', icon: 'activity', count: activities.length },
+        { id: 'notes', label: 'Notes', icon: 'stickyNote' },
+      ];
+
+      return (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 animate-fadeIn"
+            onClick={onClose}
+          />
+          
+          {/* Drawer */}
+          <div className="fixed right-0 top-0 h-full w-[480px] bg-slate-900 border-l border-slate-800 z-50 flex flex-col animate-slideIn">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-800">
+              <h2 className="text-lg font-semibold text-white">
+                {isNew ? 'New Opportunity' : 'Edit Opportunity'}
+              </h2>
+              <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+                <Icon name="x" className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Quick Stats Header (for existing opportunities) */}
+            {!isNew && (
+              <div className="p-4 bg-slate-800/50 border-b border-slate-800">
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${urgency.text}`}>
+                      {days === null ? '--' : days < 0 ? `${Math.abs(days)}` : days}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {days === null ? 'No date' : days < 0 ? 'Days overdue' : 'Days left'}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${pwin >= 70 ? 'text-green-400' : pwin >= 40 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {pwin}%
+                    </div>
+                    <div className="text-xs text-slate-500">Win Prob</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-cyan-400">
+                      {formatCurrency(formData.contractValue)}
+                    </div>
+                    <div className="text-xs text-slate-500">Value</div>
+                  </div>
+                  <div className="text-center">
+                    <div 
+                      className="w-8 h-8 rounded-full mx-auto mb-1" 
+                      style={{ backgroundColor: currentPhase?.color }}
+                    />
+                    <div className="text-xs text-slate-500">{currentPhase?.name}</div>
+                  </div>
+                </div>
+                
+                {/* Phase Stepper */}
+                <PhaseStepper 
+                  currentPhase={formData.shipleyPhase} 
+                  onPhaseClick={handlePhaseChange}
+                />
+              </div>
+            )}
+
+            {/* Tabs */}
+            {!isNew && (
+              <div className="flex border-b border-slate-800">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      activeTab === tab.id 
+                        ? 'text-cyan-400 border-b-2 border-cyan-400' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Icon name={tab.icon} className="w-4 h-4" />
+                    {tab.label}
+                    {tab.count !== undefined && (
+                      <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-slate-800">
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+              {/* Details Tab */}
+              {(activeTab === 'details' || isNew) && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Name *</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      placeholder="Opportunity name"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">Agency</label>
+                      <select
+                        value={formData.agency}
+                        onChange={(e) => setFormData(prev => ({ ...prev, agency: e.target.value }))}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      >
+                        <option value="">Select agency</option>
+                        {AGENCIES.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">Priority</label>
+                      <select
+                        value={formData.priority}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      >
+                        {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">Contract Value</label>
+                      <input
+                        type="number"
+                        value={formData.contractValue}
+                        onChange={(e) => setFormData(prev => ({ ...prev, contractValue: parseInt(e.target.value) || 0 }))}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                        placeholder="e.g., 5000000"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">Win Probability (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={formData.winProbability}
+                        onChange={(e) => setFormData(prev => ({ ...prev, winProbability: parseInt(e.target.value) || 0 }))}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">Phase</label>
+                      <select
+                        value={formData.shipleyPhase}
+                        onChange={(e) => setFormData(prev => ({ ...prev, shipleyPhase: e.target.value }))}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      >
+                        {SHIPLEY_PHASES.map(p => <option key={p.key} value={p.key}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-1">Due Date</label>
+                      <input
+                        type="date"
+                        value={formData.dueDate}
+                        onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Solicitation Number</label>
+                    <input
+                      type="text"
+                      value={formData.solicitationNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, solicitationNumber: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      placeholder="e.g., 75H71423R00001"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Description</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      rows={4}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none resize-none"
+                      placeholder="Opportunity description..."
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Activity Tab */}
+              {activeTab === 'activity' && !isNew && (
+                <ActivityTimeline activities={activities} loading={loadingActivities} />
+              )}
+
+              {/* Notes Tab */}
+              {activeTab === 'notes' && !isNew && (
+                <div className="text-center py-8 text-slate-500">
+                  <Icon name="stickyNote" className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Notes feature coming soon</p>
+                  <p className="text-xs text-slate-600 mt-1">Track team discussions and decisions</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 border-t border-slate-800 flex items-center justify-between">
+              {!isNew && (
+                <button
+                  onClick={() => onDelete(opportunity)}
+                  className="px-4 py-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                >
+                  <Icon name="trash" className="w-4 h-4 inline mr-2" />
+                  Delete
+                </button>
+              )}
+              <div className={`flex gap-2 ${isNew ? 'w-full justify-end' : ''}`}>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!formData.name || isSaving}
+                  className="px-6 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSaving && <Icon name="refresh" className="w-4 h-4 animate-spin" />}
+                  {isNew ? 'Create' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    // ============================================================
+    // DELETE CONFIRMATION MODAL
+    // ============================================================
+    const DeleteConfirmModal = ({ opportunity, onConfirm, onCancel }) => {
+      if (!opportunity) return null;
+
+      return (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50 animate-fadeIn" onClick={onCancel} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-900 border border-slate-800 rounded-xl p-6 w-[400px] z-50 animate-fadeIn">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <Icon name="alertCircle" className="w-5 h-5 text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Delete Opportunity</h3>
+            </div>
+            <p className="text-slate-400 mb-6">
+              Are you sure you want to delete "<span className="text-white">{opportunity.name}</span>"? 
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={onCancel}
+                className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    // ============================================================
+    // KEYBOARD SHORTCUTS MODAL
+    // ============================================================
+    const KeyboardShortcutsModal = ({ isOpen, onClose }) => {
+      if (!isOpen) return null;
+
+      const shortcuts = [
+        { key: 'N', description: 'New opportunity' },
+        { key: 'F or /', description: 'Focus search' },
+        { key: 'Escape', description: 'Close drawer/modal' },
+        { key: '1', description: 'Board view' },
+        { key: '2', description: 'Table view' },
+        { key: 'Shift + ?', description: 'Show shortcuts' },
+      ];
+
+      return (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50 animate-fadeIn" onClick={onClose} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-900 border border-slate-800 rounded-xl p-6 w-[400px] z-50 animate-fadeIn">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Keyboard Shortcuts</h3>
+              <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded">
+                <Icon name="x" className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {shortcuts.map((s, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                  <span className="text-slate-400">{s.description}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-xs text-cyan-400 font-mono">{s.key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    // ============================================================
+    // MAIN APP COMPONENT
+    // ============================================================
+    const App = () => {
+      // State
+      const [opportunities, setOpportunities] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [view, setView] = useState('board'); // 'board' | 'table'
+      const [drawerOpen, setDrawerOpen] = useState(false);
+      const [selectedOpportunity, setSelectedOpportunity] = useState(null);
+      const [deleteTarget, setDeleteTarget] = useState(null);
+      const [toast, setToast] = useState(null);
+      const [showShortcuts, setShowShortcuts] = useState(false);
+      const [draggingId, setDraggingId] = useState(null);
+      
+      // Filters
+      const [filters, setFilters] = useState({
+        search: '',
+        agencies: [],
+        priorities: [],
+        phases: [],
+        pWinMin: 0,
+        pWinMax: 100,
+      });
+
+      const searchRef = useRef(null);
+
+      // Fetch opportunities
+      const fetchOpportunities = async () => {
+        try {
+          const { data, error } = await supabaseClient
+            .from('opportunities')
+            .select('*')
+            .order('due_date', { ascending: true });
+
+          if (error) throw error;
+          setOpportunities((data || []).map(mapToFrontend));
+        } catch (err) {
+          console.error('Error fetching opportunities:', err);
+          showToast('Failed to load opportunities', 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // Real-time subscription
+      useEffect(() => {
+        fetchOpportunities();
+
+        const subscription = supabaseClient
+          .channel('opportunities-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, (payload) => {
+            if (payload.eventType === 'INSERT') {
+              setOpportunities(prev => [...prev, mapToFrontend(payload.new)]);
+            } else if (payload.eventType === 'UPDATE') {
+              setOpportunities(prev => prev.map(opp => 
+                opp.id === payload.new.id ? mapToFrontend(payload.new) : opp
+              ));
+            } else if (payload.eventType === 'DELETE') {
+              setOpportunities(prev => prev.filter(opp => opp.id !== payload.old.id));
+            }
+          })
+          .subscribe();
+
+        return () => {
+          subscription.unsubscribe();
+        };
+      }, []);
+
+      // Keyboard shortcuts
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          // Ignore if typing in input
+          if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+          if (e.key === 'n' || e.key === 'N') {
+            e.preventDefault();
+            handleNewOpportunity();
+          } else if (e.key === 'f' || e.key === 'F' || e.key === '/') {
+            e.preventDefault();
+            searchRef.current?.focus();
+          } else if (e.key === 'Escape') {
+            setDrawerOpen(false);
+            setDeleteTarget(null);
+            setShowShortcuts(false);
+          } else if (e.key === '1') {
+            setView('board');
+          } else if (e.key === '2') {
+            setView('table');
+          } else if (e.key === '?' && e.shiftKey) {
+            e.preventDefault();
+            setShowShortcuts(true);
+          }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+      }, []);
+
+      // Filtered opportunities
+      const filteredOpportunities = useMemo(() => {
+        return opportunities.filter(opp => {
+          // Search filter
+          if (filters.search) {
+            const search = filters.search.toLowerCase();
+            const matchesSearch = 
+              opp.name?.toLowerCase().includes(search) ||
+              opp.agency?.toLowerCase().includes(search) ||
+              opp.solicitationNumber?.toLowerCase().includes(search);
+            if (!matchesSearch) return false;
+          }
+          
+          // Agency filter
+          if (filters.agencies.length > 0 && !filters.agencies.includes(opp.agency)) return false;
+          
+          // Priority filter
+          if (filters.priorities.length > 0 && !filters.priorities.includes(opp.priority)) return false;
+          
+          // Phase filter
+          if (filters.phases.length > 0 && !filters.phases.includes(opp.shipleyPhase)) return false;
+          
+          // pWin filter
+          const pWin = opp.winProbability || 0;
+          if (pWin < filters.pWinMin || pWin > filters.pWinMax) return false;
+          
+          return true;
+        });
+      }, [opportunities, filters]);
+
+      // Group by phase for board view
+      const opportunitiesByPhase = useMemo(() => {
+        const grouped = {};
+        SHIPLEY_PHASES.forEach(phase => {
+          grouped[phase.key] = filteredOpportunities.filter(opp => opp.shipleyPhase === phase.key);
+        });
+        return grouped;
+      }, [filteredOpportunities]);
+
+      // Toast helper
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+      };
+
+      // CRUD Operations
+      const handleNewOpportunity = () => {
+        setSelectedOpportunity({});
+        setDrawerOpen(true);
+      };
+
+      const handleEditOpportunity = (opp) => {
+        setSelectedOpportunity(opp);
+        setDrawerOpen(true);
+      };
+
+      const handleSaveOpportunity = async (formData) => {
+        try {
+          const dbData = mapToDatabase(formData);
+          
+          if (selectedOpportunity?.id) {
+            // Update
+            const { error } = await supabaseClient
+              .from('opportunities')
+              .update(dbData)
+              .eq('id', selectedOpportunity.id);
+
+            if (error) throw error;
+            
+            // Log activity
+            await logActivity(selectedOpportunity.id, 'updated', null, null, null);
+            
+            showToast('Opportunity updated');
+          } else {
+            // Create
+            dbData.created_at = new Date().toISOString();
+            const { data, error } = await supabaseClient
+              .from('opportunities')
+              .insert([dbData])
+              .select()
+              .single();
+
+            if (error) throw error;
+            
+            // Log activity
+            await logActivity(data.id, 'created', null, null, null);
+            
+            showToast('Opportunity created');
+          }
+          
+          setDrawerOpen(false);
+          setSelectedOpportunity(null);
+        } catch (err) {
+          console.error('Error saving opportunity:', err);
+          showToast('Failed to save opportunity', 'error');
+        }
+      };
+
+      const handleDeleteOpportunity = async () => {
+        if (!deleteTarget) return;
+        
+        try {
+          const { error } = await supabaseClient
+            .from('opportunities')
+            .delete()
+            .eq('id', deleteTarget.id);
+
+          if (error) throw error;
+          
+          showToast('Opportunity deleted');
+          setDeleteTarget(null);
+          setDrawerOpen(false);
+        } catch (err) {
+          console.error('Error deleting opportunity:', err);
+          showToast('Failed to delete opportunity', 'error');
+        }
+      };
+
+      const handleChangePhase = async (id, newPhase) => {
+        const opp = opportunities.find(o => o.id === id);
+        if (!opp || opp.shipleyPhase === newPhase) return;
+        
+        const oldPhase = opp.shipleyPhase;
+        
+        // Optimistic update
+        setOpportunities(prev => prev.map(o => 
+          o.id === id ? { ...o, shipleyPhase: newPhase } : o
+        ));
+        
+        try {
+          const { error } = await supabaseClient
+            .from('opportunities')
+            .update({ shipley_phase: newPhase, updated_at: new Date().toISOString() })
+            .eq('id', id);
+
+          if (error) throw error;
+          
+          // Log activity
+          const oldPhaseName = SHIPLEY_PHASES.find(p => p.key === oldPhase)?.name || oldPhase;
+          const newPhaseName = SHIPLEY_PHASES.find(p => p.key === newPhase)?.name || newPhase;
+          await logActivity(id, 'phase_changed', 'phase', oldPhaseName, newPhaseName);
+          
+          showToast(`Moved to ${newPhaseName}`);
+        } catch (err) {
+          // Rollback
+          setOpportunities(prev => prev.map(o => 
+            o.id === id ? { ...o, shipleyPhase: oldPhase } : o
+          ));
+          console.error('Error changing phase:', err);
+          showToast('Failed to change phase', 'error');
+        }
+      };
+
+      const handleChangePriority = async (id, newPriority) => {
+        const opp = opportunities.find(o => o.id === id);
+        if (!opp || opp.priority === newPriority) return;
+        
+        const oldPriority = opp.priority;
+        
+        // Optimistic update
+        setOpportunities(prev => prev.map(o => 
+          o.id === id ? { ...o, priority: newPriority } : o
+        ));
+        
+        try {
+          const { error } = await supabaseClient
+            .from('opportunities')
+            .update({ priority: newPriority, updated_at: new Date().toISOString() })
+            .eq('id', id);
+
+          if (error) throw error;
+          
+          await logActivity(id, 'updated', 'priority', oldPriority, newPriority);
+          showToast(`Priority changed to ${newPriority}`);
+        } catch (err) {
+          // Rollback
+          setOpportunities(prev => prev.map(o => 
+            o.id === id ? { ...o, priority: oldPriority } : o
+          ));
+          console.error('Error changing priority:', err);
+          showToast('Failed to change priority', 'error');
+        }
+      };
+
+      const handleDuplicate = async (opp) => {
+        try {
+          const newData = {
+            name: `${opp.name} (Copy)`,
+            agency: opp.agency,
+            contract_value: opp.contractValue,
+            priority: opp.priority,
+            shipley_phase: opp.shipleyPhase,
+            win_probability: opp.winProbability,
+            due_date: opp.dueDate,
+            solicitation_number: opp.solicitationNumber,
+            description: opp.description,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          const { data, error } = await supabaseClient
+            .from('opportunities')
+            .insert([newData])
+            .select()
+            .single();
+
+          if (error) throw error;
+          
+          await logActivity(data.id, 'created', null, null, null);
+          showToast('Opportunity duplicated');
+        } catch (err) {
+          console.error('Error duplicating opportunity:', err);
+          showToast('Failed to duplicate opportunity', 'error');
+        }
+      };
+
+      const logActivity = async (opportunityId, action, field, oldValue, newValue) => {
+        try {
+          await supabaseClient
+            .from('activity_log')
+            .insert([{
+              opportunity_id: opportunityId,
+              action,
+              field_changed: field,
+              old_value: oldValue,
+              new_value: newValue,
+              user_id: 'system',
+              created_at: new Date().toISOString(),
+            }]);
+        } catch (err) {
+          console.error('Error logging activity:', err);
+        }
+      };
+
+      // Drag handlers
+      const handleDragStart = (id) => {
+        setDraggingId(id);
+      };
+
+      const handleDragEnd = () => {
+        setDraggingId(null);
+      };
+
+      const handleDrop = (opportunityId, newPhase) => {
+        handleChangePhase(opportunityId, newPhase);
+        setDraggingId(null);
+      };
+
+      // Stats
+      const stats = useMemo(() => ({
+        total: filteredOpportunities.length,
+        totalValue: filteredOpportunities.reduce((sum, o) => sum + (o.contractValue || 0), 0),
+        avgPwin: filteredOpportunities.length > 0 
+          ? Math.round(filteredOpportunities.reduce((sum, o) => sum + (o.winProbability || 0), 0) / filteredOpportunities.length)
+          : 0,
+      }), [filteredOpportunities]);
+
+      return (
+        <div className="min-h-screen bg-shield-navy">
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-800 px-6 py-4 sticky top-0 z-30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Icon name="shield" className="w-8 h-8 text-cyan-400" />
+                  <h1 className="text-xl font-bold text-white">MissionPulse</h1>
+                </div>
+                <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">Sprint 10</span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Stats */}
+                <div className="hidden md:flex items-center gap-6 text-sm">
+                  <div>
+                    <span className="text-slate-500">Pipeline:</span>
+                    <span className="text-cyan-400 font-semibold ml-1">{formatCurrency(stats.totalValue)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Avg pWin:</span>
+                    <span className="text-cyan-400 font-semibold ml-1">{stats.avgPwin}%</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Opportunities:</span>
+                    <span className="text-cyan-400 font-semibold ml-1">{stats.total}</span>
+                  </div>
+                </div>
+
+                {/* View Toggle */}
+                <div className="flex bg-slate-800 rounded-lg p-1">
+                  <button
+                    onClick={() => setView('board')}
+                    className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${view === 'board' ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <Icon name="grid" className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setView('table')}
+                    className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${view === 'table' ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <Icon name="list" className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* New Opportunity Button */}
+                <button
+                  onClick={handleNewOpportunity}
+                  className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
+                >
+                  <Icon name="plus" className="w-4 h-4" />
+                  <span className="hidden sm:inline">New</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Filter Bar */}
+          <div className="bg-slate-900/50 border-b border-slate-800 px-6 py-3">
+            <div className="flex items-center gap-4">
+              {/* Search */}
+              <div className="relative flex-1 max-w-md">
+                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={filters.search}
+                  onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  placeholder="Search opportunities... (F)"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Agency Filter */}
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value && !filters.agencies.includes(e.target.value)) {
+                    setFilters(prev => ({ ...prev, agencies: [...prev.agencies, e.target.value] }));
+                  }
+                }}
+                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 focus:border-cyan-500 focus:outline-none"
+              >
+                <option value="">Agency</option>
+                {AGENCIES.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+
+              {/* Priority Filter */}
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value && !filters.priorities.includes(e.target.value)) {
+                    setFilters(prev => ({ ...prev, priorities: [...prev.priorities, e.target.value] }));
+                  }
+                }}
+                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 focus:border-cyan-500 focus:outline-none"
+              >
+                <option value="">Priority</option>
+                {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+
+              {/* Active Filters */}
+              {(filters.agencies.length > 0 || filters.priorities.length > 0 || filters.search) && (
+                <div className="flex items-center gap-2">
+                  {filters.agencies.map(a => (
+                    <span key={a} className="flex items-center gap-1 px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs">
+                      {a}
+                      <button onClick={() => setFilters(prev => ({ ...prev, agencies: prev.agencies.filter(x => x !== a) }))}>
+                        <Icon name="x" className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {filters.priorities.map(p => (
+                    <span key={p} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${PRIORITY_COLORS[p]?.bg} ${PRIORITY_COLORS[p]?.text}`}>
+                      {p}
+                      <button onClick={() => setFilters(prev => ({ ...prev, priorities: prev.priorities.filter(x => x !== p) }))}>
+                        <Icon name="x" className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <button
+                    onClick={() => setFilters({ search: '', agencies: [], priorities: [], phases: [], pWinMin: 0, pWinMax: 100 })}
+                    className="text-xs text-slate-400 hover:text-white"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+
+              {/* Keyboard Shortcuts */}
+              <button
+                onClick={() => setShowShortcuts(true)}
+                className="text-slate-500 hover:text-slate-400 text-xs"
+              >
+                <kbd className="px-1.5 py-0.5 bg-slate-800 rounded font-mono">?</kbd>
+              </button>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <main className="p-6">
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <Icon name="refresh" className="w-8 h-8 text-cyan-400 animate-spin" />
+              </div>
+            ) : view === 'board' ? (
+              /* Board View */
+              <div className="flex gap-4 overflow-x-auto pb-4">
+                {SHIPLEY_PHASES.map(phase => (
+                  <PhaseColumn
+                    key={phase.key}
+                    phase={phase}
+                    opportunities={opportunitiesByPhase[phase.key] || []}
+                    onEdit={handleEditOpportunity}
+                    onChangePhase={handleChangePhase}
+                    onChangePriority={handleChangePriority}
+                    onDuplicate={handleDuplicate}
+                    onDelete={setDeleteTarget}
+                    onQuickPhaseForward={handleChangePhase}
+                    draggingId={draggingId}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDrop={handleDrop}
+                    drawerOpen={drawerOpen}
+                  />
+                ))}
+              </div>
+            ) : (
+              /* Table View */
+              <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-800">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Agency</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Value</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Priority</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Phase</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">pWin</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Due Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredOpportunities.map(opp => {
+                      const days = getDaysUntil(opp.dueDate);
+                      const urgency = getUrgencyClass(days);
+                      const phase = SHIPLEY_PHASES.find(p => p.key === opp.shipleyPhase);
+                      
+                      return (
+                        <tr 
+                          key={opp.id} 
+                          onClick={() => handleEditOpportunity(opp)}
+                          className="hover:bg-slate-800/50 cursor-pointer transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <span className="text-white font-medium">{opp.name}</span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-400">{opp.agency}</td>
+                          <td className="px-4 py-3 text-cyan-400 font-medium">{formatCurrency(opp.contractValue)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${PRIORITY_COLORS[opp.priority]?.bg} ${PRIORITY_COLORS[opp.priority]?.text}`}>
+                              {opp.priority}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: phase?.color }} />
+                              <span className="text-slate-300">{phase?.name}</span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={opp.winProbability >= 70 ? 'text-green-400' : opp.winProbability >= 40 ? 'text-amber-400' : 'text-red-400'}>
+                              {opp.winProbability}%
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`flex items-center gap-2 ${urgency.text}`}>
+                              <span className={`w-2 h-2 rounded-full ${urgency.dot}`} />
+                              {formatDate(opp.dueDate)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                
+                {filteredOpportunities.length === 0 && (
+                  <div className="text-center py-12 text-slate-500">
+                    <Icon name="search" className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No opportunities found</p>
+                    <p className="text-sm mt-1">Try adjusting your filters or create a new opportunity</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+
+          {/* Footer */}
+          <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/80 border-t border-slate-800 px-6 py-2 text-center">
+            <span className="text-xs text-slate-500">
+              AI GENERATED - REQUIRES HUMAN REVIEW | © 2026 Mission Meets Tech
+            </span>
+          </footer>
+
+          {/* Drawer */}
+          <OpportunityDrawer
+            opportunity={selectedOpportunity}
+            isOpen={drawerOpen}
+            onClose={() => { setDrawerOpen(false); setSelectedOpportunity(null); }}
+            onSave={handleSaveOpportunity}
+            onDelete={setDeleteTarget}
+            onChangePhase={handleChangePhase}
+          />
+
+          {/* Delete Confirmation */}
+          <DeleteConfirmModal
+            opportunity={deleteTarget}
+            onConfirm={handleDeleteOpportunity}
+            onCancel={() => setDeleteTarget(null)}
+          />
+
+          {/* Keyboard Shortcuts Modal */}
+          <KeyboardShortcutsModal
+            isOpen={showShortcuts}
+            onClose={() => setShowShortcuts(false)}
+          />
+
+          {/* Toast */}
+          {toast && (
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast(null)}
+            />
+          )}
+        </div>
+      );
+    };
+
+    // Mount App
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
