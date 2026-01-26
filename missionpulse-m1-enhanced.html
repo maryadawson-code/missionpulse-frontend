@@ -37,7 +37,93 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    const { useState, useEffect, useRef, createContext, useContext } = React;
+
+    // ============================================
+    // API CONFIGURATION & SESSION MANAGEMENT
+    // ============================================
+    const API_CONFIG = {
+      BASE_URL: 'https://missionpulse-api.onrender.com',
+      TIMEOUT: 30000
+    };
+
+    const getApiUrl = (endpoint) => `${API_CONFIG.BASE_URL}/api/${endpoint}`;
+
+    const SessionManager = {
+      TOKEN_KEY: 'missionpulse_token',
+      USER_KEY: 'missionpulse_user',
+      getToken: () => localStorage.getItem('missionpulse_token'),
+      setToken: (token) => localStorage.setItem('missionpulse_token', token),
+      getUser: () => {
+        const user = localStorage.getItem('missionpulse_user');
+        return user ? JSON.parse(user) : null;
+      },
+      setUser: (user) => localStorage.setItem('missionpulse_user', JSON.stringify(user)),
+      isAuthenticated: () => !!localStorage.getItem('missionpulse_token'),
+      logout: () => {
+        localStorage.removeItem('missionpulse_token');
+        localStorage.removeItem('missionpulse_user');
+        window.location.href = '/index.html';
+      }
+    };
+
+    const ApiClient = {
+      async request(endpoint, options = {}) {
+        const token = SessionManager.getToken();
+        const config = {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` }),
+            ...options.headers
+          },
+          ...options
+        };
+        try {
+          const response = await fetch(getApiUrl(endpoint), config);
+          if (response.status === 401) {
+            SessionManager.logout();
+            throw new Error('Session expired');
+          }
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || `API Error: ${response.status}`);
+          }
+          return await response.json();
+        } catch (error) {
+          console.error(`API Error [${endpoint}]:`, error);
+          throw error;
+        }
+      },
+      get: (endpoint) => ApiClient.request(endpoint, { method: 'GET' }),
+      post: (endpoint, data) => ApiClient.request(endpoint, { method: 'POST', body: JSON.stringify(data) })
+    };
+
+    // Auth Context for RBAC
+    const AuthContext = createContext(null);
+    const useAuth = () => useContext(AuthContext);
+
+    // Loading Component
+    const LoadingSpinner = () => (
+      <div className="flex items-center justify-center p-8">
+        <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-cyan-500 animate-spin" />
+      </div>
+    );
+
+    // Error Component
+    const ErrorMessage = ({ message, onRetry }) => (
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+          <Icon name="alert" className="w-8 h-8 text-red-400" />
+        </div>
+        <h3 className="text-lg font-semibold text-white mb-2">Something went wrong</h3>
+        <p className="text-slate-400 text-sm mb-4">{message}</p>
+        {onRetry && (
+          <button onClick={onRetry} className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-400">
+            Try Again
+          </button>
+        )}
+      </div>
+    );
 
     // ============================================
     // ICON LIBRARY
