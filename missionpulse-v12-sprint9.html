@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12.0 - Sprint 9 | Pipeline Manager</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'pulse-cyan': '#00E5FA',
+            'shield-navy': '#00050F',
+            'shield-dark': '#0a0f1a',
+            'shield-panel': '#0d1526',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 500px; opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out forwards; }
+    .animate-slideDown { animation: slideDown 0.3s ease-out forwards; overflow: hidden; }
+    .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #00E5FA; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+    .kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; font-size: 11px; font-weight: 500; border-radius: 4px; background: #1e293b; border: 1px solid #334155; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+    // ============================================================
+    // SUPABASE CLIENT
+    // ============================================================
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Field mapping: snake_case (DB) <-> camelCase (Frontend)
+    const mapToFrontend = (record) => {
+      if (!record) return null;
+      return {
+        id: record.id,
+        name: record.name,
+        agency: record.agency,
+        contractValue: record.contract_value,
+        priority: record.priority,
+        shipleyPhase: record.shipley_phase,
+        winProbability: record.win_probability,
+        dueDate: record.due_date,
+        solicitationNumber: record.solicitation_number,
+        description: record.description,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at,
+      };
+    };
+
+    const mapToDatabase = (data) => {
+      if (!data) return null;
+      const mapped = {};
+      if (data.name !== undefined) mapped.name = data.name;
+      if (data.agency !== undefined) mapped.agency = data.agency;
+      if (data.contractValue !== undefined) mapped.contract_value = data.contractValue;
+      if (data.priority !== undefined) mapped.priority = data.priority;
+      if (data.shipleyPhase !== undefined) mapped.shipley_phase = data.shipleyPhase;
+      if (data.winProbability !== undefined) mapped.win_probability = data.winProbability;
+      if (data.dueDate !== undefined) mapped.due_date = data.dueDate;
+      if (data.solicitationNumber !== undefined) mapped.solicitation_number = data.solicitationNumber;
+      if (data.description !== undefined) mapped.description = data.description;
+      mapped.updated_at = new Date().toISOString();
+      return mapped;
+    };
+
+    // ============================================================
+    // CONSTANTS
+    // ============================================================
+    const SHIPLEY_PHASES = {
+      'gate_1': { name: 'Gate 1', color: '#94a3b8', order: 1 },
+      'blue_team': { name: 'Blue Team', color: '#60a5fa', order: 2 },
+      'pink_team': { name: 'Pink Team', color: '#f472b6', order: 3 },
+      'red_team': { name: 'Red Team', color: '#ef4444', order: 4 },
+      'gold_team': { name: 'Gold Team', color: '#fbbf24', order: 5 },
+      'submitted': { name: 'Submitted', color: '#22c55e', order: 6 },
+      'awarded': { name: 'Awarded', color: '#8b5cf6', order: 7 },
+      'lost': { name: 'Lost', color: '#64748b', order: 8 }
+    };
+
+    const PRIORITY_ORDER = { 'P-0': 1, 'P-1': 2, 'P-2': 3, 'P-3': 4 };
+
+    const formatCurrency = (value) => {
+      if (!value) return '$0';
+      if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+      if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+      if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+      return `$${value.toLocaleString()}`;
+    };
+
+    // ============================================================
+    // ICONS
+    // ============================================================
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      chevronUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      kanban: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
+      table: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+      activity: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>,
+      trendingUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+      barChart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      calendar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+      building: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      help: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      loader: () => <svg className="w-full h-full animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      arrowsUpDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>,
+      sortAsc: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>,
+      sortDesc: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" /></svg>,
+      keyboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================
+    // TOAST NOTIFICATIONS
+    // ============================================================
+    const Toast = ({ message, type = 'success', onClose }) => {
+      useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+      }, [onClose]);
+
+      const colors = {
+        success: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400',
+        error: 'bg-red-500/20 border-red-500/50 text-red-400',
+        info: 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+      };
+
+      return (
+        <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg border ${colors[type]} animate-slideIn z-50`}>
+          <div className="flex items-center gap-2">
+            <Icon name={type === 'success' ? 'check' : type === 'error' ? 'x' : 'activity'} className="w-4 h-4" />
+            <span className="text-sm font-medium">{message}</span>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // DROPDOWN COMPONENT
+    // ============================================================
+    const Dropdown = ({ label, options, selected, onChange, multiple = false }) => {
+      const [isOpen, setIsOpen] = useState(false);
+      const dropdownRef = useRef(null);
+
+      useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+            setIsOpen(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, []);
+
+      const handleSelect = (value) => {
+        if (multiple) {
+          const newSelected = selected.includes(value)
+            ? selected.filter(v => v !== value)
+            : [...selected, value];
+          onChange(newSelected);
+        } else {
+          onChange(value);
+          setIsOpen(false);
+        }
+      };
+
+      return (
+        <div ref={dropdownRef} className="relative">
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:border-cyan-500/50 transition-colors"
+          >
+            <span>{label}</span>
+            {multiple && selected.length > 0 && (
+              <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full">{selected.length}</span>
+            )}
+            <Icon name="chevronDown" className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {isOpen && (
+            <div className="absolute top-full left-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 animate-fadeIn">
+              <div className="py-1 max-h-60 overflow-y-auto scrollbar-thin">
+                {options.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => handleSelect(opt.value)}
+                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-700 transition-colors ${
+                      (multiple ? selected.includes(opt.value) : selected === opt.value) ? 'text-cyan-400' : 'text-slate-300'
+                    }`}
+                  >
+                    {multiple && (
+                      <span className={`w-4 h-4 border rounded flex items-center justify-center ${
+                        selected.includes(opt.value) ? 'border-cyan-500 bg-cyan-500/20' : 'border-slate-600'
+                      }`}>
+                        {selected.includes(opt.value) && <Icon name="check" className="w-3 h-3" />}
+                      </span>
+                    )}
+                    {opt.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: opt.color }} />}
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ============================================================
+    // KEYBOARD SHORTCUTS MODAL
+    // ============================================================
+    const ShortcutsModal = ({ isOpen, onClose }) => {
+      if (!isOpen) return null;
+
+      const shortcuts = [
+        { category: 'Navigation', items: [
+          { keys: ['1'], desc: 'Switch to Board view' },
+          { keys: ['2'], desc: 'Switch to Table view' },
+          { keys: ['F'], desc: 'Focus search input' },
+          { keys: ['/'], desc: 'Focus search (alternative)' },
+        ]},
+        { category: 'Actions', items: [
+          { keys: ['N'], desc: 'New opportunity' },
+          { keys: ['Esc'], desc: 'Close drawer/panel/modal' },
+        ]},
+        { category: 'Table View', items: [
+          { keys: ['A'], desc: 'Select all visible' },
+          { keys: ['Shift', 'A'], desc: 'Deselect all' },
+        ]},
+      ];
+
+      return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md animate-fadeIn" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-white">Keyboard Shortcuts</h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-6">
+              {shortcuts.map(section => (
+                <div key={section.category}>
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">{section.category}</h4>
+                  <div className="space-y-2">
+                    {section.items.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <span className="text-sm text-slate-300">{item.desc}</span>
+                        <div className="flex items-center gap-1">
+                          {item.keys.map((key, j) => (
+                            <React.Fragment key={j}>
+                              <span className="kbd">{key}</span>
+                              {j < item.keys.length - 1 && <span className="text-slate-500 text-xs">+</span>}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // ANALYTICS DASHBOARD
+    // ============================================================
+    const AnalyticsDashboard = ({ opportunities, isOpen }) => {
+      if (!isOpen) return null;
+
+      // Pipeline Value by Phase
+      const pipelineByPhase = useMemo(() => {
+        const phaseData = {};
+        Object.keys(SHIPLEY_PHASES).forEach(phase => {
+          phaseData[phase] = { count: 0, value: 0 };
+        });
+        opportunities.forEach(opp => {
+          const phase = opp.shipleyPhase || 'gate_1';
+          if (phaseData[phase]) {
+            phaseData[phase].count++;
+            phaseData[phase].value += opp.contractValue || 0;
+          }
+        });
+        return Object.entries(phaseData)
+          .map(([key, data]) => ({ phase: key, ...SHIPLEY_PHASES[key], ...data }))
+          .sort((a, b) => a.order - b.order);
+      }, [opportunities]);
+
+      const maxPhaseValue = Math.max(...pipelineByPhase.map(p => p.value), 1);
+
+      // Win Probability Distribution
+      const pwinDistribution = useMemo(() => {
+        const dist = { high: { count: 0, value: 0 }, medium: { count: 0, value: 0 }, low: { count: 0, value: 0 } };
+        opportunities.forEach(opp => {
+          const pwin = opp.winProbability || 0;
+          const value = opp.contractValue || 0;
+          if (pwin >= 70) { dist.high.count++; dist.high.value += value; }
+          else if (pwin >= 40) { dist.medium.count++; dist.medium.value += value; }
+          else { dist.low.count++; dist.low.value += value; }
+        });
+        return dist;
+      }, [opportunities]);
+
+      const totalOpps = opportunities.length || 1;
+
+      // Due Date Timeline (next 30 days)
+      const dueTimeline = useMemo(() => {
+        const now = new Date();
+        const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        return opportunities
+          .filter(opp => {
+            if (!opp.dueDate) return false;
+            const due = new Date(opp.dueDate);
+            return due >= now && due <= thirtyDaysLater;
+          })
+          .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+          .slice(0, 10);
+      }, [opportunities]);
+
+      // Top Agencies
+      const topAgencies = useMemo(() => {
+        const agencyMap = {};
+        opportunities.forEach(opp => {
+          const agency = opp.agency || 'Unknown';
+          if (!agencyMap[agency]) agencyMap[agency] = { count: 0, value: 0 };
+          agencyMap[agency].count++;
+          agencyMap[agency].value += opp.contractValue || 0;
+        });
+        return Object.entries(agencyMap)
+          .map(([name, data]) => ({ name, ...data }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5);
+      }, [opportunities]);
+
+      const maxAgencyValue = Math.max(...topAgencies.map(a => a.value), 1);
+
+      const getPriorityColor = (priority) => {
+        switch (priority) {
+          case 'P-0': return '#ef4444';
+          case 'P-1': return '#f59e0b';
+          case 'P-2': return '#64748b';
+          default: return '#475569';
+        }
+      };
+
+      return (
+        <div className="bg-slate-900/50 border-b border-slate-700 animate-slideDown">
+          <div className="max-w-[1800px] mx-auto px-6 py-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Pipeline Value by Phase */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <Icon name="barChart" className="w-5 h-5 text-cyan-400" />
+                  <h4 className="text-sm font-semibold text-white">Pipeline by Phase</h4>
+                </div>
+                <div className="space-y-3">
+                  {pipelineByPhase.filter(p => p.value > 0 || p.count > 0).map(phase => (
+                    <div key={phase.phase}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-slate-400">{phase.name}</span>
+                        <span className="text-xs font-medium text-white">{formatCurrency(phase.value)}</span>
+                      </div>
+                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-500" 
+                          style={{ width: `${(phase.value / maxPhaseValue) * 100}%`, backgroundColor: phase.color }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Win Probability Distribution */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <Icon name="trendingUp" className="w-5 h-5 text-cyan-400" />
+                  <h4 className="text-sm font-semibold text-white">Win Probability</h4>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-emerald-400">High (70-100%)</span>
+                      <span className="text-xs text-white">{pwinDistribution.high.count} opps</span>
+                    </div>
+                    <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(pwinDistribution.high.count / totalOpps) * 100}%` }} />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{formatCurrency(pwinDistribution.high.value)}</p>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-amber-400">Medium (40-69%)</span>
+                      <span className="text-xs text-white">{pwinDistribution.medium.count} opps</span>
+                    </div>
+                    <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(pwinDistribution.medium.count / totalOpps) * 100}%` }} />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{formatCurrency(pwinDistribution.medium.value)}</p>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-red-400">Low (0-39%)</span>
+                      <span className="text-xs text-white">{pwinDistribution.low.count} opps</span>
+                    </div>
+                    <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-red-500 rounded-full" style={{ width: `${(pwinDistribution.low.count / totalOpps) * 100}%` }} />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{formatCurrency(pwinDistribution.low.value)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Due Date Timeline */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <Icon name="calendar" className="w-5 h-5 text-cyan-400" />
+                  <h4 className="text-sm font-semibold text-white">Due Next 30 Days</h4>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
+                  {dueTimeline.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-4">No upcoming deadlines</p>
+                  ) : (
+                    dueTimeline.map(opp => {
+                      const daysUntil = Math.ceil((new Date(opp.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                      return (
+                        <div key={opp.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-700/50 cursor-pointer group">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(opp.priority) }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-white truncate group-hover:text-cyan-400">{opp.name}</p>
+                            <p className="text-xs text-slate-500">{opp.agency}</p>
+                          </div>
+                          <span className={`text-xs font-medium tabular-nums ${daysUntil <= 3 ? 'text-red-400' : daysUntil <= 7 ? 'text-amber-400' : 'text-slate-400'}`}>
+                            {daysUntil}d
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Top Agencies */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <Icon name="building" className="w-5 h-5 text-cyan-400" />
+                  <h4 className="text-sm font-semibold text-white">Top Agencies</h4>
+                </div>
+                <div className="space-y-3">
+                  {topAgencies.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-4">No data available</p>
+                  ) : (
+                    topAgencies.map((agency, i) => (
+                      <div key={agency.name}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-slate-300 truncate max-w-[120px]">{agency.name}</span>
+                          <span className="text-xs text-slate-500">{agency.count} opp{agency.count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-cyan-500 rounded-full" 
+                              style={{ width: `${(agency.value / maxAgencyValue) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-white w-16 text-right">{formatCurrency(agency.value)}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // OPPORTUNITY DRAWER
+    // ============================================================
+    const OpportunityDrawer = ({ opportunity, isOpen, onClose, onSave, onDelete }) => {
+      const [formData, setFormData] = useState({
+        name: '',
+        agency: '',
+        contractValue: '',
+        priority: 'P-1',
+        shipleyPhase: 'gate_1',
+        winProbability: 50,
+        dueDate: '',
+        solicitationNumber: '',
+        description: ''
+      });
+      const [isSaving, setIsSaving] = useState(false);
+
+      useEffect(() => {
+        if (opportunity) {
+          setFormData({
+            name: opportunity.name || '',
+            agency: opportunity.agency || '',
+            contractValue: opportunity.contractValue || '',
+            priority: opportunity.priority || 'P-1',
+            shipleyPhase: opportunity.shipleyPhase || 'gate_1',
+            winProbability: opportunity.winProbability || 50,
+            dueDate: opportunity.dueDate || '',
+            solicitationNumber: opportunity.solicitationNumber || '',
+            description: opportunity.description || ''
+          });
+        } else {
+          setFormData({
+            name: '',
+            agency: '',
+            contractValue: '',
+            priority: 'P-1',
+            shipleyPhase: 'gate_1',
+            winProbability: 50,
+            dueDate: '',
+            solicitationNumber: '',
+            description: ''
+          });
+        }
+      }, [opportunity]);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setIsSaving(true);
+        await onSave({ ...formData, contractValue: Number(formData.contractValue) || 0 });
+        setIsSaving(false);
+        onClose();
+      };
+
+      if (!isOpen) return null;
+
+      return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-40" onClick={onClose}>
+          <div className="w-full max-w-lg bg-slate-900 border-l border-slate-700 animate-slideIn" onClick={e => e.stopPropagation()}>
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-6 border-b border-slate-700">
+                <h3 className="text-lg font-semibold text-white">
+                  {opportunity ? 'Edit Opportunity' : 'New Opportunity'}
+                </h3>
+                <button onClick={onClose} className="text-slate-400 hover:text-white">
+                  <Icon name="x" className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Opportunity Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                    placeholder="DHA Healthcare Platform"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Agency</label>
+                  <input
+                    type="text"
+                    value={formData.agency}
+                    onChange={e => setFormData({ ...formData, agency: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                    placeholder="Defense Health Agency"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Contract Value ($)</label>
+                    <input
+                      type="number"
+                      value={formData.contractValue}
+                      onChange={e => setFormData({ ...formData, contractValue: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      placeholder="50000000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Priority</label>
+                    <select
+                      value={formData.priority}
+                      onChange={e => setFormData({ ...formData, priority: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                    >
+                      <option value="P-0">P-0 (Must Win)</option>
+                      <option value="P-1">P-1 (High)</option>
+                      <option value="P-2">P-2 (Medium)</option>
+                      <option value="P-3">P-3 (Low)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Shipley Phase</label>
+                    <select
+                      value={formData.shipleyPhase}
+                      onChange={e => setFormData({ ...formData, shipleyPhase: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                    >
+                      {Object.entries(SHIPLEY_PHASES).sort((a, b) => a[1].order - b[1].order).map(([key, phase]) => (
+                        <option key={key} value={key}>{phase.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Win Probability: {formData.winProbability}%</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={formData.winProbability}
+                      onChange={e => setFormData({ ...formData, winProbability: Number(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Due Date</label>
+                    <input
+                      type="date"
+                      value={formData.dueDate}
+                      onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Solicitation #</label>
+                    <input
+                      type="text"
+                      value={formData.solicitationNumber}
+                      onChange={e => setFormData({ ...formData, solicitationNumber: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                      placeholder="HT0011-26-R-0042"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none resize-none"
+                    placeholder="Brief description of the opportunity..."
+                  />
+                </div>
+              </form>
+              <div className="p-6 border-t border-slate-700 flex gap-3">
+                {opportunity && (
+                  <button
+                    type="button"
+                    onClick={() => { onDelete(opportunity.id); onClose(); }}
+                    className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
+                <div className="flex-1" />
+                <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSaving}
+                  className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-lg hover:from-cyan-400 hover:to-teal-400 transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // ACTIVITY PANEL
+    // ============================================================
+    const ActivityPanel = ({ isOpen, onClose, activities, onLoadMore, hasMore }) => {
+      const [activeTab, setActiveTab] = useState('all');
+
+      const filteredActivities = useMemo(() => {
+        if (activeTab === 'all') return activities;
+        if (activeTab === 'phase') return activities.filter(a => a.action === 'phase_changed');
+        if (activeTab === 'created') return activities.filter(a => a.action === 'created');
+        if (activeTab === 'deleted') return activities.filter(a => a.action === 'deleted');
+        return activities;
+      }, [activities, activeTab]);
+
+      const formatTime = (timestamp) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+        if (diff < 60000) return 'Just now';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+        return date.toLocaleDateString();
+      };
+
+      if (!isOpen) return null;
+
+      return (
+        <div className="fixed top-0 right-0 h-full w-[400px] bg-slate-900 border-l border-slate-700 z-30 animate-slideIn">
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <h3 className="text-lg font-semibold text-white">Activity Log</h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex border-b border-slate-700">
+              {['all', 'phase', 'created', 'deleted'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 px-3 py-2 text-xs font-medium capitalize transition-colors ${
+                    activeTab === tab ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {tab === 'phase' ? 'Phase Changes' : tab}
+                </button>
+              ))}
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
+              {filteredActivities.length === 0 ? (
+                <p className="text-center text-slate-500 py-8">No activity yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {filteredActivities.map(activity => (
+                    <div key={activity.id} className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          activity.action === 'created' ? 'bg-emerald-500/20' :
+                          activity.action === 'deleted' ? 'bg-red-500/20' :
+                          activity.action === 'phase_changed' ? 'bg-purple-500/20' : 'bg-slate-700'
+                        }`}>
+                          <Icon 
+                            name={activity.action === 'created' ? 'plus' : activity.action === 'deleted' ? 'trash' : 'chevronRight'} 
+                            className={`w-4 h-4 ${
+                              activity.action === 'created' ? 'text-emerald-400' :
+                              activity.action === 'deleted' ? 'text-red-400' :
+                              activity.action === 'phase_changed' ? 'text-purple-400' : 'text-slate-400'
+                            }`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white font-medium truncate">
+                            {activity.action === 'created' && 'Created opportunity'}
+                            {activity.action === 'deleted' && 'Deleted opportunity'}
+                            {activity.action === 'phase_changed' && `Phase: ${activity.old_value} → ${activity.new_value}`}
+                            {activity.action === 'updated' && `Updated ${activity.field_changed}`}
+                          </p>
+                          <p className="text-xs text-slate-400">{formatTime(activity.created_at)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {hasMore && (
+                <button
+                  onClick={onLoadMore}
+                  className="w-full mt-4 px-4 py-2 bg-slate-800 text-cyan-400 rounded-lg hover:bg-slate-700 transition-colors text-sm"
+                >
+                  Load More
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // MAIN APPLICATION
+    // ============================================================
+    const PipelineManager = () => {
+      // Data State
+      const [opportunities, setOpportunities] = useState([]);
+      const [activities, setActivities] = useState([]);
+      const [activityCount24h, setActivityCount24h] = useState(0);
+      const [isLoading, setIsLoading] = useState(true);
+      const [error, setError] = useState(null);
+
+      // UI State
+      const [view, setView] = useState('table');
+      const [showAnalytics, setShowAnalytics] = useState(false);
+      const [showActivity, setShowActivity] = useState(false);
+      const [showShortcuts, setShowShortcuts] = useState(false);
+      const [selectedIds, setSelectedIds] = useState([]);
+      const [drawerOpen, setDrawerOpen] = useState(false);
+      const [editingOpportunity, setEditingOpportunity] = useState(null);
+      const [toast, setToast] = useState(null);
+
+      // Filter State
+      const [filters, setFilters] = useState({
+        search: '',
+        agencies: [],
+        priorities: [],
+        phases: [],
+        pWinMin: 0,
+        pWinMax: 100,
+        dueDateFrom: '',
+        dueDateTo: ''
+      });
+
+      // Sort State
+      const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+
+      const searchInputRef = useRef(null);
+
+      // ============================================================
+      // DATA FETCHING
+      // ============================================================
+      const fetchOpportunities = async () => {
+        setIsLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('opportunities')
+            .select('*')
+            .order('due_date', { ascending: true });
+
+          if (error) throw error;
+          setOpportunities((data || []).map(mapToFrontend));
+        } catch (err) {
+          setError(err.message);
+          console.error('Error fetching opportunities:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const fetchActivities = async (limit = 20) => {
+        try {
+          const { data, error } = await supabase
+            .from('activity_log')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+          if (error) throw error;
+          setActivities(data || []);
+
+          // Get 24h count
+          const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const { count } = await supabase
+            .from('activity_log')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', yesterday);
+          setActivityCount24h(count || 0);
+        } catch (err) {
+          console.error('Error fetching activities:', err);
+        }
+      };
+
+      const logActivity = async (data) => {
+        try {
+          await supabase.from('activity_log').insert([data]);
+          await fetchActivities();
+        } catch (err) {
+          console.error('Error logging activity:', err);
+        }
+      };
+
+      // Initial fetch
+      useEffect(() => {
+        fetchOpportunities();
+        fetchActivities();
+      }, []);
+
+      // Real-time subscription
+      useEffect(() => {
+        const subscription = supabase
+          .channel('opportunities-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, () => {
+            fetchOpportunities();
+          })
+          .subscribe();
+
+        return () => subscription.unsubscribe();
+      }, []);
+
+      // ============================================================
+      // KEYBOARD SHORTCUTS
+      // ============================================================
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          // Don't trigger when typing in inputs
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            if (e.key === 'Escape') {
+              e.target.blur();
+            }
+            return;
+          }
+
+          // Global shortcuts
+          switch (e.key.toLowerCase()) {
+            case '1':
+              setView('board');
+              setSelectedIds([]);
+              break;
+            case '2':
+              setView('table');
+              break;
+            case 'n':
+              setEditingOpportunity(null);
+              setDrawerOpen(true);
+              break;
+            case 'f':
+            case '/':
+              e.preventDefault();
+              searchInputRef.current?.focus();
+              break;
+            case 'escape':
+              setDrawerOpen(false);
+              setShowActivity(false);
+              setShowShortcuts(false);
+              break;
+            case '?':
+              if (e.shiftKey) {
+                setShowShortcuts(true);
+              }
+              break;
+            case 'a':
+              if (view === 'table') {
+                if (e.shiftKey) {
+                  setSelectedIds([]);
+                } else {
+                  setSelectedIds(filteredOpportunities.map(o => o.id));
+                }
+              }
+              break;
+          }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [view]);
+
+      // ============================================================
+      // CRUD OPERATIONS
+      // ============================================================
+      const handleSave = async (data) => {
+        try {
+          if (editingOpportunity) {
+            const { error } = await supabase
+              .from('opportunities')
+              .update(mapToDatabase(data))
+              .eq('id', editingOpportunity.id);
+            if (error) throw error;
+            await logActivity({
+              opportunity_id: editingOpportunity.id,
+              action: 'updated',
+              field_changed: 'multiple',
+              user_id: 'demo_user'
+            });
+            setToast({ message: 'Opportunity updated successfully', type: 'success' });
+          } else {
+            const dbData = mapToDatabase(data);
+            dbData.created_at = new Date().toISOString();
+            const { data: newOpp, error } = await supabase
+              .from('opportunities')
+              .insert([dbData])
+              .select()
+              .single();
+            if (error) throw error;
+            await logActivity({
+              opportunity_id: newOpp.id,
+              action: 'created',
+              user_id: 'demo_user'
+            });
+            setToast({ message: 'Opportunity created successfully', type: 'success' });
+          }
+          await fetchOpportunities();
+        } catch (err) {
+          setToast({ message: `Error: ${err.message}`, type: 'error' });
+        }
+      };
+
+      const handleDelete = async (id) => {
+        try {
+          await logActivity({ opportunity_id: id, action: 'deleted', user_id: 'demo_user' });
+          const { error } = await supabase.from('opportunities').delete().eq('id', id);
+          if (error) throw error;
+          setToast({ message: 'Opportunity deleted', type: 'success' });
+          await fetchOpportunities();
+        } catch (err) {
+          setToast({ message: `Error: ${err.message}`, type: 'error' });
+        }
+      };
+
+      const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        if (!confirm(`Delete ${selectedIds.length} opportunities?`)) return;
+        try {
+          for (const id of selectedIds) {
+            await logActivity({ opportunity_id: id, action: 'deleted', user_id: 'demo_user' });
+          }
+          const { error } = await supabase.from('opportunities').delete().in('id', selectedIds);
+          if (error) throw error;
+          setToast({ message: `Deleted ${selectedIds.length} opportunities`, type: 'success' });
+          setSelectedIds([]);
+          await fetchOpportunities();
+        } catch (err) {
+          setToast({ message: `Error: ${err.message}`, type: 'error' });
+        }
+      };
+
+      const handleBulkPhaseChange = async (newPhase) => {
+        if (selectedIds.length === 0) return;
+        try {
+          for (const id of selectedIds) {
+            const opp = opportunities.find(o => o.id === id);
+            await logActivity({
+              opportunity_id: id,
+              action: 'phase_changed',
+              field_changed: 'shipley_phase',
+              old_value: SHIPLEY_PHASES[opp?.shipleyPhase]?.name || 'Unknown',
+              new_value: SHIPLEY_PHASES[newPhase]?.name || newPhase,
+              user_id: 'demo_user'
+            });
+          }
+          const { error } = await supabase
+            .from('opportunities')
+            .update({ shipley_phase: newPhase, updated_at: new Date().toISOString() })
+            .in('id', selectedIds);
+          if (error) throw error;
+          setToast({ message: `Updated ${selectedIds.length} opportunities to ${SHIPLEY_PHASES[newPhase]?.name}`, type: 'success' });
+          setSelectedIds([]);
+          await fetchOpportunities();
+        } catch (err) {
+          setToast({ message: `Error: ${err.message}`, type: 'error' });
+        }
+      };
+
+      // ============================================================
+      // FILTERING & SORTING
+      // ============================================================
+      const uniqueAgencies = useMemo(() => {
+        const agencies = [...new Set(opportunities.map(o => o.agency).filter(Boolean))];
+        return agencies.sort().map(a => ({ value: a, label: a }));
+      }, [opportunities]);
+
+      const filteredOpportunities = useMemo(() => {
+        return opportunities.filter(opp => {
+          if (filters.search && !opp.name?.toLowerCase().includes(filters.search.toLowerCase()) &&
+              !opp.agency?.toLowerCase().includes(filters.search.toLowerCase()) &&
+              !opp.solicitationNumber?.toLowerCase().includes(filters.search.toLowerCase())) {
+            return false;
+          }
+          if (filters.agencies.length > 0 && !filters.agencies.includes(opp.agency)) return false;
+          if (filters.priorities.length > 0 && !filters.priorities.includes(opp.priority)) return false;
+          if (filters.phases.length > 0 && !filters.phases.includes(opp.shipleyPhase)) return false;
+          if (opp.winProbability < filters.pWinMin || opp.winProbability > filters.pWinMax) return false;
+          if (filters.dueDateFrom && opp.dueDate < filters.dueDateFrom) return false;
+          if (filters.dueDateTo && opp.dueDate > filters.dueDateTo) return false;
+          return true;
+        });
+      }, [opportunities, filters]);
+
+      const sortedOpportunities = useMemo(() => {
+        if (!sortConfig.key || !sortConfig.direction) return filteredOpportunities;
+
+        return [...filteredOpportunities].sort((a, b) => {
+          let aVal = a[sortConfig.key];
+          let bVal = b[sortConfig.key];
+
+          // Special handling for different column types
+          if (sortConfig.key === 'priority') {
+            aVal = PRIORITY_ORDER[aVal] || 99;
+            bVal = PRIORITY_ORDER[bVal] || 99;
+          } else if (sortConfig.key === 'shipleyPhase') {
+            aVal = SHIPLEY_PHASES[aVal]?.order || 99;
+            bVal = SHIPLEY_PHASES[bVal]?.order || 99;
+          } else if (sortConfig.key === 'dueDate') {
+            aVal = aVal ? new Date(aVal).getTime() : Infinity;
+            bVal = bVal ? new Date(bVal).getTime() : Infinity;
+          } else if (typeof aVal === 'string') {
+            aVal = aVal?.toLowerCase() || '';
+            bVal = bVal?.toLowerCase() || '';
+          }
+
+          if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }, [filteredOpportunities, sortConfig]);
+
+      const handleSort = (key) => {
+        setSortConfig(prev => {
+          if (prev.key === key) {
+            if (prev.direction === 'asc') return { key, direction: 'desc' };
+            if (prev.direction === 'desc') return { key: null, direction: null };
+          }
+          return { key, direction: 'asc' };
+        });
+      };
+
+      const activeFilterCount = useMemo(() => {
+        let count = 0;
+        if (filters.search) count++;
+        if (filters.agencies.length > 0) count++;
+        if (filters.priorities.length > 0) count++;
+        if (filters.phases.length > 0) count++;
+        if (filters.pWinMin > 0 || filters.pWinMax < 100) count++;
+        if (filters.dueDateFrom || filters.dueDateTo) count++;
+        return count;
+      }, [filters]);
+
+      const clearFilters = () => {
+        setFilters({
+          search: '',
+          agencies: [],
+          priorities: [],
+          phases: [],
+          pWinMin: 0,
+          pWinMax: 100,
+          dueDateFrom: '',
+          dueDateTo: ''
+        });
+        setSelectedIds([]);
+      };
+
+      // Clear selection on filter change
+      useEffect(() => {
+        setSelectedIds([]);
+      }, [filters]);
+
+      // ============================================================
+      // EXPORT
+      // ============================================================
+      const handleExport = (format) => {
+        const data = sortedOpportunities;
+        const timestamp = new Date().toISOString().split('T')[0];
+        const filename = `missionpulse-export-${timestamp}`;
+
+        if (format === 'csv') {
+          const headers = ['Name', 'Agency', 'Value', 'Priority', 'Phase', 'pWin', 'Due Date', 'Solicitation #'];
+          const rows = data.map(o => [
+            o.name,
+            o.agency,
+            o.contractValue,
+            o.priority,
+            SHIPLEY_PHASES[o.shipleyPhase]?.name || o.shipleyPhase,
+            o.winProbability,
+            o.dueDate,
+            o.solicitationNumber
+          ]);
+          const csv = [headers, ...rows].map(row => row.map(cell => `"${cell || ''}"`).join(',')).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${filename}.csv`;
+          a.click();
+        } else {
+          const json = JSON.stringify(data, null, 2);
+          const blob = new Blob([json], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${filename}.json`;
+          a.click();
+        }
+        setToast({ message: `Exported ${data.length} opportunities as ${format.toUpperCase()}`, type: 'success' });
+      };
+
+      // ============================================================
+      // ROW SELECTION
+      // ============================================================
+      const handleRowSelect = (id, event) => {
+        if (event?.shiftKey && selectedIds.length > 0) {
+          const lastSelectedIndex = sortedOpportunities.findIndex(o => o.id === selectedIds[selectedIds.length - 1]);
+          const currentIndex = sortedOpportunities.findIndex(o => o.id === id);
+          const start = Math.min(lastSelectedIndex, currentIndex);
+          const end = Math.max(lastSelectedIndex, currentIndex);
+          const rangeIds = sortedOpportunities.slice(start, end + 1).map(o => o.id);
+          setSelectedIds(prev => [...new Set([...prev, ...rangeIds])]);
+        } else {
+          setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+        }
+      };
+
+      const handleSelectAll = () => {
+        if (selectedIds.length === sortedOpportunities.length) {
+          setSelectedIds([]);
+        } else {
+          setSelectedIds(sortedOpportunities.map(o => o.id));
+        }
+      };
+
+      // ============================================================
+      // RENDER SORT ICON
+      // ============================================================
+      const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) {
+          return <Icon name="arrowsUpDown" className="w-3 h-3 text-slate-600" />;
+        }
+        return sortConfig.direction === 'asc' 
+          ? <Icon name="sortAsc" className="w-3 h-3 text-cyan-400" />
+          : <Icon name="sortDesc" className="w-3 h-3 text-cyan-400" />;
+      };
+
+      // ============================================================
+      // RENDER
+      // ============================================================
+      if (isLoading) {
+        return (
+          <div className="min-h-screen bg-shield-navy flex items-center justify-center">
+            <div className="text-center">
+              <Icon name="loader" className="w-8 h-8 text-cyan-400 mx-auto mb-4" />
+              <p className="text-slate-400">Loading pipeline...</p>
+            </div>
+          </div>
+        );
+      }
+
+      const getPriorityBadge = (priority) => {
+        const colors = {
+          'P-0': 'bg-red-500/20 text-red-400 border-red-500/50',
+          'P-1': 'bg-amber-500/20 text-amber-400 border-amber-500/50',
+          'P-2': 'bg-slate-600/50 text-slate-300 border-slate-500/50',
+          'P-3': 'bg-slate-700/50 text-slate-400 border-slate-600/50'
+        };
+        return colors[priority] || colors['P-2'];
+      };
+
+      return (
+        <div className="min-h-screen bg-shield-navy">
+          {/* Header */}
+          <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-20">
+            <div className="max-w-[1800px] mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Icon name="shield" className="w-8 h-8 text-cyan-400" />
+                    <div>
+                      <h1 className="text-xl font-bold text-white">MissionPulse</h1>
+                      <p className="text-xs text-slate-500">Pipeline Manager v12.0</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* View Toggle */}
+                  <div className="flex bg-slate-800 rounded-lg p-1">
+                    <button
+                      onClick={() => { setView('board'); setSelectedIds([]); setSortConfig({ key: null, direction: null }); }}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        view === 'board' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Icon name="kanban" className="w-4 h-4" />
+                      <span className="hidden sm:inline">Board</span>
+                      <span className="kbd text-[10px]">1</span>
+                    </button>
+                    <button
+                      onClick={() => setView('table')}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        view === 'table' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Icon name="table" className="w-4 h-4" />
+                      <span className="hidden sm:inline">Table</span>
+                      <span className="kbd text-[10px]">2</span>
+                    </button>
+                  </div>
+
+                  {/* Analytics Toggle */}
+                  <button
+                    onClick={() => setShowAnalytics(!showAnalytics)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      showAnalytics ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Icon name="barChart" className="w-4 h-4" />
+                    <span className="hidden sm:inline">Analytics</span>
+                  </button>
+
+                  {/* Activity Button */}
+                  <button
+                    onClick={() => setShowActivity(true)}
+                    className="relative flex items-center gap-2 px-3 py-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  >
+                    <Icon name="activity" className="w-4 h-4" />
+                    <span className="hidden sm:inline">Activity</span>
+                    {activityCount24h > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-cyan-500 text-white text-xs rounded-full flex items-center justify-center">
+                        {activityCount24h > 9 ? '9+' : activityCount24h}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Shortcuts Button */}
+                  <button
+                    onClick={() => setShowShortcuts(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                    title="Keyboard Shortcuts (Shift+?)"
+                  >
+                    <Icon name="help" className="w-4 h-4" />
+                  </button>
+
+                  {/* New Opportunity Button */}
+                  <button
+                    onClick={() => { setEditingOpportunity(null); setDrawerOpen(true); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-lg hover:from-cyan-400 hover:to-teal-400 transition-colors shadow-lg shadow-cyan-500/25"
+                  >
+                    <Icon name="plus" className="w-4 h-4" />
+                    <span className="hidden sm:inline">New</span>
+                    <span className="kbd text-[10px] bg-white/20 border-white/30">N</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Analytics Dashboard */}
+          <AnalyticsDashboard opportunities={filteredOpportunities} isOpen={showAnalytics} />
+
+          {/* Filters */}
+          <div className="bg-slate-900/50 border-b border-slate-700">
+            <div className="max-w-[1800px] mx-auto px-6 py-4">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[200px] max-w-md">
+                  <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search opportunities... (F)"
+                    value={filters.search}
+                    onChange={e => setFilters({ ...filters, search: e.target.value })}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Dropdowns */}
+                <Dropdown
+                  label="Agency"
+                  options={uniqueAgencies}
+                  selected={filters.agencies}
+                  onChange={v => setFilters({ ...filters, agencies: v })}
+                  multiple
+                />
+                <Dropdown
+                  label="Priority"
+                  options={[
+                    { value: 'P-0', label: 'P-0 (Must Win)' },
+                    { value: 'P-1', label: 'P-1 (High)' },
+                    { value: 'P-2', label: 'P-2 (Medium)' },
+                    { value: 'P-3', label: 'P-3 (Low)' }
+                  ]}
+                  selected={filters.priorities}
+                  onChange={v => setFilters({ ...filters, priorities: v })}
+                  multiple
+                />
+                <Dropdown
+                  label="Phase"
+                  options={Object.entries(SHIPLEY_PHASES)
+                    .sort((a, b) => a[1].order - b[1].order)
+                    .map(([key, phase]) => ({ value: key, label: phase.name, color: phase.color }))}
+                  selected={filters.phases}
+                  onChange={v => setFilters({ ...filters, phases: v })}
+                  multiple
+                />
+
+                {/* pWin Range */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg">
+                  <span className="text-xs text-slate-400">pWin:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={filters.pWinMin}
+                    onChange={e => setFilters({ ...filters, pWinMin: Number(e.target.value) })}
+                    className="w-12 bg-transparent text-white text-sm focus:outline-none"
+                  />
+                  <span className="text-slate-500">-</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={filters.pWinMax}
+                    onChange={e => setFilters({ ...filters, pWinMax: Number(e.target.value) })}
+                    className="w-12 bg-transparent text-white text-sm focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-400">%</span>
+                </div>
+
+                {/* Date Range */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg">
+                  <Icon name="calendar" className="w-4 h-4 text-slate-400" />
+                  <input
+                    type="date"
+                    value={filters.dueDateFrom}
+                    onChange={e => setFilters({ ...filters, dueDateFrom: e.target.value })}
+                    className="bg-transparent text-white text-sm focus:outline-none"
+                  />
+                  <span className="text-slate-500">→</span>
+                  <input
+                    type="date"
+                    value={filters.dueDateTo}
+                    onChange={e => setFilters({ ...filters, dueDateTo: e.target.value })}
+                    className="bg-transparent text-white text-sm focus:outline-none"
+                  />
+                </div>
+
+                {/* Clear Filters */}
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                  >
+                    <Icon name="x" className="w-4 h-4" />
+                    Clear ({activeFilterCount})
+                  </button>
+                )}
+
+                {/* Export Dropdown */}
+                <div className="relative ml-auto">
+                  <Dropdown
+                    label={<><Icon name="download" className="w-4 h-4" /> Export</>}
+                    options={[
+                      { value: 'csv', label: 'Export as CSV' },
+                      { value: 'json', label: 'Export as JSON' }
+                    ]}
+                    selected=""
+                    onChange={handleExport}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bulk Action Bar */}
+          {selectedIds.length > 0 && (
+            <div className="bg-cyan-500/10 border-b border-cyan-500/30">
+              <div className="max-w-[1800px] mx-auto px-6 py-3">
+                <div className="flex items-center gap-4">
+                  <span className="text-cyan-400 font-medium">{selectedIds.length} selected</span>
+                  <Dropdown
+                    label="Change Phase"
+                    options={Object.entries(SHIPLEY_PHASES)
+                      .sort((a, b) => a[1].order - b[1].order)
+                      .map(([key, phase]) => ({ value: key, label: phase.name, color: phase.color }))}
+                    selected=""
+                    onChange={handleBulkPhaseChange}
+                  />
+                  <button
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                  >
+                    <Icon name="trash" className="w-4 h-4" />
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setSelectedIds([])}
+                    className="text-slate-400 hover:text-white text-sm"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Content */}
+          <main className="max-w-[1800px] mx-auto px-6 py-6">
+            {view === 'board' ? (
+              /* Board View */
+              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
+                {Object.entries(SHIPLEY_PHASES)
+                  .sort((a, b) => a[1].order - b[1].order)
+                  .map(([phaseKey, phase]) => {
+                    const phaseOpps = filteredOpportunities.filter(o => o.shipleyPhase === phaseKey);
+                    const phaseValue = phaseOpps.reduce((sum, o) => sum + (o.contractValue || 0), 0);
+                    return (
+                      <div key={phaseKey} className="flex-shrink-0 w-72">
+                        <div className="bg-slate-800/50 rounded-xl border border-slate-700">
+                          <div className="p-4 border-b border-slate-700">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
+                              <h3 className="font-semibold text-white">{phase.name}</h3>
+                              <span className="ml-auto px-2 py-0.5 bg-slate-700 rounded-full text-xs text-slate-300">
+                                {phaseOpps.length}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">{formatCurrency(phaseValue)}</p>
+                          </div>
+                          <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto scrollbar-thin">
+                            {phaseOpps.length === 0 ? (
+                              <p className="text-center text-slate-500 text-sm py-4">No opportunities</p>
+                            ) : (
+                              phaseOpps.map(opp => (
+                                <div
+                                  key={opp.id}
+                                  onClick={() => { setEditingOpportunity(opp); setDrawerOpen(true); }}
+                                  className="p-3 bg-slate-900/50 rounded-lg border border-slate-700 hover:border-cyan-500/50 cursor-pointer transition-colors"
+                                >
+                                  <p className="text-sm font-medium text-white truncate">{opp.name}</p>
+                                  <p className="text-xs text-slate-500 truncate mt-0.5">{opp.agency}</p>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs border ${getPriorityBadge(opp.priority)}`}>
+                                      {opp.priority}
+                                    </span>
+                                    <span className="text-xs text-slate-400">{formatCurrency(opp.contractValue)}</span>
+                                    <span className="ml-auto text-xs text-cyan-400">{opp.winProbability}%</span>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : (
+              /* Table View */
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-700">
+                        <th className="p-4 text-left">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.length === sortedOpportunities.length && sortedOpportunities.length > 0}
+                            onChange={handleSelectAll}
+                            className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
+                          />
+                        </th>
+                        {[
+                          { key: 'name', label: 'Opportunity' },
+                          { key: 'agency', label: 'Agency' },
+                          { key: 'priority', label: 'Priority' },
+                          { key: 'shipleyPhase', label: 'Phase' },
+                          { key: 'contractValue', label: 'Value' },
+                          { key: 'winProbability', label: 'pWin' },
+                          { key: 'dueDate', label: 'Due Date' }
+                        ].map(col => (
+                          <th
+                            key={col.key}
+                            onClick={() => handleSort(col.key)}
+                            className={`p-4 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-700/50 transition-colors ${
+                              sortConfig.key === col.key ? 'text-cyan-400 bg-slate-700/30' : 'text-slate-400'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              {col.label}
+                              <SortIcon columnKey={col.key} />
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedOpportunities.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-slate-500">
+                            {filters.search || activeFilterCount > 0 
+                              ? 'No opportunities match your filters'
+                              : 'No opportunities yet. Create your first one!'}
+                          </td>
+                        </tr>
+                      ) : (
+                        sortedOpportunities.map(opp => {
+                          const phase = SHIPLEY_PHASES[opp.shipleyPhase] || SHIPLEY_PHASES.gate_1;
+                          const isSelected = selectedIds.includes(opp.id);
+                          return (
+                            <tr
+                              key={opp.id}
+                              onClick={(e) => handleRowSelect(opp.id, e)}
+                              className={`border-b border-slate-700/50 cursor-pointer transition-colors ${
+                                isSelected ? 'bg-cyan-500/10' : 'hover:bg-slate-700/30'
+                              }`}
+                            >
+                              <td className="p-4">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
+                                />
+                              </td>
+                              <td className={`p-4 ${sortConfig.key === 'name' ? 'bg-slate-700/20' : ''}`}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setEditingOpportunity(opp); setDrawerOpen(true); }}
+                                  className="text-left hover:text-cyan-400 transition-colors"
+                                >
+                                  <p className="font-medium text-white">{opp.name}</p>
+                                  {opp.solicitationNumber && (
+                                    <p className="text-xs text-slate-500">{opp.solicitationNumber}</p>
+                                  )}
+                                </button>
+                              </td>
+                              <td className={`p-4 text-sm text-slate-300 ${sortConfig.key === 'agency' ? 'bg-slate-700/20' : ''}`}>
+                                {opp.agency || '-'}
+                              </td>
+                              <td className={`p-4 ${sortConfig.key === 'priority' ? 'bg-slate-700/20' : ''}`}>
+                                <span className={`px-2 py-1 rounded text-xs border ${getPriorityBadge(opp.priority)}`}>
+                                  {opp.priority}
+                                </span>
+                              </td>
+                              <td className={`p-4 ${sortConfig.key === 'shipleyPhase' ? 'bg-slate-700/20' : ''}`}>
+                                <div className="flex items-center gap-2">
+                                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
+                                  <span className="text-sm text-slate-300">{phase.name}</span>
+                                </div>
+                              </td>
+                              <td className={`p-4 text-sm font-medium text-white tabular-nums ${sortConfig.key === 'contractValue' ? 'bg-slate-700/20' : ''}`}>
+                                {formatCurrency(opp.contractValue)}
+                              </td>
+                              <td className={`p-4 ${sortConfig.key === 'winProbability' ? 'bg-slate-700/20' : ''}`}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        opp.winProbability >= 70 ? 'bg-emerald-500' :
+                                        opp.winProbability >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                                      }`}
+                                      style={{ width: `${opp.winProbability}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-sm text-slate-300 tabular-nums">{opp.winProbability}%</span>
+                                </div>
+                              </td>
+                              <td className={`p-4 ${sortConfig.key === 'dueDate' ? 'bg-slate-700/20' : ''}`}>
+                                {opp.dueDate ? (
+                                  <span className="text-sm text-slate-300">
+                                    {new Date(opp.dueDate).toLocaleDateString()}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm text-slate-500">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Results Count */}
+            <div className="mt-4 text-sm text-slate-500">
+              Showing {sortedOpportunities.length} of {opportunities.length} opportunities
+              {sortConfig.key && (
+                <span className="ml-2 text-cyan-400">
+                  • Sorted by {sortConfig.key} ({sortConfig.direction})
+                </span>
+              )}
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-slate-700 py-4">
+            <div className="max-w-[1800px] mx-auto px-6">
+              <p className="text-xs text-slate-500 text-center">
+                AI GENERATED - REQUIRES HUMAN REVIEW • © 2026 Mission Meets Tech • MissionPulse v12.0 Sprint 9
+              </p>
+            </div>
+          </footer>
+
+          {/* Drawers & Modals */}
+          <OpportunityDrawer
+            opportunity={editingOpportunity}
+            isOpen={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            onSave={handleSave}
+            onDelete={handleDelete}
+          />
+
+          <ActivityPanel
+            isOpen={showActivity}
+            onClose={() => setShowActivity(false)}
+            activities={activities}
+            onLoadMore={() => fetchActivities(activities.length + 20)}
+            hasMore={activities.length >= 20}
+          />
+
+          <ShortcutsModal
+            isOpen={showShortcuts}
+            onClose={() => setShowShortcuts(false)}
+          />
+
+          {/* Toast Notifications */}
+          {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+        </div>
+      );
+    };
+
+    // Render App
+    ReactDOM.render(<PipelineManager />, document.getElementById('root'));
+  </script>
+</body>
+</html>
