@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse M16 - Training Data Admin</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-slideUp { animation: slideUp 0.3s ease-out forwards; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00E5FA; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo } = React;
+
+    // ============================================================================
+    // CONFIG BLOCK - M16 Training Data Admin
+    // ============================================================================
+    const CONFIG = {
+      MODULE_ID: 'M16',
+      MODULE_NAME: 'Training Data Admin',
+      VERSION: '1.0.0',
+      API_BASE: 'https://missionpulse-api.onrender.com',
+      ALLOWED_ROLES: ['admin', 'ceo', 'coo'],
+      CACHE_TTL_MINUTES: 5,
+      ENDPOINTS: {
+        COMPANY_PROFILE: '/api/training-data/company-profile',
+        WIN_THEMES: '/api/training-data/win-themes',
+        COMPETITORS: '/api/training-data/competitors',
+        LABOR_CATEGORIES: '/api/training-data/labor-categories',
+        PAST_PERFORMANCE: '/api/training-data/past-performance',
+        TEAMING_PARTNERS: '/api/training-data/teaming-partners',
+        CONTEXT_STATUS: '/api/context/status',
+        SUMMARY: '/api/training-data/summary'
+      }
+    };
+
+    // ============================================================================
+    // ICONS
+    // ============================================================================
+    const Icons = {
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+      building: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>,
+      trophy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>,
+      save: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" strokeWidth={2}/><path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35"/></svg>,
+      filter: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>,
+      upload: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>,
+      info: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+      home: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================================
+    // ERROR BOUNDARY
+    // ============================================================================
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 max-w-md text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Icon name="alert" className="w-8 h-8 text-red-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white mb-2">Module Error</h2>
+                <p className="text-slate-400 text-sm mb-4">Training Data Admin encountered an error</p>
+                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 text-sm">
+                  Reload Module
+                </button>
+              </div>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // ============================================================================
+    // TOAST PROVIDER
+    // ============================================================================
+    const ToastContext = React.createContext();
+
+    const ToastProvider = ({ children }) => {
+      const [toasts, setToasts] = useState([]);
+
+      const addToast = useCallback((message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+      }, []);
+
+      return (
+        <ToastContext.Provider value={{ addToast }}>
+          {children}
+          <div className="fixed bottom-4 right-4 z-50 space-y-2">
+            {toasts.map(toast => (
+              <div key={toast.id} className={`
+                animate-slideIn px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[280px]
+                ${toast.type === 'success' ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400' : ''}
+                ${toast.type === 'error' ? 'bg-red-500/20 border border-red-500/50 text-red-400' : ''}
+                ${toast.type === 'warning' ? 'bg-amber-500/20 border border-amber-500/50 text-amber-400' : ''}
+                ${toast.type === 'info' ? 'bg-cyan-500/20 border border-cyan-500/50 text-cyan-400' : ''}
+              `}>
+                <Icon name={toast.type === 'success' ? 'check' : toast.type === 'error' ? 'x' : 'info'} className="w-5 h-5" />
+                <span className="text-sm font-medium">{toast.message}</span>
+              </div>
+            ))}
+          </div>
+        </ToastContext.Provider>
+      );
+    };
+
+    const useToast = () => React.useContext(ToastContext);
+
+    // ============================================================================
+    // TAB CONFIGURATION
+    // ============================================================================
+    const TABS = [
+      { id: 'company', label: 'Company Profile', icon: 'building', color: '#00E5FA', endpoint: CONFIG.ENDPOINTS.COMPANY_PROFILE },
+      { id: 'winthemes', label: 'Win Themes', icon: 'trophy', color: '#10b981', endpoint: CONFIG.ENDPOINTS.WIN_THEMES },
+      { id: 'competitors', label: 'Competitors', icon: 'target', color: '#ef4444', endpoint: CONFIG.ENDPOINTS.COMPETITORS },
+      { id: 'labor', label: 'Labor Categories', icon: 'dollar', color: '#f59e0b', endpoint: CONFIG.ENDPOINTS.LABOR_CATEGORIES },
+      { id: 'pastperf', label: 'Past Performance', icon: 'shield', color: '#8b5cf6', endpoint: CONFIG.ENDPOINTS.PAST_PERFORMANCE },
+      { id: 'teaming', label: 'Teaming Partners', icon: 'users', color: '#06b6d4', endpoint: CONFIG.ENDPOINTS.TEAMING_PARTNERS }
+    ];
+
+    // ============================================================================
+    // API SERVICE
+    // ============================================================================
+    const ApiService = {
+      async get(endpoint) {
+        try {
+          const response = await fetch(`${CONFIG.API_BASE}${endpoint}`);
+          if (!response.ok) throw new Error(`API Error: ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error('API GET Error:', error);
+          throw error;
+        }
+      },
+
+      async post(endpoint, data) {
+        try {
+          const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          if (!response.ok) throw new Error(`API Error: ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error('API POST Error:', error);
+          throw error;
+        }
+      },
+
+      async put(endpoint, data) {
+        try {
+          const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          if (!response.ok) throw new Error(`API Error: ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error('API PUT Error:', error);
+          throw error;
+        }
+      },
+
+      async delete(endpoint) {
+        try {
+          const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, { method: 'DELETE' });
+          if (!response.ok) throw new Error(`API Error: ${response.status}`);
+          return true;
+        } catch (error) {
+          console.error('API DELETE Error:', error);
+          throw error;
+        }
+      }
+    };
+
+    // ============================================================================
+    // SAMPLE DATA (Demo Mode)
+    // ============================================================================
+    const DEMO_DATA = {
+      company: {
+        id: 1,
+        name: 'rockITdata LLC',
+        cage_code: '8ABC1',
+        uei: 'SAMPLE123456789',
+        naics_codes: ['541512', '541519', '518210'],
+        set_asides: ['SDVOSB', 'VOSB'],
+        capabilities: 'Healthcare IT modernization, cloud migration, AI/ML solutions for federal agencies. Specialized in DHA and VA healthcare systems.',
+        address: '123 Federal Way, Arlington, VA 22201',
+        duns: '123456789',
+        website: 'https://rockitdata.com'
+      },
+      winthemes: [
+        { id: 1, title: 'Healthcare IT Expertise', description: 'Deep expertise in DHA and VA healthcare systems with 15+ years experience', keywords: ['healthcare', 'dha', 'va', 'ehr'], status: 'active' },
+        { id: 2, title: 'CMMC Level 2 Ready', description: 'Fully certified for DoD cybersecurity requirements with documented compliance', keywords: ['cmmc', 'cybersecurity', 'nist'], status: 'active' },
+        { id: 3, title: 'Veteran-Led SDVOSB', description: 'Service-disabled veteran owned with mission-driven culture', keywords: ['sdvosb', 'veteran', 'small business'], status: 'active' }
+      ],
+      competitors: [
+        { id: 1, name: 'LargeTech Corp', cage_code: 'XYZ99', strengths: 'Large workforce (500+), multiple incumbencies, strong past performance', weaknesses: 'Slow delivery timelines, high overhead costs, bureaucratic processes', contracts: ['DHA DHITS', 'VA EHR'], status: 'active' },
+        { id: 2, name: 'MedIT Solutions', cage_code: 'ABC12', strengths: 'Strong healthcare domain expertise, agile methodology', weaknesses: 'Limited cloud capabilities, smaller team size', contracts: ['CMS Portal'], status: 'active' }
+      ],
+      labor: [
+        { id: 1, category: 'Senior Software Engineer', labor_code: 'SSE-01', rate: 165.00, ceiling: 185.00, fringe: 0.35, overhead: 0.85 },
+        { id: 2, category: 'Project Manager III', labor_code: 'PM-03', rate: 145.00, ceiling: 165.00, fringe: 0.35, overhead: 0.85 },
+        { id: 3, category: 'Data Scientist', labor_code: 'DS-01', rate: 175.00, ceiling: 195.00, fringe: 0.35, overhead: 0.85 },
+        { id: 4, category: 'DevOps Engineer', labor_code: 'DE-01', rate: 155.00, ceiling: 175.00, fringe: 0.35, overhead: 0.85 }
+      ],
+      pastperf: [
+        { id: 1, contract_number: 'DHA-2024-001', contract_name: 'MHS GENESIS Support', agency: 'DHA', value: 4200000, period_start: '2022-01-01', period_end: '2024-12-31', cpars_rating: 'Exceptional', poc_name: 'John Smith', poc_email: 'john.smith@dha.mil' },
+        { id: 2, contract_number: 'VA-2023-042', contract_name: 'VistA Modernization', agency: 'VA', value: 2800000, period_start: '2021-06-01', period_end: '2023-05-31', cpars_rating: 'Very Good', poc_name: 'Jane Doe', poc_email: 'jane.doe@va.gov' }
+      ],
+      teaming: [
+        { id: 1, partner_name: 'CloudPartner LLC', cage_code: 'CP001', role: 'Subcontractor', capabilities: 'AWS GovCloud expertise, FedRAMP High authorization', set_asides: ['8(a)'], status: 'active' },
+        { id: 2, partner_name: 'CyberShield Inc', cage_code: 'CS002', role: 'Teaming', capabilities: 'CMMC assessment services, penetration testing', set_asides: ['SDVOSB'], status: 'active' }
+      ],
+      summary: {
+        company_profile: 1,
+        win_themes: 3,
+        competitors: 2,
+        labor_categories: 4,
+        past_performance: 2,
+        teaming_partners: 2,
+        last_updated: new Date().toISOString(),
+        cache_ttl_minutes: 5
+      }
+    };
+
+    // ============================================================================
+    // COMPONENTS
+    // ============================================================================
+
+    // Stat Card
+    const StatCard = ({ icon, label, value, color, onClick }) => (
+      <div 
+        onClick={onClick}
+        className={`bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 hover:border-opacity-60 transition-all cursor-pointer group`}
+        style={{ '--hover-color': color }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}20` }}>
+            <Icon name={icon} className="w-5 h-5" style={{ color }} />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-white">{value}</div>
+            <div className="text-xs text-slate-400 group-hover:text-slate-300">{label}</div>
+          </div>
+        </div>
+      </div>
+    );
+
+    // Company Profile Tab
+    const CompanyProfileTab = ({ data, onSave }) => {
+      const [editing, setEditing] = useState(false);
+      const [formData, setFormData] = useState(data);
+      const { addToast } = useToast();
+
+      const handleSave = async () => {
+        try {
+          await onSave(formData);
+          setEditing(false);
+          addToast('Company profile updated successfully', 'success');
+        } catch (error) {
+          addToast('Failed to save company profile', 'error');
+        }
+      };
+
+      const handleChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      };
+
+      return (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Icon name="building" className="w-5 h-5 text-cyan-400" />
+              Company Profile
+            </h3>
+            {!editing ? (
+              <button onClick={() => setEditing(true)} className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 flex items-center gap-2 text-sm transition-colors">
+                <Icon name="edit" className="w-4 h-4" /> Edit Profile
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button onClick={handleSave} className="px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 flex items-center gap-2 text-sm transition-colors">
+                  <Icon name="save" className="w-4 h-4" /> Save
+                </button>
+                <button onClick={() => { setFormData(data); setEditing(false); }} className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 flex items-center gap-2 text-sm transition-colors">
+                  <Icon name="x" className="w-4 h-4" /> Cancel
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Company Name</label>
+                {editing ? (
+                  <input type="text" value={formData.name} onChange={(e) => handleChange('name', e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none" />
+                ) : (
+                  <div className="text-white font-medium">{data.name}</div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">CAGE Code</label>
+                  {editing ? (
+                    <input type="text" value={formData.cage_code} onChange={(e) => handleChange('cage_code', e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white font-mono focus:border-cyan-500 focus:outline-none" />
+                  ) : (
+                    <div className="text-white font-mono">{data.cage_code}</div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">UEI</label>
+                  {editing ? (
+                    <input type="text" value={formData.uei} onChange={(e) => handleChange('uei', e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white font-mono focus:border-cyan-500 focus:outline-none" />
+                  ) : (
+                    <div className="text-white font-mono text-sm">{data.uei}</div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Address</label>
+                {editing ? (
+                  <input type="text" value={formData.address} onChange={(e) => handleChange('address', e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none" />
+                ) : (
+                  <div className="text-slate-300 text-sm">{data.address}</div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">NAICS Codes</label>
+                <div className="flex flex-wrap gap-2">
+                  {(data.naics_codes || []).map((code, i) => (
+                    <span key={i} className="px-2 py-1 bg-slate-700 text-cyan-400 rounded text-sm font-mono">{code}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Set-Asides</label>
+                <div className="flex flex-wrap gap-2">
+                  {(data.set_asides || []).map((sa, i) => (
+                    <span key={i} className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-sm font-semibold">{sa}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Core Capabilities</label>
+                {editing ? (
+                  <textarea value={formData.capabilities} onChange={(e) => handleChange('capabilities', e.target.value)}
+                    rows={4} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none text-sm" />
+                ) : (
+                  <div className="text-slate-300 text-sm leading-relaxed">{data.capabilities}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Generic Data Table for list views
+    const DataTable = ({ title, icon, color, items, columns, onAdd, onEdit, onDelete, emptyMessage }) => {
+      const [searchQuery, setSearchQuery] = useState('');
+      const { addToast } = useToast();
+
+      const filteredItems = useMemo(() => {
+        if (!searchQuery) return items;
+        const query = searchQuery.toLowerCase();
+        return items.filter(item => 
+          columns.some(col => String(item[col.key] || '').toLowerCase().includes(query))
+        );
+      }, [items, searchQuery, columns]);
+
+      const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this item?')) {
+          try {
+            await onDelete(id);
+            addToast('Item deleted successfully', 'success');
+          } catch (error) {
+            addToast('Failed to delete item', 'error');
+          }
+        }
+      };
+
+      return (
+        <div className="space-y-4 animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Icon name={icon} className="w-5 h-5" style={{ color }} />
+              {title}
+            </h3>
+            <div className="flex gap-2">
+              <button className="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 flex items-center gap-2 text-sm transition-colors">
+                <Icon name="download" className="w-4 h-4" /> Export
+              </button>
+              <button onClick={onAdd} className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 flex items-center gap-2 text-sm transition-colors">
+                <Icon name="plus" className="w-4 h-4" /> Add New
+              </button>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input 
+              type="text" 
+              placeholder={`Search ${title.toLowerCase()}...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none text-sm"
+            />
+          </div>
+
+          {/* Table */}
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-900/50">
+                    {columns.map((col, i) => (
+                      <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">{col.label}</th>
+                    ))}
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {filteredItems.map((item, idx) => (
+                    <tr key={item.id} className="hover:bg-slate-700/30 transition-colors">
+                      {columns.map((col, i) => (
+                        <td key={i} className="px-4 py-3 text-sm text-slate-300">
+                          {col.render ? col.render(item[col.key], item) : item[col.key]}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => onEdit(item)} className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors" title="Edit">
+                            <Icon name="edit" className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete">
+                            <Icon name="trash" className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredItems.length === 0 && (
+              <div className="text-center py-12">
+                <Icon name={icon} className="w-12 h-12 mx-auto text-slate-600 mb-3" />
+                <p className="text-slate-400">{emptyMessage || 'No items found'}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="text-xs text-slate-500">
+            Showing {filteredItems.length} of {items.length} items
+          </div>
+        </div>
+      );
+    };
+
+    // Modal Component
+    const Modal = ({ isOpen, onClose, title, children }) => {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[80vh] overflow-hidden animate-slideUp" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+              <h3 className="text-lg font-semibold text-white">{title}</h3>
+              <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {children}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================================
+    // MAIN APPLICATION
+    // ============================================================================
+    const TrainingDataAdmin = () => {
+      const [activeTab, setActiveTab] = useState('company');
+      const [data, setData] = useState(DEMO_DATA);
+      const [loading, setLoading] = useState(false);
+      const [syncing, setSyncing] = useState(false);
+      const [modalOpen, setModalOpen] = useState(false);
+      const [editingItem, setEditingItem] = useState(null);
+      const { addToast } = useToast();
+
+      // Load initial data
+      useEffect(() => {
+        loadData();
+      }, []);
+
+      const loadData = async () => {
+        setLoading(true);
+        try {
+          // In production, this would call the API
+          // const summary = await ApiService.get(CONFIG.ENDPOINTS.SUMMARY);
+          // setData(summary);
+          await new Promise(r => setTimeout(r, 500)); // Simulate API delay
+          addToast('Training data loaded', 'success');
+        } catch (error) {
+          addToast('Using demo data - API unavailable', 'warning');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleCacheRefresh = async () => {
+        setSyncing(true);
+        try {
+          // await ApiService.post('/api/context/refresh', {});
+          await new Promise(r => setTimeout(r, 1500));
+          addToast('Context cache refreshed successfully', 'success');
+        } catch (error) {
+          addToast('Cache refresh failed', 'error');
+        } finally {
+          setSyncing(false);
+        }
+      };
+
+      const handleSaveCompany = async (companyData) => {
+        // await ApiService.put(CONFIG.ENDPOINTS.COMPANY_PROFILE, companyData);
+        setData(prev => ({ ...prev, company: companyData }));
+      };
+
+      const handleAddItem = (tabId) => {
+        setEditingItem(null);
+        setModalOpen(true);
+      };
+
+      const handleEditItem = (item) => {
+        setEditingItem(item);
+        setModalOpen(true);
+      };
+
+      const handleDeleteItem = async (tabId, id) => {
+        setData(prev => ({
+          ...prev,
+          [tabId]: prev[tabId].filter(item => item.id !== id)
+        }));
+      };
+
+      // Tab content renderer
+      const renderTabContent = () => {
+        switch (activeTab) {
+          case 'company':
+            return <CompanyProfileTab data={data.company} onSave={handleSaveCompany} />;
+          
+          case 'winthemes':
+            return (
+              <DataTable
+                title="Win Themes"
+                icon="trophy"
+                color="#10b981"
+                items={data.winthemes}
+                columns={[
+                  { key: 'title', label: 'Theme Title', render: (val) => <span className="font-medium text-white">{val}</span> },
+                  { key: 'description', label: 'Description', render: (val) => <span className="text-slate-400 line-clamp-1">{val}</span> },
+                  { key: 'status', label: 'Status', render: (val) => (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${val === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600 text-slate-400'}`}>
+                      {val}
+                    </span>
+                  )}
+                ]}
+                onAdd={() => handleAddItem('winthemes')}
+                onEdit={handleEditItem}
+                onDelete={(id) => handleDeleteItem('winthemes', id)}
+                emptyMessage="No win themes configured"
+              />
+            );
+
+          case 'competitors':
+            return (
+              <DataTable
+                title="Competitor Intelligence"
+                icon="target"
+                color="#ef4444"
+                items={data.competitors}
+                columns={[
+                  { key: 'name', label: 'Competitor', render: (val) => <span className="font-medium text-white">{val}</span> },
+                  { key: 'strengths', label: 'Strengths', render: (val) => <span className="text-slate-400 line-clamp-1 text-xs">{val}</span> },
+                  { key: 'weaknesses', label: 'Weaknesses', render: (val) => <span className="text-slate-400 line-clamp-1 text-xs">{val}</span> },
+                  { key: 'status', label: 'Status', render: (val) => (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${val === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600 text-slate-400'}`}>
+                      {val}
+                    </span>
+                  )}
+                ]}
+                onAdd={() => handleAddItem('competitors')}
+                onEdit={handleEditItem}
+                onDelete={(id) => handleDeleteItem('competitors', id)}
+                emptyMessage="No competitor intel configured"
+              />
+            );
+
+          case 'labor':
+            return (
+              <DataTable
+                title="Labor Categories & Rates"
+                icon="dollar"
+                color="#f59e0b"
+                items={data.labor}
+                columns={[
+                  { key: 'category', label: 'Labor Category', render: (val) => <span className="font-medium text-white">{val}</span> },
+                  { key: 'labor_code', label: 'Code', render: (val) => <span className="font-mono text-cyan-400 text-xs">{val}</span> },
+                  { key: 'rate', label: 'Loaded Rate', render: (val) => <span className="text-emerald-400 font-medium">${val?.toFixed(2)}/hr</span> },
+                  { key: 'ceiling', label: 'Ceiling', render: (val) => <span className="text-slate-400">${val?.toFixed(2)}/hr</span> }
+                ]}
+                onAdd={() => handleAddItem('labor')}
+                onEdit={handleEditItem}
+                onDelete={(id) => handleDeleteItem('labor', id)}
+                emptyMessage="No labor categories configured"
+              />
+            );
+
+          case 'pastperf':
+            return (
+              <DataTable
+                title="Past Performance"
+                icon="shield"
+                color="#8b5cf6"
+                items={data.pastperf}
+                columns={[
+                  { key: 'contract_number', label: 'Contract #', render: (val) => <span className="font-mono text-cyan-400">{val}</span> },
+                  { key: 'agency', label: 'Agency', render: (val) => <span className="font-medium text-white">{val}</span> },
+                  { key: 'value', label: 'Value', render: (val) => <span className="text-emerald-400">${(val/1000000).toFixed(1)}M</span> },
+                  { key: 'cpars_rating', label: 'CPARS', render: (val) => (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${val === 'Exceptional' ? 'bg-emerald-500/20 text-emerald-400' : val === 'Very Good' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-600 text-slate-400'}`}>
+                      {val}
+                    </span>
+                  )}
+                ]}
+                onAdd={() => handleAddItem('pastperf')}
+                onEdit={handleEditItem}
+                onDelete={(id) => handleDeleteItem('pastperf', id)}
+                emptyMessage="No past performance records"
+              />
+            );
+
+          case 'teaming':
+            return (
+              <DataTable
+                title="Teaming Partners"
+                icon="users"
+                color="#06b6d4"
+                items={data.teaming}
+                columns={[
+                  { key: 'partner_name', label: 'Partner', render: (val) => <span className="font-medium text-white">{val}</span> },
+                  { key: 'role', label: 'Role', render: (val) => <span className="text-cyan-400">{val}</span> },
+                  { key: 'capabilities', label: 'Capabilities', render: (val) => <span className="text-slate-400 line-clamp-1 text-xs">{val}</span> },
+                  { key: 'status', label: 'Status', render: (val) => (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${val === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600 text-slate-400'}`}>
+                      {val}
+                    </span>
+                  )}
+                ]}
+                onAdd={() => handleAddItem('teaming')}
+                onEdit={handleEditItem}
+                onDelete={(id) => handleDeleteItem('teaming', id)}
+                emptyMessage="No teaming partners configured"
+              />
+            );
+
+          default:
+            return null;
+        }
+      };
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-slate-400">Loading training data...</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+          {/* Header */}
+          <header className="border-b border-slate-800/50 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <a href="index.html" className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded-lg transition-colors" title="Back to Dashboard">
+                    <Icon name="home" className="w-5 h-5" />
+                  </a>
+                  <div className="p-3 bg-cyan-500/10 rounded-xl border border-cyan-500/30">
+                    <Icon name="database" className="w-7 h-7 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-white">Training Data Admin</h1>
+                    <p className="text-slate-400 text-sm">Manage AI agent context injection data</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs text-amber-400 flex items-center gap-1.5">
+                    <Icon name="shield" className="w-3 h-3" /> ADMIN ACCESS
+                  </span>
+                  <button
+                    onClick={handleCacheRefresh}
+                    disabled={syncing}
+                    className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 flex items-center gap-2 text-sm disabled:opacity-50 transition-colors"
+                  >
+                    <Icon name="refresh" className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                    {syncing ? 'Syncing...' : 'Refresh Cache'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Stats Overview */}
+          <div className="max-w-7xl mx-auto px-6 py-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {TABS.map(tab => (
+                <StatCard 
+                  key={tab.id}
+                  icon={tab.icon}
+                  label={tab.label}
+                  value={tab.id === 'company' ? 1 : data[tab.id]?.length || 0}
+                  color={tab.color}
+                  onClick={() => setActiveTab(tab.id)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <main className="max-w-7xl mx-auto px-6 pb-8">
+            <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl overflow-hidden">
+              {/* Tab Navigation */}
+              <div className="flex overflow-x-auto border-b border-slate-700/50 bg-slate-900/80">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 px-4 py-4 text-sm font-medium transition-all whitespace-nowrap ${
+                      activeTab === tab.id
+                        ? 'text-white bg-slate-800/50 border-b-2'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                    }`}
+                    style={{ borderColor: activeTab === tab.id ? tab.color : 'transparent' }}
+                  >
+                    <Icon name={tab.icon} className="w-4 h-4" style={{ color: activeTab === tab.id ? tab.color : undefined }} />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-6">
+                {renderTabContent()}
+              </div>
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-slate-800/50 bg-slate-900/30">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full">
+                <Icon name="alert" className="w-3 h-3 text-amber-400" />
+                <span className="text-xs text-amber-400 font-medium">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+              </div>
+              <p className="text-slate-500 text-xs">
+                MissionPulse v12.0 • Module M16 • © 2026 Mission Meets Tech
+              </p>
+            </div>
+          </footer>
+
+          {/* Edit Modal Placeholder */}
+          <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingItem ? 'Edit Item' : 'Add New Item'}>
+            <div className="space-y-4">
+              <p className="text-slate-400 text-sm">
+                Form fields for {activeTab} will be rendered here based on the data schema.
+              </p>
+              <div className="flex justify-end gap-2 pt-4">
+                <button onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm">
+                  Cancel
+                </button>
+                <button onClick={() => { addToast('Item saved successfully', 'success'); setModalOpen(false); }} className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 text-sm">
+                  Save
+                </button>
+              </div>
+            </div>
+          </Modal>
+        </div>
+      );
+    };
+
+    // ============================================================================
+    // RENDER
+    // ============================================================================
+    ReactDOM.render(
+      <ErrorBoundary>
+        <ToastProvider>
+          <TrainingDataAdmin />
+        </ToastProvider>
+      </ErrorBoundary>,
+      document.getElementById('root')
+    );
+  </script>
+</body>
+</html>
