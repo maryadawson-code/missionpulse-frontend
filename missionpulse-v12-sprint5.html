@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 - Sprint 5 | Shipley Pipeline Board</title>
+  <!-- Supabase SDK -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <!-- React & Dependencies -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'pulse-cyan': '#00E5FA',
+            'shield-navy': '#00050F',
+            'shield-dark': '#0a0f1a',
+            'shield-panel': '#0d1526',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-shimmer { 
+      background: linear-gradient(90deg, transparent, rgba(0,229,250,0.1), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+    }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+    .animate-slideRight { animation: slideRight 0.3s ease-out; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #00E5FA; }
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+    .dragging { opacity: 0.5; transform: rotate(2deg); }
+    .drop-zone-active { background: rgba(0, 229, 250, 0.1); border: 2px dashed #00E5FA; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <!-- Load Supabase Client Module -->
+  <script src="./supabase-client.js"></script>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // ============================================================
+    // ICON LIBRARY
+    // ============================================================
+    const Icons = {
+      grip: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      arrowRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      trendUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+      calendar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      chart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      building: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+      wifi: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>,
+      wifiOff: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================
+    // CONNECTION STATUS INDICATOR
+    // ============================================================
+    const ConnectionStatus = ({ status }) => {
+      const statusConfig = {
+        connected: { color: 'bg-emerald-500', text: 'Live', icon: 'wifi' },
+        disconnected: { color: 'bg-red-500', text: 'Offline', icon: 'wifiOff' },
+        connecting: { color: 'bg-amber-500 animate-pulse', text: 'Connecting...', icon: 'wifi' }
+      };
+      
+      const config = statusConfig[status] || statusConfig.disconnected;
+      
+      return (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+          <span className={`w-2 h-2 rounded-full ${config.color}`} />
+          <Icon name={config.icon} className="w-3.5 h-3.5 text-slate-400" />
+          <span className="text-xs text-slate-400">{config.text}</span>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // LOADING & ERROR STATES
+    // ============================================================
+    const LoadingState = ({ message = 'Loading opportunities...' }) => (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-slate-400 text-sm">{message}</p>
+      </div>
+    );
+
+    const ErrorState = ({ message, onRetry }) => (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Icon name="alert" className="w-12 h-12 text-red-400 mb-4" />
+        <p className="text-red-400 font-medium mb-2">Failed to load data</p>
+        <p className="text-slate-500 text-sm mb-4">{message}</p>
+        {onRetry && (
+          <button 
+            onClick={onRetry}
+            className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors flex items-center gap-2"
+          >
+            <Icon name="refresh" className="w-4 h-4" />
+            Retry
+          </button>
+        )}
+      </div>
+    );
+
+    const SkeletonCard = () => (
+      <div className="bg-slate-800/70 border border-slate-700/50 rounded-xl p-3 mb-3 animate-pulse">
+        <div className="flex items-start justify-between mb-2">
+          <div className="h-5 w-12 bg-slate-700 rounded" />
+          <div className="h-5 w-16 bg-slate-700 rounded" />
+        </div>
+        <div className="h-4 w-full bg-slate-700 rounded mb-2" />
+        <div className="h-3 w-3/4 bg-slate-700 rounded mb-3" />
+        <div className="h-8 w-full bg-slate-700 rounded" />
+      </div>
+    );
+
+    // ============================================================
+    // TOAST NOTIFICATIONS
+    // ============================================================
+    const Toast = ({ message, type = 'success', onClose }) => {
+      useEffect(() => {
+        const timer = setTimeout(onClose, 4000);
+        return () => clearTimeout(timer);
+      }, [onClose]);
+
+      const styles = {
+        success: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400',
+        error: 'bg-red-500/20 border-red-500/50 text-red-400',
+        info: 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400',
+      };
+
+      return (
+        <div className="fixed top-4 right-4 z-50 animate-slideIn">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${styles[type]} shadow-lg`}>
+            <Icon name={type === 'success' ? 'check' : type === 'error' ? 'alert' : 'target'} className="w-5 h-5" />
+            <span className="text-white text-sm font-medium">{message}</span>
+            <button onClick={onClose} className="text-slate-400 hover:text-white ml-2">
+              <Icon name="x" className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // OPPORTUNITY DETAIL DRAWER (Task 5.3)
+    // ============================================================
+    const OpportunityDrawer = ({ opportunity, isOpen, onClose, onEdit, onDelete, onPhaseChange, phases }) => {
+      if (!isOpen || !opportunity) return null;
+
+      const formatCurrency = (value) => {
+        if (typeof MissionPulse !== 'undefined') {
+          return MissionPulse.formatCurrency(value);
+        }
+        if (!value) return '$0';
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        return `$${value.toLocaleString()}`;
+      };
+
+      const formatDate = (dateStr) => {
+        if (!dateStr) return 'Not set';
+        return new Date(dateStr).toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric' 
+        });
+      };
+
+      const getDaysRemaining = () => {
+        if (!opportunity.dueDate) return null;
+        const due = new Date(opportunity.dueDate);
+        const now = new Date();
+        return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+      };
+
+      const days = getDaysRemaining();
+      const pWin = opportunity.winProbability || opportunity.pWin || 0;
+
+      return (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 animate-fadeIn"
+            onClick={onClose}
+          />
+          
+          {/* Drawer */}
+          <div className="fixed right-0 top-0 bottom-0 w-[480px] max-w-full bg-slate-900 border-l border-slate-700/50 z-50 overflow-y-auto animate-slideRight">
+            {/* Header */}
+            <div className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-700/50 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-white">Opportunity Details</h2>
+                <button 
+                  onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                >
+                  <Icon name="x" className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Title & Agency */}
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">{opportunity.name}</h3>
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1 rounded-lg bg-slate-800 text-cyan-400 text-sm font-medium">
+                    {opportunity.agency}
+                  </span>
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${
+                    opportunity.priority === 'P-0' ? 'bg-red-500/20 text-red-400' :
+                    opportunity.priority === 'P-1' ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-slate-600/50 text-slate-300'
+                  }`}>
+                    {opportunity.priority}
+                  </span>
+                </div>
+              </div>
+
+              {/* Key Metrics */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <p className="text-xs text-slate-500 mb-1">Contract Value</p>
+                  <p className="text-xl font-bold text-emerald-400">{formatCurrency(opportunity.contractValue || opportunity.ceiling)}</p>
+                </div>
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <p className="text-xs text-slate-500 mb-1">Win Probability</p>
+                  <p className={`text-xl font-bold ${pWin >= 70 ? 'text-emerald-400' : pWin >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                    {pWin}%
+                  </p>
+                </div>
+              </div>
+
+              {/* Due Date */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Due Date</p>
+                    <p className="text-white font-medium">{formatDate(opportunity.dueDate)}</p>
+                  </div>
+                  {days !== null && (
+                    <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${
+                      days < 0 ? 'bg-slate-600 text-slate-300' :
+                      days <= 3 ? 'bg-red-500/20 text-red-400' :
+                      days <= 7 ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-emerald-500/20 text-emerald-400'
+                    }`}>
+                      {days < 0 ? 'Submitted' : days === 0 ? 'Due Today!' : `${days} days`}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Current Phase with Change Dropdown */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <p className="text-xs text-slate-500 mb-2">Shipley Phase</p>
+                <select
+                  value={opportunity.shipleyPhase}
+                  onChange={(e) => onPhaseChange(opportunity.id, e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                >
+                  {phases.map(phase => (
+                    <option key={phase.key} value={phase.key}>
+                      {phase.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Description */}
+              {opportunity.description && (
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <p className="text-xs text-slate-500 mb-2">Description</p>
+                  <p className="text-slate-300 text-sm leading-relaxed">{opportunity.description}</p>
+                </div>
+              )}
+
+              {/* Solicitation Number */}
+              {opportunity.solicitationNumber && (
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <p className="text-xs text-slate-500 mb-1">Solicitation Number</p>
+                  <p className="text-white font-mono text-sm">{opportunity.solicitationNumber}</p>
+                </div>
+              )}
+
+              {/* Activity Log Placeholder */}
+              <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
+                <p className="text-xs text-slate-500 mb-3">Activity Log</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                    <span className="text-slate-400">Phase updated</span>
+                    <span className="text-slate-600 ml-auto">Just now</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-slate-400">Win probability increased</span>
+                    <span className="text-slate-600 ml-auto">2h ago</span>
+                  </div>
+                  <p className="text-slate-600 text-xs italic mt-2">Full activity log coming in Sprint 6</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="sticky bottom-0 bg-slate-900/95 backdrop-blur border-t border-slate-700/50 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => onEdit(opportunity)}
+                  className="flex-1 py-2.5 px-4 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 font-medium flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Icon name="edit" className="w-4 h-4" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => onDelete(opportunity)}
+                  className="py-2.5 px-4 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-400 font-medium flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Icon name="trash" className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    // ============================================================
+    // OPPORTUNITY CARD (with drag support)
+    // ============================================================
+    const OpportunityCard = ({ opportunity, onDragStart, onDragEnd, onClick }) => {
+      const formatCurrency = (value) => {
+        if (typeof MissionPulse !== 'undefined') {
+          return MissionPulse.formatCurrency(value);
+        }
+        if (!value) return '$0';
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        return `$${value.toLocaleString()}`;
+      };
+
+      const getDaysRemaining = () => {
+        if (opportunity.daysRemaining !== undefined) return opportunity.daysRemaining;
+        if (!opportunity.dueDate) return null;
+        const due = new Date(opportunity.dueDate);
+        const now = new Date();
+        return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+      };
+
+      const days = getDaysRemaining();
+      const pWin = opportunity.winProbability || opportunity.pWin || 0;
+      const value = opportunity.contractValue || opportunity.ceiling || 0;
+
+      const getDueDateColor = () => {
+        if (days === null) return { bg: 'bg-slate-700/50', text: 'text-slate-400' };
+        if (days < 0) return { bg: 'bg-slate-600', text: 'text-slate-300' };
+        if (days <= 3) return { bg: 'bg-red-500/20 border border-red-500/50', text: 'text-red-400' };
+        if (days <= 7) return { bg: 'bg-amber-500/20 border border-amber-500/50', text: 'text-amber-400' };
+        return { bg: 'bg-emerald-500/20 border border-emerald-500/50', text: 'text-emerald-400' };
+      };
+
+      const dueColors = getDueDateColor();
+
+      return (
+        <div 
+          draggable
+          onDragStart={(e) => onDragStart(e, opportunity)}
+          onDragEnd={onDragEnd}
+          onClick={() => onClick(opportunity)}
+          className="bg-slate-800/70 border border-slate-700/50 rounded-xl p-3 mb-3 hover:border-cyan-500/30 transition-all group cursor-pointer"
+        >
+          {/* Header with drag handle */}
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="drag-handle p-1 rounded hover:bg-slate-700/50 text-slate-500 hover:text-slate-300">
+                <Icon name="grip" className="w-3.5 h-3.5" />
+              </div>
+              <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${
+                opportunity.priority === 'P-0' ? 'bg-red-500/20 text-red-400 border-red-500/50' :
+                opportunity.priority === 'P-1' ? 'bg-amber-500/20 text-amber-400 border-amber-500/50' :
+                'bg-slate-600/50 text-slate-300 border-slate-500/50'
+              }`}>
+                {opportunity.priority}
+              </span>
+            </div>
+            <span className="text-emerald-400 font-bold text-sm">{formatCurrency(value)}</span>
+          </div>
+
+          {/* Opportunity Name */}
+          <h4 className="text-white font-semibold text-sm mb-1 line-clamp-2">{opportunity.name}</h4>
+          <p className="text-xs text-slate-500 mb-2">{opportunity.agency}</p>
+
+          {/* Win Probability */}
+          <div className="mb-2">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-slate-400">Win Probability</span>
+              <span className={`font-semibold ${pWin >= 70 ? 'text-emerald-400' : pWin >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                {pWin}%
+              </span>
+            </div>
+            <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all ${pWin >= 70 ? 'bg-emerald-500' : pWin >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                style={{ width: `${pWin}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Due Date */}
+          <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${dueColors.bg}`}>
+            <Icon name="clock" className={`w-3.5 h-3.5 ${dueColors.text}`} />
+            <span className={`text-xs font-medium ${dueColors.text}`}>
+              {days === null ? 'No date' : days < 0 ? 'Submitted' : days === 0 ? 'Due Today!' : days === 1 ? 'Due Tomorrow' : `${days} days left`}
+            </span>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // PHASE COLUMN (with drop zone)
+    // ============================================================
+    const PhaseColumn = ({ phase, opportunities, onDragStart, onDragEnd, onDrop, onCardClick, isLoading }) => {
+      const [isDragOver, setIsDragOver] = useState(false);
+
+      const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragOver(true);
+      };
+
+      const handleDragLeave = () => {
+        setIsDragOver(false);
+      };
+
+      const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        onDrop(e, phase.key);
+      };
+
+      const formatCurrency = (value) => {
+        if (typeof MissionPulse !== 'undefined') {
+          return MissionPulse.formatCurrency(value);
+        }
+        if (!value) return '$0';
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        return `$${value.toLocaleString()}`;
+      };
+
+      const totalValue = opportunities.reduce((sum, o) => sum + (o.contractValue || o.ceiling || 0), 0);
+      const avgWinProb = opportunities.length > 0 
+        ? Math.round(opportunities.reduce((sum, o) => sum + (o.winProbability || o.pWin || 0), 0) / opportunities.length)
+        : 0;
+
+      return (
+        <div className="flex-shrink-0 w-72 flex flex-col">
+          {/* Column Header */}
+          <div 
+            className="rounded-t-xl p-3 border-b-2"
+            style={{ 
+              backgroundColor: `${phase.color}15`,
+              borderColor: phase.color 
+            }}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span 
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+                  style={{ backgroundColor: phase.color }}
+                >
+                  {phase.name.split(' ').map(w => w[0]).join('')}
+                </span>
+                <div>
+                  <h3 className="font-semibold text-white text-sm">{phase.name}</h3>
+                  <p className="text-xs text-slate-500">{phase.order} of 8</p>
+                </div>
+              </div>
+              <span className="text-lg font-bold text-white">{opportunities.length}</span>
+            </div>
+
+            {/* Progress indicator */}
+            {opportunities.length > 0 && (
+              <>
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-slate-400">Avg. Win Prob</span>
+                    <span style={{ color: phase.color }}>{avgWinProb}%</span>
+                  </div>
+                  <div className="h-1 bg-slate-700/50 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${avgWinProb}%`, backgroundColor: phase.color }}
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-1 text-xs">
+                  <Icon name="dollar" className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400 font-semibold">{formatCurrency(totalValue)}</span>
+                  <span className="text-slate-500">pipeline</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Cards Container (Drop Zone) */}
+          <div 
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`flex-1 bg-slate-900/30 border-x border-slate-700/30 p-2 overflow-y-auto scrollbar-thin min-h-[400px] transition-all ${
+              isDragOver ? 'drop-zone-active' : ''
+            }`}
+          >
+            {isLoading ? (
+              <>
+                <SkeletonCard />
+                <SkeletonCard />
+              </>
+            ) : opportunities.length === 0 ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center p-4">
+                  <div 
+                    className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center opacity-30"
+                    style={{ backgroundColor: `${phase.color}30` }}
+                  >
+                    <Icon name="target" className="w-5 h-5" style={{ color: phase.color }} />
+                  </div>
+                  <p className="text-xs text-slate-600">No opportunities</p>
+                  <p className="text-xs text-slate-700">Drag cards here</p>
+                </div>
+              </div>
+            ) : (
+              opportunities.map(opp => (
+                <OpportunityCard 
+                  key={opp.id} 
+                  opportunity={opp} 
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                  onClick={onCardClick}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Column Footer */}
+          <div className="bg-slate-800/50 border border-slate-700/30 border-t-0 rounded-b-xl p-2">
+            <div className="text-center text-xs text-slate-600">
+              {opportunities.length} {opportunities.length === 1 ? 'opportunity' : 'opportunities'}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // M12 DASHBOARD - MISSION CONTROL (Task 5.4)
+    // ============================================================
+    const M12Dashboard = ({ stats, phases, opportunities, isLoading, onRefresh }) => {
+      // Get upcoming deadlines (next 30 days)
+      const upcomingDeadlines = opportunities
+        .filter(opp => {
+          if (!opp.dueDate) return false;
+          const due = new Date(opp.dueDate);
+          const now = new Date();
+          const days = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+          return days >= 0 && days <= 30;
+        })
+        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+        .slice(0, 5);
+
+      // Get recent activity (sorted by updated_at)
+      const recentActivity = [...opportunities]
+        .sort((a, b) => new Date(b.updatedAt || b.updated_at) - new Date(a.updatedAt || a.updated_at))
+        .slice(0, 5);
+
+      const formatCurrency = (value) => {
+        if (typeof MissionPulse !== 'undefined') {
+          return MissionPulse.formatCurrency(value);
+        }
+        if (!value) return '$0';
+        if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        return `$${value.toLocaleString()}`;
+      };
+
+      const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      };
+
+      const getTimeAgo = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diff = now - date;
+        const minutes = Math.floor(diff / 60000);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        return `${days}d ago`;
+      };
+
+      return (
+        <div className="bg-slate-900/50 border-b border-slate-700/50 px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Icon name="chart" className="w-5 h-5 text-cyan-400" />
+              Mission Control
+            </h2>
+            <button 
+              onClick={onRefresh}
+              className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            >
+              <Icon name="refresh" className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            {/* Key Metrics */}
+            <div className="lg:col-span-1 grid grid-cols-2 lg:grid-cols-1 gap-3">
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <p className="text-xs text-slate-500 mb-1">Total Pipeline</p>
+                <p className="text-2xl font-bold text-emerald-400">
+                  {isLoading ? '...' : formatCurrency(stats?.totalValue || 0)}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <p className="text-xs text-slate-500 mb-1">Active Opportunities</p>
+                <p className="text-2xl font-bold text-white">{stats?.totalCount || 0}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <p className="text-xs text-slate-500 mb-1">Avg Win Probability</p>
+                <p className="text-2xl font-bold text-cyan-400">{stats?.avgPwin || 0}%</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <p className="text-xs text-slate-500 mb-1">Due This Month</p>
+                <p className="text-2xl font-bold text-amber-400">{stats?.dueThisMonth || 0}</p>
+              </div>
+            </div>
+
+            {/* Phase Distribution Chart */}
+            <div className="lg:col-span-1 bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+              <p className="text-xs text-slate-500 mb-3">Phase Distribution</p>
+              <div className="space-y-2">
+                {phases.slice(0, 6).map(phase => {
+                  const count = stats?.byPhase?.[phase.key]?.count || 0;
+                  const maxCount = Math.max(...phases.map(p => stats?.byPhase?.[p.key]?.count || 0), 1);
+                  const percentage = (count / maxCount) * 100;
+                  
+                  return (
+                    <div key={phase.key} className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400 w-16 truncate">{phase.name.split(' ')[0]}</span>
+                      <div className="flex-1 h-4 bg-slate-700/50 rounded overflow-hidden">
+                        <div 
+                          className="h-full rounded transition-all"
+                          style={{ width: `${percentage}%`, backgroundColor: phase.color }}
+                        />
+                      </div>
+                      <span className="text-xs text-white w-6 text-right">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Upcoming Deadlines */}
+            <div className="lg:col-span-1 bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+              <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                <Icon name="calendar" className="w-3.5 h-3.5" />
+                Upcoming Deadlines
+              </p>
+              <div className="space-y-2">
+                {upcomingDeadlines.length === 0 ? (
+                  <p className="text-xs text-slate-600 italic">No upcoming deadlines</p>
+                ) : (
+                  upcomingDeadlines.map(opp => {
+                    const days = Math.ceil((new Date(opp.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                    return (
+                      <div key={opp.id} className="flex items-center gap-2 text-xs">
+                        <span className={`w-2 h-2 rounded-full ${
+                          days <= 3 ? 'bg-red-400' : days <= 7 ? 'bg-amber-400' : 'bg-emerald-400'
+                        }`} />
+                        <span className="text-white truncate flex-1">{opp.name}</span>
+                        <span className="text-slate-500">{formatDate(opp.dueDate)}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="lg:col-span-1 bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+              <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                <Icon name="clock" className="w-3.5 h-3.5" />
+                Recent Activity
+              </p>
+              <div className="space-y-2">
+                {recentActivity.length === 0 ? (
+                  <p className="text-xs text-slate-600 italic">No recent activity</p>
+                ) : (
+                  recentActivity.map(opp => (
+                    <div key={opp.id} className="flex items-center gap-2 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                      <span className="text-white truncate flex-1">{opp.name}</span>
+                      <span className="text-slate-500">{getTimeAgo(opp.updatedAt || opp.updated_at)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // MAIN SWIMLANE BOARD COMPONENT
+    // ============================================================
+    const ShipleySwimLaneBoard = () => {
+      // State
+      const [opportunitiesByPhase, setOpportunitiesByPhase] = useState({});
+      const [allOpportunities, setAllOpportunities] = useState([]);
+      const [stats, setStats] = useState(null);
+      const [phases, setPhases] = useState([]);
+      const [isLoading, setIsLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [connectionStatus, setConnectionStatus] = useState('connecting');
+      const [filter, setFilter] = useState('all');
+      const [toast, setToast] = useState(null);
+      const [draggingOpp, setDraggingOpp] = useState(null);
+      const [selectedOpp, setSelectedOpp] = useState(null);
+      const [showDashboard, setShowDashboard] = useState(true);
+      const scrollRef = useRef(null);
+
+      // Fetch data from Supabase
+      const fetchData = useCallback(async () => {
+        if (typeof MissionPulse === 'undefined') {
+          setError('MissionPulse client not loaded');
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          // Fetch opportunities grouped by phase
+          const { data: phaseData, error: phaseError } = await MissionPulse.getOpportunitiesByPhase();
+          if (phaseError) throw phaseError;
+          
+          // Convert array to object keyed by phase key for easier lookup
+          const phaseMap = {};
+          (phaseData || []).forEach(p => {
+            phaseMap[p.phase] = p;
+          });
+          setOpportunitiesByPhase(phaseMap);
+
+          // Flatten for stats and other uses
+          const allOpps = (phaseData || []).flatMap(p => p.items || []);
+          setAllOpportunities(allOpps);
+
+          // Fetch stats
+          const { data: statsData, error: statsError } = await MissionPulse.getPipelineStats();
+          if (statsError) throw statsError;
+          setStats(statsData);
+
+          // Get phases
+          const shipleyPhases = MissionPulse.getShipleyPhases();
+          setPhases(shipleyPhases);
+
+          setError(null);
+        } catch (err) {
+          console.error('Error fetching data:', err);
+          setError(err.message);
+        } finally {
+          setIsLoading(false);
+        }
+      }, []);
+
+      // Initial load and real-time subscription
+      useEffect(() => {
+        // Wait for MissionPulse to be available
+        const checkAndInit = () => {
+          if (typeof MissionPulse !== 'undefined') {
+            MissionPulse.init();
+            fetchData();
+
+            // Subscribe to connection status
+            const unsubscribeConnection = MissionPulse.onConnectionChange(status => {
+              setConnectionStatus(status);
+            });
+
+            // Subscribe to real-time updates
+            const unsubscribeOpportunities = MissionPulse.subscribeToOpportunities((event) => {
+              console.log('Real-time update:', event);
+              fetchData(); // Refresh all data on any change
+              setToast({ message: `Opportunity ${event.eventType}`, type: 'info' });
+            });
+
+            return () => {
+              unsubscribeConnection();
+              unsubscribeOpportunities();
+            };
+          } else {
+            // Retry in 100ms
+            setTimeout(checkAndInit, 100);
+          }
+        };
+
+        const cleanup = checkAndInit();
+        return () => {
+          if (typeof cleanup === 'function') cleanup();
+        };
+      }, [fetchData]);
+
+      // Handle drag start
+      const handleDragStart = (e, opportunity) => {
+        setDraggingOpp(opportunity);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', opportunity.id);
+        e.target.classList.add('dragging');
+      };
+
+      // Handle drag end
+      const handleDragEnd = (e) => {
+        setDraggingOpp(null);
+        e.target.classList.remove('dragging');
+      };
+
+      // Handle drop - update phase
+      const handleDrop = async (e, newPhaseKey) => {
+        e.preventDefault();
+        const oppId = e.dataTransfer.getData('text/plain');
+        
+        if (!oppId || !draggingOpp) return;
+        if (draggingOpp.shipleyPhase === newPhaseKey) return; // Same phase, no change
+
+        // Optimistic update
+        const oldPhase = draggingOpp.shipleyPhase;
+        setOpportunitiesByPhase(prev => {
+          const updated = { ...prev };
+          
+          // Remove from old phase
+          if (updated[oldPhase]) {
+            updated[oldPhase] = {
+              ...updated[oldPhase],
+              items: updated[oldPhase].items.filter(o => o.id !== oppId)
+            };
+          }
+          
+          // Add to new phase
+          if (updated[newPhaseKey]) {
+            updated[newPhaseKey] = {
+              ...updated[newPhaseKey],
+              items: [...updated[newPhaseKey].items, { ...draggingOpp, shipleyPhase: newPhaseKey }]
+            };
+          }
+          
+          return updated;
+        });
+
+        // Call API
+        try {
+          const { error } = await MissionPulse.updateOpportunity(oppId, { shipleyPhase: newPhaseKey });
+          if (error) throw error;
+          
+          const phaseInfo = MissionPulse.getPhaseInfo(newPhaseKey);
+          setToast({ 
+            message: `Moved to ${phaseInfo.name}`, 
+            type: 'success' 
+          });
+        } catch (err) {
+          console.error('Error updating phase:', err);
+          setToast({ message: 'Failed to update phase', type: 'error' });
+          // Revert on error
+          fetchData();
+        }
+      };
+
+      // Handle phase change from drawer
+      const handlePhaseChange = async (oppId, newPhaseKey) => {
+        try {
+          const { error } = await MissionPulse.updateOpportunity(oppId, { shipleyPhase: newPhaseKey });
+          if (error) throw error;
+          
+          const phaseInfo = MissionPulse.getPhaseInfo(newPhaseKey);
+          setToast({ message: `Phase updated to ${phaseInfo.name}`, type: 'success' });
+          fetchData();
+          
+          // Update selected opp
+          setSelectedOpp(prev => prev ? { ...prev, shipleyPhase: newPhaseKey } : null);
+        } catch (err) {
+          console.error('Error updating phase:', err);
+          setToast({ message: 'Failed to update phase', type: 'error' });
+        }
+      };
+
+      // Handle card click
+      const handleCardClick = (opportunity) => {
+        setSelectedOpp(opportunity);
+      };
+
+      // Handle edit from drawer
+      const handleEdit = (opportunity) => {
+        setToast({ message: 'Edit modal coming in Sprint 6', type: 'info' });
+      };
+
+      // Handle delete from drawer
+      const handleDelete = async (opportunity) => {
+        if (!window.confirm(`Delete "${opportunity.name}"?`)) return;
+        
+        try {
+          const { error } = await MissionPulse.deleteOpportunity(opportunity.id);
+          if (error) throw error;
+          
+          setToast({ message: 'Opportunity deleted', type: 'success' });
+          setSelectedOpp(null);
+          fetchData();
+        } catch (err) {
+          console.error('Error deleting:', err);
+          setToast({ message: 'Failed to delete opportunity', type: 'error' });
+        }
+      };
+
+      // Filter opportunities
+      const getFilteredPhases = () => {
+        if (filter === 'all') return opportunitiesByPhase;
+        
+        const filtered = {};
+        Object.keys(opportunitiesByPhase).forEach(phaseKey => {
+          const phase = opportunitiesByPhase[phaseKey];
+          filtered[phaseKey] = {
+            ...phase,
+            items: (phase.items || []).filter(o => o.priority === filter)
+          };
+        });
+        return filtered;
+      };
+
+      const filteredPhases = getFilteredPhases();
+
+      // Stats
+      const totalPipeline = allOpportunities.reduce((sum, o) => sum + (o.contractValue || o.ceiling || 0), 0);
+      const urgentCount = allOpportunities.filter(o => {
+        if (!o.dueDate) return false;
+        const days = Math.ceil((new Date(o.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+        return days >= 0 && days <= 3;
+      }).length;
+
+      const formatCurrency = (value) => {
+        if (typeof MissionPulse !== 'undefined') {
+          return MissionPulse.formatCurrency(value);
+        }
+        if (!value) return '$0';
+        if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        return `$${value.toLocaleString()}`;
+      };
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Toast Notification */}
+          {toast && (
+            <Toast 
+              message={toast.message} 
+              type={toast.type} 
+              onClose={() => setToast(null)} 
+            />
+          )}
+
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                  <Icon name="shield" className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">MissionPulse Swimlane Board</h1>
+                  <p className="text-sm text-slate-400">
+                    {phases.length} phases • {allOpportunities.length} opportunities • {formatCurrency(totalPipeline)} pipeline
+                  </p>
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center gap-3">
+                <ConnectionStatus status={connectionStatus} />
+                
+                {urgentCount > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg">
+                    <Icon name="alert" className="w-4 h-4 text-red-400" />
+                    <span className="text-red-400 text-sm font-semibold">{urgentCount} urgent</span>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setShowDashboard(!showDashboard)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    showDashboard 
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' 
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Icon name="chart" className="w-4 h-4 inline mr-1" />
+                  Dashboard
+                </button>
+
+                <div className="flex items-center gap-2 bg-slate-800 rounded-lg p-1">
+                  {['all', 'P-0', 'P-1', 'P-2'].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                        filter === f 
+                          ? 'bg-cyan-500 text-white' 
+                          : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      {f === 'all' ? 'All' : f}
+                    </button>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={fetchData}
+                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                  title="Refresh"
+                >
+                  <Icon name="refresh" className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* M12 Dashboard (Task 5.4) */}
+          {showDashboard && (
+            <M12Dashboard 
+              stats={stats}
+              phases={phases}
+              opportunities={allOpportunities}
+              isLoading={isLoading}
+              onRefresh={fetchData}
+            />
+          )}
+
+          {/* Phase Legend */}
+          <div className="bg-slate-800/30 border-b border-slate-700/30 px-6 py-3">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin">
+              <span className="text-xs text-slate-500 mr-2">Phases:</span>
+              {phases.map((phase, i) => (
+                <React.Fragment key={phase.key}>
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800/50">
+                    <div 
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: phase.color }}
+                    />
+                    <span className="text-xs text-slate-300 whitespace-nowrap">{phase.name}</span>
+                  </div>
+                  {i < phases.length - 1 && (
+                    <Icon name="chevronRight" className="w-3 h-3 text-slate-600 flex-shrink-0" />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          {/* Error State */}
+          {error && (
+            <div className="p-6">
+              <ErrorState message={error} onRetry={fetchData} />
+            </div>
+          )}
+
+          {/* Swimlane Board */}
+          {!error && (
+            <div 
+              ref={scrollRef}
+              className="flex gap-4 p-6 overflow-x-auto scrollbar-thin"
+              style={{ minHeight: showDashboard ? 'calc(100vh - 400px)' : 'calc(100vh - 180px)' }}
+            >
+              {phases.map((phase) => (
+                <PhaseColumn
+                  key={phase.key}
+                  phase={phase}
+                  opportunities={(filteredPhases[phase.key]?.items || [])}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDrop={handleDrop}
+                  onCardClick={handleCardClick}
+                  isLoading={isLoading}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Opportunity Detail Drawer (Task 5.3) */}
+          <OpportunityDrawer
+            opportunity={selectedOpp}
+            isOpen={!!selectedOpp}
+            onClose={() => setSelectedOpp(null)}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onPhaseChange={handlePhaseChange}
+            phases={phases}
+          />
+
+          {/* Footer */}
+          <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-700/50 px-6 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">MissionPulse v12 • Sprint 5 • Shipley Pipeline Board</span>
+              <span className="text-xs text-slate-600">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ShipleySwimLaneBoard />);
+  </script>
+</body>
+</html>
