@@ -3,10 +3,9 @@
  * MISSIONPULSE - TRAINING DATA API SERVICE
  * ================================================================================
  * Frontend JavaScript module for interacting with Training Data CRUD endpoints.
- * Replace mock data calls with this service.
  * 
  * Author: Mission Meets Tech
- * Version: 1.0.0
+ * Version: 1.1.0 (Updated endpoint paths)
  * ================================================================================
  */
 
@@ -59,7 +58,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Object|null>} Company profile or null if not set
      */
     async getCompanyProfile() {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/company-profile`, {
+        const response = await fetch(`${API_BASE_URL}/api/company-profile`, {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -72,7 +71,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Saved company profile
      */
     async saveCompanyProfile(profileData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/company-profile`, {
+        const response = await fetch(`${API_BASE_URL}/api/company-profile`, {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify(profileData)
@@ -89,7 +88,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Array>} List of win themes
      */
     async getWinThemes() {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/win-themes`, {
+        const response = await fetch(`${API_BASE_URL}/api/win-themes`, {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -102,23 +101,8 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Created win theme
      */
     async createWinTheme(themeData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/win-themes`, {
+        const response = await fetch(`${API_BASE_URL}/api/win-themes`, {
             method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(themeData)
-        });
-        return this.handleResponse(response);
-    },
-    
-    /**
-     * Update a win theme
-     * @param {number} id - Win theme ID
-     * @param {Object} themeData - Updated data
-     * @returns {Promise<Object>} Updated win theme
-     */
-    async updateWinTheme(id, themeData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/win-themes/${id}`, {
-            method: 'PUT',
             headers: this.getHeaders(),
             body: JSON.stringify(themeData)
         });
@@ -131,7 +115,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Deletion confirmation
      */
     async deleteWinTheme(id) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/win-themes/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/win-themes/${id}`, {
             method: 'DELETE',
             headers: this.getHeaders()
         });
@@ -147,7 +131,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Array>} List of competitors
      */
     async getCompetitors() {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/competitors`, {
+        const response = await fetch(`${API_BASE_URL}/api/competitors`, {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -160,23 +144,8 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Created competitor
      */
     async createCompetitor(competitorData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/competitors`, {
+        const response = await fetch(`${API_BASE_URL}/api/competitors`, {
             method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(competitorData)
-        });
-        return this.handleResponse(response);
-    },
-    
-    /**
-     * Update a competitor
-     * @param {number} id - Competitor ID
-     * @param {Object} competitorData - Updated data
-     * @returns {Promise<Object>} Updated competitor
-     */
-    async updateCompetitor(id, competitorData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/competitors/${id}`, {
-            method: 'PUT',
             headers: this.getHeaders(),
             body: JSON.stringify(competitorData)
         });
@@ -189,7 +158,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Deletion confirmation
      */
     async deleteCompetitor(id) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/competitors/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/competitors/${id}`, {
             method: 'DELETE',
             headers: this.getHeaders()
         });
@@ -205,7 +174,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Array>} List of labor categories
      */
     async getLaborCategories() {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/labor-categories`, {
+        const response = await fetch(`${API_BASE_URL}/api/labor-categories`, {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -218,23 +187,8 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Created labor category
      */
     async createLaborCategory(lcatData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/labor-categories`, {
+        const response = await fetch(`${API_BASE_URL}/api/labor-categories`, {
             method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(lcatData)
-        });
-        return this.handleResponse(response);
-    },
-    
-    /**
-     * Update a labor category
-     * @param {number} id - Labor category ID
-     * @param {Object} lcatData - Updated data
-     * @returns {Promise<Object>} Updated labor category
-     */
-    async updateLaborCategory(id, lcatData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/labor-categories/${id}`, {
-            method: 'PUT',
             headers: this.getHeaders(),
             body: JSON.stringify(lcatData)
         });
@@ -247,7 +201,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Deletion confirmation
      */
     async deleteLaborCategory(id) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/labor-categories/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/labor-categories/${id}`, {
             method: 'DELETE',
             headers: this.getHeaders()
         });
@@ -263,7 +217,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Array>} List of past performance records
      */
     async getPastPerformance() {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/past-performance`, {
+        const response = await fetch(`${API_BASE_URL}/api/past-performance`, {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -276,23 +230,8 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Created past performance record
      */
     async createPastPerformance(ppData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/past-performance`, {
+        const response = await fetch(`${API_BASE_URL}/api/past-performance`, {
             method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(ppData)
-        });
-        return this.handleResponse(response);
-    },
-    
-    /**
-     * Update a past performance record
-     * @param {number} id - Past performance ID
-     * @param {Object} ppData - Updated data
-     * @returns {Promise<Object>} Updated past performance record
-     */
-    async updatePastPerformance(id, ppData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/past-performance/${id}`, {
-            method: 'PUT',
             headers: this.getHeaders(),
             body: JSON.stringify(ppData)
         });
@@ -305,7 +244,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Deletion confirmation
      */
     async deletePastPerformance(id) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/past-performance/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/past-performance/${id}`, {
             method: 'DELETE',
             headers: this.getHeaders()
         });
@@ -321,7 +260,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Array>} List of teaming partners
      */
     async getTeamingPartners() {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/teaming-partners`, {
+        const response = await fetch(`${API_BASE_URL}/api/teaming-partners`, {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -334,23 +273,8 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Created teaming partner
      */
     async createTeamingPartner(partnerData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/teaming-partners`, {
+        const response = await fetch(`${API_BASE_URL}/api/teaming-partners`, {
             method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(partnerData)
-        });
-        return this.handleResponse(response);
-    },
-    
-    /**
-     * Update a teaming partner
-     * @param {number} id - Teaming partner ID
-     * @param {Object} partnerData - Updated data
-     * @returns {Promise<Object>} Updated teaming partner
-     */
-    async updateTeamingPartner(id, partnerData) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/teaming-partners/${id}`, {
-            method: 'PUT',
             headers: this.getHeaders(),
             body: JSON.stringify(partnerData)
         });
@@ -363,7 +287,7 @@ const TrainingDataAPI = {
      * @returns {Promise<Object>} Deletion confirmation
      */
     async deleteTeamingPartner(id) {
-        const response = await fetch(`${API_BASE_URL}/api/training-data/teaming-partners/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/teaming-partners/${id}`, {
             method: 'DELETE',
             headers: this.getHeaders()
         });
