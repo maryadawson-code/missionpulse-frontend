@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Training Data Admin</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; overflow-x: hidden; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* Animations */
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-slideIn { animation: slideIn 0.5s ease-out; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+    
+    /* Skeleton loading */
+    .skeleton {
+      background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    
+    /* Glass morphism */
+    .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(100, 116, 139, 0.2); }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0F172A; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    /* Tab active indicator */
+    .tab-active { border-left: 3px solid #00E5FA; background: rgba(0, 229, 250, 0.1); }
+    
+    /* Form inputs */
+    .form-input {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #334155;
+      color: #F8FAFC;
+      transition: all 0.2s;
+    }
+    .form-input:focus {
+      border-color: #00E5FA;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(0, 229, 250, 0.1);
+    }
+    .form-input::placeholder { color: #64748B; }
+    
+    /* Table hover */
+    .table-row:hover { background: rgba(0, 229, 250, 0.05); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // ========== API CONFIGURATION ==========
+    const API_BASE = 'https://missionpulse-api.onrender.com';
+    
+    // ========== DESIGN TOKENS ==========
+    const COLORS = {
+      bg: '#00050F',
+      surface: '#0F172A',
+      panel: '#1E293B',
+      border: '#334155',
+      muted: '#64748B',
+      text: '#F8FAFC',
+      cyan: '#00E5FA',
+      danger: '#EF4444',
+      warning: '#F59E0B',
+      success: '#10B981',
+      info: '#3B82F6',
+      purple: '#A855F7',
+      pink: '#EC4899',
+    };
+
+    // ========== RBAC CONFIGURATION ==========
+    const ALLOWED_ROLES = ['CEO', 'Admin', 'executive'];
+    
+    const checkAccess = () => {
+      const userStr = localStorage.getItem('missionpulse_user');
+      if (!userStr) return false;
+      try {
+        const user = JSON.parse(userStr);
+        return ALLOWED_ROLES.includes(user.role);
+      } catch {
+        return false;
+      }
+    };
+
+    const getCurrentUser = () => {
+      const userStr = localStorage.getItem('missionpulse_user');
+      if (!userStr) return { name: 'Demo User', role: 'CEO', email: 'demo@missionpulse.io' };
+      try {
+        return JSON.parse(userStr);
+      } catch {
+        return { name: 'Demo User', role: 'CEO', email: 'demo@missionpulse.io' };
+      }
+    };
+
+    // ========== ICONS ==========
+    const Icons = {
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+      building: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+      trophy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      award: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>,
+      handshake: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      save: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+      wifi: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>,
+      wifiOff: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ========== COMPONENTS ==========
+    
+    // Connection Banner
+    const ConnectionBanner = ({ isConnected, isLoading, onRetry }) => {
+      if (isConnected && !isLoading) return null;
+      
+      return (
+        <div className={`px-4 py-2 flex items-center justify-center gap-3 text-sm ${
+          isLoading ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300'
+        }`}>
+          <Icon name={isLoading ? "refresh" : "wifiOff"} className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <span>{isLoading ? 'Connecting to API...' : 'API Connection Lost'}</span>
+          {!isLoading && (
+            <button onClick={onRetry} className="px-3 py-1 bg-red-500/30 rounded hover:bg-red-500/50 transition">
+              Retry
+            </button>
+          )}
+        </div>
+      );
+    };
+
+    // Loading Skeleton
+    const Skeleton = ({ className = "" }) => (
+      <div className={`skeleton rounded ${className}`}></div>
+    );
+
+    // Error Boundary Component
+    const ErrorBoundary = ({ error, onRetry }) => (
+      <div className="p-8 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+          <Icon name="alert" className="w-8 h-8 text-red-400" />
+        </div>
+        <h3 className="text-lg font-semibold text-white mb-2">Something went wrong</h3>
+        <p className="text-slate-400 mb-4">{error?.message || 'An unexpected error occurred'}</p>
+        <button 
+          onClick={onRetry}
+          className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+
+    // Access Denied Component
+    const AccessDenied = () => (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.bg }}>
+        <div className="text-center p-8">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/20 flex items-center justify-center">
+            <Icon name="lock" className="w-10 h-10 text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Access Restricted</h2>
+          <p className="text-slate-400 mb-6">Training Data Admin requires CEO or Admin role.</p>
+          <a href="index.html" className="px-6 py-3 bg-cyan-500 text-slate-900 font-semibold rounded-lg hover:bg-cyan-400 transition">
+            Return to Dashboard
+          </a>
+        </div>
+      </div>
+    );
+
+    // Badge Component
+    const Badge = ({ children, variant = 'default', size = 'md' }) => {
+      const variants = {
+        default: 'bg-slate-700 text-slate-300',
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        info: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+        cyan: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+      };
+      const sizes = {
+        sm: 'px-2 py-0.5 text-[10px]',
+        md: 'px-2.5 py-1 text-xs',
+        lg: 'px-3 py-1.5 text-sm',
+      };
+      return (
+        <span className={`inline-flex items-center font-medium rounded-full ${variants[variant]} ${sizes[size]}`}>
+          {children}
+        </span>
+      );
+    };
+
+    // Button Component
+    const Button = ({ children, variant = 'primary', size = 'md', icon, className = '', disabled, ...props }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-slate-900 hover:from-cyan-400 hover:to-cyan-500',
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600',
+        outline: 'border border-slate-600 text-slate-300 hover:bg-slate-800',
+        danger: 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-400 hover:to-red-500',
+        success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-800',
+      };
+      const sizes = {
+        sm: 'px-3 py-1.5 text-xs',
+        md: 'px-4 py-2 text-sm',
+        lg: 'px-6 py-3 text-base',
+      };
+      return (
+        <button 
+          className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+          disabled={disabled}
+          {...props}
+        >
+          {icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    // Modal Component
+    const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+      if (!isOpen) return null;
+      
+      const sizes = {
+        sm: 'max-w-md',
+        md: 'max-w-lg',
+        lg: 'max-w-2xl',
+        xl: 'max-w-4xl',
+      };
+      
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className={`w-full ${sizes[size]} bg-slate-900 border border-slate-700 rounded-xl shadow-2xl animate-slideIn`}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <h3 className="text-lg font-semibold text-white">{title}</h3>
+              <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4">{children}</div>
+          </div>
+        </div>
+      );
+    };
+
+    // ========== DATA SECTION COMPONENTS ==========
+
+    // Company Profile Section
+    const CompanyProfileSection = ({ data, onSave, isLoading }) => {
+      const [formData, setFormData] = useState(data || {
+        name: '',
+        cage: '',
+        uei: '',
+        naics: '',
+        certifications: '',
+        coreCapabilities: '',
+        differentiators: ''
+      });
+      const [isSaving, setIsSaving] = useState(false);
+
+      useEffect(() => {
+        if (data) setFormData(data);
+      }, [data]);
+
+      const handleSave = async () => {
+        setIsSaving(true);
+        await onSave(formData);
+        setIsSaving(false);
+      };
+
+      if (isLoading) {
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {[1,2,3,4].map(i => <Skeleton key={i} className="h-16" />)}
+            </div>
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Company Name</label>
+              <input 
+                type="text" 
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="rockITdata"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">CAGE Code</label>
+              <input 
+                type="text" 
+                value={formData.cage}
+                onChange={e => setFormData({...formData, cage: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="8ABC1"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">UEI</label>
+              <input 
+                type="text" 
+                value={formData.uei}
+                onChange={e => setFormData({...formData, uei: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="ABCD1234567890"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">NAICS Codes (comma separated)</label>
+              <input 
+                type="text" 
+                value={formData.naics}
+                onChange={e => setFormData({...formData, naics: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="541512, 541519, 518210"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-400 mb-2">Certifications (comma separated)</label>
+            <input 
+              type="text" 
+              value={formData.certifications}
+              onChange={e => setFormData({...formData, certifications: e.target.value})}
+              className="w-full px-3 py-2 rounded-lg form-input"
+              placeholder="SDVOSB, ISO 27001, CMMI Level 3"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-400 mb-2">Core Capabilities</label>
+            <textarea 
+              value={formData.coreCapabilities}
+              onChange={e => setFormData({...formData, coreCapabilities: e.target.value})}
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg form-input resize-none"
+              placeholder="Healthcare IT modernization, Cloud migration, Cybersecurity..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-400 mb-2">Key Differentiators</label>
+            <textarea 
+              value={formData.differentiators}
+              onChange={e => setFormData({...formData, differentiators: e.target.value})}
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg form-input resize-none"
+              placeholder="Veteran-owned, 98% customer satisfaction..."
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+            <Button variant="outline" onClick={() => setFormData(data)}>Cancel</Button>
+            <Button variant="primary" icon="save" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </div>
+      );
+    };
+
+    // Generic CRUD Table Section
+    const CRUDTableSection = ({ 
+      data, 
+      columns, 
+      onAdd, 
+      onEdit, 
+      onDelete, 
+      isLoading, 
+      addButtonLabel = 'Add Item',
+      addButtonColor = 'primary',
+      emptyMessage = 'No items found',
+      FormComponent
+    }) => {
+      const [showModal, setShowModal] = useState(false);
+      const [editingItem, setEditingItem] = useState(null);
+      const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+      const handleAdd = () => {
+        setEditingItem(null);
+        setShowModal(true);
+      };
+
+      const handleEdit = (item) => {
+        setEditingItem(item);
+        setShowModal(true);
+      };
+
+      const handleSave = async (formData) => {
+        if (editingItem) {
+          await onEdit({ ...editingItem, ...formData });
+        } else {
+          await onAdd(formData);
+        }
+        setShowModal(false);
+        setEditingItem(null);
+      };
+
+      const handleDelete = async (id) => {
+        await onDelete(id);
+        setDeleteConfirm(null);
+      };
+
+      if (isLoading) {
+        return (
+          <div className="space-y-3">
+            {[1,2,3].map(i => <Skeleton key={i} className="h-16" />)}
+          </div>
+        );
+      }
+
+      return (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-slate-400">{data?.length || 0} items</span>
+            <Button variant={addButtonColor} icon="plus" onClick={handleAdd}>
+              {addButtonLabel}
+            </Button>
+          </div>
+
+          {(!data || data.length === 0) ? (
+            <div className="text-center py-12 text-slate-500">
+              <Icon name="database" className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>{emptyMessage}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-700">
+                    {columns.map((col, i) => (
+                      <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-cyan-400 uppercase tracking-wider">
+                        {col.header}
+                      </th>
+                    ))}
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-cyan-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((row, rowIndex) => (
+                    <tr key={row.id || rowIndex} className="border-b border-slate-800 table-row transition">
+                      {columns.map((col, colIndex) => (
+                        <td key={colIndex} className="px-4 py-3 text-sm text-slate-300">
+                          {col.render ? col.render(row[col.key], row) : row[col.key]}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-right">
+                        <button 
+                          onClick={() => handleEdit(row)}
+                          className="p-2 text-cyan-400 hover:bg-cyan-500/20 rounded transition mr-1"
+                        >
+                          <Icon name="edit" className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm(row.id)}
+                          className="p-2 text-red-400 hover:bg-red-500/20 rounded transition"
+                        >
+                          <Icon name="trash" className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Add/Edit Modal */}
+          <Modal 
+            isOpen={showModal} 
+            onClose={() => { setShowModal(false); setEditingItem(null); }}
+            title={editingItem ? 'Edit Item' : 'Add New Item'}
+            size="md"
+          >
+            <FormComponent 
+              initialData={editingItem} 
+              onSave={handleSave} 
+              onCancel={() => { setShowModal(false); setEditingItem(null); }}
+            />
+          </Modal>
+
+          {/* Delete Confirmation Modal */}
+          <Modal 
+            isOpen={!!deleteConfirm} 
+            onClose={() => setDeleteConfirm(null)}
+            title="Confirm Delete"
+            size="sm"
+          >
+            <p className="text-slate-300 mb-6">Are you sure you want to delete this item? This action cannot be undone.</p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+              <Button variant="danger" onClick={() => handleDelete(deleteConfirm)}>Delete</Button>
+            </div>
+          </Modal>
+        </div>
+      );
+    };
+
+    // ========== FORM COMPONENTS ==========
+
+    const WinThemeForm = ({ initialData, onSave, onCancel }) => {
+      const [formData, setFormData] = useState(initialData || { theme: '', description: '' });
+      return (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-400 mb-2">Theme Name</label>
+            <input 
+              type="text" 
+              value={formData.theme}
+              onChange={e => setFormData({...formData, theme: e.target.value})}
+              className="w-full px-3 py-2 rounded-lg form-input"
+              placeholder="Mission-First Approach"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-2">Description</label>
+            <textarea 
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg form-input resize-none"
+              placeholder="We prioritize warfighter outcomes..."
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button variant="success" icon="save" onClick={() => onSave(formData)}>Save</Button>
+          </div>
+        </div>
+      );
+    };
+
+    const CompetitorForm = ({ initialData, onSave, onCancel }) => {
+      const [formData, setFormData] = useState(initialData || { name: '', strengths: '', weaknesses: '', contracts: '' });
+      return (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-400 mb-2">Competitor Name</label>
+            <input 
+              type="text" 
+              value={formData.name}
+              onChange={e => setFormData({...formData, name: e.target.value})}
+              className="w-full px-3 py-2 rounded-lg form-input"
+              placeholder="Leidos"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Strengths</label>
+              <textarea 
+                value={formData.strengths}
+                onChange={e => setFormData({...formData, strengths: e.target.value})}
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg form-input resize-none"
+                placeholder="Scale, incumbency..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Weaknesses</label>
+              <textarea 
+                value={formData.weaknesses}
+                onChange={e => setFormData({...formData, weaknesses: e.target.value})}
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg form-input resize-none"
+                placeholder="Slow, bureaucratic..."
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-2">Key Contracts</label>
+            <input 
+              type="text" 
+              value={formData.contracts}
+              onChange={e => setFormData({...formData, contracts: e.target.value})}
+              className="w-full px-3 py-2 rounded-lg form-input"
+              placeholder="DHA MHS GENESIS"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button variant="danger" icon="save" onClick={() => onSave(formData)}>Save</Button>
+          </div>
+        </div>
+      );
+    };
+
+    const LaborCategoryForm = ({ initialData, onSave, onCancel }) => {
+      const [formData, setFormData] = useState(initialData || { 
+        category: '', laborCode: '', gsa: '', commercial: '', clearance: 'None' 
+      });
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Category Title</label>
+              <input 
+                type="text" 
+                value={formData.category}
+                onChange={e => setFormData({...formData, category: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="Senior Solutions Architect"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Labor Code</label>
+              <input 
+                type="text" 
+                value={formData.laborCode}
+                onChange={e => setFormData({...formData, laborCode: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="SSA-01"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">GSA Rate ($/hr)</label>
+              <input 
+                type="number" 
+                value={formData.gsa}
+                onChange={e => setFormData({...formData, gsa: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="185"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Commercial Rate ($/hr)</label>
+              <input 
+                type="number" 
+                value={formData.commercial}
+                onChange={e => setFormData({...formData, commercial: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="210"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Clearance Required</label>
+              <select 
+                value={formData.clearance}
+                onChange={e => setFormData({...formData, clearance: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+              >
+                <option value="None">None</option>
+                <option value="Public Trust">Public Trust</option>
+                <option value="Secret">Secret</option>
+                <option value="TS">Top Secret</option>
+                <option value="TS/SCI">TS/SCI</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button variant="primary" icon="save" onClick={() => onSave(formData)}>Save</Button>
+          </div>
+        </div>
+      );
+    };
+
+    const PastPerformanceForm = ({ initialData, onSave, onCancel }) => {
+      const [formData, setFormData] = useState(initialData || { 
+        contract: '', agency: '', value: '', period: '', cpars: 'Satisfactory' 
+      });
+      return (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-400 mb-2">Contract Name</label>
+            <input 
+              type="text" 
+              value={formData.contract}
+              onChange={e => setFormData({...formData, contract: e.target.value})}
+              className="w-full px-3 py-2 rounded-lg form-input"
+              placeholder="DHA DHMSM Support"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Agency</label>
+              <input 
+                type="text" 
+                value={formData.agency}
+                onChange={e => setFormData({...formData, agency: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="Defense Health Agency"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Contract Value</label>
+              <input 
+                type="text" 
+                value={formData.value}
+                onChange={e => setFormData({...formData, value: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="$12.5M"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Period of Performance</label>
+              <input 
+                type="text" 
+                value={formData.period}
+                onChange={e => setFormData({...formData, period: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="2020-2025"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">CPARS Rating</label>
+              <select 
+                value={formData.cpars}
+                onChange={e => setFormData({...formData, cpars: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+              >
+                <option value="Exceptional">Exceptional</option>
+                <option value="Very Good">Very Good</option>
+                <option value="Satisfactory">Satisfactory</option>
+                <option value="Marginal">Marginal</option>
+                <option value="Unsatisfactory">Unsatisfactory</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button variant="primary" icon="save" onClick={() => onSave(formData)}>Save</Button>
+          </div>
+        </div>
+      );
+    };
+
+    const TeamingPartnerForm = ({ initialData, onSave, onCancel }) => {
+      const [formData, setFormData] = useState(initialData || { 
+        name: '', role: '', agreement: 'Pending', capabilities: '' 
+      });
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Partner Name</label>
+              <input 
+                type="text" 
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="CloudTech Solutions"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Role</label>
+              <input 
+                type="text" 
+                value={formData.role}
+                onChange={e => setFormData({...formData, role: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="Cloud Infrastructure"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Agreement Status</label>
+              <select 
+                value={formData.agreement}
+                onChange={e => setFormData({...formData, agreement: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+              >
+                <option value="Active TA">Active TA</option>
+                <option value="Pending">Pending</option>
+                <option value="Expired">Expired</option>
+                <option value="NDA Only">NDA Only</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Capabilities</label>
+              <input 
+                type="text" 
+                value={formData.capabilities}
+                onChange={e => setFormData({...formData, capabilities: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg form-input"
+                placeholder="AWS GovCloud, Azure Gov"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button variant="primary" icon="save" onClick={() => onSave(formData)}>Save</Button>
+          </div>
+        </div>
+      );
+    };
+
+    // ========== MAIN APP ==========
+    const TrainingDataAdmin = () => {
+      const [activeSection, setActiveSection] = useState('company');
+      const [isConnected, setIsConnected] = useState(true);
+      const [isLoading, setIsLoading] = useState(true);
+      const [error, setError] = useState(null);
+      
+      // Data states
+      const [companyProfile, setCompanyProfile] = useState(null);
+      const [winThemes, setWinThemes] = useState([]);
+      const [competitors, setCompetitors] = useState([]);
+      const [laborCategories, setLaborCategories] = useState([]);
+      const [pastPerformance, setPastPerformance] = useState([]);
+      const [teamingPartners, setTeamingPartners] = useState([]);
+      
+      const user = getCurrentUser();
+
+      // Check API connection
+      const checkConnection = useCallback(async () => {
+        try {
+          const response = await fetch(`${API_BASE}/api/health`, { 
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          setIsConnected(response.ok);
+          return response.ok;
+        } catch {
+          setIsConnected(false);
+          return false;
+        }
+      }, []);
+
+      // Load initial data
+      const loadData = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+          const connected = await checkConnection();
+          if (!connected) {
+            // Use demo data if not connected
+            setCompanyProfile({
+              name: 'rockITdata',
+              cage: '8ABC1',
+              uei: 'ABCD1234567890',
+              naics: '541512, 541519, 518210',
+              certifications: 'SDVOSB, ISO 27001, CMMI Level 3',
+              coreCapabilities: 'Healthcare IT modernization, Cloud migration, Cybersecurity',
+              differentiators: 'Veteran-owned, 98% customer satisfaction, Agile methodology'
+            });
+            setWinThemes([
+              { id: 1, theme: 'Mission-First Approach', description: 'We prioritize warfighter outcomes over profit margins', useCount: 12 },
+              { id: 2, theme: 'Proven Past Performance', description: 'DHA DHMSM, VA VistA modernization track record', useCount: 8 },
+            ]);
+            setCompetitors([
+              { id: 1, name: 'Leidos', strengths: 'Scale, incumbency', weaknesses: 'Slow, bureaucratic', contracts: 'DHA MHS GENESIS' },
+            ]);
+            setLaborCategories([
+              { id: 1, category: 'Senior Solutions Architect', laborCode: 'SSA-01', gsa: 185, commercial: 210, clearance: 'Secret' },
+              { id: 2, category: 'Project Manager III', laborCode: 'PM-03', gsa: 165, commercial: 185, clearance: 'Public Trust' },
+            ]);
+            setPastPerformance([
+              { id: 1, contract: 'DHA DHMSM Support', agency: 'Defense Health Agency', value: '$12.5M', period: '2020-2025', cpars: 'Exceptional' },
+            ]);
+            setTeamingPartners([
+              { id: 1, name: 'CloudTech Solutions', role: 'Cloud Infrastructure', agreement: 'Active TA', capabilities: 'AWS GovCloud, Azure Gov' },
+            ]);
+            setIsLoading(false);
+            return;
+          }
+
+          // Fetch from API
+          const response = await fetch(`${API_BASE}/api/training-data/summary`);
+          if (response.ok) {
+            const data = await response.json();
+            // Map API response to state
+            if (data.company_profile) setCompanyProfile(data.company_profile);
+            if (data.win_themes) setWinThemes(data.win_themes);
+            if (data.competitors) setCompetitors(data.competitors);
+            if (data.labor_categories) setLaborCategories(data.labor_categories);
+            if (data.past_performance) setPastPerformance(data.past_performance);
+            if (data.teaming_partners) setTeamingPartners(data.teaming_partners);
+          }
+        } catch (err) {
+          setError(err);
+        } finally {
+          setIsLoading(false);
+        }
+      }, [checkConnection]);
+
+      useEffect(() => {
+        loadData();
+      }, [loadData]);
+
+      // CRUD handlers (would connect to real API)
+      const handleSaveCompanyProfile = async (data) => {
+        setCompanyProfile(data);
+        // TODO: POST to /api/training-data/company-profile
+      };
+
+      const createCRUDHandlers = (setState) => ({
+        onAdd: async (item) => {
+          const newItem = { ...item, id: Date.now() };
+          setState(prev => [...prev, newItem]);
+          // TODO: POST to API
+        },
+        onEdit: async (item) => {
+          setState(prev => prev.map(i => i.id === item.id ? item : i));
+          // TODO: PUT to API
+        },
+        onDelete: async (id) => {
+          setState(prev => prev.filter(i => i.id !== id));
+          // TODO: DELETE from API
+        }
+      });
+
+      // Section configurations
+      const sections = [
+        { id: 'company', label: 'Company Profile', icon: 'building', color: COLORS.cyan },
+        { id: 'themes', label: 'Win Themes', icon: 'trophy', color: COLORS.success },
+        { id: 'competitors', label: 'Competitor Intel', icon: 'users', color: COLORS.danger },
+        { id: 'labor', label: 'Labor Categories', icon: 'dollar', color: COLORS.warning },
+        { id: 'performance', label: 'Past Performance', icon: 'award', color: COLORS.purple },
+        { id: 'teaming', label: 'Teaming Partners', icon: 'handshake', color: COLORS.pink },
+      ];
+
+      if (error) {
+        return <ErrorBoundary error={error} onRetry={loadData} />;
+      }
+
+      const renderContent = () => {
+        switch(activeSection) {
+          case 'company':
+            return (
+              <CompanyProfileSection 
+                data={companyProfile} 
+                onSave={handleSaveCompanyProfile}
+                isLoading={isLoading}
+              />
+            );
+          case 'themes':
+            return (
+              <CRUDTableSection
+                data={winThemes}
+                columns={[
+                  { header: 'Theme', key: 'theme' },
+                  { header: 'Description', key: 'description' },
+                  { header: 'Used', key: 'useCount', render: (v) => <Badge variant="cyan">{v || 0} proposals</Badge> }
+                ]}
+                {...createCRUDHandlers(setWinThemes)}
+                isLoading={isLoading}
+                addButtonLabel="Add Theme"
+                addButtonColor="success"
+                emptyMessage="No win themes defined"
+                FormComponent={WinThemeForm}
+              />
+            );
+          case 'competitors':
+            return (
+              <div>
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2">
+                  <Icon name="alert" className="w-4 h-4 text-red-400" />
+                  <span className="text-sm text-red-300">Competitor data is restricted to CEO, COO, and CAP roles only.</span>
+                </div>
+                <CRUDTableSection
+                  data={competitors}
+                  columns={[
+                    { header: 'Competitor', key: 'name' },
+                    { header: 'Strengths', key: 'strengths' },
+                    { header: 'Weaknesses', key: 'weaknesses' },
+                    { header: 'Key Contracts', key: 'contracts' }
+                  ]}
+                  {...createCRUDHandlers(setCompetitors)}
+                  isLoading={isLoading}
+                  addButtonLabel="Add Competitor"
+                  addButtonColor="danger"
+                  emptyMessage="No competitor intel"
+                  FormComponent={CompetitorForm}
+                />
+              </div>
+            );
+          case 'labor':
+            return (
+              <CRUDTableSection
+                data={laborCategories}
+                columns={[
+                  { header: 'Category', key: 'category' },
+                  { header: 'Code', key: 'laborCode' },
+                  { header: 'GSA Rate', key: 'gsa', render: (v) => `$${v}/hr` },
+                  { header: 'Commercial', key: 'commercial', render: (v) => `$${v}/hr` },
+                  { header: 'Clearance', key: 'clearance', render: (v) => <Badge variant={v === 'TS/SCI' ? 'danger' : v === 'Secret' ? 'warning' : 'info'}>{v}</Badge> }
+                ]}
+                {...createCRUDHandlers(setLaborCategories)}
+                isLoading={isLoading}
+                addButtonLabel="Add Labor Category"
+                addButtonColor="primary"
+                emptyMessage="No labor categories"
+                FormComponent={LaborCategoryForm}
+              />
+            );
+          case 'performance':
+            return (
+              <CRUDTableSection
+                data={pastPerformance}
+                columns={[
+                  { header: 'Contract', key: 'contract' },
+                  { header: 'Agency', key: 'agency' },
+                  { header: 'Value', key: 'value' },
+                  { header: 'Period', key: 'period' },
+                  { header: 'CPARS', key: 'cpars', render: (v) => <Badge variant={v === 'Exceptional' ? 'success' : v === 'Very Good' ? 'cyan' : 'info'}>{v}</Badge> }
+                ]}
+                {...createCRUDHandlers(setPastPerformance)}
+                isLoading={isLoading}
+                addButtonLabel="Add Performance Record"
+                addButtonColor="primary"
+                emptyMessage="No past performance records"
+                FormComponent={PastPerformanceForm}
+              />
+            );
+          case 'teaming':
+            return (
+              <CRUDTableSection
+                data={teamingPartners}
+                columns={[
+                  { header: 'Partner', key: 'name' },
+                  { header: 'Role', key: 'role' },
+                  { header: 'Agreement', key: 'agreement', render: (v) => <Badge variant={v === 'Active TA' ? 'success' : v === 'Pending' ? 'warning' : 'info'}>{v}</Badge> },
+                  { header: 'Capabilities', key: 'capabilities' }
+                ]}
+                {...createCRUDHandlers(setTeamingPartners)}
+                isLoading={isLoading}
+                addButtonLabel="Add Partner"
+                addButtonColor="primary"
+                emptyMessage="No teaming partners"
+                FormComponent={TeamingPartnerForm}
+              />
+            );
+          default:
+            return null;
+        }
+      };
+
+      return (
+        <div className="min-h-screen" style={{ background: COLORS.bg }}>
+          {/* Connection Banner */}
+          <ConnectionBanner 
+            isConnected={isConnected} 
+            isLoading={isLoading && !companyProfile}
+            onRetry={loadData}
+          />
+
+          {/* Header */}
+          <header className="border-b" style={{ borderColor: COLORS.border, background: COLORS.surface }}>
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 rounded-lg" style={{ background: 'rgba(0, 229, 250, 0.1)' }}>
+                    <Icon name="database" className="w-6 h-6 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-white">Training Data Admin</h1>
+                    <p className="text-sm text-slate-400">Manage company data that powers AI agent context</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Badge variant="success" size="md">
+                    <Icon name="shield" className="w-3 h-3 mr-1" />
+                    {user.role} Access
+                  </Badge>
+                  <a href="index.html" className="text-sm text-slate-400 hover:text-cyan-400 transition">
+                    ← Back to Dashboard
+                  </a>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <main className="max-w-7xl mx-auto px-6 py-6">
+            <div className="grid grid-cols-12 gap-6">
+              {/* Sidebar */}
+              <div className="col-span-3">
+                <div className="rounded-xl p-4" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-3 px-3">Data Categories</div>
+                  <nav className="space-y-1">
+                    {sections.map(section => (
+                      <button
+                        key={section.id}
+                        onClick={() => setActiveSection(section.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition ${
+                          activeSection === section.id 
+                            ? 'tab-active text-white' 
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        <Icon name={section.icon} className="w-4 h-4" style={{ color: activeSection === section.id ? section.color : undefined }} />
+                        <span className="text-sm font-medium">{section.label}</span>
+                        {activeSection === section.id && (
+                          <Icon name="chevronRight" className="w-4 h-4 ml-auto text-cyan-400" />
+                        )}
+                      </button>
+                    ))}
+                  </nav>
+
+                  {/* Context Injection Status */}
+                  <div className="mt-6 p-3 rounded-lg" style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Icon name="check" className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-semibold text-emerald-400">Context Injection Active</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Changes sync to agents within 5 minutes (TTL cache)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content Area */}
+              <div className="col-span-9">
+                <div className="rounded-xl p-6" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+                  <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                    {(() => {
+                      const section = sections.find(s => s.id === activeSection);
+                      return (
+                        <>
+                          <Icon name={section?.icon || 'database'} className="w-5 h-5" style={{ color: section?.color }} />
+                          {section?.label}
+                        </>
+                      );
+                    })()}
+                  </h2>
+                  {renderContent()}
+                </div>
+              </div>
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t py-4 mt-8" style={{ borderColor: COLORS.border }}>
+            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+              <span className="text-xs text-slate-500">MissionPulse v12 • Training Data Admin • INTERNAL USE ONLY</span>
+              <Badge variant="warning" size="sm">AI GENERATED - REQUIRES HUMAN REVIEW</Badge>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    // ========== RENDER ==========
+    // Check access before rendering
+    const App = () => {
+      // For demo purposes, allow access. In production, uncomment the check:
+      // if (!checkAccess()) return <AccessDenied />;
+      return <TrainingDataAdmin />;
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
