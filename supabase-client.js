@@ -378,165 +378,14 @@
   }
 
   // ============================================================
-  // ACTIVITY LOGGING OPERATIONS
+  // BULK OPERATIONS
   // ============================================================
 
   /**
-   * Log an activity for an opportunity
-   * @param {Object} activityData - Activity data
-   * @param {string} activityData.opportunityId - Related opportunity ID
-   * @param {string} activityData.action - Action type (created, updated, phase_changed, deleted)
-   * @param {string} activityData.fieldChanged - Field that changed (optional)
-   * @param {string} activityData.oldValue - Previous value (optional)
-   * @param {string} activityData.newValue - New value (optional)
-   * @param {string} activityData.userId - User who performed action (defaults to 'system')
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function logActivity(activityData) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const dbData = {
-        opportunity_id: activityData.opportunityId,
-        action: activityData.action,
-        field_changed: activityData.fieldChanged || null,
-        old_value: activityData.oldValue || null,
-        new_value: activityData.newValue || null,
-        user_id: activityData.userId || 'system',
-        created_at: new Date().toISOString()
-      };
-
-      const { data, error } = await supabase
-        .from('activity_log')
-        .insert([dbData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      return { data, error: null };
-    } catch (error) {
-      console.warn('[MissionPulse] Error logging activity:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Get activities for a specific opportunity
-   * @param {string} opportunityId - Opportunity ID
-   * @param {Object} options - Query options
-   * @param {number} options.limit - Max results (default 50)
-   * @returns {Promise<{data: Array, error: Error|null}>}
-   */
-  async function getActivities(opportunityId, options = {}) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      let query = supabase
-        .from('activity_log')
-        .select('*')
-        .eq('opportunity_id', opportunityId)
-        .order('created_at', { ascending: false });
-
-      if (options.limit) {
-        query = query.limit(options.limit);
-      } else {
-        query = query.limit(50);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Map to frontend format
-      const mappedData = (data || []).map(activity => ({
-        id: activity.id,
-        opportunityId: activity.opportunity_id,
-        action: activity.action,
-        fieldChanged: activity.field_changed,
-        oldValue: activity.old_value,
-        newValue: activity.new_value,
-        userId: activity.user_id,
-        createdAt: activity.created_at
-      }));
-
-      return { data: mappedData, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error fetching activities:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Get recent activities across all opportunities
-   * @param {Object} options - Query options
-   * @param {number} options.limit - Max results (default 20)
-   * @param {string} options.action - Filter by action type
-   * @returns {Promise<{data: Array, error: Error|null}>}
-   */
-  async function getRecentActivities(options = {}) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      let query = supabase
-        .from('activity_log')
-        .select(`
-          *,
-          opportunities (
-            name,
-            agency
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (options.action) {
-        query = query.eq('action', options.action);
-      }
-
-      query = query.limit(options.limit || 20);
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Map to frontend format with opportunity info
-      const mappedData = (data || []).map(activity => ({
-        id: activity.id,
-        opportunityId: activity.opportunity_id,
-        opportunityName: activity.opportunities?.name || 'Unknown',
-        opportunityAgency: activity.opportunities?.agency || 'Unknown',
-        action: activity.action,
-        fieldChanged: activity.field_changed,
-        oldValue: activity.old_value,
-        newValue: activity.new_value,
-        userId: activity.user_id,
-        createdAt: activity.created_at
-      }));
-
-      return { data: mappedData, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error fetching recent activities:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Bulk update opportunities (for bulk phase change)
+   * Bulk update multiple opportunities
    * @param {Array<string>} ids - Array of opportunity IDs
-   * @param {Object} updates - Fields to update
-   * @returns {Promise<{data: Array, error: Error|null}>}
+   * @param {Object} updates - Fields to update in frontend format
+   * @returns {Promise<{data: {success: boolean, count: number}, error: Error|null}>}
    */
   async function bulkUpdateOpportunities(ids, updates) {
     if (!supabase) {
@@ -545,7 +394,12 @@
       }
     }
 
+    if (!ids || ids.length === 0) {
+      return { data: null, error: new Error('No IDs provided') };
+    }
+
     try {
+      // Map to database format
       const dbData = mapToDatabase(updates);
       dbData.updated_at = new Date().toISOString();
 
@@ -557,17 +411,18 @@
 
       if (error) throw error;
 
-      // Log activity for each
+      // Log activity for each updated opportunity
       for (const id of ids) {
         await logActivity({
           opportunityId: id,
           action: 'updated',
           fieldChanged: Object.keys(updates).join(', '),
-          newValue: JSON.stringify(updates)
+          newValue: JSON.stringify(updates),
+          userId: 'system'
         });
       }
 
-      return { data: (data || []).map(mapToFrontend), error: null };
+      return { data: { success: true, count: data?.length || 0 }, error: null };
     } catch (error) {
       console.error('[MissionPulse] Error bulk updating opportunities:', error);
       return { data: null, error };
@@ -575,7 +430,7 @@
   }
 
   /**
-   * Bulk delete opportunities
+   * Bulk delete multiple opportunities
    * @param {Array<string>} ids - Array of opportunity IDs
    * @returns {Promise<{data: {success: boolean, count: number}, error: Error|null}>}
    */
@@ -584,6 +439,10 @@
       if (!initSupabase()) {
         return { data: null, error: new Error('Supabase not initialized') };
       }
+    }
+
+    if (!ids || ids.length === 0) {
+      return { data: null, error: new Error('No IDs provided') };
     }
 
     try {
@@ -601,8 +460,124 @@
     }
   }
 
+  // ============================================================
+  // ACTIVITY LOGGING
+  // ============================================================
+
   /**
-   * Get unique agencies from all opportunities (for filter dropdown)
+   * Log an activity event
+   * @param {Object} data - Activity data
+   * @param {string} data.opportunityId - Opportunity ID
+   * @param {string} data.action - Action type (created, updated, phase_changed, deleted)
+   * @param {string} data.fieldChanged - Field that changed (optional)
+   * @param {string} data.oldValue - Previous value (optional)
+   * @param {string} data.newValue - New value (optional)
+   * @param {string} data.userId - User ID (default: 'system')
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function logActivity(data) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const activityData = {
+        opportunity_id: data.opportunityId,
+        action: data.action,
+        field_changed: data.fieldChanged || null,
+        old_value: data.oldValue || null,
+        new_value: data.newValue || null,
+        user_id: data.userId || 'system',
+        created_at: new Date().toISOString()
+      };
+
+      const { data: result, error } = await supabase
+        .from('activity_log')
+        .insert([activityData])
+        .select()
+        .single();
+
+      if (error) {
+        // Silently fail if activity_log table doesn't exist
+        console.warn('[MissionPulse] Activity logging failed:', error.message);
+        return { data: null, error: null };
+      }
+
+      return { data: result, error: null };
+    } catch (error) {
+      console.warn('[MissionPulse] Activity logging error:', error);
+      return { data: null, error: null };
+    }
+  }
+
+  /**
+   * Get activities for an opportunity
+   * @param {string} opportunityId - Opportunity ID
+   * @param {Object} options - Query options
+   * @param {number} options.limit - Max results (default: 50)
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  async function getActivities(opportunityId, options = {}) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const limit = options.limit || 50;
+      
+      const { data, error } = await supabase
+        .from('activity_log')
+        .select('*')
+        .eq('opportunity_id', opportunityId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.warn('[MissionPulse] Error fetching activities:', error);
+      return { data: [], error: null };
+    }
+  }
+
+  /**
+   * Get recent activities across all opportunities
+   * @param {Object} options - Query options
+   * @param {number} options.limit - Max results (default: 20)
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  async function getRecentActivities(options = {}) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const limit = options.limit || 20;
+      
+      const { data, error } = await supabase
+        .from('activity_log')
+        .select('*, opportunities(name)')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.warn('[MissionPulse] Error fetching recent activities:', error);
+      return { data: [], error: null };
+    }
+  }
+
+  /**
+   * Get unique agencies from opportunities
    * @returns {Promise<{data: Array<string>, error: Error|null}>}
    */
   async function getUniqueAgencies() {
@@ -619,13 +594,11 @@
 
       if (error) throw error;
 
-      // Get unique agencies
       const agencies = [...new Set((data || []).map(d => d.agency).filter(Boolean))].sort();
-      
       return { data: agencies, error: null };
     } catch (error) {
       console.error('[MissionPulse] Error fetching agencies:', error);
-      return { data: null, error };
+      return { data: [], error: null };
     }
   }
 
@@ -781,9 +754,6 @@
     getActivities,
     getRecentActivities,
 
-    // Filter Helpers
-    getUniqueAgencies,
-
     // Real-time
     subscribeToOpportunities,
     onConnectionChange,
@@ -793,6 +763,7 @@
     formatCurrency,
     getPhaseInfo,
     getShipleyPhases,
+    getUniqueAgencies,
     mapToFrontend,
     mapToDatabase,
 
