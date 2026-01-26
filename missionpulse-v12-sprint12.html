@@ -1,0 +1,2378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse v12 | Sprint 12 - Analytics & Themes</title>
+    <meta name="description" content="Federal proposal management with Supabase backend - Sprint 12: Analytics Dashboard, Saved Filters, Theme Toggle, Timeline">
+    
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React 18 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+      // Configure Tailwind with theme support
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'mmt-cyan': '#00E5FA',
+              'mmt-cyan-dark': '#0891b2',
+              'mmt-navy': '#00050F',
+            }
+          }
+        }
+      }
+    </script>
+
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+      
+      :root {
+        --mmt-cyan: #00E5FA;
+        --mmt-cyan-dark: #0891b2;
+        --mmt-navy: #00050F;
+      }
+      
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+        min-height: 100vh;
+        transition: background-color 0.3s, color 0.3s;
+      }
+      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      
+      /* Dark Theme (Default) */
+      body.dark {
+        background: var(--mmt-navy);
+        color: #e2e8f0;
+      }
+      
+      /* Light Theme */
+      body.light {
+        background: #f8fafc;
+        color: #1e293b;
+      }
+      
+      /* Dark Mode Scrollbar */
+      .dark ::-webkit-scrollbar { width: 6px; height: 6px; }
+      .dark ::-webkit-scrollbar-track { background: #0a1628; }
+      .dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+      .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+      
+      /* Light Mode Scrollbar */
+      .light ::-webkit-scrollbar { width: 6px; height: 6px; }
+      .light ::-webkit-scrollbar-track { background: #e2e8f0; }
+      .light ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+      .light ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+      
+      /* Animations */
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+      
+      .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+      .animate-slideIn { animation: slideIn 0.3s ease-out; }
+      .animate-pulse-slow { animation: pulse 2s infinite; }
+      
+      /* Transitions */
+      .theme-transition { transition: background-color 0.3s, border-color 0.3s, color 0.3s, box-shadow 0.3s; }
+      
+      /* Drag over styles */
+      .drag-over { background: rgba(0, 229, 250, 0.1) !important; border-color: #00E5FA !important; }
+    </style>
+</head>
+<body class="dark overflow-hidden">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+// ============================================================
+// MISSIONPULSE v12 - SPRINT 12
+// Analytics Dashboard | Saved Filters | Theme Toggle | Timeline
+// © 2026 Mission Meets Tech
+// ============================================================
+
+const { useState, useEffect, useMemo, useCallback, useRef, createContext, useContext } = React;
+
+// ============================================================
+// SUPABASE CONFIGURATION
+// ============================================================
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+
+let supabase;
+try {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  console.error('Failed to initialize Supabase:', e);
+}
+
+// ============================================================
+// CONSTANTS & CONFIGURATION
+// ============================================================
+const SHIPLEY_PHASES = [
+  { id: 'gate_1', name: 'Gate 1', color: '#94a3b8', order: 1 },
+  { id: 'blue_team', name: 'Blue Team', color: '#60a5fa', order: 2 },
+  { id: 'pink_team', name: 'Pink Team', color: '#f472b6', order: 3 },
+  { id: 'red_team', name: 'Red Team', color: '#ef4444', order: 4 },
+  { id: 'gold_team', name: 'Gold Team', color: '#fbbf24', order: 5 },
+  { id: 'submitted', name: 'Submitted', color: '#22c55e', order: 6 },
+  { id: 'awarded', name: 'Awarded', color: '#8b5cf6', order: 7 },
+  { id: 'lost', name: 'Lost', color: '#64748b', order: 8 }
+];
+
+const PRIORITIES = [
+  { id: 'P-0', name: 'P-0 Critical', color: '#ef4444' },
+  { id: 'P-1', name: 'P-1 High', color: '#f97316' },
+  { id: 'P-2', name: 'P-2 Medium', color: '#eab308' },
+  { id: 'P-3', name: 'P-3 Low', color: '#22c55e' }
+];
+
+const AGENCIES = ['DHA', 'VA', 'CMS', 'IHS', 'HHS', 'DOD', 'Army', 'Navy', 'Air Force'];
+
+const LOCAL_STORAGE_KEYS = {
+  SETTINGS: 'MP_SETTINGS',
+  FILTER_PRESETS: 'MP_FILTER_PRESETS',
+  DISMISSED_NOTIFICATIONS: 'MP_DISMISSED_NOTIFICATIONS',
+  RECENTLY_VIEWED: 'MP_RECENTLY_VIEWED'
+};
+
+// ============================================================
+// THEME CONTEXT
+// ============================================================
+const ThemeContext = createContext(null);
+
+// ============================================================
+// FIELD MAPPING UTILITIES
+// ============================================================
+const mapToFrontend = (record) => {
+  if (!record) return null;
+  return {
+    id: record.id,
+    name: record.name,
+    agency: record.agency,
+    contractValue: record.contract_value,
+    priority: record.priority,
+    shipleyPhase: record.shipley_phase,
+    winProbability: record.win_probability,
+    dueDate: record.due_date,
+    solicitationNumber: record.solicitation_number,
+    description: record.description,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at
+  };
+};
+
+const mapToDatabase = (data) => {
+  if (!data) return null;
+  const mapped = {};
+  if (data.name !== undefined) mapped.name = data.name;
+  if (data.agency !== undefined) mapped.agency = data.agency;
+  if (data.contractValue !== undefined) mapped.contract_value = data.contractValue;
+  if (data.priority !== undefined) mapped.priority = data.priority;
+  if (data.shipleyPhase !== undefined) mapped.shipley_phase = data.shipleyPhase;
+  if (data.winProbability !== undefined) mapped.win_probability = data.winProbability;
+  if (data.dueDate !== undefined) mapped.due_date = data.dueDate;
+  if (data.solicitationNumber !== undefined) mapped.solicitation_number = data.solicitationNumber;
+  if (data.description !== undefined) mapped.description = data.description;
+  return mapped;
+};
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+const formatCurrency = (value) => {
+  if (!value) return '$0';
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
+  return `$${value}`;
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const daysUntil = (dateStr) => {
+  if (!dateStr) return null;
+  const diff = new Date(dateStr) - new Date();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+};
+
+// ============================================================
+// ICON COMPONENT
+// ============================================================
+const Icon = ({ name, className = 'w-5 h-5', style }) => {
+  const icons = {
+    layoutGrid: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+    table: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+    calendar: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+    barChart: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+    filter: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+    search: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+    plus: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+    x: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+    check: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+    chevronDown: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+    chevronRight: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+    settings: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+    bell: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
+    sun: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+    moon: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>,
+    bookmark: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>,
+    trash: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+    edit: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+    refresh: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+    activity: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+    clock: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    trendingUp: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+    pieChart: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>,
+    target: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+    dollarSign: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    moreVertical: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>,
+    gitBranch: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12m0 0a3 3 0 103 3 3 3 0 00-3-3zm12-6a3 3 0 10-3 3 3 3 0 003-3zM9 18h6a3 3 0 003-3V9" /></svg>,
+    fileText: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+    clipboard: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+    command: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 3a3 3 0 00-3 3v12a3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3H6a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3V6a3 3 0 00-3-3 3 3 0 00-3 3 3 3 0 003 3h12a3 3 0 003-3 3 3 0 00-3-3z" /></svg>,
+  };
+  return icons[name] || <span className={className}>?</span>;
+};
+
+// ============================================================
+// TOAST NOTIFICATIONS
+// ============================================================
+const ToastContext = createContext(null);
+
+const ToastProvider = ({ children }) => {
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = useCallback((message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  }, []);
+
+  return (
+    <ToastContext.Provider value={{ addToast }}>
+      {children}
+      <div className="fixed bottom-20 right-4 z-50 space-y-2">
+        {toasts.map(toast => (
+          <div 
+            key={toast.id} 
+            className={`animate-slideIn px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-sm ${
+              toast.type === 'success' ? 'bg-emerald-500/90 text-white' :
+              toast.type === 'error' ? 'bg-red-500/90 text-white' :
+              toast.type === 'warning' ? 'bg-amber-500/90 text-white' :
+              'bg-slate-700/90 text-white'
+            }`}
+          >
+            <Icon name={toast.type === 'success' ? 'check' : toast.type === 'error' ? 'x' : 'bell'} className="w-4 h-4" />
+            <span className="text-sm font-medium">{toast.message}</span>
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+};
+
+const useToast = () => useContext(ToastContext);
+
+// ============================================================
+// ANALYTICS DASHBOARD COMPONENT
+// ============================================================
+const AnalyticsDashboard = ({ opportunities, theme, onFilterClick }) => {
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [hoveredSlice, setHoveredSlice] = useState(null);
+
+  const refresh = () => setLastUpdated(new Date());
+
+  // Calculate summary stats
+  const summaryStats = useMemo(() => {
+    const activeOpps = opportunities.filter(o => !['awarded', 'lost'].includes(o.shipleyPhase));
+    const totalPipeline = activeOpps.reduce((sum, o) => sum + (o.contractValue || 0), 0);
+    const avgPWin = activeOpps.length > 0 
+      ? Math.round(activeOpps.reduce((sum, o) => sum + (o.winProbability || 0), 0) / activeOpps.length)
+      : 0;
+    const wonOpps = opportunities.filter(o => o.shipleyPhase === 'awarded');
+    const completedOpps = opportunities.filter(o => ['awarded', 'lost'].includes(o.shipleyPhase));
+    const winRate = completedOpps.length > 0 ? Math.round((wonOpps.length / completedOpps.length) * 100) : 0;
+
+    return {
+      totalPipeline,
+      activeCount: activeOpps.length,
+      avgPWin,
+      winRate
+    };
+  }, [opportunities]);
+
+  // Pipeline by Phase Data
+  const pipelineByPhase = useMemo(() => {
+    return SHIPLEY_PHASES.map(phase => {
+      const phaseOpps = opportunities.filter(o => o.shipleyPhase === phase.id);
+      return {
+        ...phase,
+        count: phaseOpps.length,
+        value: phaseOpps.reduce((sum, o) => sum + (o.contractValue || 0), 0)
+      };
+    }).filter(p => p.count > 0 || ['gate_1', 'blue_team', 'pink_team', 'red_team', 'gold_team', 'submitted'].includes(p.id));
+  }, [opportunities]);
+
+  const maxPipelineValue = Math.max(...pipelineByPhase.map(p => p.value), 1);
+
+  // Win Probability Distribution
+  const pWinDistribution = useMemo(() => {
+    const buckets = [
+      { range: '0-25%', min: 0, max: 25, color: '#ef4444', count: 0 },
+      { range: '26-50%', min: 26, max: 50, color: '#f97316', count: 0 },
+      { range: '51-75%', min: 51, max: 75, color: '#eab308', count: 0 },
+      { range: '76-100%', min: 76, max: 100, color: '#22c55e', count: 0 }
+    ];
+    opportunities.forEach(o => {
+      const pWin = o.winProbability || 0;
+      const bucket = buckets.find(b => pWin >= b.min && pWin <= b.max);
+      if (bucket) bucket.count++;
+    });
+    return buckets;
+  }, [opportunities]);
+
+  const maxPWinCount = Math.max(...pWinDistribution.map(b => b.count), 1);
+
+  // Agency Breakdown
+  const agencyBreakdown = useMemo(() => {
+    const agencies = {};
+    opportunities.forEach(o => {
+      if (o.agency) {
+        agencies[o.agency] = (agencies[o.agency] || 0) + 1;
+      }
+    });
+    const colors = ['#00E5FA', '#f472b6', '#22c55e', '#fbbf24', '#a78bfa', '#60a5fa', '#f97316', '#ef4444'];
+    return Object.entries(agencies)
+      .map(([name, count], i) => ({ name, count, color: colors[i % colors.length] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [opportunities]);
+
+  const totalAgencyCount = agencyBreakdown.reduce((sum, a) => sum + a.count, 0);
+
+  // Due Date Heat Map (next 6 weeks)
+  const heatMapData = useMemo(() => {
+    const weeks = [];
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    
+    for (let w = 0; w < 6; w++) {
+      const week = [];
+      for (let d = 0; d < 7; d++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + (w * 7) + d);
+        const dateStr = date.toISOString().split('T')[0];
+        const oppsOnDate = opportunities.filter(o => o.dueDate === dateStr);
+        week.push({
+          date,
+          dateStr,
+          count: oppsOnDate.length,
+          opps: oppsOnDate,
+          isToday: date.toDateString() === today.toDateString()
+        });
+      }
+      weeks.push(week);
+    }
+    return weeks;
+  }, [opportunities]);
+
+  const cardClass = theme === 'dark' 
+    ? 'bg-slate-800/50 border border-slate-700/50 rounded-xl p-4'
+    : 'bg-white border border-slate-200 rounded-xl p-4 shadow-sm';
+
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+  const textMuted = theme === 'dark' ? 'text-slate-500' : 'text-slate-500';
+
+  // Draw donut chart
+  const renderDonut = () => {
+    if (totalAgencyCount === 0) return null;
+    let startAngle = -90;
+    const paths = [];
+    
+    agencyBreakdown.forEach((agency, i) => {
+      const angle = (agency.count / totalAgencyCount) * 360;
+      const endAngle = startAngle + angle;
+      const largeArc = angle > 180 ? 1 : 0;
+      
+      const r = 60;
+      const cx = 80, cy = 80;
+      
+      const x1 = cx + r * Math.cos((startAngle * Math.PI) / 180);
+      const y1 = cy + r * Math.sin((startAngle * Math.PI) / 180);
+      const x2 = cx + r * Math.cos((endAngle * Math.PI) / 180);
+      const y2 = cy + r * Math.sin((endAngle * Math.PI) / 180);
+      
+      paths.push(
+        <path
+          key={agency.name}
+          d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`}
+          fill={agency.color}
+          className="cursor-pointer transition-opacity hover:opacity-80"
+          onClick={() => onFilterClick?.({ agencies: [agency.name] })}
+          onMouseEnter={() => setHoveredSlice(agency)}
+          onMouseLeave={() => setHoveredSlice(null)}
+        />
+      );
+      startAngle = endAngle;
+    });
+
+    return (
+      <svg viewBox="0 0 160 160" className="w-32 h-32">
+        {paths}
+        <circle cx="80" cy="80" r="35" fill={theme === 'dark' ? '#1e293b' : '#ffffff'} />
+        <text x="80" y="75" textAnchor="middle" className={`text-xs font-semibold fill-current ${textPrimary}`}>
+          {totalAgencyCount}
+        </text>
+        <text x="80" y="90" textAnchor="middle" className={`text-[10px] fill-current ${textMuted}`}>
+          Total
+        </text>
+      </svg>
+    );
+  };
+
+  return (
+    <div className="p-6 space-y-6 animate-fadeIn overflow-auto">
+      {/* Summary Row */}
+      <div className="flex items-center justify-between">
+        <h2 className={`text-xl font-bold ${textPrimary}`}>Analytics Dashboard</h2>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs ${textMuted}`}>
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </span>
+          <button
+            onClick={refresh}
+            className={`p-2 rounded-lg transition-colors ${
+              theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
+            }`}
+            title="Refresh data"
+          >
+            <Icon name="refresh" className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: 'Total Pipeline', value: formatCurrency(summaryStats.totalPipeline), icon: 'dollarSign', color: '#00E5FA' },
+          { label: 'Active Opportunities', value: summaryStats.activeCount, icon: 'target', color: '#22c55e' },
+          { label: 'Avg Win Probability', value: `${summaryStats.avgPWin}%`, icon: 'trendingUp', color: '#f97316' },
+          { label: 'Win Rate', value: `${summaryStats.winRate}%`, icon: 'pieChart', color: '#8b5cf6' }
+        ].map(stat => (
+          <div key={stat.label} className={cardClass}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-medium ${textSecondary}`}>{stat.label}</span>
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: `${stat.color}20` }}
+              >
+                <Icon name={stat.icon} className="w-4 h-4" style={{ color: stat.color }} />
+              </div>
+            </div>
+            <p className={`text-2xl font-bold ${textPrimary}`}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts Grid */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Widget 1: Pipeline Funnel by Phase */}
+        <div className={cardClass}>
+          <h3 className={`text-sm font-semibold ${textPrimary} mb-4`}>Pipeline by Phase</h3>
+          <div className="space-y-3">
+            {pipelineByPhase.map(phase => (
+              <div 
+                key={phase.id} 
+                className="cursor-pointer group"
+                onClick={() => onFilterClick?.({ phases: [phase.id] })}
+              >
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className={textSecondary}>{phase.name}</span>
+                  <span className={textPrimary}>{phase.count} • {formatCurrency(phase.value)}</span>
+                </div>
+                <div className={`h-6 rounded-md overflow-hidden ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
+                  <div 
+                    className="h-full rounded-md transition-all group-hover:opacity-80"
+                    style={{ 
+                      width: `${(phase.value / maxPipelineValue) * 100}%`,
+                      backgroundColor: phase.color,
+                      minWidth: phase.value > 0 ? '20px' : '0'
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Widget 2: Win Probability Distribution */}
+        <div className={cardClass}>
+          <h3 className={`text-sm font-semibold ${textPrimary} mb-4`}>Win Probability Distribution</h3>
+          <div className="flex items-end justify-around h-36 gap-2">
+            {pWinDistribution.map(bucket => (
+              <div 
+                key={bucket.range} 
+                className="flex-1 flex flex-col items-center cursor-pointer group"
+                onClick={() => onFilterClick?.({ 
+                  pWinMin: bucket.min, 
+                  pWinMax: bucket.max 
+                })}
+              >
+                <div 
+                  className="w-full rounded-t-md transition-all group-hover:opacity-80"
+                  style={{ 
+                    height: `${Math.max((bucket.count / maxPWinCount) * 100, 10)}%`,
+                    backgroundColor: bucket.color
+                  }}
+                />
+                <span className={`text-[10px] mt-2 ${textMuted}`}>{bucket.range}</span>
+                <span className={`text-xs font-semibold ${textPrimary}`}>{bucket.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Widget 3: Due Date Heat Map */}
+        <div className={cardClass}>
+          <h3 className={`text-sm font-semibold ${textPrimary} mb-4`}>Due Date Heat Map (Next 6 Weeks)</h3>
+          <div className="space-y-1">
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <span key={i} className={`text-[10px] text-center ${textMuted}`}>{d}</span>
+              ))}
+            </div>
+            {heatMapData.map((week, wi) => (
+              <div key={wi} className="grid grid-cols-7 gap-1">
+                {week.map((day, di) => (
+                  <div
+                    key={di}
+                    className={`aspect-square rounded-sm flex items-center justify-center text-[9px] cursor-pointer transition-all hover:ring-1 hover:ring-cyan-500 relative group ${
+                      day.isToday ? 'ring-1 ring-cyan-400' : ''
+                    }`}
+                    style={{
+                      backgroundColor: day.count === 0 
+                        ? (theme === 'dark' ? '#334155' : '#e2e8f0')
+                        : day.count === 1 
+                          ? '#eab308'
+                          : '#ef4444'
+                    }}
+                    title={`${day.date.toLocaleDateString()}: ${day.count} due`}
+                  >
+                    {day.date.getDate()}
+                    {day.count > 0 && (
+                      <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
+                        theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-900 text-white'
+                      }`}>
+                        {day.opps.map(o => o.name).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Widget 4: Agency Breakdown */}
+        <div className={cardClass}>
+          <h3 className={`text-sm font-semibold ${textPrimary} mb-4`}>Agency Breakdown</h3>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              {renderDonut()}
+              {hoveredSlice && (
+                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none`}>
+                  <p className={`text-lg font-bold ${textPrimary}`}>{hoveredSlice.count}</p>
+                  <p className={`text-[10px] ${textMuted}`}>{hoveredSlice.name}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex-1 space-y-2">
+              {agencyBreakdown.map(agency => (
+                <div 
+                  key={agency.name}
+                  className="flex items-center gap-2 cursor-pointer hover:opacity-80"
+                  onClick={() => onFilterClick?.({ agencies: [agency.name] })}
+                >
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agency.color }} />
+                  <span className={`text-xs flex-1 ${textSecondary}`}>{agency.name}</span>
+                  <span className={`text-xs font-semibold ${textPrimary}`}>{agency.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// SAVED FILTER PRESETS COMPONENT
+// ============================================================
+const SavedFilterPresets = ({ filters, onApplyPreset, onSavePreset, theme }) => {
+  const [presets, setPresets] = useState([]);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Load presets from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.FILTER_PRESETS);
+    if (saved) {
+      setPresets(JSON.parse(saved));
+    } else {
+      // Default preset
+      const defaultPresets = [
+        { id: 'default-1', name: 'P-0 Critical', filters: { priorities: ['P-0'] } }
+      ];
+      setPresets(defaultPresets);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.FILTER_PRESETS, JSON.stringify(defaultPresets));
+    }
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const savePreset = () => {
+    if (!presetName.trim()) return;
+    if (presets.length >= 10) {
+      alert('Maximum 10 presets allowed. Delete some to add more.');
+      return;
+    }
+    
+    const newPreset = {
+      id: `preset-${Date.now()}`,
+      name: presetName.trim(),
+      filters: { ...filters }
+    };
+    
+    const updated = [...presets, newPreset];
+    setPresets(updated);
+    localStorage.setItem(LOCAL_STORAGE_KEYS.FILTER_PRESETS, JSON.stringify(updated));
+    setShowSaveModal(false);
+    setPresetName('');
+  };
+
+  const deletePreset = (id) => {
+    if (!confirm('Delete this filter preset?')) return;
+    const updated = presets.filter(p => p.id !== id);
+    setPresets(updated);
+    localStorage.setItem(LOCAL_STORAGE_KEYS.FILTER_PRESETS, JSON.stringify(updated));
+  };
+
+  const hasActiveFilters = filters.search || 
+    filters.agencies?.length > 0 || 
+    filters.priorities?.length > 0 || 
+    filters.phases?.length > 0 ||
+    filters.pWinMin > 0 ||
+    filters.pWinMax < 100;
+
+  const recentPresets = presets.slice(-3).reverse();
+
+  const cardClass = theme === 'dark' 
+    ? 'bg-slate-800 border border-slate-700'
+    : 'bg-white border border-slate-200 shadow-lg';
+
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+
+  return (
+    <>
+      <div className="flex items-center gap-2" ref={dropdownRef}>
+        {/* Quick Preset Badges */}
+        {recentPresets.map(preset => (
+          <button
+            key={preset.id}
+            onClick={() => onApplyPreset(preset.filters)}
+            className={`px-2 py-1 text-xs rounded-full transition-colors ${
+              theme === 'dark' 
+                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            {preset.name}
+          </button>
+        ))}
+
+        {/* Presets Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg transition-colors ${
+              theme === 'dark'
+                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Icon name="bookmark" className="w-3.5 h-3.5" />
+            <span>My Filters</span>
+            <Icon name="chevronDown" className="w-3 h-3" />
+          </button>
+
+          {showDropdown && (
+            <div className={`absolute top-full left-0 mt-2 w-56 rounded-lg z-50 ${cardClass} animate-fadeIn`}>
+              <div className="p-2 max-h-64 overflow-y-auto">
+                {presets.length === 0 ? (
+                  <p className={`text-xs ${textSecondary} p-2`}>No saved presets</p>
+                ) : (
+                  presets.map(preset => (
+                    <div
+                      key={preset.id}
+                      className={`flex items-center gap-2 p-2 rounded-lg ${
+                        theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <button
+                        onClick={() => {
+                          onApplyPreset(preset.filters);
+                          setShowDropdown(false);
+                        }}
+                        className={`flex-1 text-left text-sm ${textPrimary}`}
+                      >
+                        {preset.name}
+                      </button>
+                      <button
+                        onClick={() => deletePreset(preset.id)}
+                        className="p-1 text-red-400 hover:text-red-300"
+                      >
+                        <Icon name="trash" className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className={`border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'} p-2`}>
+                <span className={`text-[10px] ${textSecondary}`}>
+                  {presets.length}/10 presets
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Save Filters Button */}
+        {hasActiveFilters && (
+          <button
+            onClick={() => setShowSaveModal(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors"
+          >
+            <Icon name="plus" className="w-3.5 h-3.5" />
+            Save Filters
+          </button>
+        )}
+      </div>
+
+      {/* Save Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className={`w-96 rounded-xl p-6 ${cardClass} animate-fadeIn`}>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Save Filter Preset</h3>
+            <input
+              type="text"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              placeholder="Enter preset name..."
+              className={`w-full px-3 py-2 rounded-lg border text-sm mb-4 ${
+                theme === 'dark'
+                  ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
+                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+              }`}
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && savePreset()}
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className={`px-4 py-2 text-sm rounded-lg ${
+                  theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={savePreset}
+                disabled={!presetName.trim()}
+                className="px-4 py-2 text-sm bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// ============================================================
+// THEME TOGGLE COMPONENT
+// ============================================================
+const ThemeToggle = ({ theme, setTheme }) => {
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    document.body.className = newTheme;
+  };
+
+  return (
+    <button
+      onClick={toggleTheme}
+      className={`p-2 rounded-lg transition-colors ${
+        theme === 'dark' 
+          ? 'hover:bg-slate-700 text-slate-400 hover:text-slate-300'
+          : 'hover:bg-slate-100 text-slate-600 hover:text-slate-800'
+      }`}
+      title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      <Icon name={theme === 'dark' ? 'sun' : 'moon'} className="w-5 h-5" />
+    </button>
+  );
+};
+
+// ============================================================
+// OPPORTUNITY TIMELINE COMPONENT
+// ============================================================
+const OpportunityTimeline = ({ opportunity, activityLog, theme }) => {
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+  const textMuted = theme === 'dark' ? 'text-slate-500' : 'text-slate-500';
+
+  // Get phase changes from activity log
+  const milestones = useMemo(() => {
+    const phaseChanges = activityLog
+      .filter(a => a.field_changed === 'shipley_phase' && a.opportunity_id === opportunity.id)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    // Add creation as first milestone
+    const events = [{
+      id: 'created',
+      type: 'created',
+      phase: SHIPLEY_PHASES.find(p => p.id === 'gate_1'),
+      date: opportunity.createdAt,
+      label: 'Created',
+      isCurrent: false
+    }];
+
+    phaseChanges.forEach(change => {
+      const phase = SHIPLEY_PHASES.find(p => p.id === change.new_value);
+      if (phase) {
+        events.push({
+          id: change.id,
+          type: 'phase_change',
+          phase,
+          date: change.created_at,
+          label: phase.name,
+          oldPhase: change.old_value,
+          isCurrent: false
+        });
+      }
+    });
+
+    // Mark current phase
+    const currentPhaseIndex = events.length - 1;
+    if (currentPhaseIndex >= 0) {
+      events[currentPhaseIndex].isCurrent = true;
+    }
+
+    // Calculate durations
+    for (let i = 0; i < events.length; i++) {
+      if (i < events.length - 1) {
+        const start = new Date(events[i].date);
+        const end = new Date(events[i + 1].date);
+        events[i].duration = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+      }
+    }
+
+    return events;
+  }, [activityLog, opportunity]);
+
+  // Calculate total lifecycle
+  const totalDays = useMemo(() => {
+    if (!opportunity.createdAt) return 0;
+    const start = new Date(opportunity.createdAt);
+    const now = new Date();
+    return Math.ceil((now - start) / (1000 * 60 * 60 * 24));
+  }, [opportunity]);
+
+  // Future phases (not yet reached)
+  const currentPhaseOrder = SHIPLEY_PHASES.find(p => p.id === opportunity.shipleyPhase)?.order || 1;
+  const futurePhases = SHIPLEY_PHASES.filter(p => p.order > currentPhaseOrder && p.order <= 6);
+
+  return (
+    <div className="p-4 space-y-6 animate-fadeIn">
+      {/* Duration Stats */}
+      <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-xs ${textSecondary}`}>Total Lifecycle</p>
+            <p className={`text-xl font-bold ${textPrimary}`}>{totalDays} days</p>
+          </div>
+          <div className="text-right">
+            <p className={`text-xs ${textSecondary}`}>Current Phase</p>
+            <p className={`text-lg font-semibold`} style={{ color: SHIPLEY_PHASES.find(p => p.id === opportunity.shipleyPhase)?.color }}>
+              {SHIPLEY_PHASES.find(p => p.id === opportunity.shipleyPhase)?.name || 'Gate 1'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      <div className="relative">
+        {/* Vertical Line */}
+        <div className={`absolute left-4 top-0 bottom-0 w-0.5 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+
+        {/* Milestone Events */}
+        <div className="space-y-4">
+          {milestones.map((milestone, index) => (
+            <div key={milestone.id} className="relative flex items-start gap-4 pl-10">
+              {/* Node */}
+              <div 
+                className={`absolute left-2 w-4 h-4 rounded-full border-2 ${
+                  milestone.isCurrent 
+                    ? 'ring-4 ring-cyan-500/30' 
+                    : ''
+                }`}
+                style={{ 
+                  backgroundColor: milestone.phase?.color || '#64748b',
+                  borderColor: milestone.isCurrent ? '#00E5FA' : (theme === 'dark' ? '#1e293b' : '#ffffff')
+                }}
+              />
+
+              {/* Content */}
+              <div className="flex-1 pb-4">
+                <div className="flex items-center gap-2">
+                  <span className={`font-semibold ${textPrimary}`}>{milestone.label}</span>
+                  {milestone.isCurrent && (
+                    <span className="px-2 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 rounded-full">
+                      CURRENT
+                    </span>
+                  )}
+                </div>
+                <p className={`text-xs ${textMuted} mt-1`}>
+                  {formatDate(milestone.date)}
+                  {milestone.duration && (
+                    <span className={`ml-2 ${textSecondary}`}>
+                      • {milestone.duration} days in this phase
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {/* Future Phases (Faded) */}
+          {futurePhases.map((phase, index) => (
+            <div key={phase.id} className="relative flex items-start gap-4 pl-10 opacity-40">
+              {/* Dotted connection line */}
+              {index === 0 && (
+                <div className={`absolute left-4 -top-4 w-0.5 h-4 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'}`} style={{ backgroundImage: 'repeating-linear-gradient(to bottom, currentColor, currentColor 4px, transparent 4px, transparent 8px)' }} />
+              )}
+              
+              {/* Node */}
+              <div 
+                className="absolute left-2 w-4 h-4 rounded-full border-2 border-dashed"
+                style={{ 
+                  borderColor: phase.color,
+                  backgroundColor: 'transparent'
+                }}
+              />
+
+              {/* Content */}
+              <div className="flex-1 pb-4">
+                <span className={textSecondary}>{phase.name}</span>
+                <p className={`text-xs ${textMuted} mt-1`}>Upcoming</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Phase Duration Summary */}
+      {milestones.filter(m => m.duration).length > 0 && (
+        <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+          <h4 className={`text-xs font-semibold ${textSecondary} mb-3`}>Time Per Phase</h4>
+          <div className="space-y-2">
+            {milestones.filter(m => m.duration).map(m => (
+              <div key={m.id} className="flex items-center justify-between">
+                <span className={`text-sm ${textPrimary}`}>{m.label}</span>
+                <span className={`text-sm font-mono ${textSecondary}`}>{m.duration} days</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// OPPORTUNITY DRAWER WITH TIMELINE TAB
+// ============================================================
+const OpportunityDrawer = ({ opportunity, onClose, onSave, onDelete, activityLog, theme }) => {
+  const [activeTab, setActiveTab] = useState('details');
+  const [formData, setFormData] = useState(opportunity || {});
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    if (opportunity) setFormData(opportunity);
+  }, [opportunity]);
+
+  if (!opportunity) return null;
+
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+  const bgPrimary = theme === 'dark' ? 'bg-slate-900' : 'bg-white';
+  const bgSecondary = theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50';
+  const borderColor = theme === 'dark' ? 'border-slate-700' : 'border-slate-200';
+
+  const tabs = [
+    { id: 'details', label: 'Details', icon: 'fileText' },
+    { id: 'activity', label: 'Activity', icon: 'activity' },
+    { id: 'notes', label: 'Notes', icon: 'clipboard' },
+    { id: 'timeline', label: 'Timeline', icon: 'gitBranch' }
+  ];
+
+  const handleSave = async () => {
+    await onSave(formData);
+    addToast('Opportunity updated', 'success');
+    onClose();
+  };
+
+  const handleDelete = async () => {
+    if (confirm('Delete this opportunity?')) {
+      await onDelete(opportunity.id);
+      addToast('Opportunity deleted', 'success');
+      onClose();
+    }
+  };
+
+  // Filter activity for this opportunity
+  const oppActivity = activityLog.filter(a => a.opportunity_id === opportunity.id)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      {/* Backdrop */}
+      <div className="flex-1 bg-black/50" onClick={onClose} />
+      
+      {/* Drawer */}
+      <div className={`w-[500px] ${bgPrimary} border-l ${borderColor} flex flex-col animate-slideIn`}>
+        {/* Header */}
+        <div className={`p-4 border-b ${borderColor}`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-xs ${textSecondary}`}>
+              {opportunity.solicitationNumber || 'No solicitation'}
+            </span>
+            <button onClick={onClose} className={`p-1 rounded-lg ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+              <Icon name="x" className="w-5 h-5" />
+            </button>
+          </div>
+          <h2 className={`text-lg font-bold ${textPrimary}`}>{opportunity.name}</h2>
+          
+          {/* Quick Stats */}
+          <div className="flex items-center gap-4 mt-3">
+            <div className="flex items-center gap-1">
+              <div 
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: PRIORITIES.find(p => p.id === opportunity.priority)?.color }}
+              />
+              <span className={`text-xs ${textSecondary}`}>{opportunity.priority}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className={`text-xs font-semibold ${textPrimary}`}>
+                {formatCurrency(opportunity.contractValue)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className={`text-xs ${textSecondary}`}>pWin:</span>
+              <span className={`text-xs font-semibold text-cyan-400`}>{opportunity.winProbability}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className={`flex border-b ${borderColor}`}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm transition-colors ${
+                activeTab === tab.id
+                  ? 'text-cyan-400 border-b-2 border-cyan-400'
+                  : textSecondary
+              }`}
+            >
+              <Icon name={tab.icon} className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === 'details' && (
+            <div className="p-4 space-y-4">
+              <div>
+                <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Name</label>
+                <input
+                  type="text"
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-lg border ${
+                    theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Agency</label>
+                  <select
+                    value={formData.agency || ''}
+                    onChange={(e) => setFormData({ ...formData, agency: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-lg border ${
+                      theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  >
+                    {AGENCIES.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Priority</label>
+                  <select
+                    value={formData.priority || ''}
+                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-lg border ${
+                      theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  >
+                    {PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Contract Value</label>
+                  <input
+                    type="number"
+                    value={formData.contractValue || ''}
+                    onChange={(e) => setFormData({ ...formData, contractValue: parseInt(e.target.value) || 0 })}
+                    className={`w-full px-3 py-2 rounded-lg border ${
+                      theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Win Probability</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.winProbability || ''}
+                    onChange={(e) => setFormData({ ...formData, winProbability: parseInt(e.target.value) || 0 })}
+                    className={`w-full px-3 py-2 rounded-lg border ${
+                      theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Due Date</label>
+                <input
+                  type="date"
+                  value={formData.dueDate || ''}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-lg border ${
+                    theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+              <div>
+                <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Phase</label>
+                <select
+                  value={formData.shipleyPhase || 'gate_1'}
+                  onChange={(e) => setFormData({ ...formData, shipleyPhase: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-lg border ${
+                    theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                >
+                  {SHIPLEY_PHASES.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Description</label>
+                <textarea
+                  value={formData.description || ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className={`w-full px-3 py-2 rounded-lg border ${
+                    theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'activity' && (
+            <div className="p-4 space-y-3">
+              {oppActivity.length === 0 ? (
+                <p className={`text-sm ${textSecondary} text-center py-8`}>No activity yet</p>
+              ) : (
+                oppActivity.map(activity => (
+                  <div key={activity.id} className={`p-3 rounded-lg ${bgSecondary}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm ${textPrimary}`}>
+                        {activity.action === 'created' ? 'Created' :
+                         activity.action === 'phase_changed' ? `Phase: ${activity.old_value} → ${activity.new_value}` :
+                         activity.action === 'updated' ? `Updated ${activity.field_changed}` :
+                         activity.action}
+                      </span>
+                      <span className={`text-xs ${textSecondary}`}>
+                        {formatDate(activity.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div className="p-4">
+              <textarea
+                placeholder="Add notes about this opportunity..."
+                rows={10}
+                className={`w-full px-3 py-2 rounded-lg border resize-none ${
+                  theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                }`}
+              />
+            </div>
+          )}
+
+          {activeTab === 'timeline' && (
+            <OpportunityTimeline 
+              opportunity={opportunity} 
+              activityLog={activityLog}
+              theme={theme}
+            />
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className={`p-4 border-t ${borderColor} flex items-center justify-between`}>
+          <button
+            onClick={handleDelete}
+            className="px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+          >
+            Delete
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className={`px-4 py-2 text-sm rounded-lg ${
+                theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 text-sm bg-cyan-500 text-white rounded-lg hover:bg-cyan-600"
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// OPPORTUNITY CARD COMPONENT
+// ============================================================
+const OpportunityCard = ({ opportunity, onClick, theme, onDragStart, onDragEnd }) => {
+  const days = daysUntil(opportunity.dueDate);
+  const priority = PRIORITIES.find(p => p.id === opportunity.priority);
+  
+  const bgCard = theme === 'dark' ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-white hover:bg-slate-50';
+  const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, opportunity)}
+      onDragEnd={onDragEnd}
+      onClick={() => onClick(opportunity)}
+      className={`${bgCard} border ${borderColor} rounded-lg p-3 cursor-pointer transition-all hover:shadow-lg theme-transition`}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div 
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: priority?.color }}
+          />
+          <span className={`text-xs ${textSecondary}`}>{opportunity.agency}</span>
+        </div>
+        {days !== null && days <= 7 && days >= 0 && (
+          <span className="px-1.5 py-0.5 text-[10px] bg-red-500/20 text-red-400 rounded">
+            {days === 0 ? 'TODAY' : `${days}d`}
+          </span>
+        )}
+      </div>
+      <h4 className={`text-sm font-medium ${textPrimary} mb-2 line-clamp-2`}>{opportunity.name}</h4>
+      <div className="flex items-center justify-between">
+        <span className={`text-xs font-semibold ${textPrimary}`}>
+          {formatCurrency(opportunity.contractValue)}
+        </span>
+        <div className="flex items-center gap-1">
+          <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div 
+              className="h-full rounded-full"
+              style={{ 
+                width: `${opportunity.winProbability || 0}%`,
+                backgroundColor: opportunity.winProbability >= 70 ? '#22c55e' : opportunity.winProbability >= 40 ? '#eab308' : '#ef4444'
+              }}
+            />
+          </div>
+          <span className={`text-[10px] ${textSecondary}`}>{opportunity.winProbability}%</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// BOARD VIEW COMPONENT
+// ============================================================
+const BoardView = ({ opportunities, onCardClick, onPhaseChange, theme }) => {
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOverPhase, setDragOverPhase] = useState(null);
+
+  const handleDragStart = (e, opp) => {
+    setDraggedItem(opp);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDragOverPhase(null);
+  };
+
+  const handleDragOver = (e, phaseId) => {
+    e.preventDefault();
+    setDragOverPhase(phaseId);
+  };
+
+  const handleDrop = (e, phaseId) => {
+    e.preventDefault();
+    if (draggedItem && draggedItem.shipleyPhase !== phaseId) {
+      onPhaseChange(draggedItem.id, phaseId);
+    }
+    setDragOverPhase(null);
+    setDraggedItem(null);
+  };
+
+  const columnBg = theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-100/50';
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+
+  return (
+    <div className="flex gap-4 p-4 overflow-x-auto h-full">
+      {SHIPLEY_PHASES.filter(p => p.order <= 6).map(phase => {
+        const phaseOpps = opportunities.filter(o => o.shipleyPhase === phase.id);
+        const isOver = dragOverPhase === phase.id;
+        
+        return (
+          <div
+            key={phase.id}
+            className={`flex-shrink-0 w-72 ${columnBg} rounded-xl p-3 flex flex-col theme-transition ${
+              isOver ? 'drag-over' : ''
+            }`}
+            onDragOver={(e) => handleDragOver(e, phase.id)}
+            onDragLeave={() => setDragOverPhase(null)}
+            onDrop={(e) => handleDrop(e, phase.id)}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
+                <span className={`text-sm font-semibold ${textPrimary}`}>{phase.name}</span>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} ${textSecondary}`}>
+                {phaseOpps.length}
+              </span>
+            </div>
+            <div className="flex-1 space-y-2 overflow-y-auto">
+              {phaseOpps.map(opp => (
+                <OpportunityCard
+                  key={opp.id}
+                  opportunity={opp}
+                  onClick={onCardClick}
+                  theme={theme}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                />
+              ))}
+              {phaseOpps.length === 0 && (
+                <div className={`text-center py-8 text-sm ${textSecondary}`}>
+                  Drop opportunities here
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============================================================
+// TABLE VIEW COMPONENT
+// ============================================================
+const TableView = ({ opportunities, onRowClick, theme }) => {
+  const [sortField, setSortField] = useState('dueDate');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const sorted = useMemo(() => {
+    return [...opportunities].sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+      if (sortField === 'dueDate') {
+        aVal = aVal ? new Date(aVal).getTime() : 0;
+        bVal = bVal ? new Date(bVal).getTime() : 0;
+      }
+      if (sortField === 'contractValue' || sortField === 'winProbability') {
+        aVal = aVal || 0;
+        bVal = bVal || 0;
+      }
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [opportunities, sortField, sortDir]);
+
+  const bgHeader = theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50';
+  const bgRow = theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50';
+  const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+
+  const SortHeader = ({ field, label }) => (
+    <th 
+      onClick={() => handleSort(field)}
+      className={`px-4 py-3 text-left text-xs font-medium ${textSecondary} cursor-pointer hover:text-cyan-400`}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortField === field && (
+          <span className="text-cyan-400">{sortDir === 'asc' ? '↑' : '↓'}</span>
+        )}
+      </div>
+    </th>
+  );
+
+  return (
+    <div className="p-4 overflow-auto">
+      <table className="w-full">
+        <thead className={bgHeader}>
+          <tr>
+            <SortHeader field="name" label="Opportunity" />
+            <SortHeader field="agency" label="Agency" />
+            <SortHeader field="priority" label="Priority" />
+            <SortHeader field="shipleyPhase" label="Phase" />
+            <SortHeader field="contractValue" label="Value" />
+            <SortHeader field="winProbability" label="pWin" />
+            <SortHeader field="dueDate" label="Due Date" />
+          </tr>
+        </thead>
+        <tbody className={`divide-y ${borderColor}`}>
+          {sorted.map(opp => {
+            const phase = SHIPLEY_PHASES.find(p => p.id === opp.shipleyPhase);
+            const priority = PRIORITIES.find(p => p.id === opp.priority);
+            const days = daysUntil(opp.dueDate);
+            
+            return (
+              <tr 
+                key={opp.id} 
+                onClick={() => onRowClick(opp)}
+                className={`${bgRow} cursor-pointer transition-colors`}
+              >
+                <td className={`px-4 py-3 ${textPrimary}`}>
+                  <div className="font-medium">{opp.name}</div>
+                  <div className={`text-xs ${textSecondary}`}>{opp.solicitationNumber}</div>
+                </td>
+                <td className={`px-4 py-3 text-sm ${textSecondary}`}>{opp.agency}</td>
+                <td className="px-4 py-3">
+                  <span 
+                    className="px-2 py-0.5 text-xs rounded-full"
+                    style={{ backgroundColor: `${priority?.color}20`, color: priority?.color }}
+                  >
+                    {opp.priority}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span 
+                    className="px-2 py-0.5 text-xs rounded-full"
+                    style={{ backgroundColor: `${phase?.color}20`, color: phase?.color }}
+                  >
+                    {phase?.name}
+                  </span>
+                </td>
+                <td className={`px-4 py-3 text-sm font-semibold ${textPrimary}`}>
+                  {formatCurrency(opp.contractValue)}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-16 h-1.5 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                      <div 
+                        className="h-full rounded-full"
+                        style={{ 
+                          width: `${opp.winProbability || 0}%`,
+                          backgroundColor: opp.winProbability >= 70 ? '#22c55e' : opp.winProbability >= 40 ? '#eab308' : '#ef4444'
+                        }}
+                      />
+                    </div>
+                    <span className={`text-xs ${textSecondary}`}>{opp.winProbability}%</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className={`text-sm ${textPrimary}`}>{formatDate(opp.dueDate)}</div>
+                  {days !== null && days <= 7 && days >= 0 && (
+                    <span className="text-xs text-red-400">
+                      {days === 0 ? 'Due today!' : `${days} days left`}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ============================================================
+// CALENDAR VIEW COMPONENT
+// ============================================================
+const CalendarView = ({ opportunities, onDateClick, theme }) => {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+  const bgCell = theme === 'dark' ? 'bg-slate-800/30 hover:bg-slate-800/50' : 'bg-white hover:bg-slate-50';
+  const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+
+  const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+  const startDate = new Date(monthStart);
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+
+  const weeks = [];
+  let current = new Date(startDate);
+  
+  while (current <= monthEnd || current.getDay() !== 0) {
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(current);
+      const dateStr = date.toISOString().split('T')[0];
+      const dayOpps = opportunities.filter(o => o.dueDate === dateStr);
+      const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
+      const isToday = date.toDateString() === new Date().toDateString();
+      
+      week.push({
+        date,
+        dateStr,
+        opportunities: dayOpps,
+        isCurrentMonth,
+        isToday
+      });
+      current.setDate(current.getDate() + 1);
+    }
+    weeks.push(week);
+    if (weeks.length > 6) break;
+  }
+
+  const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+  const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+
+  return (
+    <div className="p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className={`text-lg font-semibold ${textPrimary}`}>
+          {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </h3>
+        <div className="flex gap-2">
+          <button onClick={prevMonth} className={`p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+            <Icon name="chevronRight" className="w-4 h-4 rotate-180" />
+          </button>
+          <button onClick={nextMonth} className={`p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+            <Icon name="chevronRight" className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      <div className={`border rounded-xl overflow-hidden ${borderColor}`}>
+        {/* Day Headers */}
+        <div className={`grid grid-cols-7 ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className={`py-2 text-center text-xs font-medium ${textSecondary}`}>
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Week Rows */}
+        {weeks.map((week, wi) => (
+          <div key={wi} className={`grid grid-cols-7 border-t ${borderColor}`}>
+            {week.map((day, di) => (
+              <div
+                key={di}
+                onClick={() => day.isCurrentMonth && onDateClick?.(day.date)}
+                className={`min-h-[100px] p-2 border-r last:border-r-0 ${borderColor} ${bgCell} cursor-pointer transition-colors ${
+                  !day.isCurrentMonth ? 'opacity-40' : ''
+                }`}
+              >
+                <div className={`flex items-center justify-between mb-1 ${
+                  day.isToday ? 'text-cyan-400' : textSecondary
+                }`}>
+                  <span className={`text-sm font-medium ${day.isToday ? 'bg-cyan-500 text-white px-1.5 rounded-full' : ''}`}>
+                    {day.date.getDate()}
+                  </span>
+                  {day.opportunities.length > 0 && (
+                    <span className="text-[10px]">{day.opportunities.length}</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {day.opportunities.slice(0, 3).map(opp => {
+                    const priority = PRIORITIES.find(p => p.id === opp.priority);
+                    return (
+                      <div 
+                        key={opp.id}
+                        className="text-[10px] truncate px-1 py-0.5 rounded"
+                        style={{ backgroundColor: `${priority?.color}20`, color: priority?.color }}
+                      >
+                        {opp.name}
+                      </div>
+                    );
+                  })}
+                  {day.opportunities.length > 3 && (
+                    <div className={`text-[10px] ${textMuted}`}>+{day.opportunities.length - 3} more</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// COMMAND PALETTE COMPONENT
+// ============================================================
+const CommandPalette = ({ isOpen, onClose, opportunities, onSelectOpportunity, onAction, theme }) => {
+  const [query, setQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuery('');
+      setSelectedIndex(0);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isOpen]);
+
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase();
+    return opportunities
+      .filter(o => 
+        o.name.toLowerCase().includes(q) ||
+        o.agency?.toLowerCase().includes(q) ||
+        o.solicitationNumber?.toLowerCase().includes(q)
+      )
+      .slice(0, 8);
+  }, [query, opportunities]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(i => Math.min(i + 1, results.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && results[selectedIndex]) {
+      onSelectOpportunity(results[selectedIndex]);
+      onClose();
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const bgModal = theme === 'dark' ? 'bg-slate-900' : 'bg-white';
+  const borderColor = theme === 'dark' ? 'border-slate-700' : 'border-slate-200';
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className={`relative w-[600px] ${bgModal} border ${borderColor} rounded-xl shadow-2xl animate-fadeIn`}>
+        <div className={`flex items-center gap-3 px-4 py-3 border-b ${borderColor}`}>
+          <Icon name="search" className={`w-5 h-5 ${textSecondary}`} />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Search opportunities, run commands..."
+            className={`flex-1 bg-transparent outline-none text-sm ${textPrimary} placeholder:${textSecondary}`}
+          />
+          <kbd className={`px-2 py-0.5 text-[10px] rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'} ${textSecondary}`}>
+            ESC
+          </kbd>
+        </div>
+        
+        {results.length > 0 && (
+          <div className="max-h-80 overflow-y-auto p-2">
+            {results.map((opp, i) => (
+              <button
+                key={opp.id}
+                onClick={() => { onSelectOpportunity(opp); onClose(); }}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                  i === selectedIndex 
+                    ? (theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100')
+                    : (theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-slate-50')
+                }`}
+              >
+                <div 
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: PRIORITIES.find(p => p.id === opp.priority)?.color }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${textPrimary}`}>{opp.name}</p>
+                  <p className={`text-xs truncate ${textSecondary}`}>{opp.agency} • {opp.solicitationNumber}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {query && results.length === 0 && (
+          <div className={`p-8 text-center ${textSecondary}`}>
+            <p className="text-sm">No results found</p>
+          </div>
+        )}
+
+        {!query && (
+          <div className={`p-4 ${textSecondary}`}>
+            <p className="text-xs mb-2">Quick actions:</p>
+            <div className="space-y-1">
+              {[
+                { key: 'N', label: 'New opportunity' },
+                { key: '1', label: 'Board view' },
+                { key: '2', label: 'Table view' },
+                { key: '3', label: 'Calendar view' },
+                { key: '4', label: 'Analytics view' },
+              ].map(action => (
+                <div key={action.key} className="flex items-center gap-2 text-xs">
+                  <kbd className={`px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                    {action.key}
+                  </kbd>
+                  <span>{action.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// SETTINGS PANEL COMPONENT
+// ============================================================
+const SettingsPanel = ({ isOpen, onClose, settings, setSettings, theme, setTheme }) => {
+  if (!isOpen) return null;
+
+  const bgPanel = theme === 'dark' ? 'bg-slate-900' : 'bg-white';
+  const borderColor = theme === 'dark' ? 'border-slate-700' : 'border-slate-200';
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+  const bgInput = theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300';
+
+  const Toggle = ({ label, checked, onChange }) => (
+    <div className="flex items-center justify-between py-2">
+      <span className={`text-sm ${textSecondary}`}>{label}</span>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`w-10 h-6 rounded-full transition-colors ${checked ? 'bg-cyan-500' : (theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300')}`}
+      >
+        <div className={`w-4 h-4 rounded-full bg-white transform transition-transform mx-1 ${checked ? 'translate-x-4' : ''}`} />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/50" onClick={onClose} />
+      <div className={`w-96 ${bgPanel} border-l ${borderColor} p-6 animate-slideIn overflow-y-auto`}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className={`text-lg font-bold ${textPrimary}`}>Settings</h2>
+          <button onClick={onClose} className={`p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+            <Icon name="x" className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Display Settings */}
+        <div className="mb-6">
+          <h3 className={`text-sm font-semibold ${textPrimary} mb-3`}>Display</h3>
+          <div className="space-y-3">
+            <div>
+              <label className={`text-xs ${textSecondary} mb-1 block`}>Default View</label>
+              <select
+                value={settings.defaultView}
+                onChange={(e) => setSettings({ ...settings, defaultView: e.target.value })}
+                className={`w-full px-3 py-2 rounded-lg border text-sm ${bgInput} ${textPrimary}`}
+              >
+                <option value="board">Board</option>
+                <option value="table">Table</option>
+                <option value="calendar">Calendar</option>
+                <option value="analytics">Analytics</option>
+              </select>
+            </div>
+            <Toggle 
+              label="Show completed opportunities" 
+              checked={settings.showCompleted} 
+              onChange={(v) => setSettings({ ...settings, showCompleted: v })} 
+            />
+            <Toggle 
+              label="Compact mode" 
+              checked={settings.compactMode} 
+              onChange={(v) => setSettings({ ...settings, compactMode: v })} 
+            />
+          </div>
+        </div>
+
+        {/* Theme */}
+        <div className="mb-6">
+          <h3 className={`text-sm font-semibold ${textPrimary} mb-3`}>Appearance</h3>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setTheme('dark')}
+              className={`flex-1 py-3 rounded-lg border ${
+                theme === 'dark' ? 'border-cyan-500 bg-cyan-500/10' : `border-slate-300 ${bgInput}`
+              }`}
+            >
+              <Icon name="moon" className="w-5 h-5 mx-auto mb-1" />
+              <span className={`text-xs ${textSecondary}`}>Dark</span>
+            </button>
+            <button
+              onClick={() => setTheme('light')}
+              className={`flex-1 py-3 rounded-lg border ${
+                theme === 'light' ? 'border-cyan-500 bg-cyan-500/10' : `border-slate-700 ${bgInput}`
+              }`}
+            >
+              <Icon name="sun" className="w-5 h-5 mx-auto mb-1" />
+              <span className={`text-xs ${textSecondary}`}>Light</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Notifications */}
+        <div className="mb-6">
+          <h3 className={`text-sm font-semibold ${textPrimary} mb-3`}>Notifications</h3>
+          <div className="space-y-1">
+            <Toggle 
+              label="Due soon alerts" 
+              checked={settings.notifications?.dueSoon ?? true} 
+              onChange={(v) => setSettings({ 
+                ...settings, 
+                notifications: { ...settings.notifications, dueSoon: v }
+              })} 
+            />
+            <Toggle 
+              label="Phase stuck alerts" 
+              checked={settings.notifications?.phaseStuck ?? true} 
+              onChange={(v) => setSettings({ 
+                ...settings, 
+                notifications: { ...settings.notifications, phaseStuck: v }
+              })} 
+            />
+            <Toggle 
+              label="High value alerts" 
+              checked={settings.notifications?.highValue ?? true} 
+              onChange={(v) => setSettings({ 
+                ...settings, 
+                notifications: { ...settings.notifications, highValue: v }
+              })} 
+            />
+          </div>
+        </div>
+
+        {/* Data Management */}
+        <div>
+          <h3 className={`text-sm font-semibold ${textPrimary} mb-3`}>Data</h3>
+          <div className="space-y-2">
+            <button className={`w-full px-4 py-2 text-sm rounded-lg text-left ${
+              theme === 'dark' ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-100 hover:bg-slate-200'
+            } ${textPrimary}`}>
+              Export data as JSON
+            </button>
+            <button className={`w-full px-4 py-2 text-sm rounded-lg text-left ${
+              theme === 'dark' ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-100 hover:bg-slate-200'
+            } ${textPrimary}`}>
+              Export data as CSV
+            </button>
+            <button 
+              onClick={() => {
+                if (confirm('Reset all settings to defaults?')) {
+                  setSettings({
+                    defaultView: 'board',
+                    showCompleted: true,
+                    compactMode: false,
+                    notifications: { dueSoon: true, phaseStuck: true, highValue: true }
+                  });
+                }
+              }}
+              className="w-full px-4 py-2 text-sm rounded-lg text-left text-red-400 hover:bg-red-500/10"
+            >
+              Reset to defaults
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// MAIN APP COMPONENT
+// ============================================================
+function App() {
+  // State
+  const [opportunities, setOpportunities] = useState([]);
+  const [activityLog, setActivityLog] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('board');
+  const [theme, setTheme] = useState('dark');
+  const [selectedOpportunity, setSelectedOpportunity] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+
+  // Filters
+  const [filters, setFilters] = useState({
+    search: '',
+    agencies: [],
+    priorities: [],
+    phases: [],
+    pWinMin: 0,
+    pWinMax: 100,
+    dueDateStart: null,
+    dueDateEnd: null
+  });
+
+  // Settings
+  const [settings, setSettings] = useState({
+    defaultView: 'board',
+    showCompleted: true,
+    compactMode: false,
+    notifications: {
+      dueSoon: true,
+      phaseStuck: true,
+      highValue: true
+    }
+  });
+
+  // Load settings on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem(LOCAL_STORAGE_KEYS.SETTINGS);
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings);
+      setSettings(parsed);
+      if (parsed.theme) {
+        setTheme(parsed.theme);
+        document.body.className = parsed.theme;
+      }
+      if (parsed.defaultView) {
+        setView(parsed.defaultView);
+      }
+    }
+    
+    // Check system preference
+    if (!savedSettings && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      setTheme('light');
+      document.body.className = 'light';
+    }
+  }, []);
+
+  // Save settings when changed
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.SETTINGS, JSON.stringify({ ...settings, theme }));
+  }, [settings, theme]);
+
+  // Update body class when theme changes
+  useEffect(() => {
+    document.body.className = theme;
+  }, [theme]);
+
+  // Fetch opportunities
+  useEffect(() => {
+    fetchOpportunities();
+    fetchActivityLog();
+  }, []);
+
+  const fetchOpportunities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('*')
+        .order('due_date', { ascending: true });
+      
+      if (error) throw error;
+      setOpportunities((data || []).map(mapToFrontend));
+    } catch (err) {
+      console.error('Error fetching opportunities:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchActivityLog = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('activity_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
+      setActivityLog(data || []);
+    } catch (err) {
+      console.error('Error fetching activity:', err);
+    }
+  };
+
+  // Update opportunity
+  const updateOpportunity = async (data) => {
+    try {
+      const dbData = mapToDatabase(data);
+      const { error } = await supabase
+        .from('opportunities')
+        .update(dbData)
+        .eq('id', data.id);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setOpportunities(prev => prev.map(o => o.id === data.id ? { ...o, ...data } : o));
+    } catch (err) {
+      console.error('Error updating opportunity:', err);
+    }
+  };
+
+  // Delete opportunity
+  const deleteOpportunity = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('opportunities')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setOpportunities(prev => prev.filter(o => o.id !== id));
+    } catch (err) {
+      console.error('Error deleting opportunity:', err);
+    }
+  };
+
+  // Phase change with activity logging
+  const handlePhaseChange = async (oppId, newPhase) => {
+    const opp = opportunities.find(o => o.id === oppId);
+    if (!opp) return;
+
+    // Log activity
+    await supabase.from('activity_log').insert({
+      opportunity_id: oppId,
+      action: 'phase_changed',
+      field_changed: 'shipley_phase',
+      old_value: opp.shipleyPhase,
+      new_value: newPhase,
+      user_id: 'user'
+    });
+
+    // Update opportunity
+    await updateOpportunity({ id: oppId, shipleyPhase: newPhase });
+    
+    // Refresh activity
+    fetchActivityLog();
+  };
+
+  // Filter opportunities
+  const filteredOpportunities = useMemo(() => {
+    return opportunities.filter(opp => {
+      if (filters.search && !opp.name.toLowerCase().includes(filters.search.toLowerCase())) return false;
+      if (filters.agencies.length > 0 && !filters.agencies.includes(opp.agency)) return false;
+      if (filters.priorities.length > 0 && !filters.priorities.includes(opp.priority)) return false;
+      if (filters.phases.length > 0 && !filters.phases.includes(opp.shipleyPhase)) return false;
+      if (opp.winProbability < filters.pWinMin || opp.winProbability > filters.pWinMax) return false;
+      if (!settings.showCompleted && ['awarded', 'lost'].includes(opp.shipleyPhase)) return false;
+      return true;
+    });
+  }, [opportunities, filters, settings.showCompleted]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(true);
+      } else if (e.key === 'Escape') {
+        setShowCommandPalette(false);
+        setShowSettings(false);
+        setSelectedOpportunity(null);
+      } else if (e.key === '1') {
+        setView('board');
+      } else if (e.key === '2') {
+        setView('table');
+      } else if (e.key === '3') {
+        setView('calendar');
+      } else if (e.key === '4') {
+        setView('analytics');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Apply filter preset
+  const applyPreset = (presetFilters) => {
+    setFilters({ ...filters, ...presetFilters });
+  };
+
+  // Handle filter click from analytics
+  const handleFilterClick = (filterUpdate) => {
+    setFilters({ ...filters, ...filterUpdate });
+    setView('board');
+  };
+
+  // Theme-aware colors
+  const bgMain = theme === 'dark' ? 'bg-[#00050F]' : 'bg-slate-50';
+  const bgHeader = theme === 'dark' ? 'bg-slate-900/95' : 'bg-white';
+  const borderColor = theme === 'dark' ? 'border-slate-800' : 'border-slate-200';
+  const textPrimary = theme === 'dark' ? 'text-white' : 'text-slate-900';
+  const textSecondary = theme === 'dark' ? 'text-slate-400' : 'text-slate-600';
+
+  return (
+    <ToastProvider>
+      <div className={`h-screen flex flex-col ${bgMain} theme-transition`}>
+        {/* Header */}
+        <header className={`flex-shrink-0 h-14 ${bgHeader} border-b ${borderColor} flex items-center justify-between px-4 theme-transition`}>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">MP</span>
+              </div>
+              <div>
+                <h1 className={`text-sm font-bold ${textPrimary}`}>MissionPulse</h1>
+                <p className={`text-[10px] ${textSecondary}`}>Sprint 12</p>
+              </div>
+            </div>
+
+            {/* View Toggle */}
+            <div className={`flex items-center gap-1 px-1 py-1 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`}>
+              {[
+                { id: 'board', icon: 'layoutGrid', label: 'Board' },
+                { id: 'table', icon: 'table', label: 'Table' },
+                { id: 'calendar', icon: 'calendar', label: 'Calendar' },
+                { id: 'analytics', icon: 'barChart', label: 'Analytics' }
+              ].map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => setView(v.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors ${
+                    view === v.id 
+                      ? 'bg-cyan-500 text-white' 
+                      : `${textSecondary} hover:${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`
+                  }`}
+                  title={`${v.label} (${['board', 'table', 'calendar', 'analytics'].indexOf(v.id) + 1})`}
+                >
+                  <Icon name={v.icon} className="w-4 h-4" />
+                  <span className="hidden sm:inline">{v.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Saved Filter Presets */}
+            <SavedFilterPresets 
+              filters={filters}
+              onApplyPreset={applyPreset}
+              theme={theme}
+            />
+
+            {/* Search */}
+            <div className={`relative`}>
+              <Icon name="search" className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSecondary}`} />
+              <input
+                type="text"
+                placeholder="Search... (⌘K)"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                onFocus={() => setShowCommandPalette(true)}
+                className={`w-48 pl-9 pr-3 py-1.5 text-sm rounded-lg border ${
+                  theme === 'dark' 
+                    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500'
+                    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                }`}
+              />
+            </div>
+
+            {/* Theme Toggle */}
+            <ThemeToggle theme={theme} setTheme={setTheme} />
+
+            {/* Settings */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className={`p-2 rounded-lg transition-colors ${
+                theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+              }`}
+              title="Settings"
+            >
+              <Icon name="settings" className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-hidden">
+          {loading ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className={textSecondary}>Loading opportunities...</p>
+              </div>
+            </div>
+          ) : view === 'board' ? (
+            <BoardView 
+              opportunities={filteredOpportunities}
+              onCardClick={setSelectedOpportunity}
+              onPhaseChange={handlePhaseChange}
+              theme={theme}
+            />
+          ) : view === 'table' ? (
+            <TableView
+              opportunities={filteredOpportunities}
+              onRowClick={setSelectedOpportunity}
+              theme={theme}
+            />
+          ) : view === 'calendar' ? (
+            <CalendarView
+              opportunities={filteredOpportunities}
+              theme={theme}
+            />
+          ) : view === 'analytics' ? (
+            <AnalyticsDashboard
+              opportunities={filteredOpportunities}
+              theme={theme}
+              onFilterClick={handleFilterClick}
+            />
+          ) : null}
+        </main>
+
+        {/* Footer */}
+        <footer className={`flex-shrink-0 h-6 ${bgHeader} border-t ${borderColor} flex items-center justify-center theme-transition`}>
+          <span className={`text-[10px] ${textSecondary} tracking-wider`}>
+            AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 12 • © 2026 Mission Meets Tech
+          </span>
+        </footer>
+
+        {/* Modals & Panels */}
+        {selectedOpportunity && (
+          <OpportunityDrawer
+            opportunity={selectedOpportunity}
+            onClose={() => setSelectedOpportunity(null)}
+            onSave={updateOpportunity}
+            onDelete={deleteOpportunity}
+            activityLog={activityLog}
+            theme={theme}
+          />
+        )}
+
+        <SettingsPanel
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          settings={settings}
+          setSettings={setSettings}
+          theme={theme}
+          setTheme={setTheme}
+        />
+
+        <CommandPalette
+          isOpen={showCommandPalette}
+          onClose={() => setShowCommandPalette(false)}
+          opportunities={opportunities}
+          onSelectOpportunity={setSelectedOpportunity}
+          theme={theme}
+        />
+      </div>
+    </ToastProvider>
+  );
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
