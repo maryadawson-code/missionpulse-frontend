@@ -1,203 +1,223 @@
 /**
- * MissionPulse - Supabase Client
- * Centralized authentication and database access
+ * MissionPulse Supabase Client Helper
+ * Provides MP.auth and MP.db namespaces for common operations
  * 
  * Usage:
- *   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+ *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
  *   <script src="supabase-client.js"></script>
  *   
  *   // Then use:
- *   await MP.auth.getUser();
+ *   await MP.auth.login(email, password);
  *   await MP.db.getOpportunities();
  */
 
-const MP = (function() {
-  // ===========================================
-  // CONFIGURATION
-  // ===========================================
-  const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+// ============================================================
+// CONFIGURATION
+// ============================================================
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+
+// Initialize Supabase client
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+// MISSIONPULSE NAMESPACE
+// ============================================================
+const MP = {
+  // Direct access to supabase client
+  client: supabase,
   
-  // Initialize Supabase client
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  
-  // Cache for user data
-  let _currentUser = null;
-  let _currentCompany = null;
-  
-  // ===========================================
-  // AUTHENTICATION MODULE
-  // ===========================================
-  const auth = {
+  // ============================================================
+  // AUTH NAMESPACE
+  // ============================================================
+  auth: {
     /**
      * Get current session
+     * @returns {Promise<{session: Object|null, error: Error|null}>}
      */
     async getSession() {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      return { session, error };
+      const { data, error } = await supabase.auth.getSession();
+      return { session: data?.session, error };
     },
     
     /**
-     * Get current user with profile data
+     * Get current user
+     * @returns {Promise<{user: Object|null, error: Error|null}>}
      */
     async getUser() {
-      if (_currentUser) return _currentUser;
-      
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) return null;
-      
-      // Get user profile from our users table
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*, companies(*)')
-        .eq('id', user.id)
-        .single();
-      
-      if (profile) {
-        _currentUser = {
-          id: user.id,
-          email: user.email,
-          ...profile
-        };
-        _currentCompany = profile.companies;
-      }
-      
-      return _currentUser;
+      const { data, error } = await supabase.auth.getUser();
+      return { user: data?.user, error };
     },
     
     /**
-     * Get current company
+     * Login with email and password
+     * @param {string} email 
+     * @param {string} password 
+     * @returns {Promise<{user: Object|null, session: Object|null, error: Error|null}>}
      */
-    async getCompany() {
-      if (_currentCompany) return _currentCompany;
-      await this.getUser();
-      return _currentCompany;
+    async login(email, password) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      return { user: data?.user, session: data?.session, error };
     },
     
     /**
-     * Check if user is logged in
+     * Sign up with email and password
+     * @param {string} email 
+     * @param {string} password 
+     * @param {Object} metadata - Additional user metadata (full_name, etc.)
+     * @returns {Promise<{user: Object|null, session: Object|null, error: Error|null}>}
      */
-    async isAuthenticated() {
-      const { session } = await this.getSession();
-      return !!session;
+    async signup(email, password, metadata = {}) {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: metadata }
+      });
+      return { user: data?.user, session: data?.session, error };
     },
     
     /**
-     * Sign out
+     * Logout current user
+     * @returns {Promise<{error: Error|null}>}
      */
-    async signOut() {
-      _currentUser = null;
-      _currentCompany = null;
+    async logout() {
       const { error } = await supabase.auth.signOut();
-      if (!error) {
-        window.location.href = 'login.html';
-      }
       return { error };
     },
     
     /**
-     * Require authentication - redirect to login if not authenticated
+     * Send password reset email
+     * @param {string} email 
+     * @returns {Promise<{error: Error|null}>}
      */
-    async requireAuth() {
-      const isAuth = await this.isAuthenticated();
-      if (!isAuth) {
-        window.location.href = 'login.html';
-        return false;
+    async resetPassword(email) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password.html'
+      });
+      return { error };
+    },
+    
+    /**
+     * OAuth sign in
+     * @param {string} provider - 'google' or 'azure'
+     * @returns {Promise<{error: Error|null}>}
+     */
+    async oauthLogin(provider) {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin + '/index.html' }
+      });
+      return { error };
+    },
+    
+    /**
+     * Listen for auth state changes
+     * @param {Function} callback - (event, session) => void
+     * @returns {Object} subscription object with unsubscribe method
+     */
+    onAuthStateChange(callback) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
+      return subscription;
+    },
+    
+    /**
+     * Check if user is authenticated, redirect if not
+     * @param {string} redirectUrl - URL to redirect to if not authenticated
+     * @returns {Promise<{user: Object|null, session: Object|null}>}
+     */
+    async requireAuth(redirectUrl = '/login.html') {
+      const { session, error } = await this.getSession();
+      if (error || !session) {
+        window.location.href = redirectUrl;
+        return { user: null, session: null };
       }
-      return true;
-    },
-    
-    /**
-     * Check if user has required role
-     */
-    async hasRole(allowedRoles) {
-      const user = await this.getUser();
-      if (!user) return false;
-      
-      if (Array.isArray(allowedRoles)) {
-        return allowedRoles.includes(user.role);
-      }
-      return user.role === allowedRoles;
-    },
-    
-    /**
-     * RBAC role hierarchy
-     */
-    roleHierarchy: {
-      'CEO': ['*'],
-      'COO': ['*'],
-      'CAP': ['strategy', 'intelligence', 'pricing', 'delivery', 'compliance'],
-      'PM': ['delivery', 'compliance', 'team'],
-      'SA': ['delivery', 'technical'],
-      'FIN': ['pricing', 'contracts'],
-      'CON': ['compliance', 'contracts'],
-      'DEL': ['delivery', 'staffing'],
-      'QA': ['review', 'compliance'],
-      'Partner': ['assigned_only'],
-      'Admin': ['admin', 'users', 'settings']
-    },
-    
-    /**
-     * Check if user can access a module
-     */
-    async canAccessModule(module) {
-      const user = await this.getUser();
-      if (!user) return false;
-      
-      const permissions = this.roleHierarchy[user.role] || [];
-      if (permissions.includes('*')) return true;
-      
-      // Module to permission mapping
-      const modulePermissions = {
-        'pipeline': ['strategy', '*'],
-        'warroom': ['strategy', 'delivery', '*'],
-        'swimlane': ['delivery', '*'],
-        'contracts': ['contracts', 'compliance', '*'],
-        'irondome': ['delivery', '*'],
-        'blackhat': ['strategy', '*'],  // RESTRICTED
-        'pricing': ['pricing', '*'],     // RESTRICTED
-        'hitl': ['review', '*'],
-        'orals': ['strategy', '*'],      // RESTRICTED
-        'frenemy': ['strategy', '*'],    // RESTRICTED
-        'dashboard': ['*'],
-        'roi': ['strategy', '*'],
-        'postaward': ['delivery', '*'],
-        'lessons': ['*'],
-        'rbac': ['admin', '*']           // ADMIN ONLY
-      };
-      
-      const requiredPerms = modulePermissions[module] || ['*'];
-      return requiredPerms.some(p => permissions.includes(p) || permissions.includes('*'));
+      return { user: session.user, session };
     }
-  };
+  },
   
-  // ===========================================
-  // DATABASE MODULE
-  // ===========================================
-  const db = {
+  // ============================================================
+  // DATABASE NAMESPACE
+  // ============================================================
+  db: {
     /**
-     * Get all opportunities for current company
+     * Get current user's company ID
+     * @returns {Promise<string|null>}
      */
-    async getOpportunities(filters = {}) {
-      const company = await auth.getCompany();
-      if (!company) return { data: [], error: 'Not authenticated' };
+    async getCompanyId() {
+      const { user } = await MP.auth.getUser();
+      if (!user) return null;
+      
+      const { data } = await supabase
+        .from('users')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+      
+      return data?.company_id || null;
+    },
+    
+    /**
+     * Get current user's profile with company
+     * @returns {Promise<{data: Object|null, error: Error|null}>}
+     */
+    async getUserProfile() {
+      const { user } = await MP.auth.getUser();
+      if (!user) return { data: null, error: new Error('Not authenticated') };
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          companies (
+            id,
+            name,
+            domain,
+            cage_code,
+            duns_number,
+            naics_codes,
+            set_aside_status
+          )
+        `)
+        .eq('id', user.id)
+        .single();
+      
+      return { data, error };
+    },
+    
+    /**
+     * Get all opportunities for current user's company
+     * @param {Object} options - Filter options
+     * @param {string} options.phase - Shipley phase filter
+     * @param {string} options.priority - Priority filter
+     * @param {string} options.status - Status filter (default: 'active')
+     * @param {string} options.orderBy - Column to order by
+     * @param {boolean} options.ascending - Sort direction
+     * @returns {Promise<{data: Array, error: Error|null}>}
+     */
+    async getOpportunities(options = {}) {
+      const companyId = await this.getCompanyId();
+      if (!companyId) return { data: [], error: new Error('No company ID') };
       
       let query = supabase
         .from('opportunities')
         .select('*')
-        .eq('company_id', company.id)
-        .order('submission_deadline', { ascending: true });
+        .eq('company_id', companyId);
       
-      // Apply filters
-      if (filters.status) {
-        query = query.eq('status', filters.status);
+      if (options.phase && options.phase !== 'all') {
+        query = query.eq('shipley_phase', options.phase);
       }
-      if (filters.phase) {
-        query = query.eq('shipley_phase', filters.phase);
+      
+      if (options.priority && options.priority !== 'all') {
+        query = query.eq('priority', options.priority);
       }
-      if (filters.priority) {
-        query = query.eq('priority', filters.priority);
+      
+      if (options.status) {
+        query = query.eq('status', options.status);
       }
+      
+      query = query.order(options.orderBy || 'submission_deadline', { 
+        ascending: options.ascending ?? true 
+      });
       
       const { data, error } = await query;
       return { data: data || [], error };
@@ -205,11 +225,21 @@ const MP = (function() {
     
     /**
      * Get single opportunity by ID
+     * @param {string} id 
+     * @returns {Promise<{data: Object|null, error: Error|null}>}
      */
     async getOpportunity(id) {
       const { data, error } = await supabase
         .from('opportunities')
-        .select('*, capture_manager:users!capture_manager_id(*), proposal_manager:users!proposal_manager_id(*)')
+        .select(`
+          *,
+          proposal_sections (*),
+          compliance_requirements (*),
+          team_assignments (
+            *,
+            users (id, full_name, email, role)
+          )
+        `)
         .eq('id', id)
         .single();
       
@@ -218,31 +248,27 @@ const MP = (function() {
     
     /**
      * Create new opportunity
+     * @param {Object} opportunity 
+     * @returns {Promise<{data: Object|null, error: Error|null}>}
      */
     async createOpportunity(opportunity) {
-      const company = await auth.getCompany();
-      const user = await auth.getUser();
-      if (!company || !user) return { data: null, error: 'Not authenticated' };
+      const companyId = await this.getCompanyId();
+      if (!companyId) return { data: null, error: new Error('No company ID') };
       
       const { data, error } = await supabase
         .from('opportunities')
-        .insert({
-          ...opportunity,
-          company_id: company.id
-        })
+        .insert({ ...opportunity, company_id: companyId })
         .select()
         .single();
-      
-      // Log to audit
-      if (data) {
-        await this.logAudit('create', 'opportunity', data.id, data.title);
-      }
       
       return { data, error };
     },
     
     /**
      * Update opportunity
+     * @param {string} id 
+     * @param {Object} updates 
+     * @returns {Promise<{data: Object|null, error: Error|null}>}
      */
     async updateOpportunity(id, updates) {
       const { data, error } = await supabase
@@ -252,106 +278,75 @@ const MP = (function() {
         .select()
         .single();
       
-      if (data) {
-        await this.logAudit('update', 'opportunity', id, data.title);
-      }
-      
       return { data, error };
     },
     
     /**
-     * Get proposal sections for an opportunity
+     * Delete opportunity
+     * @param {string} id 
+     * @returns {Promise<{error: Error|null}>}
      */
-    async getProposalSections(opportunityId) {
-      const { data, error } = await supabase
-        .from('proposal_sections')
-        .select('*, assigned_to:users!assigned_to(*)')
-        .eq('opportunity_id', opportunityId)
-        .order('volume')
-        .order('section_number');
+    async deleteOpportunity(id) {
+      const { error } = await supabase
+        .from('opportunities')
+        .delete()
+        .eq('id', id);
       
-      return { data: data || [], error };
-    },
-    
-    /**
-     * Get compliance requirements for an opportunity
-     */
-    async getComplianceRequirements(opportunityId) {
-      const { data, error } = await supabase
-        .from('compliance_requirements')
-        .select('*')
-        .eq('opportunity_id', opportunityId)
-        .order('requirement_id');
-      
-      return { data: data || [], error };
-    },
-    
-    /**
-     * Get team assignments for an opportunity
-     */
-    async getTeamAssignments(opportunityId) {
-      const { data, error } = await supabase
-        .from('team_assignments')
-        .select('*, user:users(*)')
-        .eq('opportunity_id', opportunityId);
-      
-      return { data: data || [], error };
+      return { error };
     },
     
     /**
      * Get company users
+     * @returns {Promise<{data: Array, error: Error|null}>}
      */
     async getCompanyUsers() {
-      const company = await auth.getCompany();
-      if (!company) return { data: [], error: 'Not authenticated' };
+      const companyId = await this.getCompanyId();
+      if (!companyId) return { data: [], error: new Error('No company ID') };
       
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .order('full_name');
       
       return { data: data || [], error };
     },
     
     /**
-     * Get lessons learned / playbook entries
+     * Get chat history for an opportunity
+     * @param {string} opportunityId 
+     * @param {number} limit 
+     * @returns {Promise<{data: Array, error: Error|null}>}
      */
-    async getLessonsLearned(filters = {}) {
-      const company = await auth.getCompany();
-      if (!company) return { data: [], error: 'Not authenticated' };
+    async getChatHistory(opportunityId, limit = 50) {
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select(`
+          *,
+          users (id, full_name)
+        `)
+        .eq('opportunity_id', opportunityId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
       
-      let query = supabase
-        .from('lessons_learned')
-        .select('*')
-        .eq('company_id', company.id)
-        .order('created_at', { ascending: false });
-      
-      if (filters.category) {
-        query = query.eq('category', filters.category);
-      }
-      if (filters.starred) {
-        query = query.eq('is_starred', true);
-      }
-      
-      const { data, error } = await query;
-      return { data: data || [], error };
+      return { data: (data || []).reverse(), error };
     },
     
     /**
-     * Save to playbook
+     * Save chat message
+     * @param {Object} message 
+     * @returns {Promise<{data: Object|null, error: Error|null}>}
      */
-    async saveToPlaybook(entry) {
-      const company = await auth.getCompany();
-      const user = await auth.getUser();
-      if (!company || !user) return { data: null, error: 'Not authenticated' };
+    async saveChatMessage(message) {
+      const companyId = await this.getCompanyId();
+      const { user } = await MP.auth.getUser();
       
       const { data, error } = await supabase
-        .from('lessons_learned')
+        .from('chat_history')
         .insert({
-          ...entry,
-          company_id: company.id,
-          created_by: user.id
+          ...message,
+          company_id: companyId,
+          user_id: user?.id
         })
         .select()
         .single();
@@ -360,262 +355,136 @@ const MP = (function() {
     },
     
     /**
-     * Get chat history
+     * Log audit event
+     * @param {Object} event 
+     * @returns {Promise<{error: Error|null}>}
      */
-    async getChatHistory(agentName = null, opportunityId = null) {
-      const user = await auth.getUser();
-      if (!user) return { data: [], error: 'Not authenticated' };
+    async logAudit(event) {
+      const companyId = await this.getCompanyId();
+      const { user } = await MP.auth.getUser();
       
-      let query = supabase
-        .from('chat_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
+      const { error } = await supabase
+        .from('audit_log')
+        .insert({
+          ...event,
+          company_id: companyId,
+          user_id: user?.id
+        });
       
-      if (agentName) {
-        query = query.eq('agent_name', agentName);
-      }
-      if (opportunityId) {
-        query = query.eq('opportunity_id', opportunityId);
-      }
-      
-      const { data, error } = await query.limit(50);
-      return { data: data || [], error };
+      return { error };
+    }
+  },
+  
+  // ============================================================
+  // REALTIME NAMESPACE
+  // ============================================================
+  realtime: {
+    /**
+     * Subscribe to opportunity changes
+     * @param {string} companyId 
+     * @param {Function} callback - (payload) => void
+     * @returns {Object} channel object
+     */
+    subscribeToOpportunities(companyId, callback) {
+      return supabase
+        .channel('opportunities-changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'opportunities',
+          filter: `company_id=eq.${companyId}`
+        }, callback)
+        .subscribe();
     },
     
     /**
-     * Save chat message
+     * Subscribe to notifications
+     * @param {string} userId 
+     * @param {Function} callback 
+     * @returns {Object} channel object
      */
-    async saveChatMessage(agentName, messages, opportunityId = null) {
-      const user = await auth.getUser();
-      const company = await auth.getCompany();
-      if (!user || !company) return { data: null, error: 'Not authenticated' };
-      
-      // Check if there's an existing chat session for this agent/opportunity
-      let query = supabase
-        .from('chat_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('agent_name', agentName);
-      
-      if (opportunityId) {
-        query = query.eq('opportunity_id', opportunityId);
-      }
-      
-      const { data: existing } = await query.order('created_at', { ascending: false }).limit(1);
-      
-      if (existing && existing.length > 0) {
-        // Update existing chat
-        const { data, error } = await supabase
-          .from('chat_history')
-          .update({
-            messages: messages,
-            message_count: messages.length
-          })
-          .eq('id', existing[0].id)
-          .select()
-          .single();
-        
-        return { data, error };
-      } else {
-        // Create new chat
-        const { data, error } = await supabase
-          .from('chat_history')
-          .insert({
-            user_id: user.id,
-            company_id: company.id,
-            agent_name: agentName,
-            opportunity_id: opportunityId,
-            messages: messages,
-            message_count: messages.length
-          })
-          .select()
-          .single();
-        
-        return { data, error };
-      }
+    subscribeToNotifications(userId, callback) {
+      return supabase
+        .channel('notifications')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        }, callback)
+        .subscribe();
     },
     
     /**
-     * Get notifications
+     * Unsubscribe from a channel
+     * @param {Object} channel 
      */
-    async getNotifications(unreadOnly = false) {
-      const user = await auth.getUser();
-      if (!user) return { data: [], error: 'Not authenticated' };
-      
-      let query = supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (unreadOnly) {
-        query = query.eq('is_read', false);
+    unsubscribe(channel) {
+      if (channel) {
+        supabase.removeChannel(channel);
       }
-      
-      const { data, error } = await query.limit(50);
-      return { data: data || [], error };
-    },
-    
+    }
+  },
+  
+  // ============================================================
+  // STORAGE NAMESPACE
+  // ============================================================
+  storage: {
     /**
-     * Mark notification as read
+     * Upload file
+     * @param {string} bucket 
+     * @param {string} path 
+     * @param {File} file 
+     * @returns {Promise<{data: Object|null, error: Error|null}>}
      */
-    async markNotificationRead(notificationId) {
-      const { data, error } = await supabase
-        .from('notifications')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('id', notificationId);
+    async uploadFile(bucket, path, file) {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
       
       return { data, error };
     },
     
     /**
-     * Log audit event
+     * Get file URL
+     * @param {string} bucket 
+     * @param {string} path 
+     * @returns {string}
      */
-    async logAudit(action, resourceType, resourceId, resourceName = null) {
-      const user = await auth.getUser();
-      const company = await auth.getCompany();
-      if (!company) return;
-      
-      await supabase.from('audit_log').insert({
-        company_id: company.id,
-        user_id: user?.id,
-        action,
-        resource_type: resourceType,
-        resource_id: resourceId,
-        resource_name: resourceName
-      });
+    getFileUrl(bucket, path) {
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      return data?.publicUrl;
     },
     
     /**
-     * Get dashboard stats
+     * Delete file
+     * @param {string} bucket 
+     * @param {string} path 
+     * @returns {Promise<{error: Error|null}>}
      */
-    async getDashboardStats() {
-      const company = await auth.getCompany();
-      if (!company) return null;
-      
-      const { data: opportunities } = await this.getOpportunities({ status: 'active' });
-      
-      if (!opportunities) return null;
-      
-      const stats = {
-        totalOpportunities: opportunities.length,
-        totalPipelineValue: opportunities.reduce((sum, o) => sum + (o.estimated_value || 0), 0),
-        avgPwin: Math.round(opportunities.reduce((sum, o) => sum + (o.pwin || 0), 0) / (opportunities.length || 1)),
-        byPhase: {},
-        byPriority: {},
-        upcomingDeadlines: []
-      };
-      
-      // Count by phase
-      opportunities.forEach(o => {
-        stats.byPhase[o.shipley_phase] = (stats.byPhase[o.shipley_phase] || 0) + 1;
-        stats.byPriority[o.priority] = (stats.byPriority[o.priority] || 0) + 1;
-      });
-      
-      // Get upcoming deadlines (next 30 days)
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      
-      stats.upcomingDeadlines = opportunities
-        .filter(o => o.submission_deadline && new Date(o.submission_deadline) <= thirtyDaysFromNow)
-        .sort((a, b) => new Date(a.submission_deadline) - new Date(b.submission_deadline))
-        .slice(0, 5);
-      
-      return stats;
+    async deleteFile(bucket, path) {
+      const { error } = await supabase.storage.from(bucket).remove([path]);
+      return { error };
+    },
+    
+    /**
+     * List files in a folder
+     * @param {string} bucket 
+     * @param {string} folder 
+     * @returns {Promise<{data: Array, error: Error|null}>}
+     */
+    async listFiles(bucket, folder) {
+      const { data, error } = await supabase.storage.from(bucket).list(folder);
+      return { data: data || [], error };
     }
-  };
-  
-  // ===========================================
-  // UTILITY FUNCTIONS
-  // ===========================================
-  const utils = {
-    /**
-     * Format currency
-     */
-    formatCurrency(cents) {
-      if (!cents) return '$0';
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(cents / 100);
-    },
-    
-    /**
-     * Format date
-     */
-    formatDate(dateString) {
-      if (!dateString) return 'N/A';
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    },
-    
-    /**
-     * Days until deadline
-     */
-    daysUntil(dateString) {
-      if (!dateString) return null;
-      const deadline = new Date(dateString);
-      const today = new Date();
-      const diffTime = deadline - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays;
-    },
-    
-    /**
-     * Shipley phase display name
-     */
-    phaseDisplayName(phase) {
-      const names = {
-        'gate1': 'Gate 1',
-        'blue': 'Blue Team',
-        'kickoff': 'Kickoff',
-        'pink': 'Pink Team',
-        'red': 'Red Team',
-        'gold': 'Gold Team',
-        'white': 'White Glove',
-        'submit': 'Submitted',
-        'awarded': 'Awarded',
-        'lost': 'Lost'
-      };
-      return names[phase] || phase;
-    },
-    
-    /**
-     * Phase color
-     */
-    phaseColor(phase) {
-      const colors = {
-        'gate1': 'gray',
-        'blue': 'blue',
-        'kickoff': 'purple',
-        'pink': 'pink',
-        'red': 'red',
-        'gold': 'yellow',
-        'white': 'white',
-        'submit': 'green',
-        'awarded': 'emerald',
-        'lost': 'slate'
-      };
-      return colors[phase] || 'gray';
-    }
-  };
-  
-  // ===========================================
-  // EXPOSE PUBLIC API
-  // ===========================================
-  return {
-    supabase,  // Direct access to Supabase client if needed
-    auth,
-    db,
-    utils
-  };
-})();
+  }
+};
 
-// Make available globally
+// Export for use in other scripts
 window.MP = MP;
+window.supabase = supabase;
+
+console.log('✅ MissionPulse Supabase Client loaded');

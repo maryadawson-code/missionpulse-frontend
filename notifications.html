@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse | Notifications</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #e2e8f0; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0a1628; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.12); border-radius: 12px; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .animate-spin { animation: spin 1s linear infinite; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script src="supabase-client.js"></script>
+  <script src="auth-guard.js"></script>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+    const supabase = window.supabase;
+
+    // ============================================================
+    // NOTIFICATION TYPES & ICONS
+    // ============================================================
+    const NOTIFICATION_TYPES = {
+      deadline_warning: { icon: 'clock', color: '#f59e0b', label: 'Deadline Alert' },
+      assignment: { icon: 'userPlus', color: '#3b82f6', label: 'Assignment' },
+      review_request: { icon: 'eye', color: '#8b5cf6', label: 'Review Request' },
+      comment: { icon: 'chat', color: '#00E5FA', label: 'Comment' },
+      status_change: { icon: 'refresh', color: '#10b981', label: 'Status Update' },
+      compliance_alert: { icon: 'shield', color: '#ef4444', label: 'Compliance' },
+      system: { icon: 'bell', color: '#64748b', label: 'System' }
+    };
+
+    // ============================================================
+    // ICONS
+    // ============================================================
+    const Icon = ({ name, className = 'w-5 h-5' }) => {
+      const icons = {
+        arrowLeft: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+        bell: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
+        clock: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        userPlus: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>,
+        eye: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+        chat: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+        refresh: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+        shield: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+        check: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+        checkAll: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+        trash: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+        loader: <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>,
+        inbox: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>,
+        external: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>,
+      };
+      return icons[name] || icons.bell;
+    };
+
+    // ============================================================
+    // UI COMPONENTS
+    // ============================================================
+    const Button = ({ children, onClick, variant = 'primary', icon, disabled, loading, size = 'md', className = '' }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400',
+        secondary: 'bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+      };
+      const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm' };
+      return (
+        <button 
+          onClick={onClick} 
+          disabled={disabled || loading}
+          className={`inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+        >
+          {loading ? <Icon name="loader" className="w-4 h-4" /> : icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    // ============================================================
+    // NOTIFICATION ITEM
+    // ============================================================
+    const NotificationItem = ({ notification, onMarkRead, onDelete }) => {
+      const typeConfig = NOTIFICATION_TYPES[notification.type] || NOTIFICATION_TYPES.system;
+      const timeAgo = getTimeAgo(notification.created_at);
+
+      return (
+        <div 
+          className={`p-4 border-b border-slate-700/30 hover:bg-slate-800/30 transition-all animate-slideIn ${
+            !notification.is_read ? 'bg-slate-800/20' : ''
+          }`}
+        >
+          <div className="flex items-start gap-4">
+            {/* Icon */}
+            <div 
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: `${typeConfig.color}20` }}
+            >
+              <Icon name={typeConfig.icon} className="w-5 h-5" style={{ color: typeConfig.color }} />
+            </div>
+            
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className={`font-medium ${notification.is_read ? 'text-slate-300' : 'text-white'}`}>
+                    {notification.title}
+                  </h4>
+                  {notification.message && (
+                    <p className="text-sm text-slate-400 mt-1 line-clamp-2">
+                      {notification.message}
+                    </p>
+                  )}
+                </div>
+                {!notification.is_read && (
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 flex-shrink-0 mt-2"></span>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-4 mt-2">
+                <span className="text-xs text-slate-500">{timeAgo}</span>
+                <span 
+                  className="text-xs px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: `${typeConfig.color}20`, color: typeConfig.color }}
+                >
+                  {typeConfig.label}
+                </span>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {notification.action_url && (
+                <a 
+                  href={notification.action_url}
+                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
+                  title="View"
+                >
+                  <Icon name="external" className="w-4 h-4" />
+                </a>
+              )}
+              {!notification.is_read && (
+                <button 
+                  onClick={() => onMarkRead(notification.id)}
+                  className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                  title="Mark as read"
+                >
+                  <Icon name="check" className="w-4 h-4" />
+                </button>
+              )}
+              <button 
+                onClick={() => onDelete(notification.id)}
+                className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                title="Delete"
+              >
+                <Icon name="trash" className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+    function getTimeAgo(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    }
+
+    // ============================================================
+    // MAIN PAGE COMPONENT
+    // ============================================================
+    function NotificationsPage() {
+      const [notifications, setNotifications] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [filter, setFilter] = useState('all'); // all, unread
+      const [typeFilter, setTypeFilter] = useState('all');
+
+      useEffect(() => {
+        loadNotifications();
+        
+        // Subscribe to real-time notifications
+        const channel = supabase
+          .channel('notifications-realtime')
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications'
+          }, (payload) => {
+            setNotifications(prev => [payload.new, ...prev]);
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      }, []);
+
+      const loadNotifications = async () => {
+        try {
+          const { user } = await MP.auth.getUser();
+          if (!user) return;
+
+          const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+          if (error) throw error;
+          setNotifications(data || []);
+        } catch (err) {
+          console.error('Error loading notifications:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const markAsRead = async (id) => {
+        try {
+          await supabase
+            .from('notifications')
+            .update({ is_read: true, read_at: new Date().toISOString() })
+            .eq('id', id);
+
+          setNotifications(prev => 
+            prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+          );
+        } catch (err) {
+          console.error('Error marking as read:', err);
+        }
+      };
+
+      const markAllAsRead = async () => {
+        try {
+          const { user } = await MP.auth.getUser();
+          if (!user) return;
+
+          await supabase
+            .from('notifications')
+            .update({ is_read: true, read_at: new Date().toISOString() })
+            .eq('user_id', user.id)
+            .eq('is_read', false);
+
+          setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        } catch (err) {
+          console.error('Error marking all as read:', err);
+        }
+      };
+
+      const deleteNotification = async (id) => {
+        try {
+          await supabase
+            .from('notifications')
+            .delete()
+            .eq('id', id);
+
+          setNotifications(prev => prev.filter(n => n.id !== id));
+        } catch (err) {
+          console.error('Error deleting notification:', err);
+        }
+      };
+
+      const clearAll = async () => {
+        if (!confirm('Delete all notifications? This cannot be undone.')) return;
+        
+        try {
+          const { user } = await MP.auth.getUser();
+          if (!user) return;
+
+          await supabase
+            .from('notifications')
+            .delete()
+            .eq('user_id', user.id);
+
+          setNotifications([]);
+        } catch (err) {
+          console.error('Error clearing notifications:', err);
+        }
+      };
+
+      // Filter notifications
+      const filteredNotifications = useMemo(() => {
+        return notifications.filter(n => {
+          if (filter === 'unread' && n.is_read) return false;
+          if (typeFilter !== 'all' && n.type !== typeFilter) return false;
+          return true;
+        });
+      }, [notifications, filter, typeFilter]);
+
+      const unreadCount = notifications.filter(n => !n.is_read).length;
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
+            <Icon name="loader" className="w-10 h-10 text-cyan-400" />
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-6 py-4 sticky top-0 z-40 backdrop-blur-sm">
+            <div className="max-w-4xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <a href="/index.html" className="text-slate-400 hover:text-white transition-colors">
+                  <Icon name="arrowLeft" className="w-5 h-5" />
+                </a>
+                <div>
+                  <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Icon name="bell" className="w-6 h-6 text-cyan-400" />
+                    Notifications
+                    {unreadCount > 0 && (
+                      <span className="px-2 py-0.5 text-xs font-bold bg-cyan-500 text-white rounded-full">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </h1>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <Button variant="ghost" size="sm" icon="checkAll" onClick={markAllAsRead}>
+                    Mark all read
+                  </Button>
+                )}
+                {notifications.length > 0 && (
+                  <Button variant="ghost" size="sm" icon="trash" onClick={clearAll}>
+                    Clear all
+                  </Button>
+                )}
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-4xl mx-auto px-6 py-6">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              <div className="flex bg-slate-800/50 rounded-lg p-1">
+                <button
+                  onClick={() => setFilter('all')}
+                  className={`px-4 py-1.5 text-sm rounded-md transition-all ${
+                    filter === 'all' 
+                      ? 'bg-cyan-500/20 text-cyan-400' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setFilter('unread')}
+                  className={`px-4 py-1.5 text-sm rounded-md transition-all ${
+                    filter === 'unread' 
+                      ? 'bg-cyan-500/20 text-cyan-400' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Unread ({unreadCount})
+                </button>
+              </div>
+              
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-cyan-500"
+              >
+                <option value="all">All types</option>
+                {Object.entries(NOTIFICATION_TYPES).map(([key, config]) => (
+                  <option key={key} value={key}>{config.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Notifications List */}
+            {filteredNotifications.length === 0 ? (
+              <div className="glass-panel p-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                  <Icon name="inbox" className="w-8 h-8 text-slate-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  {filter === 'unread' ? 'All caught up!' : 'No notifications'}
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  {filter === 'unread' 
+                    ? "You've read all your notifications." 
+                    : "You don't have any notifications yet."
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="glass-panel overflow-hidden">
+                {filteredNotifications.map((notification, index) => (
+                  <NotificationItem
+                    key={notification.id}
+                    notification={notification}
+                    onMarkRead={markAsRead}
+                    onDelete={deleteNotification}
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  />
+                ))}
+              </div>
+            )}
+          </main>
+
+          {/* Footer */}
+          <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-700/50 backdrop-blur-sm z-30">
+            <div className="max-w-4xl mx-auto px-6 py-2 flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                {notifications.length} total notifications
+              </span>
+              <span className="text-xs text-slate-500">MissionPulse v12.0</span>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<NotificationsPage />);
+  </script>
+</body>
+</html>

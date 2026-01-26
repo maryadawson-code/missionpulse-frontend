@@ -1,168 +1,292 @@
 /**
- * MissionPulse - Auth Guard
- * Add this script to any page that requires authentication
+ * MissionPulse Auth Guard
+ * Include this script on any page that requires authentication
  * 
  * Usage:
- *   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+ *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
  *   <script src="supabase-client.js"></script>
  *   <script src="auth-guard.js"></script>
  * 
- * The script will:
- * 1. Check if user is authenticated
- * 2. Redirect to login if not
- * 3. Check role-based access for restricted modules
- * 4. Populate user info in the page
+ * Or as a module:
+ *   <script type="module">
+ *     import { requireAuth, getCurrentUser } from './auth-guard.js';
+ *     const user = await requireAuth();
+ *   </script>
  */
 
-(async function() {
-  // Wait for DOM and MP to be ready
-  if (typeof MP === 'undefined') {
-    console.error('MissionPulse: supabase-client.js must be loaded before auth-guard.js');
-    return;
-  }
-  
-  // ===========================================
-  // CHECK AUTHENTICATION
-  // ===========================================
-  const isAuthenticated = await MP.auth.isAuthenticated();
-  
-  if (!isAuthenticated) {
-    // Save the current URL to redirect back after login
-    sessionStorage.setItem('mp_redirect_after_login', window.location.href);
-    window.location.href = 'login.html';
-    return;
-  }
-  
-  // ===========================================
-  // LOAD USER DATA
-  // ===========================================
-  const user = await MP.auth.getUser();
-  const company = await MP.auth.getCompany();
-  
-  if (!user) {
-    console.error('MissionPulse: Failed to load user data');
-    window.location.href = 'login.html';
-    return;
-  }
-  
-  // ===========================================
-  // CHECK MODULE ACCESS (RBAC)
-  // ===========================================
-  // Determine which module this page is
-  const pageName = window.location.pathname.split('/').pop().replace('.html', '');
-  
-  // Map page names to modules
-  const pageToModule = {
-    'index': 'dashboard',
-    'missionpulse-m1-enhanced': 'pipeline',
-    'missionpulse-m2-warroom-enhanced': 'warroom',
-    'missionpulse-m3-swimlane-board': 'swimlane',
-    'missionpulse-m5-contracts': 'contracts',
-    'missionpulse-m5-contracts-enhanced': 'contracts',
-    'missionpulse-m6-iron-dome': 'irondome',
-    'missionpulse-m7-blackhat-enhanced': 'blackhat',
-    'missionpulse-m8-pricing': 'pricing',
-    'missionpulse-m9-hitl-enhanced': 'hitl',
-    'missionpulse-m11-frenemy-protocol': 'frenemy',
-    'missionpulse-m13-launch-roi': 'roi',
-    'missionpulse-m14-post-award': 'postaward',
-    'missionpulse-m15-lessons-playbook': 'lessons',
-    'missionpulse-task16-rbac': 'rbac'
+(function() {
+  'use strict';
+
+  // ============================================================
+  // CONFIGURATION
+  // ============================================================
+  const CONFIG = {
+    loginUrl: '/login.html',
+    dashboardUrl: '/index.html',
+    sessionCheckInterval: 60000, // Check session every 60 seconds
+    showLoadingOverlay: true
   };
-  
-  const moduleName = pageToModule[pageName];
-  
-  // Restricted modules (check access)
-  const restrictedModules = ['blackhat', 'pricing', 'frenemy', 'rbac'];
-  
-  if (moduleName && restrictedModules.includes(moduleName)) {
-    const canAccess = await MP.auth.canAccessModule(moduleName);
+
+  // ============================================================
+  // LOADING OVERLAY
+  // ============================================================
+  function showLoadingOverlay() {
+    if (!CONFIG.showLoadingOverlay) return;
     
-    if (!canAccess) {
-      // Redirect to dashboard with access denied message
-      sessionStorage.setItem('mp_access_denied', moduleName);
-      window.location.href = 'index.html';
-      return;
+    const overlay = document.createElement('div');
+    overlay.id = 'auth-loading-overlay';
+    overlay.innerHTML = `
+      <style>
+        #auth-loading-overlay {
+          position: fixed;
+          inset: 0;
+          background: #00050F;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 99999;
+          opacity: 1;
+          transition: opacity 0.3s ease-out;
+        }
+        #auth-loading-overlay.fade-out {
+          opacity: 0;
+        }
+        .auth-loader {
+          text-align: center;
+        }
+        .auth-loader-icon {
+          width: 48px;
+          height: 48px;
+          margin: 0 auto 16px;
+          background: linear-gradient(135deg, #00E5FA, #00BDAE);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 8px 32px rgba(0, 229, 250, 0.3);
+        }
+        .auth-loader-icon svg {
+          width: 28px;
+          height: 28px;
+          color: white;
+        }
+        .auth-loader-text {
+          color: #94a3b8;
+          font-family: 'Inter', sans-serif;
+          font-size: 14px;
+        }
+        .auth-loader-spinner {
+          width: 24px;
+          height: 24px;
+          border: 2px solid rgba(0, 229, 250, 0.2);
+          border-top-color: #00E5FA;
+          border-radius: 50%;
+          animation: auth-spin 0.8s linear infinite;
+          margin: 16px auto 0;
+        }
+        @keyframes auth-spin {
+          to { transform: rotate(360deg); }
+        }
+      </style>
+      <div class="auth-loader">
+        <div class="auth-loader-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+        <div class="auth-loader-text">Verifying authentication...</div>
+        <div class="auth-loader-spinner"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  function hideLoadingOverlay() {
+    const overlay = document.getElementById('auth-loading-overlay');
+    if (overlay) {
+      overlay.classList.add('fade-out');
+      setTimeout(() => overlay.remove(), 300);
     }
   }
-  
-  // ===========================================
-  // POPULATE USER INFO IN PAGE
-  // ===========================================
-  // Look for common elements to populate
-  const userNameEl = document.getElementById('mp-user-name');
-  const userEmailEl = document.getElementById('mp-user-email');
-  const userRoleEl = document.getElementById('mp-user-role');
-  const userAvatarEl = document.getElementById('mp-user-avatar');
-  const companyNameEl = document.getElementById('mp-company-name');
-  const logoutBtn = document.getElementById('mp-logout-btn');
-  
-  if (userNameEl) {
-    userNameEl.textContent = user.full_name || user.email.split('@')[0];
-  }
-  
-  if (userEmailEl) {
-    userEmailEl.textContent = user.email;
-  }
-  
-  if (userRoleEl) {
-    userRoleEl.textContent = user.role;
-  }
-  
-  if (userAvatarEl) {
-    if (user.avatar_url) {
-      userAvatarEl.src = user.avatar_url;
-    } else {
-      // Generate initials avatar
-      const initials = (user.full_name || user.email)
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
-      userAvatarEl.alt = initials;
-      // You could also set a placeholder image or use CSS to show initials
+
+  // ============================================================
+  // AUTH CHECK
+  // ============================================================
+  async function checkAuth() {
+    // Make sure supabase is available
+    if (typeof window.supabase === 'undefined') {
+      console.error('Supabase client not found. Include supabase-client.js first.');
+      return null;
+    }
+
+    try {
+      const { data: { session }, error } = await window.supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Auth check error:', error);
+        return null;
+      }
+      
+      return session;
+    } catch (err) {
+      console.error('Auth check exception:', err);
+      return null;
     }
   }
-  
-  if (companyNameEl && company) {
-    companyNameEl.textContent = company.name;
+
+  // ============================================================
+  // REQUIRE AUTH (Main function)
+  // ============================================================
+  async function requireAuth() {
+    showLoadingOverlay();
+    
+    const session = await checkAuth();
+    
+    if (!session) {
+      // Store the intended destination
+      const currentPath = window.location.pathname + window.location.search;
+      if (currentPath !== CONFIG.loginUrl) {
+        sessionStorage.setItem('auth_redirect', currentPath);
+      }
+      
+      // Redirect to login
+      window.location.href = CONFIG.loginUrl;
+      return null;
+    }
+    
+    hideLoadingOverlay();
+    return session.user;
   }
-  
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      await MP.auth.signOut();
-    });
+
+  // ============================================================
+  // GET CURRENT USER (with profile)
+  // ============================================================
+  async function getCurrentUser() {
+    if (typeof window.MP !== 'undefined' && window.MP.db) {
+      const { data, error } = await window.MP.db.getUserProfile();
+      if (error) {
+        console.warn('Could not fetch user profile:', error);
+        const session = await checkAuth();
+        return session?.user || null;
+      }
+      return data;
+    }
+    
+    // Fallback to basic auth user
+    const session = await checkAuth();
+    return session?.user || null;
   }
-  
-  // ===========================================
-  // EXPOSE USER DATA GLOBALLY
-  // ===========================================
-  window.mpUser = user;
-  window.mpCompany = company;
-  
-  // ===========================================
-  // CHECK FOR ACCESS DENIED MESSAGE
-  // ===========================================
-  const accessDenied = sessionStorage.getItem('mp_access_denied');
-  if (accessDenied) {
-    sessionStorage.removeItem('mp_access_denied');
-    // Show toast notification (if toast system exists)
-    if (typeof showToast === 'function') {
-      showToast(`Access denied to ${accessDenied} module. Your role: ${user.role}`, 'error');
-    } else {
-      console.warn(`Access denied to ${accessDenied} module. User role: ${user.role}`);
+
+  // ============================================================
+  // SESSION MONITOR
+  // ============================================================
+  function startSessionMonitor() {
+    // Check session periodically
+    setInterval(async () => {
+      const session = await checkAuth();
+      if (!session) {
+        console.log('Session expired, redirecting to login...');
+        window.location.href = CONFIG.loginUrl;
+      }
+    }, CONFIG.sessionCheckInterval);
+    
+    // Listen for auth state changes
+    if (typeof window.supabase !== 'undefined') {
+      window.supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
+          window.location.href = CONFIG.loginUrl;
+        }
+      });
     }
   }
-  
-  // ===========================================
-  // DISPATCH EVENT WHEN AUTH IS COMPLETE
-  // ===========================================
-  document.dispatchEvent(new CustomEvent('mp:auth:ready', {
-    detail: { user, company }
-  }));
-  
-  console.log('MissionPulse: Auth guard loaded', { user: user.email, role: user.role, company: company?.name });
-  
+
+  // ============================================================
+  // REDIRECT AFTER LOGIN
+  // ============================================================
+  function handlePostLoginRedirect() {
+    const redirect = sessionStorage.getItem('auth_redirect');
+    if (redirect && redirect !== CONFIG.loginUrl) {
+      sessionStorage.removeItem('auth_redirect');
+      window.location.href = redirect;
+      return true;
+    }
+    return false;
+  }
+
+  // ============================================================
+  // ROLE-BASED ACCESS CONTROL
+  // ============================================================
+  const ROLE_PERMISSIONS = {
+    CEO: ['*'],
+    COO: ['*'],
+    CAP: ['strategy', 'intelligence', 'delivery', 'command'],
+    PM: ['delivery', 'command'],
+    SA: ['delivery'],
+    FIN: ['pricing', 'contracts'],
+    CON: ['compliance', 'contracts'],
+    DEL: ['delivery', 'staffing'],
+    QA: ['review', 'compliance'],
+    Partner: ['assigned_sections_only'],
+    Admin: ['admin', 'users', 'settings', '*']
+  };
+
+  function canAccess(userRole, module) {
+    const permissions = ROLE_PERMISSIONS[userRole] || [];
+    if (permissions.includes('*')) return true;
+    return permissions.some(p => module.toLowerCase().includes(p.toLowerCase()));
+  }
+
+  function requireRole(allowedRoles) {
+    return async function() {
+      const user = await getCurrentUser();
+      if (!user) {
+        window.location.href = CONFIG.loginUrl;
+        return false;
+      }
+      
+      const userRole = user.role || 'Member';
+      if (!allowedRoles.includes(userRole) && !['CEO', 'COO', 'Admin'].includes(userRole)) {
+        console.warn(`Access denied. Required roles: ${allowedRoles.join(', ')}, User role: ${userRole}`);
+        // Could redirect to access denied page or show error
+        return false;
+      }
+      
+      return true;
+    };
+  }
+
+  // ============================================================
+  // AUTO-INIT
+  // ============================================================
+  async function init() {
+    // Skip auth check on login page
+    const isLoginPage = window.location.pathname.includes('login');
+    
+    if (!isLoginPage) {
+      await requireAuth();
+      startSessionMonitor();
+    }
+  }
+
+  // Run when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // ============================================================
+  // EXPORTS
+  // ============================================================
+  window.AuthGuard = {
+    requireAuth,
+    getCurrentUser,
+    checkAuth,
+    canAccess,
+    requireRole,
+    handlePostLoginRedirect,
+    config: CONFIG
+  };
+
+  console.log('✅ MissionPulse Auth Guard loaded');
 })();

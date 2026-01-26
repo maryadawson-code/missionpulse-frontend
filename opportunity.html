@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse | Opportunity Details</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Inter', sans-serif; 
+      background: var(--deep-navy); 
+      min-height: 100vh;
+      color: #e2e8f0;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0a1628; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .glass-panel { 
+      background: rgba(15, 23, 42, 0.7); 
+      backdrop-filter: blur(12px); 
+      border: 1px solid rgba(0, 229, 250, 0.12); 
+      border-radius: 12px; 
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script src="supabase-client.js"></script>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+    const supabase = window.supabase;
+
+    // ============================================================
+    // CONSTANTS
+    // ============================================================
+    const SHIPLEY_PHASES = [
+      { id: 'capture', name: 'Capture', color: '#8b5cf6', description: 'Opportunity Identified' },
+      { id: 'qualify', name: 'Qualify', color: '#06b6d4', description: 'Go/No-Go Decision' },
+      { id: 'proposal', name: 'Proposal', color: '#3b82f6', description: 'Active Writing' },
+      { id: 'review', name: 'Review', color: '#f59e0b', description: 'Color Team Reviews' },
+      { id: 'submit', name: 'Submit', color: '#10b981', description: 'Final Submission' },
+      { id: 'award', name: 'Award', color: '#ec4899', description: 'Evaluation Period' }
+    ];
+
+    const PRIORITIES = [
+      { id: 'high', name: 'High', color: '#ef4444' },
+      { id: 'medium', name: 'Medium', color: '#f59e0b' },
+      { id: 'low', name: 'Low', color: '#10b981' }
+    ];
+
+    const CONTRACT_TYPES = ['FFP', 'T&M', 'CPFF', 'CPIF', 'IDIQ', 'BPA'];
+    
+    const AGENCIES = [
+      'Defense Health Agency (DHA)',
+      'Department of Veterans Affairs (VA)',
+      'Centers for Medicare & Medicaid Services (CMS)',
+      'Indian Health Service (IHS)',
+      'Department of Health and Human Services (HHS)',
+      'Centers for Disease Control (CDC)',
+      'National Institutes of Health (NIH)',
+      'Food and Drug Administration (FDA)',
+      'Other'
+    ];
+
+    // ============================================================
+    // ICONS
+    // ============================================================
+    const Icon = ({ name, className = 'w-5 h-5' }) => {
+      const icons = {
+        arrowLeft: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+        save: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
+        trash: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+        calendar: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+        building: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+        currency: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        chart: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+        document: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+        users: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+        loader: <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>,
+        check: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+        x: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+        alert: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      };
+      return icons[name] || null;
+    };
+
+    // ============================================================
+    // COMPONENTS
+    // ============================================================
+    const Card = ({ children, className = '', title, icon }) => (
+      <div className={`glass-panel p-5 ${className}`}>
+        {title && (
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-700/50">
+            {icon && <Icon name={icon} className="w-5 h-5 text-cyan-400" />}
+            <h3 className="font-semibold text-white">{title}</h3>
+          </div>
+        )}
+        {children}
+      </div>
+    );
+
+    const Input = ({ label, type = 'text', value, onChange, placeholder, required, prefix, suffix, ...props }) => (
+      <div>
+        {label && <label className="block text-sm font-medium text-slate-300 mb-2">{label}{required && <span className="text-red-400 ml-1">*</span>}</label>}
+        <div className="relative">
+          {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{prefix}</span>}
+          <input
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            required={required}
+            className={`w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 transition-colors ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''}`}
+            {...props}
+          />
+          {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{suffix}</span>}
+        </div>
+      </div>
+    );
+
+    const Select = ({ label, value, onChange, options, required, placeholder }) => (
+      <div>
+        {label && <label className="block text-sm font-medium text-slate-300 mb-2">{label}{required && <span className="text-red-400 ml-1">*</span>}</label>}
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required={required}
+          className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500 transition-colors"
+        >
+          {placeholder && <option value="">{placeholder}</option>}
+          {options.map(opt => (
+            <option key={opt.id || opt} value={opt.id || opt}>
+              {opt.name || opt}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+
+    const Textarea = ({ label, value, onChange, placeholder, rows = 4 }) => (
+      <div>
+        {label && <label className="block text-sm font-medium text-slate-300 mb-2">{label}</label>}
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          rows={rows}
+          className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 transition-colors resize-none"
+        />
+      </div>
+    );
+
+    const Button = ({ children, onClick, type = 'button', variant = 'primary', size = 'md', icon, disabled, loading, className = '' }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400',
+        secondary: 'bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50',
+        danger: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+      };
+      const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      
+      return (
+        <button 
+          type={type}
+          onClick={onClick} 
+          disabled={disabled || loading}
+          className={`inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all ${variants[variant]} ${sizes[size]} ${disabled || loading ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+        >
+          {loading ? <Icon name="loader" className="w-4 h-4" /> : icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, color = '#00E5FA' }) => (
+      <span 
+        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+        style={{ backgroundColor: `${color}20`, color: color, border: `1px solid ${color}40` }}
+      >
+        {children}
+      </span>
+    );
+
+    const ProgressBar = ({ value, max = 100, showLabel = true }) => {
+      const percent = Math.min(Math.round((value / max) * 100), 100);
+      return (
+        <div>
+          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-cyan-500 to-teal-500 transition-all duration-500"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          {showLabel && <div className="text-xs text-slate-400 mt-1 text-right">{percent}% Complete</div>}
+        </div>
+      );
+    };
+
+    // Delete Confirmation Modal
+    const DeleteModal = ({ isOpen, onClose, onConfirm, title, loading }) => {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-panel p-6 w-full max-w-md animate-fadeIn">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                <Icon name="alert" className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Delete Opportunity?</h3>
+                <p className="text-sm text-slate-400">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to delete <strong>"{title}"</strong>? All associated data including compliance items, team assignments, and chat history will be permanently removed.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={onClose} className="flex-1">Cancel</Button>
+              <Button variant="danger" onClick={onConfirm} loading={loading} className="flex-1">Delete</Button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // MAIN PAGE
+    // ============================================================
+    function OpportunityDetailPage() {
+      // Get opportunity ID from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const opportunityId = urlParams.get('id');
+      const isNew = !opportunityId || opportunityId === 'new';
+
+      const [loading, setLoading] = useState(!isNew);
+      const [saving, setSaving] = useState(false);
+      const [deleting, setDeleting] = useState(false);
+      const [showDeleteModal, setShowDeleteModal] = useState(false);
+      const [toast, setToast] = useState(null);
+      const [currentUser, setCurrentUser] = useState(null);
+
+      // Form state
+      const [formData, setFormData] = useState({
+        title: '',
+        agency: '',
+        solicitation_number: '',
+        contract_value: '',
+        contract_type: 'FFP',
+        naics_code: '',
+        submission_deadline: '',
+        shipley_phase: 'capture',
+        pwin: 50,
+        priority: 'medium',
+        completion_percent: 0,
+        status: 'active',
+        description: ''
+      });
+
+      // Load data on mount
+      useEffect(() => {
+        checkAuth();
+        if (!isNew) {
+          loadOpportunity();
+        }
+      }, [opportunityId]);
+
+      const checkAuth = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          window.location.href = '/login.html';
+          return;
+        }
+        
+        // Get user profile
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*, companies(*)')
+          .eq('id', session.user.id)
+          .single();
+        
+        setCurrentUser(profile);
+      };
+
+      const loadOpportunity = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('opportunities')
+            .select('*')
+            .eq('id', opportunityId)
+            .single();
+          
+          if (error) throw error;
+          
+          if (data) {
+            setFormData({
+              ...data,
+              contract_value: data.contract_value?.toString() || '',
+              submission_deadline: data.submission_deadline?.split('T')[0] || ''
+            });
+          }
+        } catch (err) {
+          console.error('Error loading opportunity:', err);
+          showToast('Failed to load opportunity', 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+      };
+
+      const updateField = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      };
+
+      const handleSave = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+
+        try {
+          // Prepare data
+          const saveData = {
+            ...formData,
+            contract_value: parseFloat(formData.contract_value) || 0,
+            pwin: parseInt(formData.pwin) || 50,
+            completion_percent: parseInt(formData.completion_percent) || 0
+          };
+
+          if (isNew) {
+            // Get company_id from current user
+            const { data: profile } = await supabase
+              .from('users')
+              .select('company_id')
+              .eq('id', (await supabase.auth.getUser()).data.user.id)
+              .single();
+
+            saveData.company_id = profile.company_id;
+
+            const { data, error } = await supabase
+              .from('opportunities')
+              .insert(saveData)
+              .select()
+              .single();
+
+            if (error) throw error;
+            
+            showToast('Opportunity created successfully!');
+            // Redirect to the new opportunity
+            window.location.href = `/opportunity.html?id=${data.id}`;
+          } else {
+            const { error } = await supabase
+              .from('opportunities')
+              .update(saveData)
+              .eq('id', opportunityId);
+
+            if (error) throw error;
+            showToast('Opportunity saved successfully!');
+          }
+        } catch (err) {
+          console.error('Save error:', err);
+          showToast(err.message || 'Failed to save opportunity', 'error');
+        } finally {
+          setSaving(false);
+        }
+      };
+
+      const handleDelete = async () => {
+        setDeleting(true);
+        try {
+          const { error } = await supabase
+            .from('opportunities')
+            .delete()
+            .eq('id', opportunityId);
+
+          if (error) throw error;
+          
+          showToast('Opportunity deleted');
+          setTimeout(() => window.location.href = '/index.html', 1000);
+        } catch (err) {
+          console.error('Delete error:', err);
+          showToast('Failed to delete opportunity', 'error');
+        } finally {
+          setDeleting(false);
+          setShowDeleteModal(false);
+        }
+      };
+
+      const getPhaseColor = (phaseId) => SHIPLEY_PHASES.find(p => p.id === phaseId)?.color || '#94a3b8';
+      const getPriorityColor = (priorityId) => PRIORITIES.find(p => p.id === priorityId)?.color || '#94a3b8';
+
+      // Calculate days until deadline
+      const daysUntilDeadline = useMemo(() => {
+        if (!formData.submission_deadline) return null;
+        const deadline = new Date(formData.submission_deadline);
+        const today = new Date();
+        return Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+      }, [formData.submission_deadline]);
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
+            <Icon name="loader" className="w-10 h-10 text-cyan-400" />
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-[#00050F] pb-20">
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-6 py-4 sticky top-0 z-40 backdrop-blur-sm">
+            <div className="max-w-5xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <a href="/index.html" className="text-slate-400 hover:text-white transition-colors">
+                  <Icon name="arrowLeft" className="w-5 h-5" />
+                </a>
+                <div>
+                  <h1 className="text-xl font-bold text-white">
+                    {isNew ? 'New Opportunity' : formData.title || 'Edit Opportunity'}
+                  </h1>
+                  {!isNew && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge color={getPhaseColor(formData.shipley_phase)}>
+                        {SHIPLEY_PHASES.find(p => p.id === formData.shipley_phase)?.name}
+                      </Badge>
+                      <Badge color={getPriorityColor(formData.priority)}>
+                        {formData.priority?.charAt(0).toUpperCase() + formData.priority?.slice(1)} Priority
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {!isNew && (
+                  <Button variant="danger" size="sm" icon="trash" onClick={() => setShowDeleteModal(true)}>
+                    Delete
+                  </Button>
+                )}
+                <Button variant="primary" icon="save" onClick={handleSave} loading={saving}>
+                  {isNew ? 'Create Opportunity' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Form */}
+          <main className="max-w-5xl mx-auto px-6 py-8">
+            <form onSubmit={handleSave} className="space-y-6">
+              
+              {/* Basic Info */}
+              <Card title="Basic Information" icon="document">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <Input
+                      label="Opportunity Title"
+                      value={formData.title}
+                      onChange={(v) => updateField('title', v)}
+                      placeholder="e.g., Enterprise Healthcare Data Platform Modernization"
+                      required
+                    />
+                  </div>
+                  
+                  <Select
+                    label="Agency"
+                    value={formData.agency}
+                    onChange={(v) => updateField('agency', v)}
+                    options={AGENCIES}
+                    placeholder="Select agency..."
+                    required
+                  />
+                  
+                  <Input
+                    label="Solicitation Number"
+                    value={formData.solicitation_number}
+                    onChange={(v) => updateField('solicitation_number', v)}
+                    placeholder="e.g., HC1028-25-R-0042"
+                  />
+                  
+                  <div className="md:col-span-2">
+                    <Textarea
+                      label="Description"
+                      value={formData.description}
+                      onChange={(v) => updateField('description', v)}
+                      placeholder="Describe the opportunity scope, requirements, and key objectives..."
+                      rows={4}
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Contract Details */}
+              <Card title="Contract Details" icon="currency">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input
+                    label="Contract Value"
+                    type="number"
+                    value={formData.contract_value}
+                    onChange={(v) => updateField('contract_value', v)}
+                    placeholder="95000000"
+                    prefix="$"
+                  />
+                  
+                  <Select
+                    label="Contract Type"
+                    value={formData.contract_type}
+                    onChange={(v) => updateField('contract_type', v)}
+                    options={CONTRACT_TYPES}
+                  />
+                  
+                  <Input
+                    label="NAICS Code"
+                    value={formData.naics_code}
+                    onChange={(v) => updateField('naics_code', v)}
+                    placeholder="541512"
+                  />
+                </div>
+              </Card>
+
+              {/* Timeline & Status */}
+              <Card title="Timeline & Status" icon="calendar">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Input
+                    label="Submission Deadline"
+                    type="date"
+                    value={formData.submission_deadline}
+                    onChange={(v) => updateField('submission_deadline', v)}
+                    required
+                  />
+                  
+                  <Select
+                    label="Shipley Phase"
+                    value={formData.shipley_phase}
+                    onChange={(v) => updateField('shipley_phase', v)}
+                    options={SHIPLEY_PHASES}
+                    required
+                  />
+                  
+                  <Select
+                    label="Priority"
+                    value={formData.priority}
+                    onChange={(v) => updateField('priority', v)}
+                    options={PRIORITIES}
+                  />
+                  
+                  <Select
+                    label="Status"
+                    value={formData.status}
+                    onChange={(v) => updateField('status', v)}
+                    options={[
+                      { id: 'active', name: 'Active' },
+                      { id: 'paused', name: 'Paused' },
+                      { id: 'won', name: 'Won' },
+                      { id: 'lost', name: 'Lost' },
+                      { id: 'cancelled', name: 'Cancelled' }
+                    ]}
+                  />
+                </div>
+                
+                {/* Deadline Warning */}
+                {daysUntilDeadline !== null && daysUntilDeadline <= 14 && (
+                  <div className={`mt-4 p-3 rounded-lg flex items-center gap-3 ${daysUntilDeadline <= 7 ? 'bg-red-500/20 border border-red-500/30' : 'bg-amber-500/20 border border-amber-500/30'}`}>
+                    <Icon name="alert" className={`w-5 h-5 ${daysUntilDeadline <= 7 ? 'text-red-400' : 'text-amber-400'}`} />
+                    <span className={daysUntilDeadline <= 7 ? 'text-red-300' : 'text-amber-300'}>
+                      {daysUntilDeadline <= 0 
+                        ? 'Deadline has passed!' 
+                        : `Only ${daysUntilDeadline} day${daysUntilDeadline === 1 ? '' : 's'} until submission deadline`
+                      }
+                    </span>
+                  </div>
+                )}
+              </Card>
+
+              {/* Win Probability & Progress */}
+              <Card title="Win Probability & Progress" icon="chart">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Win Probability (pWin): {formData.pwin}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={formData.pwin}
+                      onChange={(e) => updateField('pwin', e.target.value)}
+                      className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                    />
+                    <div className="flex justify-between text-xs text-slate-500 mt-1">
+                      <span>0%</span>
+                      <span>50%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Completion: {formData.completion_percent}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={formData.completion_percent}
+                      onChange={(e) => updateField('completion_percent', e.target.value)}
+                      className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                    />
+                    <div className="flex justify-between text-xs text-slate-500 mt-1">
+                      <span>Not Started</span>
+                      <span>In Progress</span>
+                      <span>Complete</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-6">
+                  <ProgressBar value={formData.completion_percent} />
+                </div>
+              </Card>
+
+              {/* Action Buttons (Mobile) */}
+              <div className="md:hidden flex gap-3">
+                {!isNew && (
+                  <Button variant="danger" icon="trash" onClick={() => setShowDeleteModal(true)} className="flex-1">
+                    Delete
+                  </Button>
+                )}
+                <Button type="submit" variant="primary" icon="save" loading={saving} className="flex-1">
+                  {isNew ? 'Create' : 'Save'}
+                </Button>
+              </div>
+            </form>
+          </main>
+
+          {/* Footer */}
+          <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-700/50 backdrop-blur-sm z-30">
+            <div className="max-w-5xl mx-auto px-6 py-2 flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                {isNew ? 'Creating new opportunity' : `Last saved: ${new Date().toLocaleString()}`}
+              </span>
+              <span className="text-xs text-slate-500">MissionPulse v12.0</span>
+            </div>
+          </footer>
+
+          {/* Delete Confirmation Modal */}
+          <DeleteModal
+            isOpen={showDeleteModal}
+            onClose={() => setShowDeleteModal(false)}
+            onConfirm={handleDelete}
+            title={formData.title}
+            loading={deleting}
+          />
+
+          {/* Toast */}
+          {toast && (
+            <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg border shadow-lg backdrop-blur-sm animate-slideIn ${
+              toast.type === 'error' 
+                ? 'bg-red-500/20 border-red-500/30 text-red-400' 
+                : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Icon name={toast.type === 'error' ? 'x' : 'check'} className="w-5 h-5" />
+                {toast.message}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<OpportunityDetailPage />);
+  </script>
+</body>
+</html>
