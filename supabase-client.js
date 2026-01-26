@@ -1,430 +1,745 @@
-/**
- * MissionPulse Supabase Client
- * Handles all database and authentication operations
- * Version: 1.0.1 - Fixed CDN initialization
- */
+// ═══════════════════════════════════════════════════════════════
+// MISSIONPULSE SUPABASE CLIENT MODULE v1.0
+// Shared database connectivity for all frontend pages
+// © 2026 Mission Meets Tech
+// ═══════════════════════════════════════════════════════════════
 
-// Supabase Configuration
-const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+(function(global) {
+  'use strict';
 
-// Initialize Supabase Client - Handle both CDN and module imports
-let supabaseClient = null;
+  // ─────────────────────────────────────────────────────────────
+  // CONFIGURATION
+  // ─────────────────────────────────────────────────────────────
+  const CONFIG = {
+    SUPABASE_URL: 'https://djuviwarqdvlbgcfuupa.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA',
+    DEFAULT_COMPANY_ID: '11111111-1111-1111-1111-111111111111',
+    DEBUG: false
+  };
 
-try {
-    // CDN version exports to window.supabase or just supabase
-    if (typeof supabase !== 'undefined' && supabase.createClient) {
-        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log('✅ Supabase client initialized (global)');
-    } else if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log('✅ Supabase client initialized (window)');
-    } else {
-        console.error('❌ Supabase library not found! Make sure the CDN script is loaded first.');
+  // ─────────────────────────────────────────────────────────────
+  // SUPABASE CLIENT INITIALIZATION
+  // ─────────────────────────────────────────────────────────────
+  let client = null;
+
+  function getClient() {
+    if (!client) {
+      if (typeof supabase === 'undefined') {
+        throw new Error('Supabase JS library not loaded. Include the CDN script first.');
+      }
+      client = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+      if (CONFIG.DEBUG) console.log('[MissionPulse] Supabase client initialized');
     }
-} catch (error) {
-    console.error('❌ Failed to initialize Supabase:', error);
-}
+    return client;
+  }
 
-// =============================================================================
-// AUTH HELPER FUNCTIONS
-// =============================================================================
+  // ─────────────────────────────────────────────────────────────
+  // UTILITY FUNCTIONS
+  // ─────────────────────────────────────────────────────────────
+  
+  function calculateDaysRemaining(dueDate) {
+    if (!dueDate) return null;
+    const due = new Date(dueDate);
+    const today = new Date();
+    const diffTime = due - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  }
 
-/**
- * Sign up a new user with email and password
- */
-async function signUpUser(email, password, metadata = {}) {
-    if (!supabaseClient) {
-        console.error('❌ Supabase client not initialized');
-        return { success: false, error: 'Supabase client not initialized' };
+  function formatCurrency(value) {
+    if (!value) return '$0';
+    if (value >= 1000000000) return '$' + (value / 1000000000).toFixed(1) + 'B';
+    if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+    if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'K';
+    return '$' + value.toLocaleString();
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return 'TBD';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function log(message, data) {
+    if (CONFIG.DEBUG) {
+      console.log(`[MissionPulse] ${message}`, data || '');
     }
-    
-    try {
-        console.log('📝 Attempting signup for:', email);
-        const { data, error } = await supabaseClient.auth.signUp({
-            email: email,
-            password: password,
-            options: {
-                data: metadata,
-                emailRedirectTo: `${window.location.origin}/login.html`
-            }
-        });
-        
-        if (error) {
-            console.error('❌ Signup error:', error.message);
-            throw error;
-        }
-        
-        console.log('✅ Sign up successful:', data.user?.email);
-        return { success: true, user: data.user, session: data.session };
-    } catch (error) {
-        console.error('❌ Sign up error:', error.message);
-        return { success: false, error: error.message };
-    }
-}
+  }
 
-/**
- * Sign in existing user with email and password
- */
-async function signInUser(email, password) {
-    if (!supabaseClient) {
-        console.error('❌ Supabase client not initialized');
-        return { success: false, error: 'Supabase client not initialized' };
-    }
-    
-    try {
-        console.log('🔐 Attempting signin for:', email);
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
-        
-        if (error) {
-            console.error('❌ Signin error:', error.message);
-            throw error;
-        }
-        
-        console.log('✅ Sign in successful:', data.user?.email);
-        return { success: true, user: data.user, session: data.session };
-    } catch (error) {
-        console.error('❌ Sign in error:', error.message);
-        return { success: false, error: error.message };
-    }
-}
+  function handleError(operation, error) {
+    console.error(`[MissionPulse] ${operation} failed:`, error);
+    return { data: null, error: error.message || 'Unknown error occurred' };
+  }
 
-/**
- * Sign out current user
- */
-async function signOutUser() {
-    if (!supabaseClient) {
-        return { success: false, error: 'Supabase client not initialized' };
-    }
-    
-    try {
-        const { error } = await supabaseClient.auth.signOut();
-        if (error) throw error;
-        
-        console.log('✅ Sign out successful');
-        window.location.href = '/login.html';
-        return { success: true };
-    } catch (error) {
-        console.error('❌ Sign out error:', error.message);
-        return { success: false, error: error.message };
-    }
-}
-
-/**
- * Get current session
- */
-async function getCurrentSession() {
-    if (!supabaseClient) return null;
-    
-    try {
-        const { data: { session }, error } = await supabaseClient.auth.getSession();
-        return session;
-    } catch (error) {
-        console.error('❌ Get session error:', error);
-        return null;
-    }
-}
-
-/**
- * Get current user
- */
-async function getCurrentUser() {
-    if (!supabaseClient) return null;
-    
-    try {
-        const { data: { user }, error } = await supabaseClient.auth.getUser();
-        return user;
-    } catch (error) {
-        console.error('❌ Get user error:', error);
-        return null;
-    }
-}
-
-/**
- * Send password reset email
- */
-async function resetPassword(email) {
-    if (!supabaseClient) {
-        return { success: false, error: 'Supabase client not initialized' };
-    }
-    
-    try {
-        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/reset-password.html`
-        });
-        
-        if (error) throw error;
-        
-        console.log('✅ Password reset email sent');
-        return { success: true };
-    } catch (error) {
-        console.error('❌ Password reset error:', error.message);
-        return { success: false, error: error.message };
-    }
-}
-
-// =============================================================================
-// DATABASE HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Fetch user profile from database
- */
-async function getUserProfile(userId) {
-    if (!supabaseClient) return null;
-    
-    try {
-        const { data, error } = await supabaseClient
-            .from('users')
-            .select('*, companies(name, logo_url)')
-            .eq('id', userId)
-            .single();
-        
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error('❌ Get user profile error:', error.message);
-        return null;
-    }
-}
-
-/**
- * Fetch all opportunities for a company
- */
-async function getOpportunities(companyId = null) {
-    if (!supabaseClient) return [];
-    
-    try {
-        let query = supabaseClient
-            .from('opportunities')
-            .select('*')
-            .order('due_date', { ascending: true });
-        
-        if (companyId) {
-            query = query.eq('company_id', companyId);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error('❌ Get opportunities error:', error.message);
-        return [];
-    }
-}
-
-/**
- * Fetch single opportunity with details
- */
-async function getOpportunityById(opportunityId) {
-    if (!supabaseClient) return null;
-    
-    try {
-        const { data, error } = await supabaseClient
-            .from('opportunities')
-            .select('*')
-            .eq('id', opportunityId)
-            .single();
-        
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error('❌ Get opportunity error:', error.message);
-        return null;
-    }
-}
-
-/**
- * Fetch compliance requirements for an opportunity
- */
-async function getComplianceRequirements(opportunityId = null) {
-    if (!supabaseClient) return [];
-    
-    try {
-        let query = supabaseClient
-            .from('compliance_requirements')
-            .select('*')
-            .order('created_at', { ascending: false });
-        
-        if (opportunityId) {
-            query = query.eq('opportunity_id', opportunityId);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error('❌ Get compliance requirements error:', error.message);
-        return [];
-    }
-}
-
-/**
- * Fetch lessons learned
- */
-async function getLessonsLearned(companyId = null) {
-    if (!supabaseClient) return [];
-    
-    try {
-        let query = supabaseClient
-            .from('lessons_learned')
-            .select('*')
-            .order('created_at', { ascending: false });
-        
-        if (companyId) {
-            query = query.eq('company_id', companyId);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error('❌ Get lessons learned error:', error.message);
-        return [];
-    }
-}
-
-/**
- * Get company details
- */
-async function getCompany(companyId) {
-    if (!supabaseClient) return null;
-    
-    try {
-        const { data, error } = await supabaseClient
-            .from('companies')
-            .select('*')
-            .eq('id', companyId)
-            .single();
-        
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error('❌ Get company error:', error.message);
-        return null;
-    }
-}
-
-/**
- * Get all companies (for admin)
- */
-async function getAllCompanies() {
-    if (!supabaseClient) return [];
-    
-    try {
-        const { data, error } = await supabaseClient
-            .from('companies')
-            .select('*')
-            .order('name', { ascending: true });
-        
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error('❌ Get all companies error:', error.message);
-        return [];
-    }
-}
-
-// =============================================================================
-// AUTH STATE LISTENER
-// =============================================================================
-
-/**
- * Listen for auth state changes
- */
-function onAuthStateChange(callback) {
-    if (!supabaseClient) {
-        console.error('❌ Cannot listen for auth changes - client not initialized');
-        return;
-    }
-    
-    supabaseClient.auth.onAuthStateChange((event, session) => {
-        console.log('🔐 Auth state changed:', event);
-        callback(event, session);
-    });
-}
-
-// =============================================================================
-// RBAC HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Check if user has specific permission
- */
-function hasPermission(role, permission) {
-    const permissions = {
-        'admin': ['all'],
-        'ceo': ['view_all', 'go_nogo', 'approve_pricing', 'view_financials', 'manage_partners'],
-        'coo': ['view_all', 'manage_captures', 'assign_resources', 'view_financials'],
-        'capture_manager': ['view_captures', 'manage_proposals', 'assign_team', 'black_hat'],
-        'proposal_manager': ['view_proposals', 'edit_sections', 'compliance', 'schedule'],
-        'solution_architect': ['edit_technical', 'edit_management', 'pricing_support'],
-        'finance': ['view_financials', 'pricing', 'boe'],
-        'contracts': ['compliance', 'far_dfars', 'terms'],
-        'delivery': ['staffing', 'resumes', 'past_performance'],
-        'qa': ['review_all', 'compliance_check', 'quality_gate'],
-        'partner': ['view_assigned', 'edit_assigned'],
-        'viewer': ['view_only']
+  // ─────────────────────────────────────────────────────────────
+  // FIELD MAPPING: Database → Frontend
+  // ─────────────────────────────────────────────────────────────
+  
+  function mapOpportunityFromDB(dbRow) {
+    return {
+      id: dbRow.id,
+      name: dbRow.title,
+      nickname: dbRow.nickname || dbRow.title,
+      description: dbRow.description,
+      agency: dbRow.agency,
+      solicitation: dbRow.solicitation_number,
+      ceiling: dbRow.estimated_value,
+      ceilingFormatted: formatCurrency(dbRow.estimated_value),
+      contractType: dbRow.contract_type,
+      phase: dbRow.phase,
+      pWin: dbRow.pwin,
+      priority: dbRow.priority,
+      goNoGo: dbRow.go_no_go,
+      dueDate: dbRow.proposal_due,
+      daysRemaining: calculateDaysRemaining(dbRow.proposal_due),
+      naicsCode: dbRow.naics_code,
+      setAside: dbRow.set_aside,
+      periodOfPerformance: dbRow.period_of_performance,
+      releaseDate: dbRow.release_date,
+      currentGate: dbRow.current_gate,
+      isArchived: dbRow.is_archived,
+      createdAt: dbRow.created_at,
+      _raw: CONFIG.DEBUG ? dbRow : undefined
     };
-    
-    const userPerms = permissions[role] || ['view_only'];
-    return userPerms.includes('all') || userPerms.includes(permission);
-}
+  }
 
-/**
- * Get visible menu items based on role
- */
-function getVisibleMenuItems(role) {
-    const allItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: 'home', roles: ['all'] },
-        { id: 'opportunities', label: 'Opportunities', icon: 'target', roles: ['all'] },
-        { id: 'proposals', label: 'Proposals', icon: 'document', roles: ['admin', 'ceo', 'coo', 'capture_manager', 'proposal_manager'] },
-        { id: 'pricing', label: 'Pricing', icon: 'calculator', roles: ['admin', 'ceo', 'coo', 'finance'] },
-        { id: 'compliance', label: 'Compliance', icon: 'shield', roles: ['admin', 'ceo', 'coo', 'contracts', 'qa'] },
-        { id: 'team', label: 'Team', icon: 'users', roles: ['admin', 'ceo', 'coo', 'capture_manager'] },
-        { id: 'partners', label: 'Partners', icon: 'handshake', roles: ['admin', 'ceo', 'coo'] },
-        { id: 'analytics', label: 'Analytics', icon: 'chart', roles: ['admin', 'ceo', 'coo'] },
-        { id: 'settings', label: 'Settings', icon: 'settings', roles: ['admin'] }
-    ];
-    
-    return allItems.filter(item => 
-        item.roles.includes('all') || item.roles.includes(role)
-    );
-}
+  function mapOpportunityToDB(frontendObj) {
+    const dbObj = {};
+    if (frontendObj.name !== undefined) dbObj.title = frontendObj.name;
+    if (frontendObj.nickname !== undefined) dbObj.nickname = frontendObj.nickname;
+    if (frontendObj.description !== undefined) dbObj.description = frontendObj.description;
+    if (frontendObj.agency !== undefined) dbObj.agency = frontendObj.agency;
+    if (frontendObj.solicitation !== undefined) dbObj.solicitation_number = frontendObj.solicitation;
+    if (frontendObj.ceiling !== undefined) dbObj.estimated_value = frontendObj.ceiling;
+    if (frontendObj.contractType !== undefined) dbObj.contract_type = frontendObj.contractType;
+    if (frontendObj.phase !== undefined) dbObj.phase = frontendObj.phase;
+    if (frontendObj.pWin !== undefined) dbObj.pwin = frontendObj.pWin;
+    if (frontendObj.priority !== undefined) dbObj.priority = frontendObj.priority;
+    if (frontendObj.goNoGo !== undefined) dbObj.go_no_go = frontendObj.goNoGo;
+    if (frontendObj.dueDate !== undefined) dbObj.proposal_due = frontendObj.dueDate;
+    if (frontendObj.naicsCode !== undefined) dbObj.naics_code = frontendObj.naicsCode;
+    if (frontendObj.setAside !== undefined) dbObj.set_aside = frontendObj.setAside;
+    if (frontendObj.isArchived !== undefined) dbObj.is_archived = frontendObj.isArchived;
+    return dbObj;
+  }
 
-// Export for global access
-window.mpSupabase = {
-    client: supabaseClient,
-    auth: {
-        signUp: signUpUser,
-        signIn: signInUser,
-        signOut: signOutUser,
-        getSession: getCurrentSession,
-        getUser: getCurrentUser,
-        resetPassword: resetPassword,
-        onStateChange: onAuthStateChange
-    },
-    db: {
-        getUserProfile,
-        getOpportunities,
-        getOpportunityById,
-        getComplianceRequirements,
-        getLessonsLearned,
-        getCompany,
-        getAllCompanies
-    },
-    rbac: {
-        hasPermission,
-        getVisibleMenuItems
+  function mapUserFromDB(dbRow) {
+    return {
+      id: dbRow.id,
+      email: dbRow.email,
+      fullName: dbRow.full_name,
+      roleId: dbRow.role_id,
+      avatarUrl: dbRow.avatar_url,
+      isActive: dbRow.is_active,
+      companyId: dbRow.company_id
+    };
+  }
+
+  function mapCompetitorFromDB(dbRow) {
+    return {
+      id: dbRow.id,
+      opportunityId: dbRow.opportunity_id,
+      companyName: dbRow.company_name,
+      threatLevel: dbRow.threat_level,
+      isIncumbent: dbRow.incumbent,
+      strengths: dbRow.strengths || [],
+      weaknesses: dbRow.weaknesses || [],
+      ghostStrategy: dbRow.ghost_strategy,
+      confidenceScore: dbRow.confidence_score
+    };
+  }
+
+  function mapComplianceFromDB(dbRow) {
+    return {
+      id: dbRow.id,
+      opportunityId: dbRow.opportunity_id,
+      pwsReference: dbRow.pws_reference,
+      requirementText: dbRow.requirement_text,
+      status: dbRow.status,
+      riskLevel: dbRow.risk_level,
+      assignedTo: dbRow.assigned_to,
+      sectionAssignment: dbRow.section_assignment,
+      responseOutline: dbRow.response_outline,
+      proofPoints: dbRow.proof_points || [],
+      dueDate: dbRow.due_date
+    };
+  }
+
+  function mapPartnerFromDB(dbRow) {
+    return {
+      id: dbRow.id,
+      partnerName: dbRow.partner_name,
+      partnerType: dbRow.partner_type,
+      contactName: dbRow.contact_name,
+      contactEmail: dbRow.contact_email,
+      socioeconomicStatus: dbRow.socioeconomic_status || [],
+      capabilities: dbRow.capabilities || [],
+      trustScore: dbRow.trust_score,
+      ndaStatus: dbRow.nda_status,
+      teamingAgreementStatus: dbRow.teaming_agreement_status
+    };
+  }
+
+  function mapLessonFromDB(dbRow) {
+    return {
+      id: dbRow.id,
+      opportunityId: dbRow.opportunity_id,
+      category: dbRow.category,
+      title: dbRow.title,
+      lessonText: dbRow.lesson_text,
+      context: dbRow.context,
+      outcome: dbRow.outcome,
+      impactScore: dbRow.impact_score,
+      isGoldenExample: dbRow.is_golden_example,
+      tags: dbRow.tags || [],
+      createdBy: dbRow.created_by,
+      createdAt: dbRow.created_at
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CRUD: OPPORTUNITIES
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getOpportunities(options = {}) {
+    try {
+      let query = getClient().from('opportunities').select('*');
+      
+      if (!options.includeArchived) {
+        query = query.eq('is_archived', false);
+      }
+      if (options.phase) {
+        query = query.eq('phase', options.phase);
+      }
+      if (options.companyId) {
+        query = query.eq('company_id', options.companyId);
+      }
+      
+      query = query.order(options.orderBy || 'estimated_value', { 
+        ascending: options.ascending || false 
+      });
+      
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      log('Fetched opportunities', { count: data.length });
+      return { data: data.map(mapOpportunityFromDB), error: null };
+    } catch (error) {
+      return handleError('getOpportunities', error);
     }
-};
+  }
 
-console.log('✅ MissionPulse Supabase Client v1.0.1 loaded');
-console.log('🔗 Supabase URL:', SUPABASE_URL);
-console.log('🔑 Client initialized:', supabaseClient ? 'YES' : 'NO');
+  async function getOpportunityById(id) {
+    try {
+      const { data, error } = await getClient()
+        .from('opportunities')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      return { data: mapOpportunityFromDB(data), error: null };
+    } catch (error) {
+      return handleError('getOpportunityById', error);
+    }
+  }
+
+  async function createOpportunity(opportunity) {
+    try {
+      const dbData = mapOpportunityToDB(opportunity);
+      dbData.company_id = opportunity.companyId || CONFIG.DEFAULT_COMPANY_ID;
+      
+      const { data, error } = await getClient()
+        .from('opportunities')
+        .insert(dbData)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      log('Created opportunity', data.id);
+      return { data: mapOpportunityFromDB(data), error: null };
+    } catch (error) {
+      return handleError('createOpportunity', error);
+    }
+  }
+
+  async function updateOpportunity(id, updates) {
+    try {
+      const dbData = mapOpportunityToDB(updates);
+      
+      const { data, error } = await getClient()
+        .from('opportunities')
+        .update(dbData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      log('Updated opportunity', id);
+      return { data: mapOpportunityFromDB(data), error: null };
+    } catch (error) {
+      return handleError('updateOpportunity', error);
+    }
+  }
+
+  async function deleteOpportunity(id, soft = true) {
+    try {
+      if (soft) {
+        return updateOpportunity(id, { isArchived: true });
+      }
+      
+      const { error } = await getClient()
+        .from('opportunities')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      log('Deleted opportunity', id);
+      return { data: { id }, error: null };
+    } catch (error) {
+      return handleError('deleteOpportunity', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CRUD: USERS
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getUsers(options = {}) {
+    try {
+      let query = getClient()
+        .from('users')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (options.roleId) {
+        query = query.eq('role_id', options.roleId);
+      }
+      if (options.companyId) {
+        query = query.eq('company_id', options.companyId);
+      }
+      
+      const { data, error } = await query.order('full_name');
+      if (error) throw error;
+      
+      return { data: data.map(mapUserFromDB), error: null };
+    } catch (error) {
+      return handleError('getUsers', error);
+    }
+  }
+
+  async function getUserByEmail(email) {
+    try {
+      const { data, error } = await getClient()
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+      
+      if (error) throw error;
+      return { data: mapUserFromDB(data), error: null };
+    } catch (error) {
+      return handleError('getUserByEmail', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CRUD: COMPETITORS
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getCompetitors(opportunityId) {
+    try {
+      const { data, error } = await getClient()
+        .from('competitors')
+        .select('*')
+        .eq('opportunity_id', opportunityId)
+        .order('threat_level', { ascending: false });
+      
+      if (error) throw error;
+      return { data: data.map(mapCompetitorFromDB), error: null };
+    } catch (error) {
+      return handleError('getCompetitors', error);
+    }
+  }
+
+  async function createCompetitor(competitor) {
+    try {
+      const { data, error } = await getClient()
+        .from('competitors')
+        .insert({
+          opportunity_id: competitor.opportunityId,
+          company_name: competitor.companyName,
+          threat_level: competitor.threatLevel || 'Medium',
+          incumbent: competitor.isIncumbent || false,
+          strengths: competitor.strengths || [],
+          weaknesses: competitor.weaknesses || [],
+          ghost_strategy: competitor.ghostStrategy
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return { data: mapCompetitorFromDB(data), error: null };
+    } catch (error) {
+      return handleError('createCompetitor', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CRUD: COMPLIANCE
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getComplianceRequirements(opportunityId) {
+    try {
+      const { data, error } = await getClient()
+        .from('compliance_requirements')
+        .select('*')
+        .eq('opportunity_id', opportunityId)
+        .order('pws_reference');
+      
+      if (error) throw error;
+      return { data: data.map(mapComplianceFromDB), error: null };
+    } catch (error) {
+      return handleError('getComplianceRequirements', error);
+    }
+  }
+
+  async function updateComplianceStatus(id, status, riskLevel) {
+    try {
+      const updateData = { status };
+      if (riskLevel) updateData.risk_level = riskLevel;
+      
+      const { data, error } = await getClient()
+        .from('compliance_requirements')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return { data: mapComplianceFromDB(data), error: null };
+    } catch (error) {
+      return handleError('updateComplianceStatus', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CRUD: PARTNERS
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getPartners(companyId) {
+    try {
+      const { data, error } = await getClient()
+        .from('partners')
+        .select('*')
+        .eq('company_id', companyId || CONFIG.DEFAULT_COMPANY_ID)
+        .order('trust_score', { ascending: false });
+      
+      if (error) throw error;
+      return { data: data.map(mapPartnerFromDB), error: null };
+    } catch (error) {
+      return handleError('getPartners', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CRUD: PLAYBOOK LESSONS
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getPlaybookLessons(options = {}) {
+    try {
+      let query = getClient()
+        .from('playbook_lessons')
+        .select('*')
+        .eq('company_id', options.companyId || CONFIG.DEFAULT_COMPANY_ID);
+      
+      if (options.category) {
+        query = query.eq('category', options.category);
+      }
+      if (options.goldenOnly) {
+        query = query.eq('is_golden_example', true);
+      }
+      if (options.opportunityId) {
+        query = query.eq('opportunity_id', options.opportunityId);
+      }
+      
+      const { data, error } = await query.order('impact_score', { ascending: false });
+      if (error) throw error;
+      
+      return { data: data.map(mapLessonFromDB), error: null };
+    } catch (error) {
+      return handleError('getPlaybookLessons', error);
+    }
+  }
+
+  async function createPlaybookLesson(lesson) {
+    try {
+      const { data, error } = await getClient()
+        .from('playbook_lessons')
+        .insert({
+          company_id: lesson.companyId || CONFIG.DEFAULT_COMPANY_ID,
+          opportunity_id: lesson.opportunityId,
+          category: lesson.category,
+          title: lesson.title,
+          lesson_text: lesson.lessonText,
+          context: lesson.context,
+          outcome: lesson.outcome,
+          impact_score: lesson.impactScore || 5,
+          is_golden_example: lesson.isGoldenExample || false,
+          tags: lesson.tags || [],
+          created_by: lesson.createdBy
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return { data: mapLessonFromDB(data), error: null };
+    } catch (error) {
+      return handleError('createPlaybookLesson', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CRUD: GATE REVIEWS
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getGateReviews(opportunityId) {
+    try {
+      const { data, error } = await getClient()
+        .from('gate_reviews')
+        .select('*')
+        .eq('opportunity_id', opportunityId)
+        .order('gate_number');
+      
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return handleError('getGateReviews', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CRUD: TEAM MEMBERS
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getTeamMembers(opportunityId) {
+    try {
+      const { data, error } = await getClient()
+        .from('team_members')
+        .select('*, users(full_name, email)')
+        .eq('opportunity_id', opportunityId)
+        .order('is_key_personnel', { ascending: false });
+      
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return handleError('getTeamMembers', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // AGGREGATE QUERIES
+  // ─────────────────────────────────────────────────────────────
+  
+  async function getPipelineStats(companyId) {
+    try {
+      const { data: opportunities, error } = await getClient()
+        .from('opportunities')
+        .select('estimated_value, pwin, phase, is_archived, priority')
+        .eq('is_archived', false);
+      
+      if (error) throw error;
+      
+      const stats = {
+        totalOpportunities: opportunities.length,
+        totalValue: opportunities.reduce((sum, o) => sum + (o.estimated_value || 0), 0),
+        totalValueFormatted: '',
+        activeCount: opportunities.filter(o => !['Won', 'Lost'].includes(o.phase)).length,
+        avgPwin: opportunities.length > 0 
+          ? Math.round(opportunities.reduce((sum, o) => sum + (o.pwin || 0), 0) / opportunities.length)
+          : 0,
+        byPhase: {},
+        byPriority: {},
+        highValueCount: opportunities.filter(o => o.estimated_value >= 50000000).length
+      };
+      
+      stats.totalValueFormatted = formatCurrency(stats.totalValue);
+      
+      opportunities.forEach(o => {
+        stats.byPhase[o.phase] = (stats.byPhase[o.phase] || 0) + 1;
+        stats.byPriority[o.priority] = (stats.byPriority[o.priority] || 0) + 1;
+      });
+      
+      return { data: stats, error: null };
+    } catch (error) {
+      return handleError('getPipelineStats', error);
+    }
+  }
+
+  async function getComplianceStats(opportunityId) {
+    try {
+      const { data: requirements, error } = await getClient()
+        .from('compliance_requirements')
+        .select('status, risk_level')
+        .eq('opportunity_id', opportunityId);
+      
+      if (error) throw error;
+      
+      const total = requirements.length;
+      const stats = {
+        total,
+        compliant: requirements.filter(r => r.status === 'Compliant').length,
+        partial: requirements.filter(r => r.status === 'Partial').length,
+        highRisk: requirements.filter(r => r.status === 'High Risk').length,
+        inProgress: requirements.filter(r => r.status === 'In Progress').length,
+        notStarted: requirements.filter(r => r.status === 'Not Started').length,
+        complianceRate: 0,
+        riskBreakdown: {
+          green: requirements.filter(r => r.risk_level === 'Green').length,
+          yellow: requirements.filter(r => r.risk_level === 'Yellow').length,
+          red: requirements.filter(r => r.risk_level === 'Red').length
+        }
+      };
+      
+      stats.complianceRate = total > 0 ? Math.round((stats.compliant / total) * 100) : 0;
+      
+      return { data: stats, error: null };
+    } catch (error) {
+      return handleError('getComplianceStats', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // REAL-TIME SUBSCRIPTIONS
+  // ─────────────────────────────────────────────────────────────
+  
+  function subscribeToOpportunities(callback) {
+    const channel = getClient()
+      .channel('opportunities-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'opportunities' },
+        (payload) => {
+          log('Realtime update', payload);
+          callback(payload);
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      channel.unsubscribe();
+    };
+  }
+
+  function subscribeToTable(tableName, callback) {
+    const channel = getClient()
+      .channel(`${tableName}-changes`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: tableName },
+        (payload) => {
+          log(`Realtime update on ${tableName}`, payload);
+          callback(payload);
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      channel.unsubscribe();
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // ACTIVITY LOGGING
+  // ─────────────────────────────────────────────────────────────
+  
+  async function logActivity(actionType, entityType, entityId, metadata = {}) {
+    try {
+      await getClient()
+        .from('activity_log')
+        .insert({
+          company_id: CONFIG.DEFAULT_COMPANY_ID,
+          action_type: actionType,
+          entity_type: entityType,
+          entity_id: entityId,
+          metadata
+        });
+    } catch (error) {
+      console.warn('[MissionPulse] Activity logging failed:', error);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // EXPORT PUBLIC API
+  // ─────────────────────────────────────────────────────────────
+  
+  global.MissionPulse = {
+    // Configuration
+    config: CONFIG,
+    getClient,
+    
+    // Utilities
+    formatCurrency,
+    formatDate,
+    calculateDaysRemaining,
+    
+    // Mappers (for custom queries)
+    mappers: {
+      opportunityFromDB: mapOpportunityFromDB,
+      opportunityToDB: mapOpportunityToDB,
+      userFromDB: mapUserFromDB,
+      competitorFromDB: mapCompetitorFromDB,
+      complianceFromDB: mapComplianceFromDB,
+      partnerFromDB: mapPartnerFromDB,
+      lessonFromDB: mapLessonFromDB
+    },
+    
+    // Opportunities
+    getOpportunities,
+    getOpportunityById,
+    createOpportunity,
+    updateOpportunity,
+    deleteOpportunity,
+    
+    // Users
+    getUsers,
+    getUserByEmail,
+    
+    // Competitors
+    getCompetitors,
+    createCompetitor,
+    
+    // Compliance
+    getComplianceRequirements,
+    updateComplianceStatus,
+    
+    // Partners
+    getPartners,
+    
+    // Playbook
+    getPlaybookLessons,
+    createPlaybookLesson,
+    
+    // Gate Reviews
+    getGateReviews,
+    
+    // Team Members
+    getTeamMembers,
+    
+    // Aggregates
+    getPipelineStats,
+    getComplianceStats,
+    
+    // Realtime
+    subscribeToOpportunities,
+    subscribeToTable,
+    
+    // Activity
+    logActivity
+  };
+
+  log('MissionPulse module loaded v1.0');
+
+})(typeof window !== 'undefined' ? window : global);
