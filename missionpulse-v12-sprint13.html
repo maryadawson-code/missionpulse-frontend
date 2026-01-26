@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse v12 Sprint 13 | Pipeline Management</title>
+    <meta name="description" content="Federal proposal pipeline management with Supabase integration">
+    
+    <!-- React & Babel -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'mmt-cyan': '#00E5FA',
+              'mmt-navy': '#00050F',
+            }
+          }
+        }
+      }
+    </script>
+    
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+      
+      :root {
+        --mmt-cyan: #00E5FA;
+        --mmt-navy: #00050F;
+      }
+      
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        min-height: 100vh;
+        transition: background-color 0.3s, color 0.3s;
+      }
+      body.dark { background: var(--mmt-navy); color: #e2e8f0; }
+      body.light { background: #f8fafc; color: #1e293b; }
+      
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #1e293b; }
+      ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+      
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      
+      .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+      .animate-slideIn { animation: slideIn 0.3s ease-out; }
+      .animate-pulse { animation: pulse 2s infinite; }
+      
+      .glass-panel { 
+        background: rgba(15, 23, 42, 0.7); 
+        backdrop-filter: blur(12px); 
+        border: 1px solid rgba(0, 229, 250, 0.12); 
+      }
+      
+      .light .glass-panel {
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+      }
+      
+      /* Drag and Drop Styles */
+      .drag-over { background: rgba(0, 229, 250, 0.1); border: 2px dashed #00E5FA; }
+      .dragging { opacity: 0.5; transform: rotate(2deg); }
+      
+      /* Print Styles for PDF */
+      @media print {
+        body { background: white !important; color: black !important; }
+        .no-print { display: none !important; }
+      }
+    </style>
+</head>
+<body class="dark">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+// ============================================================
+// MISSIONPULSE v12 SPRINT 13
+// Bulk Import | PDF Reports | Templates | Duplicate
+// © 2026 Mission Meets Tech
+// ============================================================
+
+const { useState, useEffect, useMemo, useCallback, useRef, createContext, useContext } = React;
+
+// ============================================================
+// SUPABASE CONFIGURATION
+// ============================================================
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+const SHIPLEY_PHASES = [
+  { id: 'gate_1', name: 'Gate 1', color: '#94a3b8', order: 1 },
+  { id: 'blue_team', name: 'Blue Team', color: '#60a5fa', order: 2 },
+  { id: 'pink_team', name: 'Pink Team', color: '#f472b6', order: 3 },
+  { id: 'red_team', name: 'Red Team', color: '#ef4444', order: 4 },
+  { id: 'gold_team', name: 'Gold Team', color: '#fbbf24', order: 5 },
+  { id: 'submitted', name: 'Submitted', color: '#22c55e', order: 6 },
+  { id: 'awarded', name: 'Awarded', color: '#8b5cf6', order: 7 },
+  { id: 'lost', name: 'Lost', color: '#64748b', order: 8 },
+];
+
+const PRIORITIES = ['P-0', 'P-1', 'P-2', 'P-3'];
+const AGENCIES = ['DHA', 'VA', 'CMS', 'IHS', 'NIH', 'HHS', 'DOD', 'USDA', 'GSA'];
+
+const LOCALSTORAGE_KEYS = {
+  SETTINGS: 'MP_SETTINGS',
+  FILTER_PRESETS: 'MP_FILTER_PRESETS',
+  TEMPLATES: 'MP_OPPORTUNITY_TEMPLATES',
+  THEME: 'MP_THEME',
+};
+
+// Default templates pre-loaded
+const DEFAULT_TEMPLATES = [
+  { id: 'tpl_1', name: 'Healthcare IT - DHA', data: { agency: 'DHA', priority: 'P-1', shipleyPhase: 'gate_1', winProbability: 50 }},
+  { id: 'tpl_2', name: 'VA Modernization', data: { agency: 'VA', priority: 'P-2', shipleyPhase: 'gate_1', winProbability: 45 }},
+];
+
+// ============================================================
+// FIELD MAPPING
+// ============================================================
+const mapToFrontend = (record) => {
+  if (!record) return null;
+  return {
+    id: record.id,
+    name: record.name,
+    agency: record.agency,
+    contractValue: record.contract_value,
+    priority: record.priority,
+    shipleyPhase: record.shipley_phase,
+    winProbability: record.win_probability,
+    dueDate: record.due_date,
+    solicitationNumber: record.solicitation_number,
+    description: record.description,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at,
+  };
+};
+
+const mapToDatabase = (data) => {
+  if (!data) return null;
+  const mapped = {};
+  if (data.name !== undefined) mapped.name = data.name;
+  if (data.agency !== undefined) mapped.agency = data.agency;
+  if (data.contractValue !== undefined) mapped.contract_value = data.contractValue;
+  if (data.priority !== undefined) mapped.priority = data.priority;
+  if (data.shipleyPhase !== undefined) mapped.shipley_phase = data.shipleyPhase;
+  if (data.winProbability !== undefined) mapped.win_probability = data.winProbability;
+  if (data.dueDate !== undefined) mapped.due_date = data.dueDate;
+  if (data.solicitationNumber !== undefined) mapped.solicitation_number = data.solicitationNumber;
+  if (data.description !== undefined) mapped.description = data.description;
+  return mapped;
+};
+
+// ============================================================
+// ICONS
+// ============================================================
+const Icons = {
+  search: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+  plus: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+  filter: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+  x: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+  upload: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+  download: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+  file: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+  copy: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+  trash: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+  edit: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+  dots: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>,
+  sun: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  moon: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>,
+  check: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+  chevronDown: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+  calendar: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+  grid: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+  table: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+  chart: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+  save: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
+  template: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>,
+  alert: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+  clock: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+};
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+const formatCurrency = (value) => {
+  if (!value) return '$0';
+  if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+  return `$${value.toLocaleString()}`;
+};
+
+const formatDate = (date) => {
+  if (!date) return '-';
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const getDaysRemaining = (dueDate) => {
+  if (!dueDate) return null;
+  const today = new Date();
+  const due = new Date(dueDate);
+  return Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+};
+
+const generateId = () => `opp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+// ============================================================
+// TOAST CONTEXT
+// ============================================================
+const ToastContext = createContext(null);
+
+const ToastProvider = ({ children }) => {
+  const [toasts, setToasts] = useState([]);
+  
+  const addToast = useCallback((message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
+  
+  return (
+    <ToastContext.Provider value={{ addToast }}>
+      {children}
+      <div className="fixed bottom-4 right-4 z-50 space-y-2">
+        {toasts.map(toast => (
+          <div 
+            key={toast.id}
+            className={`px-4 py-3 rounded-lg shadow-lg animate-fadeIn ${
+              toast.type === 'success' ? 'bg-emerald-500 text-white' :
+              toast.type === 'error' ? 'bg-red-500 text-white' :
+              toast.type === 'warning' ? 'bg-amber-500 text-white' :
+              'bg-slate-700 text-white'
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+};
+
+const useToast = () => useContext(ToastContext);
+
+// ============================================================
+// UI COMPONENTS
+// ============================================================
+const Button = ({ children, variant = 'primary', size = 'md', icon: Icon, disabled, className = '', ...props }) => {
+  const variants = {
+    primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400 shadow-lg shadow-cyan-500/25',
+    secondary: 'bg-slate-700 dark:bg-slate-700 light:bg-slate-200 text-white dark:text-white light:text-slate-700 hover:bg-slate-600 border border-slate-600',
+    ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50',
+    danger: 'bg-red-500 text-white hover:bg-red-400',
+    success: 'bg-emerald-500 text-white hover:bg-emerald-400',
+  };
+  const sizes = {
+    xs: 'px-2 py-1 text-xs',
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-sm',
+    lg: 'px-6 py-3 text-base',
+  };
+  
+  return (
+    <button
+      className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
+      disabled={disabled}
+      {...props}
+    >
+      {Icon && <Icon className="w-4 h-4" />}
+      {children}
+    </button>
+  );
+};
+
+const Badge = ({ children, color, className = '' }) => (
+  <span 
+    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${className}`}
+    style={{ backgroundColor: `${color}20`, color, border: `1px solid ${color}40` }}
+  >
+    {children}
+  </span>
+);
+
+const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+  if (!isOpen) return null;
+  
+  const sizes = {
+    sm: 'max-w-md',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
+  };
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+      <div className={`relative glass-panel rounded-xl shadow-2xl w-full ${sizes[size]} max-h-[90vh] overflow-hidden animate-fadeIn`}>
+        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-700/50">
+            <Icons.x className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Dropdown = ({ trigger, children, align = 'right' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  return (
+    <div className="relative" ref={ref}>
+      <div onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
+      {isOpen && (
+        <div className={`absolute z-50 mt-1 glass-panel rounded-lg shadow-xl py-1 min-w-[160px] animate-fadeIn ${align === 'right' ? 'right-0' : 'left-0'}`}>
+          {typeof children === 'function' ? children(() => setIsOpen(false)) : children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DropdownItem = ({ children, icon: Icon, onClick, danger }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-700/50 transition-colors ${danger ? 'text-red-400' : 'text-slate-300'}`}
+  >
+    {Icon && <Icon className="w-4 h-4" />}
+    {children}
+  </button>
+);
+
+// ============================================================
+// IMPORT MODAL COMPONENT
+// ============================================================
+const ImportModal = ({ isOpen, onClose, onImport }) => {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState([]);
+  const [errors, setErrors] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef(null);
+  const { addToast } = useToast();
+  
+  const CSV_TEMPLATE = `name,agency,contract_value,priority,shipley_phase,win_probability,due_date,solicitation_number,description
+"DHA EHR Modernization",DHA,25000000,P-1,blue_team,65,2026-03-15,W81K04-24-R-0042,"Electronic health records modernization"
+"VA Claims Processing",VA,18000000,P-2,gate_1,45,2026-04-20,36C10B24R0001,"Claims automation platform"`;
+
+  const downloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'missionpulse_import_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  
+  const parseCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const rows = [];
+    const errs = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].match(/(".*?"|[^,]+)/g)?.map(v => v.trim().replace(/^"|"$/g, '')) || [];
+      const row = {};
+      headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+      
+      // Validate required fields
+      if (!row.name || !row.agency) {
+        errs.push({ line: i + 1, message: 'Missing name or agency' });
+        row._valid = false;
+      } else {
+        row._valid = true;
+      }
+      rows.push(row);
+    }
+    
+    return { rows, errors: errs };
+  };
+  
+  const handleFile = (f) => {
+    if (!f || !f.name.endsWith('.csv')) {
+      addToast('Please select a CSV file', 'error');
+      return;
+    }
+    
+    setFile(f);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const { rows, errors: errs } = parseCSV(e.target.result);
+      setPreview(rows.slice(0, 5));
+      setErrors(errs);
+    };
+    reader.readAsText(f);
+  };
+  
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    handleFile(e.dataTransfer.files[0]);
+  };
+  
+  const handleImport = async () => {
+    if (!file) return;
+    
+    setImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const { rows, errors: errs } = parseCSV(e.target.result);
+      const validRows = rows.filter(r => r._valid);
+      
+      let imported = 0;
+      let failed = 0;
+      
+      // Batch insert in groups of 10
+      for (let i = 0; i < validRows.length; i += 10) {
+        const batch = validRows.slice(i, i + 10).map(row => ({
+          name: row.name,
+          agency: row.agency,
+          contract_value: parseInt(row.contract_value) || 0,
+          priority: row.priority || 'P-2',
+          shipley_phase: row.shipley_phase || 'gate_1',
+          win_probability: parseInt(row.win_probability) || 50,
+          due_date: row.due_date || null,
+          solicitation_number: row.solicitation_number || null,
+          description: row.description || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+        
+        const { data, error } = await supabase.from('opportunities').insert(batch).select();
+        
+        if (error) {
+          console.error('Import batch error:', error);
+          failed += batch.length;
+        } else {
+          imported += data.length;
+          // Log activity for each
+          for (const opp of data) {
+            await supabase.from('activity_log').insert({
+              opportunity_id: opp.id,
+              action: 'created',
+              user_id: 'import',
+              created_at: new Date().toISOString(),
+            });
+          }
+        }
+      }
+      
+      setImporting(false);
+      const skipped = rows.length - validRows.length;
+      addToast(`Imported ${imported} of ${rows.length} opportunities${skipped > 0 ? ` (${skipped} skipped)` : ''}`, imported > 0 ? 'success' : 'warning');
+      onImport();
+      onClose();
+      setFile(null);
+      setPreview([]);
+    };
+    reader.readAsText(file);
+  };
+  
+  const reset = () => {
+    setFile(null);
+    setPreview([]);
+    setErrors([]);
+  };
+  
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Import Opportunities" size="lg">
+      <div className="space-y-4">
+        {/* Drop Zone */}
+        {!file ? (
+          <div
+            className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+              dragOver ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-600 hover:border-slate-500'
+            }`}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+          >
+            <Icons.upload className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+            <p className="text-slate-300 mb-2">Drag and drop a CSV file here</p>
+            <p className="text-slate-500 text-sm mb-4">or</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => handleFile(e.target.files[0])}
+            />
+            <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+              Browse Files
+            </Button>
+          </div>
+        ) : (
+          <div className="p-4 bg-slate-800/50 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Icons.file className="w-8 h-8 text-cyan-400" />
+              <div>
+                <p className="font-medium">{file.name}</p>
+                <p className="text-sm text-slate-400">{preview.length} rows previewed</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={reset}>Change</Button>
+          </div>
+        )}
+        
+        {/* Download Template Link */}
+        <div className="text-center">
+          <button onClick={downloadTemplate} className="text-cyan-400 hover:text-cyan-300 text-sm underline">
+            Download CSV Template
+          </button>
+        </div>
+        
+        {/* Preview Table */}
+        {preview.length > 0 && (
+          <div className="overflow-x-auto">
+            <p className="text-sm text-slate-400 mb-2">Preview (first 5 rows):</p>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-left">Name</th>
+                  <th className="px-3 py-2 text-left">Agency</th>
+                  <th className="px-3 py-2 text-left">Value</th>
+                  <th className="px-3 py-2 text-left">Priority</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.map((row, idx) => (
+                  <tr key={idx} className={row._valid ? '' : 'bg-red-500/10'}>
+                    <td className="px-3 py-2">
+                      {row._valid ? (
+                        <Icons.check className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <Icons.alert className="w-4 h-4 text-red-400" />
+                      )}
+                    </td>
+                    <td className="px-3 py-2">{row.name || '-'}</td>
+                    <td className="px-3 py-2">{row.agency || '-'}</td>
+                    <td className="px-3 py-2">{formatCurrency(parseInt(row.contract_value))}</td>
+                    <td className="px-3 py-2">{row.priority || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {errors.length > 0 && (
+              <p className="text-red-400 text-sm mt-2">{errors.length} row(s) have validation errors</p>
+            )}
+          </div>
+        )}
+        
+        {/* Actions */}
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-700">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button 
+            variant="primary" 
+            onClick={handleImport} 
+            disabled={!file || preview.length === 0 || importing}
+          >
+            {importing ? 'Importing...' : `Import ${preview.filter(r => r._valid).length} Opportunities`}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ============================================================
+// PDF REPORT MODAL COMPONENT
+// ============================================================
+const PDFReportModal = ({ isOpen, onClose, opportunities }) => {
+  const [config, setConfig] = useState({
+    title: `Pipeline Report - ${new Date().toLocaleDateString()}`,
+    sections: {
+      executiveSummary: true,
+      pipelineByPhase: true,
+      upcomingDeadlines: true,
+      highPriority: true,
+      fullList: false,
+    },
+    dateRange: { start: '', end: '' },
+  });
+  const [generating, setGenerating] = useState(false);
+  const { addToast } = useToast();
+  
+  const generatePDF = async () => {
+    setGenerating(true);
+    
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let y = 20;
+      
+      // Header
+      doc.setFontSize(20);
+      doc.setTextColor(0, 229, 250);
+      doc.text('MissionPulse', 20, y);
+      y += 10;
+      
+      doc.setFontSize(16);
+      doc.setTextColor(30, 41, 59);
+      doc.text(config.title, 20, y);
+      y += 8;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 20, y);
+      y += 15;
+      
+      // Filter by date range if specified
+      let filteredOpps = [...opportunities];
+      if (config.dateRange.start) {
+        filteredOpps = filteredOpps.filter(o => new Date(o.dueDate) >= new Date(config.dateRange.start));
+      }
+      if (config.dateRange.end) {
+        filteredOpps = filteredOpps.filter(o => new Date(o.dueDate) <= new Date(config.dateRange.end));
+      }
+      
+      // Executive Summary
+      if (config.sections.executiveSummary) {
+        doc.setFontSize(14);
+        doc.setTextColor(30, 41, 59);
+        doc.text('Executive Summary', 20, y);
+        y += 8;
+        
+        const totalValue = filteredOpps.reduce((sum, o) => sum + (o.contractValue || 0), 0);
+        const avgPwin = filteredOpps.length > 0 
+          ? Math.round(filteredOpps.reduce((sum, o) => sum + (o.winProbability || 0), 0) / filteredOpps.length)
+          : 0;
+        const activeCount = filteredOpps.filter(o => !['awarded', 'lost', 'submitted'].includes(o.shipleyPhase)).length;
+        
+        doc.setFontSize(10);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`• Total Pipeline Value: ${formatCurrency(totalValue)}`, 25, y); y += 6;
+        doc.text(`• Active Opportunities: ${activeCount}`, 25, y); y += 6;
+        doc.text(`• Average Win Probability: ${avgPwin}%`, 25, y); y += 6;
+        doc.text(`• Total Opportunities: ${filteredOpps.length}`, 25, y); y += 12;
+      }
+      
+      // Pipeline by Phase
+      if (config.sections.pipelineByPhase) {
+        doc.setFontSize(14);
+        doc.setTextColor(30, 41, 59);
+        doc.text('Pipeline by Phase', 20, y);
+        y += 8;
+        
+        const phaseData = SHIPLEY_PHASES.map(phase => {
+          const phaseOpps = filteredOpps.filter(o => o.shipleyPhase === phase.id);
+          return [phase.name, phaseOpps.length.toString(), formatCurrency(phaseOpps.reduce((s, o) => s + (o.contractValue || 0), 0))];
+        });
+        
+        doc.autoTable({
+          startY: y,
+          head: [['Phase', 'Count', 'Total Value']],
+          body: phaseData,
+          theme: 'striped',
+          headStyles: { fillColor: [0, 229, 250] },
+          margin: { left: 20 },
+        });
+        y = doc.lastAutoTable.finalY + 12;
+      }
+      
+      // Upcoming Deadlines (next 30 days)
+      if (config.sections.upcomingDeadlines) {
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        const upcoming = filteredOpps
+          .filter(o => o.dueDate && new Date(o.dueDate) <= thirtyDaysFromNow && new Date(o.dueDate) >= new Date())
+          .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+        
+        if (upcoming.length > 0) {
+          if (y > 250) { doc.addPage(); y = 20; }
+          
+          doc.setFontSize(14);
+          doc.setTextColor(30, 41, 59);
+          doc.text('Upcoming Deadlines (Next 30 Days)', 20, y);
+          y += 8;
+          
+          doc.autoTable({
+            startY: y,
+            head: [['Name', 'Agency', 'Due Date', 'Days Left']],
+            body: upcoming.map(o => [o.name, o.agency, formatDate(o.dueDate), getDaysRemaining(o.dueDate)?.toString()]),
+            theme: 'striped',
+            headStyles: { fillColor: [239, 68, 68] },
+            margin: { left: 20 },
+          });
+          y = doc.lastAutoTable.finalY + 12;
+        }
+      }
+      
+      // High Priority (P-0, P-1)
+      if (config.sections.highPriority) {
+        const highPri = filteredOpps.filter(o => ['P-0', 'P-1'].includes(o.priority));
+        
+        if (highPri.length > 0) {
+          if (y > 250) { doc.addPage(); y = 20; }
+          
+          doc.setFontSize(14);
+          doc.setTextColor(30, 41, 59);
+          doc.text('High Priority Opportunities (P-0 & P-1)', 20, y);
+          y += 8;
+          
+          doc.autoTable({
+            startY: y,
+            head: [['Name', 'Agency', 'Priority', 'Value', 'Win %']],
+            body: highPri.map(o => [o.name, o.agency, o.priority, formatCurrency(o.contractValue), `${o.winProbability}%`]),
+            theme: 'striped',
+            headStyles: { fillColor: [251, 191, 36] },
+            margin: { left: 20 },
+          });
+          y = doc.lastAutoTable.finalY + 12;
+        }
+      }
+      
+      // Full List
+      if (config.sections.fullList) {
+        if (y > 200) { doc.addPage(); y = 20; }
+        
+        doc.setFontSize(14);
+        doc.setTextColor(30, 41, 59);
+        doc.text('Full Opportunity List', 20, y);
+        y += 8;
+        
+        doc.autoTable({
+          startY: y,
+          head: [['Name', 'Agency', 'Phase', 'Priority', 'Value', 'Due']],
+          body: filteredOpps.map(o => [
+            o.name?.substring(0, 30),
+            o.agency,
+            SHIPLEY_PHASES.find(p => p.id === o.shipleyPhase)?.name || o.shipleyPhase,
+            o.priority,
+            formatCurrency(o.contractValue),
+            formatDate(o.dueDate),
+          ]),
+          theme: 'striped',
+          headStyles: { fillColor: [0, 229, 250] },
+          margin: { left: 20 },
+          styles: { fontSize: 8 },
+        });
+      }
+      
+      // Footer on all pages
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text('AI GENERATED - REQUIRES HUMAN REVIEW', 20, 285);
+        doc.text(`Page ${i} of ${pageCount}`, 180, 285);
+      }
+      
+      doc.save(`MissionPulse_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      addToast('PDF report generated successfully', 'success');
+      onClose();
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      addToast('Failed to generate PDF', 'error');
+    }
+    
+    setGenerating(false);
+  };
+  
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Generate PDF Report" size="md">
+      <div className="space-y-4">
+        {/* Report Title */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Report Title</label>
+          <input
+            type="text"
+            value={config.title}
+            onChange={(e) => setConfig(c => ({ ...c, title: e.target.value }))}
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+        
+        {/* Include Sections */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Include Sections</label>
+          <div className="space-y-2">
+            {[
+              { key: 'executiveSummary', label: 'Executive Summary' },
+              { key: 'pipelineByPhase', label: 'Pipeline by Phase' },
+              { key: 'upcomingDeadlines', label: 'Upcoming Deadlines (Next 30 Days)' },
+              { key: 'highPriority', label: 'High Priority (P-0, P-1)' },
+              { key: 'fullList', label: 'Full Opportunity List' },
+            ].map(item => (
+              <label key={item.key} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.sections[item.key]}
+                  onChange={(e) => setConfig(c => ({ ...c, sections: { ...c.sections, [item.key]: e.target.checked }}))}
+                  className="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500"
+                />
+                <span className="text-sm">{item.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        
+        {/* Date Range Filter */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Date Range (Optional)</label>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={config.dateRange.start}
+              onChange={(e) => setConfig(c => ({ ...c, dateRange: { ...c.dateRange, start: e.target.value }}))}
+              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+            />
+            <span className="self-center text-slate-400">to</span>
+            <input
+              type="date"
+              value={config.dateRange.end}
+              onChange={(e) => setConfig(c => ({ ...c, dateRange: { ...c.dateRange, end: e.target.value }}))}
+              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+        </div>
+        
+        {/* Actions */}
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-700">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={generatePDF} disabled={generating}>
+            {generating ? 'Generating...' : 'Generate PDF'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ============================================================
+// TEMPLATE MANAGER MODAL
+// ============================================================
+const TemplateManagerModal = ({ isOpen, onClose }) => {
+  const [templates, setTemplates] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const { addToast } = useToast();
+  
+  useEffect(() => {
+    const saved = localStorage.getItem(LOCALSTORAGE_KEYS.TEMPLATES);
+    if (saved) {
+      setTemplates(JSON.parse(saved));
+    } else {
+      setTemplates(DEFAULT_TEMPLATES);
+      localStorage.setItem(LOCALSTORAGE_KEYS.TEMPLATES, JSON.stringify(DEFAULT_TEMPLATES));
+    }
+  }, [isOpen]);
+  
+  const deleteTemplate = (id) => {
+    const updated = templates.filter(t => t.id !== id);
+    setTemplates(updated);
+    localStorage.setItem(LOCALSTORAGE_KEYS.TEMPLATES, JSON.stringify(updated));
+    addToast('Template deleted', 'success');
+  };
+  
+  const renameTemplate = (id) => {
+    if (!editName.trim()) return;
+    const updated = templates.map(t => t.id === id ? { ...t, name: editName } : t);
+    setTemplates(updated);
+    localStorage.setItem(LOCALSTORAGE_KEYS.TEMPLATES, JSON.stringify(updated));
+    setEditingId(null);
+    setEditName('');
+    addToast('Template renamed', 'success');
+  };
+  
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Manage Templates" size="md">
+      <div className="space-y-4">
+        {templates.length === 0 ? (
+          <p className="text-slate-400 text-center py-8">No templates saved yet</p>
+        ) : (
+          <div className="space-y-2">
+            {templates.map(tpl => (
+              <div key={tpl.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                {editingId === tpl.id ? (
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && renameTemplate(tpl.id)}
+                    className="flex-1 px-2 py-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-cyan-500"
+                    autoFocus
+                  />
+                ) : (
+                  <div>
+                    <p className="font-medium">{tpl.name}</p>
+                    <p className="text-xs text-slate-400">
+                      {tpl.data.agency} • {tpl.data.priority} • {SHIPLEY_PHASES.find(p => p.id === tpl.data.shipleyPhase)?.name}
+                    </p>
+                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  {editingId === tpl.id ? (
+                    <>
+                      <Button variant="ghost" size="xs" onClick={() => renameTemplate(tpl.id)}>Save</Button>
+                      <Button variant="ghost" size="xs" onClick={() => setEditingId(null)}>Cancel</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="ghost" size="xs" onClick={() => { setEditingId(tpl.id); setEditName(tpl.name); }}>
+                        <Icons.edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="xs" onClick={() => deleteTemplate(tpl.id)}>
+                        <Icons.trash className="w-4 h-4 text-red-400" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <p className="text-xs text-slate-500 text-center">
+          {templates.length}/20 templates • Save templates from the opportunity drawer
+        </p>
+        
+        <div className="flex justify-end pt-4 border-t border-slate-700">
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ============================================================
+// SAVE AS TEMPLATE MODAL
+// ============================================================
+const SaveTemplateModal = ({ isOpen, onClose, opportunity }) => {
+  const [name, setName] = useState('');
+  const { addToast } = useToast();
+  
+  useEffect(() => {
+    if (opportunity) {
+      setName(`${opportunity.agency} - ${opportunity.name?.substring(0, 20)}`);
+    }
+  }, [opportunity]);
+  
+  const saveTemplate = () => {
+    if (!name.trim()) {
+      addToast('Please enter a template name', 'warning');
+      return;
+    }
+    
+    const saved = localStorage.getItem(LOCALSTORAGE_KEYS.TEMPLATES);
+    const templates = saved ? JSON.parse(saved) : DEFAULT_TEMPLATES;
+    
+    if (templates.length >= 20) {
+      addToast('Maximum 20 templates allowed', 'warning');
+      return;
+    }
+    
+    const newTemplate = {
+      id: `tpl_${Date.now()}`,
+      name: name.trim(),
+      data: {
+        agency: opportunity.agency,
+        priority: opportunity.priority,
+        shipleyPhase: opportunity.shipleyPhase || 'gate_1',
+        winProbability: opportunity.winProbability || 50,
+        description: opportunity.description,
+      },
+    };
+    
+    templates.push(newTemplate);
+    localStorage.setItem(LOCALSTORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
+    addToast('Template saved successfully', 'success');
+    onClose();
+  };
+  
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Save as Template" size="sm">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Template Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter template name"
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+        
+        <p className="text-xs text-slate-400">
+          This will save the opportunity's agency, priority, phase, and description as a reusable template.
+        </p>
+        
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-700">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={saveTemplate}>Save Template</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ============================================================
+// OPPORTUNITY DRAWER
+// ============================================================
+const OpportunityDrawer = ({ opportunity, isOpen, onClose, onSave, onDelete, onDuplicate }) => {
+  const [formData, setFormData] = useState({});
+  const [activeTab, setActiveTab] = useState('details');
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const { addToast } = useToast();
+  
+  useEffect(() => {
+    if (opportunity) {
+      setFormData({ ...opportunity });
+    } else {
+      setFormData({
+        name: '',
+        agency: 'DHA',
+        contractValue: 0,
+        priority: 'P-2',
+        shipleyPhase: 'gate_1',
+        winProbability: 50,
+        dueDate: '',
+        solicitationNumber: '',
+        description: '',
+      });
+    }
+  }, [opportunity]);
+  
+  if (!isOpen) return null;
+  
+  const handleSave = async () => {
+    if (!formData.name) {
+      addToast('Name is required', 'warning');
+      return;
+    }
+    await onSave(formData);
+  };
+  
+  const isNew = !opportunity?.id;
+  
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+      <div className="fixed right-0 top-0 bottom-0 z-50 w-[480px] glass-panel border-l border-slate-700 overflow-hidden animate-slideIn">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+          <h3 className="text-lg font-semibold">{isNew ? 'New Opportunity' : 'Edit Opportunity'}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-700/50 rounded">
+            <Icons.x className="w-5 h-5" />
+          </button>
+        </div>
+        
+        {/* Tabs */}
+        <div className="flex border-b border-slate-700">
+          {['details', 'activity', 'notes'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === tab 
+                  ? 'text-cyan-400 border-b-2 border-cyan-400' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+        
+        {/* Content */}
+        <div className="p-4 overflow-y-auto" style={{ height: 'calc(100vh - 180px)' }}>
+          {activeTab === 'details' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData(d => ({ ...d, name: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+                  placeholder="Opportunity name"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Agency</label>
+                  <select
+                    value={formData.agency || 'DHA'}
+                    onChange={(e) => setFormData(d => ({ ...d, agency: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+                  >
+                    {AGENCIES.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Priority</label>
+                  <select
+                    value={formData.priority || 'P-2'}
+                    onChange={(e) => setFormData(d => ({ ...d, priority: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+                  >
+                    {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Contract Value</label>
+                  <input
+                    type="number"
+                    value={formData.contractValue || 0}
+                    onChange={(e) => setFormData(d => ({ ...d, contractValue: parseInt(e.target.value) || 0 }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Win Probability %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.winProbability || 50}
+                    onChange={(e) => setFormData(d => ({ ...d, winProbability: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Shipley Phase</label>
+                <select
+                  value={formData.shipleyPhase || 'gate_1'}
+                  onChange={(e) => setFormData(d => ({ ...d, shipleyPhase: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+                >
+                  {SHIPLEY_PHASES.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Due Date</label>
+                <input
+                  type="date"
+                  value={formData.dueDate || ''}
+                  onChange={(e) => setFormData(d => ({ ...d, dueDate: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Solicitation Number</label>
+                <input
+                  type="text"
+                  value={formData.solicitationNumber || ''}
+                  onChange={(e) => setFormData(d => ({ ...d, solicitationNumber: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500"
+                  placeholder="e.g., W81K04-24-R-0042"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <textarea
+                  value={formData.description || ''}
+                  onChange={(e) => setFormData(d => ({ ...d, description: e.target.value }))}
+                  rows={4}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-cyan-500 resize-none"
+                  placeholder="Brief description..."
+                />
+              </div>
+            </div>
+          )}
+          
+          {activeTab === 'activity' && (
+            <div className="text-center py-8 text-slate-400">
+              Activity timeline coming soon...
+            </div>
+          )}
+          
+          {activeTab === 'notes' && (
+            <div className="text-center py-8 text-slate-400">
+              Notes feature coming soon...
+            </div>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700 bg-slate-900/90 flex items-center gap-2">
+          {!isNew && (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setShowSaveTemplate(true)} icon={Icons.template}>
+                Save as Template
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onDuplicate(opportunity)} icon={Icons.copy}>
+                Duplicate
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onDelete(opportunity.id)} className="text-red-400" icon={Icons.trash}>
+                Delete
+              </Button>
+            </>
+          )}
+          <div className="flex-1" />
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={handleSave}>
+            {isNew ? 'Create' : 'Save Changes'}
+          </Button>
+        </div>
+      </div>
+      
+      <SaveTemplateModal 
+        isOpen={showSaveTemplate} 
+        onClose={() => setShowSaveTemplate(false)} 
+        opportunity={formData}
+      />
+    </>
+  );
+};
+
+// ============================================================
+// OPPORTUNITY CARD
+// ============================================================
+const OpportunityCard = ({ opportunity, onEdit, onDuplicate, onDelete, onPhaseChange }) => {
+  const phase = SHIPLEY_PHASES.find(p => p.id === opportunity.shipleyPhase);
+  const daysRemaining = getDaysRemaining(opportunity.dueDate);
+  
+  const handleDragStart = (e) => {
+    e.dataTransfer.setData('opportunityId', opportunity.id);
+    e.target.classList.add('dragging');
+  };
+  
+  const handleDragEnd = (e) => {
+    e.target.classList.remove('dragging');
+  };
+  
+  return (
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      className="p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:border-cyan-500/30 transition-all cursor-pointer group"
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-white truncate">{opportunity.name}</h4>
+          <p className="text-xs text-slate-400">{opportunity.agency}</p>
+        </div>
+        <Dropdown
+          trigger={
+            <button className="p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-700/50 rounded transition-opacity">
+              <Icons.dots className="w-4 h-4" />
+            </button>
+          }
+        >
+          {(close) => (
+            <>
+              <DropdownItem icon={Icons.edit} onClick={() => { onEdit(opportunity); close(); }}>Edit</DropdownItem>
+              <DropdownItem icon={Icons.copy} onClick={() => { onDuplicate(opportunity); close(); }}>Duplicate</DropdownItem>
+              <div className="border-t border-slate-700 my-1" />
+              <DropdownItem icon={Icons.trash} danger onClick={() => { onDelete(opportunity.id); close(); }}>Delete</DropdownItem>
+            </>
+          )}
+        </Dropdown>
+      </div>
+      
+      <div className="flex items-center gap-2 mb-2">
+        <Badge color={phase?.color || '#94a3b8'}>{phase?.name || 'Gate 1'}</Badge>
+        <Badge color={
+          opportunity.priority === 'P-0' ? '#ef4444' :
+          opportunity.priority === 'P-1' ? '#f59e0b' :
+          '#64748b'
+        }>{opportunity.priority}</Badge>
+      </div>
+      
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-emerald-400 font-medium">{formatCurrency(opportunity.contractValue)}</span>
+        <div className="flex items-center gap-1">
+          <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div 
+              className="h-full rounded-full transition-all"
+              style={{ 
+                width: `${opportunity.winProbability || 0}%`,
+                backgroundColor: opportunity.winProbability >= 70 ? '#22c55e' : opportunity.winProbability >= 40 ? '#f59e0b' : '#ef4444'
+              }}
+            />
+          </div>
+          <span className="text-slate-400">{opportunity.winProbability}%</span>
+        </div>
+      </div>
+      
+      {daysRemaining !== null && (
+        <div className={`mt-2 flex items-center gap-1 text-xs ${
+          daysRemaining <= 3 ? 'text-red-400' : daysRemaining <= 7 ? 'text-amber-400' : 'text-slate-400'
+        }`}>
+          <Icons.clock className="w-3 h-3" />
+          {daysRemaining <= 0 ? 'Overdue' : `${daysRemaining} days`}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// BOARD VIEW
+// ============================================================
+const BoardView = ({ opportunities, onEdit, onDuplicate, onDelete, onPhaseChange }) => {
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+  };
+  
+  const handleDragLeave = (e) => {
+    e.currentTarget.classList.remove('drag-over');
+  };
+  
+  const handleDrop = (e, phaseId) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    const oppId = e.dataTransfer.getData('opportunityId');
+    if (oppId) {
+      onPhaseChange(oppId, phaseId);
+    }
+  };
+  
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-4 px-4">
+      {SHIPLEY_PHASES.map(phase => {
+        const phaseOpps = opportunities.filter(o => o.shipleyPhase === phase.id);
+        return (
+          <div key={phase.id} className="flex-shrink-0 w-72">
+            <div className="flex items-center gap-2 mb-3 px-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
+              <span className="text-sm font-semibold">{phase.name}</span>
+              <span className="ml-auto text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">
+                {phaseOpps.length}
+              </span>
+            </div>
+            <div
+              className="space-y-2 min-h-[200px] p-2 bg-slate-800/30 rounded-xl border border-slate-700/30 transition-colors"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, phase.id)}
+            >
+              {phaseOpps.map(opp => (
+                <OpportunityCard
+                  key={opp.id}
+                  opportunity={opp}
+                  onEdit={onEdit}
+                  onDuplicate={onDuplicate}
+                  onDelete={onDelete}
+                  onPhaseChange={onPhaseChange}
+                />
+              ))}
+              {phaseOpps.length === 0 && (
+                <p className="text-xs text-slate-500 text-center py-8">Drop items here</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============================================================
+// TABLE VIEW
+// ============================================================
+const TableView = ({ opportunities, onEdit, onDuplicate, onDelete }) => {
+  const [sortField, setSortField] = useState('dueDate');
+  const [sortDir, setSortDir] = useState('asc');
+  
+  const sorted = useMemo(() => {
+    return [...opportunities].sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+      if (sortField === 'dueDate') {
+        aVal = aVal ? new Date(aVal).getTime() : Infinity;
+        bVal = bVal ? new Date(bVal).getTime() : Infinity;
+      }
+      if (sortField === 'contractValue' || sortField === 'winProbability') {
+        aVal = aVal || 0;
+        bVal = bVal || 0;
+      }
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [opportunities, sortField, sortDir]);
+  
+  const toggleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+  
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead className="bg-slate-800/50">
+          <tr>
+            {[
+              { key: 'name', label: 'Name' },
+              { key: 'agency', label: 'Agency' },
+              { key: 'shipleyPhase', label: 'Phase' },
+              { key: 'priority', label: 'Priority' },
+              { key: 'contractValue', label: 'Value' },
+              { key: 'winProbability', label: 'Win %' },
+              { key: 'dueDate', label: 'Due Date' },
+            ].map(col => (
+              <th
+                key={col.key}
+                onClick={() => toggleSort(col.key)}
+                className="px-4 py-3 text-left text-xs font-semibold text-slate-400 cursor-pointer hover:text-white"
+              >
+                <div className="flex items-center gap-1">
+                  {col.label}
+                  {sortField === col.key && (
+                    <Icons.chevronDown className={`w-3 h-3 transition-transform ${sortDir === 'desc' ? 'rotate-180' : ''}`} />
+                  )}
+                </div>
+              </th>
+            ))}
+            <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-700/50">
+          {sorted.map(opp => {
+            const phase = SHIPLEY_PHASES.find(p => p.id === opp.shipleyPhase);
+            return (
+              <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors">
+                <td className="px-4 py-3">
+                  <p className="font-medium text-white">{opp.name}</p>
+                  {opp.solicitationNumber && (
+                    <p className="text-xs text-slate-500 font-mono">{opp.solicitationNumber}</p>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-300">{opp.agency}</td>
+                <td className="px-4 py-3">
+                  <Badge color={phase?.color}>{phase?.name}</Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <Badge color={
+                    opp.priority === 'P-0' ? '#ef4444' :
+                    opp.priority === 'P-1' ? '#f59e0b' :
+                    '#64748b'
+                  }>{opp.priority}</Badge>
+                </td>
+                <td className="px-4 py-3 text-sm text-emerald-400 font-medium">
+                  {formatCurrency(opp.contractValue)}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full"
+                        style={{ 
+                          width: `${opp.winProbability || 0}%`,
+                          backgroundColor: opp.winProbability >= 70 ? '#22c55e' : opp.winProbability >= 40 ? '#f59e0b' : '#ef4444'
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs text-slate-400">{opp.winProbability}%</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-300">{formatDate(opp.dueDate)}</td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="xs" onClick={() => onEdit(opp)}>
+                      <Icons.edit className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="xs" onClick={() => onDuplicate(opp)}>
+                      <Icons.copy className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="xs" onClick={() => onDelete(opp.id)}>
+                      <Icons.trash className="w-4 h-4 text-red-400" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ============================================================
+// MAIN APP
+// ============================================================
+function App() {
+  // State
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('board');
+  const [theme, setTheme] = useState('dark');
+  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState({ agencies: [], priorities: [], phases: [] });
+  const [selectedOpp, setSelectedOpp] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  
+  const { addToast } = useToast();
+  
+  // Load theme from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem(LOCALSTORAGE_KEYS.THEME) || 'dark';
+    setTheme(savedTheme);
+    document.body.className = savedTheme;
+  }, []);
+  
+  // Load templates
+  useEffect(() => {
+    const saved = localStorage.getItem(LOCALSTORAGE_KEYS.TEMPLATES);
+    setTemplates(saved ? JSON.parse(saved) : DEFAULT_TEMPLATES);
+  }, []);
+  
+  // Toggle theme
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    document.body.className = newTheme;
+    localStorage.setItem(LOCALSTORAGE_KEYS.THEME, newTheme);
+  };
+  
+  // Fetch opportunities
+  const fetchOpportunities = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('opportunities').select('*').order('due_date', { ascending: true });
+      if (error) throw error;
+      setOpportunities((data || []).map(mapToFrontend));
+    } catch (error) {
+      console.error('Fetch error:', error);
+      addToast('Failed to load opportunities', 'error');
+    }
+    setLoading(false);
+  };
+  
+  useEffect(() => {
+    fetchOpportunities();
+    
+    // Real-time subscription
+    const subscription = supabase
+      .channel('opportunities-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, () => {
+        fetchOpportunities();
+      })
+      .subscribe();
+    
+    return () => { subscription.unsubscribe(); };
+  }, []);
+  
+  // Filter opportunities
+  const filteredOpps = useMemo(() => {
+    return opportunities.filter(opp => {
+      if (search && !opp.name?.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filters.agencies.length && !filters.agencies.includes(opp.agency)) return false;
+      if (filters.priorities.length && !filters.priorities.includes(opp.priority)) return false;
+      if (filters.phases.length && !filters.phases.includes(opp.shipleyPhase)) return false;
+      return true;
+    });
+  }, [opportunities, search, filters]);
+  
+  // CRUD Operations
+  const handleSave = async (data) => {
+    try {
+      if (data.id) {
+        // Update
+        const { error } = await supabase
+          .from('opportunities')
+          .update({ ...mapToDatabase(data), updated_at: new Date().toISOString() })
+          .eq('id', data.id);
+        if (error) throw error;
+        
+        // Log activity
+        await supabase.from('activity_log').insert({
+          opportunity_id: data.id,
+          action: 'updated',
+          user_id: 'system',
+          created_at: new Date().toISOString(),
+        });
+        
+        addToast('Opportunity updated', 'success');
+      } else {
+        // Create
+        const { data: newOpp, error } = await supabase
+          .from('opportunities')
+          .insert([{ ...mapToDatabase(data), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
+          .select()
+          .single();
+        if (error) throw error;
+        
+        // Log activity
+        await supabase.from('activity_log').insert({
+          opportunity_id: newOpp.id,
+          action: 'created',
+          user_id: 'system',
+          created_at: new Date().toISOString(),
+        });
+        
+        addToast('Opportunity created', 'success');
+      }
+      
+      setDrawerOpen(false);
+      setSelectedOpp(null);
+      fetchOpportunities();
+    } catch (error) {
+      console.error('Save error:', error);
+      addToast('Failed to save opportunity', 'error');
+    }
+  };
+  
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this opportunity?')) return;
+    
+    try {
+      // Log before delete
+      await supabase.from('activity_log').insert({
+        opportunity_id: id,
+        action: 'deleted',
+        user_id: 'system',
+        created_at: new Date().toISOString(),
+      });
+      
+      const { error } = await supabase.from('opportunities').delete().eq('id', id);
+      if (error) throw error;
+      
+      addToast('Opportunity deleted', 'success');
+      setDrawerOpen(false);
+      setSelectedOpp(null);
+      fetchOpportunities();
+    } catch (error) {
+      console.error('Delete error:', error);
+      addToast('Failed to delete opportunity', 'error');
+    }
+  };
+  
+  const handleDuplicate = async (opp) => {
+    try {
+      const duplicateData = {
+        ...mapToDatabase(opp),
+        name: `${opp.name} (Copy)`,
+        shipley_phase: 'gate_1',
+        due_date: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      delete duplicateData.id;
+      
+      const { data: newOpp, error } = await supabase
+        .from('opportunities')
+        .insert([duplicateData])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Log activity
+      await supabase.from('activity_log').insert({
+        opportunity_id: newOpp.id,
+        action: 'created',
+        field_changed: 'duplicated',
+        old_value: opp.id,
+        user_id: 'system',
+        created_at: new Date().toISOString(),
+      });
+      
+      addToast('Opportunity duplicated', 'success');
+      setSelectedOpp(mapToFrontend(newOpp));
+      setDrawerOpen(true);
+      fetchOpportunities();
+    } catch (error) {
+      console.error('Duplicate error:', error);
+      addToast('Failed to duplicate opportunity', 'error');
+    }
+  };
+  
+  const handlePhaseChange = async (oppId, newPhase) => {
+    try {
+      const opp = opportunities.find(o => o.id === oppId);
+      const oldPhase = opp?.shipleyPhase;
+      
+      const { error } = await supabase
+        .from('opportunities')
+        .update({ shipley_phase: newPhase, updated_at: new Date().toISOString() })
+        .eq('id', oppId);
+      
+      if (error) throw error;
+      
+      // Log phase change
+      await supabase.from('activity_log').insert({
+        opportunity_id: oppId,
+        action: 'phase_changed',
+        field_changed: 'shipley_phase',
+        old_value: oldPhase,
+        new_value: newPhase,
+        user_id: 'system',
+        created_at: new Date().toISOString(),
+      });
+      
+      addToast('Phase updated', 'success');
+      fetchOpportunities();
+    } catch (error) {
+      console.error('Phase change error:', error);
+      addToast('Failed to update phase', 'error');
+    }
+  };
+  
+  // Create from template
+  const createFromTemplate = (template) => {
+    setSelectedOpp({
+      name: '',
+      ...template.data,
+    });
+    setDrawerOpen(true);
+  };
+  
+  // Stats
+  const stats = useMemo(() => {
+    const totalValue = filteredOpps.reduce((sum, o) => sum + (o.contractValue || 0), 0);
+    const avgPwin = filteredOpps.length > 0 
+      ? Math.round(filteredOpps.reduce((sum, o) => sum + (o.winProbability || 0), 0) / filteredOpps.length)
+      : 0;
+    return { totalValue, avgPwin, count: filteredOpps.length };
+  }, [filteredOpps]);
+  
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setSelectedOpp(null);
+        setDrawerOpen(true);
+      }
+      if (e.key === 'Escape') {
+        setDrawerOpen(false);
+        setSelectedOpp(null);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+  
+  return (
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#00050F] text-slate-200' : 'bg-slate-100 text-slate-800'}`}>
+      {/* Header */}
+      <header className={`sticky top-0 z-30 ${theme === 'dark' ? 'bg-slate-900/90' : 'bg-white/90'} backdrop-blur-sm border-b ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">MP</span>
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold">MissionPulse</h1>
+                  <p className="text-xs text-slate-500">Pipeline Management</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {/* Stats */}
+              <div className={`flex items-center gap-4 px-4 py-2 rounded-lg ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-200'}`}>
+                <div>
+                  <p className="text-xs text-slate-500">Pipeline</p>
+                  <p className="text-sm font-semibold text-emerald-400">{formatCurrency(stats.totalValue)}</p>
+                </div>
+                <div className={`w-px h-8 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'}`} />
+                <div>
+                  <p className="text-xs text-slate-500">Avg pWin</p>
+                  <p className="text-sm font-semibold">{stats.avgPwin}%</p>
+                </div>
+                <div className={`w-px h-8 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'}`} />
+                <div>
+                  <p className="text-xs text-slate-500">Active</p>
+                  <p className="text-sm font-semibold">{stats.count}</p>
+                </div>
+              </div>
+              
+              {/* Theme Toggle */}
+              <button 
+                onClick={toggleTheme}
+                className={`p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-slate-200'}`}
+              >
+                {theme === 'dark' ? <Icons.sun className="w-5 h-5" /> : <Icons.moon className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+          
+          {/* Toolbar */}
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            <div className="relative flex-1 max-w-md">
+              <Icons.search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search opportunities... (N to create new)"
+                className={`w-full pl-9 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${
+                  theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'
+                }`}
+              />
+            </div>
+            
+            {/* View Toggle */}
+            <div className={`flex rounded-lg p-1 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-200'}`}>
+              {[
+                { id: 'board', icon: Icons.grid, label: 'Board' },
+                { id: 'table', icon: Icons.table, label: 'Table' },
+              ].map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => setView(v.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    view === v.id 
+                      ? 'bg-cyan-500 text-white' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <v.icon className="w-4 h-4" />
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            
+            {/* Import Button */}
+            <Button variant="secondary" size="md" icon={Icons.upload} onClick={() => setShowImportModal(true)}>
+              Import
+            </Button>
+            
+            {/* Export Dropdown */}
+            <Dropdown
+              trigger={
+                <Button variant="secondary" size="md" icon={Icons.download}>
+                  Export
+                </Button>
+              }
+            >
+              {(close) => (
+                <>
+                  <DropdownItem icon={Icons.file} onClick={() => { 
+                    const csv = ['name,agency,contract_value,priority,shipley_phase,win_probability,due_date,solicitation_number,description']
+                      .concat(filteredOpps.map(o => 
+                        `"${o.name}",${o.agency},${o.contractValue},${o.priority},${o.shipleyPhase},${o.winProbability},${o.dueDate || ''},${o.solicitationNumber || ''},"${o.description || ''}"`
+                      )).join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'missionpulse_export.csv';
+                    a.click();
+                    close();
+                  }}>Export CSV</DropdownItem>
+                  <DropdownItem icon={Icons.file} onClick={() => { 
+                    const blob = new Blob([JSON.stringify(filteredOpps, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'missionpulse_export.json';
+                    a.click();
+                    close();
+                  }}>Export JSON</DropdownItem>
+                  <div className="border-t border-slate-700 my-1" />
+                  <DropdownItem icon={Icons.file} onClick={() => { setShowPDFModal(true); close(); }}>Generate PDF Report</DropdownItem>
+                </>
+              )}
+            </Dropdown>
+            
+            {/* New Opportunity Dropdown */}
+            <Dropdown
+              trigger={
+                <Button variant="primary" size="md" icon={Icons.plus}>
+                  New Opportunity
+                </Button>
+              }
+            >
+              {(close) => (
+                <>
+                  <DropdownItem icon={Icons.plus} onClick={() => { setSelectedOpp(null); setDrawerOpen(true); close(); }}>
+                    Blank Opportunity
+                  </DropdownItem>
+                  {templates.length > 0 && (
+                    <>
+                      <div className="border-t border-slate-700 my-1" />
+                      <p className="px-3 py-1 text-xs text-slate-500">From Template</p>
+                      {templates.map(tpl => (
+                        <DropdownItem key={tpl.id} icon={Icons.template} onClick={() => { createFromTemplate(tpl); close(); }}>
+                          {tpl.name}
+                        </DropdownItem>
+                      ))}
+                    </>
+                  )}
+                  <div className="border-t border-slate-700 my-1" />
+                  <DropdownItem icon={Icons.template} onClick={() => { setShowTemplateManager(true); close(); }}>
+                    Manage Templates...
+                  </DropdownItem>
+                </>
+              )}
+            </Dropdown>
+          </div>
+        </div>
+      </header>
+      
+      {/* Main Content */}
+      <main className="py-6">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : view === 'board' ? (
+          <BoardView
+            opportunities={filteredOpps}
+            onEdit={(opp) => { setSelectedOpp(opp); setDrawerOpen(true); }}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+            onPhaseChange={handlePhaseChange}
+          />
+        ) : (
+          <div className="px-4">
+            <TableView
+              opportunities={filteredOpps}
+              onEdit={(opp) => { setSelectedOpp(opp); setDrawerOpen(true); }}
+              onDuplicate={handleDuplicate}
+              onDelete={handleDelete}
+            />
+          </div>
+        )}
+        
+        {filteredOpps.length === 0 && !loading && (
+          <div className="text-center py-20">
+            <Icons.filter className="w-12 h-12 mx-auto mb-4 text-slate-500" />
+            <p className="text-slate-400 mb-2">No opportunities found</p>
+            <Button variant="primary" onClick={() => { setSelectedOpp(null); setDrawerOpen(true); }}>
+              Create First Opportunity
+            </Button>
+          </div>
+        )}
+      </main>
+      
+      {/* Footer */}
+      <footer className={`fixed bottom-0 left-0 right-0 h-6 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-center z-20`}>
+        <span className="text-[10px] text-slate-500 tracking-wider">
+          AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 13 • © 2026 Mission Meets Tech
+        </span>
+      </footer>
+      
+      {/* Modals */}
+      <ImportModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} onImport={fetchOpportunities} />
+      <PDFReportModal isOpen={showPDFModal} onClose={() => setShowPDFModal(false)} opportunities={filteredOpps} />
+      <TemplateManagerModal isOpen={showTemplateManager} onClose={() => setShowTemplateManager(false)} />
+      
+      {/* Drawer */}
+      <OpportunityDrawer
+        opportunity={selectedOpp}
+        isOpen={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setSelectedOpp(null); }}
+        onSave={handleSave}
+        onDelete={handleDelete}
+        onDuplicate={handleDuplicate}
+      />
+    </div>
+  );
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <ToastProvider>
+    <App />
+  </ToastProvider>
+);
+    </script>
+</body>
+</html>
