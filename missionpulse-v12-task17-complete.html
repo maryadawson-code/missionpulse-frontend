@@ -10,6 +10,10 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Supabase Integration (Sprint 2) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
 
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -49,10 +53,12 @@
       @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
       @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       
       .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
       .animate-slideUp { animation: slideUp 0.5s ease-out; }
       .animate-pulse { animation: pulse 2s infinite; }
+      .animate-spin { animation: spin 1s linear infinite; }
       
       /* Progress Bar Animation */
       .progress-bar { transition: width 0.8s ease-out; }
@@ -60,6 +66,13 @@
       /* Hover effects */
       .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
       .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 25px -5px rgba(0, 229, 250, 0.15); }
+      
+      /* Skeleton Loading */
+      .skeleton {
+        background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+      }
     </style>
 </head>
 <body class="overflow-hidden">
@@ -69,10 +82,11 @@
 // ============================================================
 // MISSIONPULSE v12 ULTIMATE - TASK 17 FINAL INTEGRATION
 // All 11 Shipley Roles | 16 Modules | Full RBAC
-// Â© 2026 Mission Meets Tech
+// Sprint 2: Supabase Integration
+// © 2026 Mission Meets Tech
 // ============================================================
 
-const { useState, useEffect, useMemo, useCallback, createContext, useContext } = React;
+const { useState, useEffect, useMemo, useCallback, createContext, useContext, useRef } = React;
 
 // ============================================================
 // CONTEXT & CONSTANTS
@@ -93,7 +107,7 @@ const ROLES = [
     bgColor: 'rgba(251, 191, 36, 0.2)', 
     shipleyFunction: 'Executive Approver',
     description: 'Final Go/No-Go authority, strategic oversight',
-    access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'launch_roi', 'orals', 'frenemy', 'post_award', 'training_admin'],
+    access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'launch_roi', 'orals', 'frenemy', 'post_award'],
     restrictions: []
   },
   { 
@@ -215,7 +229,7 @@ const ROLES = [
     bgColor: 'rgba(203, 213, 225, 0.2)', 
     shipleyFunction: 'System Administrator',
     description: 'Full system access, audit logs, configuration',
-    access: ['admin', 'audit', 'dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'contracts', 'writer', 'blackhat', 'pricing', 'hitl', 'orals', 'frenemy', 'launch_roi', 'post_award', 'training_admin'],
+    access: ['admin', 'audit', 'dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'contracts', 'writer', 'blackhat', 'pricing', 'hitl', 'orals', 'frenemy', 'launch_roi', 'post_award'],
     restrictions: []
   }
 ];
@@ -239,8 +253,7 @@ const MODULES = [
   { id: 'launch_roi', name: 'Launch & ROI', icon: 'rocket', color: '#e879f9', scene: '13', description: 'Submission', category: 'Command' },
   { id: 'post_award', name: 'Post-Award', icon: 'archive', color: '#a78bfa', scene: '14', description: 'Transition', category: 'Command' },
   { id: 'admin', name: 'Admin Settings', icon: 'sliders', color: '#cbd5e1', scene: '15', description: 'Configuration', category: 'Admin', badge: 'ADMIN' },
-  { id: 'audit', name: 'Audit Log', icon: 'list', color: '#64748b', scene: '16', description: 'Security Logs', category: 'Admin', badge: 'ADMIN' },
-  { id: 'training_admin', name: 'Training Data', icon: 'database', color: '#00E5FA', scene: '17', description: 'AI Agent Training', category: 'Admin', badge: 'CEO', href: 'missionpulse-training-admin.html' }
+  { id: 'audit', name: 'Audit Log', icon: 'list', color: '#64748b', scene: '16', description: 'Security Logs', category: 'Admin', badge: 'ADMIN' }
 ];
 
 // Group modules by category
@@ -283,7 +296,6 @@ const Icon = ({ name, className = 'w-5 h-5', style }) => {
     archive: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
     sliders: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>,
     list: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>,
-    database: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>,
     search: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
     send: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
     chevronDown: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
@@ -309,9 +321,13 @@ const Icon = ({ name, className = 'w-5 h-5', style }) => {
     star: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
     info: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     folder: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
+    loader: <svg className={className + ' animate-spin'} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+    database: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>,
+    wifi: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>,
+    wifiOff: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" /></svg>,
   };
   
-  return icons[name] || <span className={className}>â—</span>;
+  return icons[name] || <span className={className}>●</span>;
 };
 
 // ============================================================
@@ -365,6 +381,61 @@ const Badge = ({ children, color = '#00E5FA', variant = 'default' }) => {
     </span>
   );
 };
+
+// ============================================================
+// LOADING & ERROR STATE COMPONENTS (Sprint 2)
+// ============================================================
+const LoadingState = ({ message = 'Loading data...' }) => (
+  <div className="flex flex-col items-center justify-center py-12 animate-fadeIn">
+    <div className="w-16 h-16 mb-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+      <Icon name="loader" className="w-8 h-8 text-cyan-400 animate-spin" />
+    </div>
+    <p className="text-sm text-slate-400">{message}</p>
+    <div className="flex items-center gap-2 mt-2">
+      <Icon name="database" className="w-4 h-4 text-cyan-400" />
+      <span className="text-xs text-cyan-400">Connecting to Supabase</span>
+    </div>
+  </div>
+);
+
+const ErrorState = ({ error, onRetry }) => (
+  <div className="flex flex-col items-center justify-center py-12 animate-fadeIn">
+    <div className="w-16 h-16 mb-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+      <Icon name="wifiOff" className="w-8 h-8 text-red-400" />
+    </div>
+    <h3 className="text-lg font-semibold text-white mb-2">Connection Error</h3>
+    <p className="text-sm text-slate-400 text-center max-w-md mb-4">
+      {error || 'Unable to fetch data from the database. Please check your connection.'}
+    </p>
+    {onRetry && (
+      <Button variant="primary" size="sm" icon="refresh" onClick={onRetry}>
+        Retry
+      </Button>
+    )}
+  </div>
+);
+
+const SkeletonRow = () => (
+  <tr>
+    <td className="px-4 py-3"><div className="h-4 w-48 skeleton rounded" /><div className="h-3 w-24 skeleton rounded mt-1" /></td>
+    <td className="px-4 py-3"><div className="h-5 w-12 skeleton rounded-full" /></td>
+    <td className="px-4 py-3"><div className="h-4 w-16 skeleton rounded" /></td>
+    <td className="px-4 py-3"><div className="h-5 w-10 skeleton rounded-full" /></td>
+    <td className="px-4 py-3"><div className="h-5 w-20 skeleton rounded-full" /></td>
+    <td className="px-4 py-3"><div className="h-2 w-20 skeleton rounded" /></td>
+    <td className="px-4 py-3"><div className="h-4 w-8 skeleton rounded" /></td>
+  </tr>
+);
+
+const ConnectionStatus = ({ isConnected, isRealtime }) => (
+  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/50">
+    <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+    <span className="text-xs text-slate-400">
+      {isConnected ? (isRealtime ? 'Live Updates' : 'Connected') : 'Offline'}
+    </span>
+    {isRealtime && <Icon name="wifi" className="w-3 h-3 text-emerald-400" />}
+  </div>
+);
 
 // ============================================================
 // SIDEBAR NAVIGATION COMPONENT
@@ -450,13 +521,11 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
                 key={role.id}
                 onClick={() => { onRoleChange(role); setShowRoleSwitcher(false); }}
                 className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors ${
-                  currentRole.id === role.id 
-                    ? 'bg-cyan-500/20 border border-cyan-500/30' 
-                    : 'hover:bg-slate-700/50'
+                  currentRole.id === role.id ? 'bg-cyan-500/20 border border-cyan-500/30' : 'hover:bg-slate-700/50'
                 }`}
               >
                 <div 
-                  className="w-6 h-6 rounded-md flex items-center justify-center"
+                  className="w-6 h-6 rounded flex items-center justify-center"
                   style={{ backgroundColor: role.bgColor }}
                 >
                   <Icon name={role.icon} className="w-3 h-3" style={{ color: role.color }} />
@@ -475,75 +544,65 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-        {MODULE_CATEGORIES.map(category => {
-          const catModules = modulesByCategory[category.id] || [];
+      <nav className="flex-1 overflow-y-auto p-3">
+        {MODULE_CATEGORIES.map(cat => {
+          const catModules = modulesByCategory[cat.id] || [];
           if (catModules.length === 0) return null;
           
-          const isExpanded = expandedCategories.includes(category.id);
+          const isExpanded = expandedCategories.includes(cat.id);
           
           return (
-            <div key={category.id} className="mb-2">
+            <div key={cat.id} className="mb-2">
               {!collapsed && (
                 <button
-                  onClick={() => toggleCategory(category.id)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-300"
+                  onClick={() => toggleCategory(cat.id)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-400 transition-colors"
                 >
-                  <span>{category.name}</span>
-                  <Icon name={isExpanded ? 'chevronDown' : 'chevronRight'} className="w-3 h-3" />
+                  <Icon name={cat.icon} className="w-3 h-3" />
+                  <span className="flex-1 text-left">{cat.name}</span>
+                  <Icon 
+                    name="chevronDown" 
+                    className={`w-3 h-3 transition-transform ${isExpanded ? '' : '-rotate-90'}`} 
+                  />
                 </button>
               )}
               
               {(isExpanded || collapsed) && (
-                <div className="space-y-0.5">
-                  {catModules.map(mod => {
-                    const isActive = activeModule?.id === mod.id;
-                    const hasAccess = currentRole.access.includes(mod.id);
-                    
-                    return (
-                      <button
-                        key={mod.id}
-                        onClick={() => hasAccess && onModuleSelect(mod)}
-                        disabled={!hasAccess}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                          isActive 
-                            ? 'bg-gradient-to-r from-cyan-500/20 to-transparent border-l-2 border-cyan-400' 
-                            : hasAccess 
-                              ? 'hover:bg-slate-800/50' 
-                              : 'opacity-40 cursor-not-allowed'
-                        }`}
+                <div className={`${collapsed ? '' : 'ml-2'} space-y-0.5`}>
+                  {catModules.map(mod => (
+                    <button
+                      key={mod.id}
+                      onClick={() => onModuleSelect(mod)}
+                      className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-all ${
+                        activeModule?.id === mod.id
+                          ? 'bg-cyan-500/20 border border-cyan-500/30 text-cyan-400'
+                          : 'hover:bg-slate-800/50 text-slate-400 hover:text-white'
+                      } ${collapsed ? 'justify-center' : ''}`}
+                      title={collapsed ? mod.name : undefined}
+                    >
+                      <div 
+                        className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: activeModule?.id === mod.id ? `${mod.color}30` : 'transparent' }}
                       >
-                        <div 
-                          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ 
-                            backgroundColor: isActive ? `${mod.color}30` : `${mod.color}15`,
-                            border: isActive ? `1px solid ${mod.color}50` : 'none'
-                          }}
-                        >
-                          <Icon name={mod.icon} className="w-3.5 h-3.5" style={{ color: mod.color }} />
-                        </div>
-                        {!collapsed && (
-                          <>
-                            <div className="flex-1 text-left">
-                              <p className={`text-sm font-medium ${isActive ? 'text-white' : 'text-slate-300'}`}>
-                                {mod.name}
-                              </p>
-                            </div>
-                            {mod.badge && (
-                              <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded ${
-                                mod.badge === 'PRIVATE' ? 'bg-red-500/20 text-red-400' :
-                                mod.badge === 'CUI' ? 'bg-amber-500/20 text-amber-400' :
-                                mod.badge === 'ADMIN' ? 'bg-purple-500/20 text-purple-400' :
-                                'bg-slate-600 text-slate-300'
-                              }`}>
-                                {mod.badge}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </button>
-                    );
-                  })}
+                        <Icon name={mod.icon} className="w-4 h-4" style={{ color: mod.color }} />
+                      </div>
+                      {!collapsed && (
+                        <>
+                          <span className="flex-1 text-left text-sm">{mod.name}</span>
+                          {mod.badge && (
+                            <span className={`px-1.5 py-0.5 text-[9px] rounded font-semibold ${
+                              mod.badge === 'PRIVATE' ? 'bg-red-500/20 text-red-400' :
+                              mod.badge === 'CUI' ? 'bg-amber-500/20 text-amber-400' :
+                              mod.badge === 'ADMIN' ? 'bg-purple-500/20 text-purple-400' :
+                              'bg-slate-600 text-slate-300'
+                            }`}>
+                              {mod.badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -575,7 +634,7 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
       <div className={`p-3 border-t border-slate-800 ${collapsed ? 'text-center' : ''}`}>
         <div className="flex items-center gap-2 px-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          {!collapsed && <span className="text-[10px] text-slate-400">RBAC Active â€¢ FedRAMP Moderate</span>}
+          {!collapsed && <span className="text-[10px] text-slate-400">RBAC Active • FedRAMP Moderate</span>}
         </div>
       </div>
     </aside>
@@ -583,35 +642,112 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
 };
 
 // ============================================================
-// MODULE COMPONENTS (Simplified for integration)
-// Each renders functional UI for its purpose
+// MODULE COMPONENTS (With Supabase Integration)
 // ============================================================
 
-// M1: Pipeline Intelligence
+// M1: Pipeline Intelligence - SUPABASE INTEGRATED
 const M1_Pipeline = ({ roleContext }) => {
-  const [opportunities] = useState([
-    { id: 'OPP-2026-DHA-001', name: 'DHA MHS GENESIS Cloud Migration', agency: 'DHA', ceiling: 98450210, priority: 'P-0', phase: 'Pink Team', pWin: 72, daysRemaining: 37 },
-    { id: 'OPP-2026-VA-003', name: 'VA Enterprise Cloud Hosting', agency: 'VA', ceiling: 45000000, priority: 'P-1', phase: 'Blue Team', pWin: 58, daysRemaining: 82 },
-    { id: 'OPP-2026-CMS-008', name: 'CMS Data Analytics Modernization', agency: 'CMS', ceiling: 125000000, priority: 'P-0', phase: 'Red Team', pWin: 68, daysRemaining: 127 },
-  ]);
-  
-  return (
-    <div className="p-6 space-y-6 animate-fadeIn">
-      {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card><p className="text-xs text-slate-400 mb-1">Active Pursuits</p><p className="text-2xl font-bold text-white">12</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Pipeline Value</p><p className="text-2xl font-bold text-emerald-400">$847M</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Avg Win Probability</p><p className="text-2xl font-bold text-cyan-400">64%</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Due This Month</p><p className="text-2xl font-bold text-amber-400">3</p></Card>
-      </div>
+  const [opportunities, setOpportunities] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isRealtime, setIsRealtime] = useState(false);
+  const subscriptionRef = useRef(null);
+
+  // Fetch opportunities from Supabase
+  const fetchOpportunities = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
       
-      {/* Opportunities Table */}
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Active Opportunities</h3>
-          <Button variant="primary" size="sm" icon="plus">Add Opportunity</Button>
+      // Check if MissionPulse client is available
+      if (typeof MissionPulse === 'undefined') {
+        throw new Error('Supabase client not initialized. Check supabase-client.js is loaded.');
+      }
+      
+      // Fetch opportunities and stats in parallel
+      const [oppsResult, statsResult] = await Promise.all([
+        MissionPulse.getOpportunities(),
+        MissionPulse.getPipelineStats()
+      ]);
+      
+      setOpportunities(oppsResult || []);
+      setStats(statsResult || {});
+      setLoading(false);
+    } catch (err) {
+      console.error('Pipeline fetch error:', err);
+      setError(err.message || 'Failed to fetch opportunities');
+      setLoading(false);
+    }
+  }, []);
+
+  // Setup real-time subscription
+  useEffect(() => {
+    fetchOpportunities();
+    
+    // Subscribe to real-time updates
+    if (typeof MissionPulse !== 'undefined' && MissionPulse.subscribeToOpportunities) {
+      try {
+        subscriptionRef.current = MissionPulse.subscribeToOpportunities((payload) => {
+          console.log('Real-time update:', payload);
+          setIsRealtime(true);
+          
+          // Handle different event types
+          if (payload.eventType === 'INSERT') {
+            setOpportunities(prev => [payload.new, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setOpportunities(prev => 
+              prev.map(opp => opp.id === payload.new.id ? payload.new : opp)
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setOpportunities(prev => 
+              prev.filter(opp => opp.id !== payload.old.id)
+            );
+          }
+          
+          // Refresh stats on any change
+          MissionPulse.getPipelineStats().then(setStats);
+        });
+      } catch (err) {
+        console.warn('Real-time subscription not available:', err);
+      }
+    }
+    
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscriptionRef.current && subscriptionRef.current.unsubscribe) {
+        subscriptionRef.current.unsubscribe();
+      }
+    };
+  }, [fetchOpportunities]);
+
+  // Calculate days remaining from due date
+  const calculateDaysRemaining = (dueDate) => {
+    if (!dueDate) return null;
+    const due = new Date(dueDate);
+    const today = new Date();
+    const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+    return diff;
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6 animate-fadeIn">
+        {/* Stats Row Skeleton */}
+        <div className="grid grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => (
+            <Card key={i}>
+              <div className="h-3 w-20 skeleton rounded mb-2" />
+              <div className="h-8 w-16 skeleton rounded" />
+            </Card>
+          ))}
         </div>
-        <div className="overflow-x-auto">
+        {/* Table Skeleton */}
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-6 w-40 skeleton rounded" />
+            <div className="h-8 w-32 skeleton rounded" />
+          </div>
           <table className="w-full">
             <thead className="bg-slate-800/50">
               <tr>
@@ -625,36 +761,127 @@ const M1_Pipeline = ({ roleContext }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {opportunities.map(opp => (
-                <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-white">{opp.name}</p>
-                    <p className="text-xs text-slate-500">{opp.id}</p>
-                  </td>
-                  <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
-                  <td className="px-4 py-3 text-sm text-emerald-400 font-mono">${(opp.ceiling / 1000000).toFixed(1)}M</td>
-                  <td className="px-4 py-3">
-                    <Badge color={opp.priority === 'P-0' ? '#ef4444' : '#f59e0b'}>{opp.priority}</Badge>
-                  </td>
-                  <td className="px-4 py-3"><Badge color="#8b5cf6">{opp.phase}</Badge></td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pWin}%` }} />
-                      </div>
-                      <span className="text-sm text-cyan-400">{opp.pWin}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-sm font-medium ${opp.daysRemaining < 45 ? 'text-red-400' : 'text-slate-300'}`}>
-                      {opp.daysRemaining}d
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {[1,2,3].map(i => <SkeletonRow key={i} />)}
             </tbody>
           </table>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <ErrorState error={error} onRetry={fetchOpportunities} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6 animate-fadeIn">
+      {/* Stats Row - Live Data */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Active Pursuits</p>
+          <p className="text-2xl font-bold text-white">{stats?.totalCount || opportunities.length}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Pipeline Value</p>
+          <p className="text-2xl font-bold text-emerald-400">
+            ${((stats?.totalValue || 0) / 1000000).toFixed(0)}M
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Avg Win Probability</p>
+          <p className="text-2xl font-bold text-cyan-400">
+            {stats?.avgPwin ? Math.round(stats.avgPwin) : '—'}%
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Due This Month</p>
+          <p className="text-2xl font-bold text-amber-400">{stats?.dueThisMonth || 0}</p>
+        </Card>
+      </div>
+      
+      {/* Opportunities Table - Live Data */}
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-white">Active Opportunities</h3>
+            <ConnectionStatus isConnected={!error} isRealtime={isRealtime} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" icon="refresh" onClick={fetchOpportunities}>
+              Refresh
+            </Button>
+            <Button variant="primary" size="sm" icon="plus">Add Opportunity</Button>
+          </div>
         </div>
+        
+        {opportunities.length === 0 ? (
+          <div className="text-center py-12">
+            <Icon name="folder" className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400">No opportunities found</p>
+            <p className="text-sm text-slate-500 mt-1">Add your first opportunity to get started</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Priority</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Days Left</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {opportunities.map(opp => {
+                  const daysRemaining = calculateDaysRemaining(opp.dueDate);
+                  return (
+                    <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-white">{opp.name || opp.title}</p>
+                        <p className="text-xs text-slate-500">{opp.solicitationNumber || opp.id}</p>
+                      </td>
+                      <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
+                      <td className="px-4 py-3 text-sm text-emerald-400 font-mono">
+                        ${((opp.ceiling || opp.contractValue || 0) / 1000000).toFixed(1)}M
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge color={opp.priority === 'P-0' ? '#ef4444' : opp.priority === 'P-1' ? '#f59e0b' : '#94a3b8'}>
+                          {opp.priority || 'P-2'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3"><Badge color="#8b5cf6">{opp.phase || opp.shipleyPhase || 'Gate 1'}</Badge></td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-cyan-500 progress-bar" 
+                              style={{ width: `${opp.pWin || opp.winProbability || 0}%` }} 
+                            />
+                          </div>
+                          <span className="text-sm text-cyan-400">{opp.pWin || opp.winProbability || 0}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-sm font-medium ${
+                          daysRemaining !== null && daysRemaining < 45 ? 'text-red-400' : 'text-slate-300'
+                        }`}>
+                          {daysRemaining !== null ? `${daysRemaining}d` : '—'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -867,23 +1094,23 @@ const M7_BlackHat = ({ roleContext }) => (
       <Badge color="#ef4444">PRIVATE - CAP/ADMIN ONLY</Badge>
     </div>
     <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
-      <p className="text-sm text-red-400">âš ï¸ This module contains sensitive competitive intelligence. Access is restricted.</p>
+      <p className="text-sm text-red-400">⚠️ This module contains sensitive competitive intelligence. Access is restricted.</p>
     </div>
     <div className="grid grid-cols-2 gap-4">
       <Card>
         <h3 className="text-sm font-semibold text-white mb-3">Competitor Analysis: Leidos</h3>
         <ul className="space-y-2 text-sm text-slate-300">
-          <li>â€¢ Incumbent advantage (3-year IDIQ)</li>
-          <li>â€¢ Strong DHA relationships</li>
-          <li>â€¢ Weakness: Recent DCAA audit findings</li>
+          <li>• Incumbent advantage (3-year IDIQ)</li>
+          <li>• Strong DHA relationships</li>
+          <li>• Weakness: Recent DCAA audit findings</li>
         </ul>
       </Card>
       <Card>
         <h3 className="text-sm font-semibold text-white mb-3">Our Counter-Strategy</h3>
         <ul className="space-y-2 text-sm text-slate-300">
-          <li>â€¢ Emphasize innovation vs. status quo</li>
-          <li>â€¢ Highlight cloud-native architecture</li>
-          <li>â€¢ Price 8-12% below incumbent</li>
+          <li>• Emphasize innovation vs. status quo</li>
+          <li>• Highlight cloud-native architecture</li>
+          <li>• Price 8-12% below incumbent</li>
         </ul>
       </Card>
     </div>
@@ -962,7 +1189,7 @@ const M9_HITL = ({ roleContext }) => (
           <div key={item.id} className="flex items-center justify-between p-3 bg-slate-800/30 rounded-lg">
             <div>
               <p className="text-sm font-medium text-white">{item.section}</p>
-              <p className="text-xs text-slate-400">{item.type} â€¢ {item.id}</p>
+              <p className="text-xs text-slate-400">{item.type} • {item.id}</p>
             </div>
             <div className="flex items-center gap-3">
               <div className={`px-2 py-1 rounded text-xs font-semibold ${
@@ -1027,7 +1254,7 @@ const M11_FrenemyProtocol = ({ roleContext }) => (
       <Button variant="primary" size="sm" icon="plus">Add Partner</Button>
     </div>
     <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-      <p className="text-sm text-amber-400">âš ï¸ Partner access automatically revokes upon proposal submission</p>
+      <p className="text-sm text-amber-400">⚠️ Partner access automatically revokes upon proposal submission</p>
     </div>
     <Card>
       <table className="w-full">
@@ -1073,17 +1300,17 @@ const M12_Dashboard = ({ roleContext }) => (
       <Card>
         <h3 className="text-sm font-semibold text-white mb-3">Recent Activity</h3>
         <div className="space-y-2 text-sm">
-          <p className="text-slate-300">â€¢ Pink Team review scheduled for DHA</p>
-          <p className="text-slate-300">â€¢ VA proposal moved to Blue Team</p>
-          <p className="text-slate-300">â€¢ New compliance requirement flagged</p>
+          <p className="text-slate-300">• Pink Team review scheduled for DHA</p>
+          <p className="text-slate-300">• VA proposal moved to Blue Team</p>
+          <p className="text-slate-300">• New compliance requirement flagged</p>
         </div>
       </Card>
       <Card>
         <h3 className="text-sm font-semibold text-white mb-3">Team Status</h3>
         <div className="space-y-2 text-sm">
-          <p className="text-slate-300">â€¢ 11 team members online</p>
-          <p className="text-slate-300">â€¢ 3 pending reviews in HITL</p>
-          <p className="text-slate-300">â€¢ All systems operational</p>
+          <p className="text-slate-300">• 11 team members online</p>
+          <p className="text-slate-300">• 3 pending reviews in HITL</p>
+          <p className="text-slate-300">• All systems operational</p>
         </div>
       </Card>
     </div>
@@ -1097,7 +1324,7 @@ const M13_LaunchROI = ({ roleContext }) => (
     <div className="grid grid-cols-4 gap-4">
       <Card><p className="text-xs text-slate-400">Time Saved</p><p className="text-2xl font-bold text-cyan-400">340 hrs</p></Card>
       <Card><p className="text-xs text-slate-400">Cost Savings</p><p className="text-2xl font-bold text-emerald-400">$127.5K</p></Card>
-      <Card><p className="text-xs text-slate-400">Win Rate Î”</p><p className="text-2xl font-bold text-purple-400">+18%</p></Card>
+      <Card><p className="text-xs text-slate-400">Win Rate Δ</p><p className="text-2xl font-bold text-purple-400">+18%</p></Card>
       <Card><p className="text-xs text-slate-400">Cycle Time</p><p className="text-2xl font-bold text-white">18d vs 45d</p></Card>
     </div>
     <Card>
@@ -1189,6 +1416,10 @@ const M15_AdminSettings = ({ roleContext }) => (
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-sm text-slate-300">API latency: 42ms</span>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-sm text-slate-300">Supabase connected</span>
+          </div>
         </div>
       </Card>
     </div>
@@ -1273,7 +1504,7 @@ const MainContent = ({ activeModule, currentRole }) => {
           <p className="text-slate-400 mb-4">Select a module from the sidebar to begin</p>
           <p className="text-sm text-slate-500">
             Logged in as <span className="text-cyan-400 font-semibold">{currentRole.name}</span>
-            <span className="mx-2">â€¢</span>
+            <span className="mx-2">•</span>
             {currentRole.access.length} modules available
           </p>
         </div>
@@ -1403,11 +1634,6 @@ function App() {
 
   const handleModuleSelect = (mod) => {
     if (currentRole.access.includes(mod.id)) {
-      // Handle external links (like Training Admin)
-      if (mod.href) {
-        window.location.href = mod.href;
-        return;
-      }
       setActiveModule(mod);
     }
   };
@@ -1430,7 +1656,7 @@ function App() {
       {/* Global Footer */}
       <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-50">
         <span className="text-[10px] text-slate-500 tracking-wider">
-          AI GENERATED - REQUIRES HUMAN REVIEW â€¢ MissionPulse v12.0 Ultimate â€¢ Â© 2026 Mission Meets Tech
+          AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 Ultimate • © 2026 Mission Meets Tech
         </span>
       </div>
     </RoleContext.Provider>
