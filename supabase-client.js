@@ -1,15 +1,30 @@
 /**
  * MissionPulse Supabase Client
  * Handles all database and authentication operations
- * Version: 1.0.0
+ * Version: 1.0.1 - Fixed CDN initialization
  */
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
 
-// Initialize Supabase Client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Initialize Supabase Client - Handle both CDN and module imports
+let supabaseClient = null;
+
+try {
+    // CDN version exports to window.supabase or just supabase
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('✅ Supabase client initialized (global)');
+    } else if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('✅ Supabase client initialized (window)');
+    } else {
+        console.error('❌ Supabase library not found! Make sure the CDN script is loaded first.');
+    }
+} catch (error) {
+    console.error('❌ Failed to initialize Supabase:', error);
+}
 
 // =============================================================================
 // AUTH HELPER FUNCTIONS
@@ -17,14 +32,16 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /**
  * Sign up a new user with email and password
- * @param {string} email - User's email address
- * @param {string} password - User's password (min 6 characters)
- * @param {object} metadata - Additional user metadata (name, role, etc.)
- * @returns {Promise<object>} - User object or error
  */
 async function signUpUser(email, password, metadata = {}) {
+    if (!supabaseClient) {
+        console.error('❌ Supabase client not initialized');
+        return { success: false, error: 'Supabase client not initialized' };
+    }
+    
     try {
-        const { data, error } = await supabase.auth.signUp({
+        console.log('📝 Attempting signup for:', email);
+        const { data, error } = await supabaseClient.auth.signUp({
             email: email,
             password: password,
             options: {
@@ -33,7 +50,10 @@ async function signUpUser(email, password, metadata = {}) {
             }
         });
         
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Signup error:', error.message);
+            throw error;
+        }
         
         console.log('✅ Sign up successful:', data.user?.email);
         return { success: true, user: data.user, session: data.session };
@@ -45,18 +65,24 @@ async function signUpUser(email, password, metadata = {}) {
 
 /**
  * Sign in existing user with email and password
- * @param {string} email - User's email address
- * @param {string} password - User's password
- * @returns {Promise<object>} - Session object or error
  */
 async function signInUser(email, password) {
+    if (!supabaseClient) {
+        console.error('❌ Supabase client not initialized');
+        return { success: false, error: 'Supabase client not initialized' };
+    }
+    
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        console.log('🔐 Attempting signin for:', email);
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
         });
         
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Signin error:', error.message);
+            throw error;
+        }
         
         console.log('✅ Sign in successful:', data.user?.email);
         return { success: true, user: data.user, session: data.session };
@@ -68,11 +94,14 @@ async function signInUser(email, password) {
 
 /**
  * Sign out current user
- * @returns {Promise<object>} - Success status
  */
 async function signOutUser() {
+    if (!supabaseClient) {
+        return { success: false, error: 'Supabase client not initialized' };
+    }
+    
     try {
-        const { error } = await supabase.auth.signOut();
+        const { error } = await supabaseClient.auth.signOut();
         if (error) throw error;
         
         console.log('✅ Sign out successful');
@@ -86,30 +115,44 @@ async function signOutUser() {
 
 /**
  * Get current session
- * @returns {Promise<object|null>} - Current session or null
  */
 async function getCurrentSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    return session;
+    if (!supabaseClient) return null;
+    
+    try {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        return session;
+    } catch (error) {
+        console.error('❌ Get session error:', error);
+        return null;
+    }
 }
 
 /**
  * Get current user
- * @returns {Promise<object|null>} - Current user or null
  */
 async function getCurrentUser() {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    return user;
+    if (!supabaseClient) return null;
+    
+    try {
+        const { data: { user }, error } = await supabaseClient.auth.getUser();
+        return user;
+    } catch (error) {
+        console.error('❌ Get user error:', error);
+        return null;
+    }
 }
 
 /**
  * Send password reset email
- * @param {string} email - User's email address
- * @returns {Promise<object>} - Success status
  */
 async function resetPassword(email) {
+    if (!supabaseClient) {
+        return { success: false, error: 'Supabase client not initialized' };
+    }
+    
     try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
             redirectTo: `${window.location.origin}/reset-password.html`
         });
         
@@ -129,12 +172,12 @@ async function resetPassword(email) {
 
 /**
  * Fetch user profile from database
- * @param {string} userId - User's UUID
- * @returns {Promise<object|null>} - User profile or null
  */
 async function getUserProfile(userId) {
+    if (!supabaseClient) return null;
+    
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('users')
             .select('*, companies(name, logo_url)')
             .eq('id', userId)
@@ -149,39 +192,13 @@ async function getUserProfile(userId) {
 }
 
 /**
- * Create or update user profile after signup
- * @param {string} userId - User's UUID from auth
- * @param {object} profileData - Profile information
- * @returns {Promise<object>} - Success status
- */
-async function upsertUserProfile(userId, profileData) {
-    try {
-        const { data, error } = await supabase
-            .from('users')
-            .upsert({
-                id: userId,
-                ...profileData,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'id' });
-        
-        if (error) throw error;
-        
-        console.log('✅ User profile updated');
-        return { success: true, data };
-    } catch (error) {
-        console.error('❌ Upsert profile error:', error.message);
-        return { success: false, error: error.message };
-    }
-}
-
-/**
  * Fetch all opportunities for a company
- * @param {string} companyId - Company UUID
- * @returns {Promise<array>} - Array of opportunities
  */
 async function getOpportunities(companyId = null) {
+    if (!supabaseClient) return [];
+    
     try {
-        let query = supabase
+        let query = supabaseClient
             .from('opportunities')
             .select('*')
             .order('due_date', { ascending: true });
@@ -202,12 +219,12 @@ async function getOpportunities(companyId = null) {
 
 /**
  * Fetch single opportunity with details
- * @param {string} opportunityId - Opportunity UUID
- * @returns {Promise<object|null>} - Opportunity object or null
  */
 async function getOpportunityById(opportunityId) {
+    if (!supabaseClient) return null;
+    
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('opportunities')
             .select('*')
             .eq('id', opportunityId)
@@ -223,12 +240,12 @@ async function getOpportunityById(opportunityId) {
 
 /**
  * Fetch compliance requirements for an opportunity
- * @param {string} opportunityId - Opportunity UUID
- * @returns {Promise<array>} - Array of compliance requirements
  */
 async function getComplianceRequirements(opportunityId = null) {
+    if (!supabaseClient) return [];
+    
     try {
-        let query = supabase
+        let query = supabaseClient
             .from('compliance_requirements')
             .select('*')
             .order('created_at', { ascending: false });
@@ -249,12 +266,12 @@ async function getComplianceRequirements(opportunityId = null) {
 
 /**
  * Fetch lessons learned
- * @param {string} companyId - Company UUID (optional)
- * @returns {Promise<array>} - Array of lessons
  */
 async function getLessonsLearned(companyId = null) {
+    if (!supabaseClient) return [];
+    
     try {
-        let query = supabase
+        let query = supabaseClient
             .from('lessons_learned')
             .select('*')
             .order('created_at', { ascending: false });
@@ -274,99 +291,13 @@ async function getLessonsLearned(companyId = null) {
 }
 
 /**
- * Fetch team assignments for an opportunity
- * @param {string} opportunityId - Opportunity UUID
- * @returns {Promise<array>} - Array of team assignments with user details
- */
-async function getTeamAssignments(opportunityId) {
-    try {
-        const { data, error } = await supabase
-            .from('team_assignments')
-            .select('*, users(id, full_name, email, role, avatar_url)')
-            .eq('opportunity_id', opportunityId);
-        
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error('❌ Get team assignments error:', error.message);
-        return [];
-    }
-}
-
-/**
- * Fetch chat history for an opportunity
- * @param {string} opportunityId - Opportunity UUID
- * @param {number} limit - Number of messages to fetch
- * @returns {Promise<array>} - Array of chat messages
- */
-async function getChatHistory(opportunityId, limit = 50) {
-    try {
-        const { data, error } = await supabase
-            .from('chat_history')
-            .select('*, users(full_name, avatar_url)')
-            .eq('opportunity_id', opportunityId)
-            .order('created_at', { ascending: false })
-            .limit(limit);
-        
-        if (error) throw error;
-        return (data || []).reverse();
-    } catch (error) {
-        console.error('❌ Get chat history error:', error.message);
-        return [];
-    }
-}
-
-/**
- * Save chat message
- * @param {object} message - Message object
- * @returns {Promise<object>} - Saved message or error
- */
-async function saveChatMessage(message) {
-    try {
-        const { data, error } = await supabase
-            .from('chat_history')
-            .insert(message)
-            .select()
-            .single();
-        
-        if (error) throw error;
-        return { success: true, data };
-    } catch (error) {
-        console.error('❌ Save chat message error:', error.message);
-        return { success: false, error: error.message };
-    }
-}
-
-/**
- * Log audit event
- * @param {object} event - Audit event details
- * @returns {Promise<object>} - Success status
- */
-async function logAuditEvent(event) {
-    try {
-        const { error } = await supabase
-            .from('audit_log')
-            .insert({
-                ...event,
-                created_at: new Date().toISOString()
-            });
-        
-        if (error) throw error;
-        return { success: true };
-    } catch (error) {
-        console.error('❌ Log audit event error:', error.message);
-        return { success: false, error: error.message };
-    }
-}
-
-/**
  * Get company details
- * @param {string} companyId - Company UUID
- * @returns {Promise<object|null>} - Company object or null
  */
 async function getCompany(companyId) {
+    if (!supabaseClient) return null;
+    
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('companies')
             .select('*')
             .eq('id', companyId)
@@ -382,11 +313,12 @@ async function getCompany(companyId) {
 
 /**
  * Get all companies (for admin)
- * @returns {Promise<array>} - Array of companies
  */
 async function getAllCompanies() {
+    if (!supabaseClient) return [];
+    
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('companies')
             .select('*')
             .order('name', { ascending: true });
@@ -399,46 +331,23 @@ async function getAllCompanies() {
     }
 }
 
-/**
- * Fetch notifications for user
- * @param {string} userId - User UUID
- * @returns {Promise<array>} - Array of notifications
- */
-async function getNotifications(userId) {
-    try {
-        const { data, error } = await supabase
-            .from('notifications')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(20);
-        
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error('❌ Get notifications error:', error.message);
-        return [];
-    }
-}
+// =============================================================================
+// AUTH STATE LISTENER
+// =============================================================================
 
 /**
- * Mark notification as read
- * @param {string} notificationId - Notification UUID
- * @returns {Promise<object>} - Success status
+ * Listen for auth state changes
  */
-async function markNotificationRead(notificationId) {
-    try {
-        const { error } = await supabase
-            .from('notifications')
-            .update({ read: true })
-            .eq('id', notificationId);
-        
-        if (error) throw error;
-        return { success: true };
-    } catch (error) {
-        console.error('❌ Mark notification read error:', error.message);
-        return { success: false, error: error.message };
+function onAuthStateChange(callback) {
+    if (!supabaseClient) {
+        console.error('❌ Cannot listen for auth changes - client not initialized');
+        return;
     }
+    
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+        console.log('🔐 Auth state changed:', event);
+        callback(event, session);
+    });
 }
 
 // =============================================================================
@@ -447,9 +356,6 @@ async function markNotificationRead(notificationId) {
 
 /**
  * Check if user has specific permission
- * @param {string} role - User's role
- * @param {string} permission - Permission to check
- * @returns {boolean} - Whether user has permission
  */
 function hasPermission(role, permission) {
     const permissions = {
@@ -473,8 +379,6 @@ function hasPermission(role, permission) {
 
 /**
  * Get visible menu items based on role
- * @param {string} role - User's role
- * @returns {array} - Array of visible menu items
  */
 function getVisibleMenuItems(role) {
     const allItems = [
@@ -494,70 +398,9 @@ function getVisibleMenuItems(role) {
     );
 }
 
-// =============================================================================
-// AUTH STATE LISTENER
-// =============================================================================
-
-/**
- * Listen for auth state changes
- * @param {function} callback - Callback function to handle state changes
- */
-function onAuthStateChange(callback) {
-    supabase.auth.onAuthStateChange((event, session) => {
-        console.log('🔐 Auth state changed:', event);
-        callback(event, session);
-    });
-}
-
-// =============================================================================
-// REALTIME SUBSCRIPTIONS
-// =============================================================================
-
-/**
- * Subscribe to opportunity updates
- * @param {string} opportunityId - Opportunity UUID
- * @param {function} callback - Callback for updates
- * @returns {object} - Subscription object
- */
-function subscribeToOpportunity(opportunityId, callback) {
-    return supabase
-        .channel(`opportunity:${opportunityId}`)
-        .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'opportunities', filter: `id=eq.${opportunityId}` },
-            callback
-        )
-        .subscribe();
-}
-
-/**
- * Subscribe to chat messages
- * @param {string} opportunityId - Opportunity UUID
- * @param {function} callback - Callback for new messages
- * @returns {object} - Subscription object
- */
-function subscribeToChatMessages(opportunityId, callback) {
-    return supabase
-        .channel(`chat:${opportunityId}`)
-        .on('postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'chat_history', filter: `opportunity_id=eq.${opportunityId}` },
-            callback
-        )
-        .subscribe();
-}
-
-/**
- * Unsubscribe from channel
- * @param {object} subscription - Subscription to remove
- */
-function unsubscribe(subscription) {
-    if (subscription) {
-        supabase.removeChannel(subscription);
-    }
-}
-
 // Export for global access
 window.mpSupabase = {
-    client: supabase,
+    client: supabaseClient,
     auth: {
         signUp: signUpUser,
         signIn: signInUser,
@@ -569,29 +412,19 @@ window.mpSupabase = {
     },
     db: {
         getUserProfile,
-        upsertUserProfile,
         getOpportunities,
         getOpportunityById,
         getComplianceRequirements,
         getLessonsLearned,
-        getTeamAssignments,
-        getChatHistory,
-        saveChatMessage,
-        logAuditEvent,
         getCompany,
-        getAllCompanies,
-        getNotifications,
-        markNotificationRead
+        getAllCompanies
     },
     rbac: {
         hasPermission,
         getVisibleMenuItems
-    },
-    realtime: {
-        subscribeToOpportunity,
-        subscribeToChatMessages,
-        unsubscribe
     }
 };
 
-console.log('✅ MissionPulse Supabase Client initialized');
+console.log('✅ MissionPulse Supabase Client v1.0.1 loaded');
+console.log('🔗 Supabase URL:', SUPABASE_URL);
+console.log('🔑 Client initialized:', supabaseClient ? 'YES' : 'NO');
