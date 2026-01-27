@@ -1,8 +1,17 @@
 /**
  * MissionPulse Supabase Client Module
- * Sprint 16: Shared client with auth, CRUD operations, and real-time subscriptions
+ * Sprint 2-3: Shared client with CRUD operations and real-time subscriptions
  * 
- * © 2026 Mission Meets Tech
+ * Provides MissionPulse namespace with:
+ * - getOpportunities() - Fetch all opportunities
+ * - getPipelineStats() - Aggregate statistics
+ * - subscribeToOpportunities(callback) - Real-time updates
+ * - createOpportunity(data) - Create new opportunity
+ * - updateOpportunity(id, data) - Update existing opportunity
+ * - deleteOpportunity(id) - Delete opportunity
+ * - getOpportunitiesByPhase() - Grouped by Shipley phase
+ * 
+ * Â© 2026 Mission Meets Tech
  */
 
 (function(global) {
@@ -14,10 +23,10 @@
   const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
 
+  // Initialize Supabase client
   let supabase = null;
   let connectionStatus = 'disconnected';
   let connectionListeners = [];
-  let authListeners = [];
 
   function initSupabase() {
     if (typeof global.supabase !== 'undefined' && global.supabase.createClient) {
@@ -25,12 +34,6 @@
       connectionStatus = 'connected';
       notifyConnectionListeners();
       console.log('[MissionPulse] Supabase client initialized');
-      
-      supabase.auth.onAuthStateChange((event, session) => {
-        console.log('[MissionPulse] Auth state changed:', event);
-        authListeners.forEach(cb => cb(event, session));
-      });
-      
       return true;
     }
     console.warn('[MissionPulse] Supabase library not loaded');
@@ -42,157 +45,50 @@
   }
 
   // ============================================================
-  // AUTHENTICATION FUNCTIONS
-  // ============================================================
-
-  async function signIn(email, password) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: password
-      });
-
-      if (error) {
-        console.error('[MissionPulse] Sign in error:', error);
-        return { data: null, error };
-      }
-
-      console.log('[MissionPulse] Sign in successful:', data.user?.email);
-      return { data, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Sign in exception:', error);
-      return { data: null, error };
-    }
-  }
-
-  async function signOut() {
-    if (!supabase) {
-      return { error: new Error('Supabase not initialized') };
-    }
-
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('[MissionPulse] Sign out error:', error);
-        return { error };
-      }
-      
-      localStorage.removeItem('mp_user');
-      console.log('[MissionPulse] Sign out successful');
-      return { error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Sign out exception:', error);
-      return { error };
-    }
-  }
-
-  async function getSession() {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: { session: null }, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      return { data, error };
-    } catch (error) {
-      console.error('[MissionPulse] Get session exception:', error);
-      return { data: { session: null }, error };
-    }
-  }
-
-  async function getCurrentUser() {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: { user: null }, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const { data, error } = await supabase.auth.getUser();
-      return { data, error };
-    } catch (error) {
-      console.error('[MissionPulse] Get user exception:', error);
-      return { data: { user: null }, error };
-    }
-  }
-
-  async function getUserProfile(userId) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, email, role, is_active, company_id')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('[MissionPulse] Get user profile error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Get user profile exception:', error);
-      return { data: null, error };
-    }
-  }
-
-  function onAuthStateChange(callback) {
-    authListeners.push(callback);
-    
-    return () => {
-      const index = authListeners.indexOf(callback);
-      if (index > -1) {
-        authListeners.splice(index, 1);
-      }
-    };
-  }
-
-  async function requireAuth(loginUrl = 'login.html') {
-    const { data: { session }, error } = await getSession();
-    
-    if (error || !session) {
-      console.log('[MissionPulse] Not authenticated, redirecting to login');
-      window.location.href = loginUrl;
-      return null;
-    }
-    
-    return session;
-  }
-
-  // ============================================================
-  // FIELD MAPPING
+  // FIELD MAPPING: snake_case (DB) <-> camelCase (Frontend)
   // ============================================================
   const fieldMapping = {
+    // DB -> Frontend
     toFrontend: {
-      id: 'id', name: 'name', agency: 'agency', contract_value: 'contractValue',
-      priority: 'priority', shipley_phase: 'shipleyPhase', win_probability: 'winProbability',
-      due_date: 'dueDate', solicitation_number: 'solicitationNumber', created_at: 'createdAt',
-      updated_at: 'updatedAt', description: 'description', contract_type: 'contractType',
-      set_aside: 'setAside', naics_code: 'naicsCode', primary_contact: 'primaryContact'
+      id: 'id',
+      name: 'name',
+      agency: 'agency',
+      contract_value: 'contractValue',
+      priority: 'priority',
+      shipley_phase: 'shipleyPhase',
+      win_probability: 'winProbability',
+      due_date: 'dueDate',
+      solicitation_number: 'solicitationNumber',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+      description: 'description',
+      contract_type: 'contractType',
+      set_aside: 'setAside',
+      naics_code: 'naicsCode',
+      primary_contact: 'primaryContact'
     },
+    // Frontend -> DB
     toDatabase: {
-      id: 'id', name: 'name', agency: 'agency', contractValue: 'contract_value',
-      priority: 'priority', shipleyPhase: 'shipley_phase', winProbability: 'win_probability',
-      dueDate: 'due_date', solicitationNumber: 'solicitation_number', createdAt: 'created_at',
-      updatedAt: 'updated_at', description: 'description', contractType: 'contract_type',
-      setAside: 'set_aside', naicsCode: 'naics_code', primaryContact: 'primary_contact'
+      id: 'id',
+      name: 'name',
+      agency: 'agency',
+      contractValue: 'contract_value',
+      priority: 'priority',
+      shipleyPhase: 'shipley_phase',
+      winProbability: 'win_probability',
+      dueDate: 'due_date',
+      solicitationNumber: 'solicitation_number',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+      description: 'description',
+      contractType: 'contract_type',
+      setAside: 'set_aside',
+      naicsCode: 'naics_code',
+      primaryContact: 'primary_contact'
     }
   };
 
+  // Map DB record to frontend format
   function mapToFrontend(record) {
     if (!record) return null;
     const mapped = {};
@@ -201,6 +97,7 @@
       mapped[frontendKey] = record[key];
     });
     
+    // Compute derived fields
     if (mapped.dueDate) {
       const dueDate = new Date(mapped.dueDate);
       const today = new Date();
@@ -208,13 +105,19 @@
       mapped.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
     
+    // Map shipley_phase to display phase
     mapped.phase = mapShipleyPhaseToDisplay(mapped.shipleyPhase);
+    
+    // Format ceiling from contract_value
     mapped.ceiling = mapped.contractValue;
+    
+    // Map win_probability to pWin
     mapped.pWin = mapped.winProbability;
     
     return mapped;
   }
 
+  // Map frontend data to DB format
   function mapToDatabase(data) {
     if (!data) return null;
     const mapped = {};
@@ -227,6 +130,7 @@
     return mapped;
   }
 
+  // Shipley phase display mapping
   const SHIPLEY_PHASES = {
     'gate_1': { name: 'Gate 1', color: '#94a3b8', order: 1 },
     'blue_team': { name: 'Blue Team', color: '#60a5fa', order: 2 },
@@ -248,6 +152,13 @@
   // CRUD OPERATIONS
   // ============================================================
 
+  /**
+   * Fetch all opportunities
+   * @param {Object} options - Query options
+   * @param {string} options.orderBy - Field to order by
+   * @param {boolean} options.ascending - Sort direction
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
   async function getOpportunities(options = {}) {
     if (!supabase) {
       if (!initSupabase()) {
@@ -256,15 +167,22 @@
     }
 
     try {
-      let query = supabase.from('opportunities').select('*');
+      let query = supabase
+        .from('opportunities')
+        .select('*');
+
+      // Apply ordering
       const orderBy = options.orderBy || 'due_date';
       const ascending = options.ascending !== undefined ? options.ascending : true;
       query = query.order(orderBy, { ascending });
 
       const { data, error } = await query;
+
       if (error) throw error;
 
+      // Map all records to frontend format
       const mappedData = (data || []).map(mapToFrontend);
+      
       return { data: mappedData, error: null };
     } catch (error) {
       console.error('[MissionPulse] Error fetching opportunities:', error);
@@ -272,6 +190,10 @@
     }
   }
 
+  /**
+   * Get pipeline statistics
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
   async function getPipelineStats() {
     if (!supabase) {
       if (!initSupabase()) {
@@ -286,6 +208,7 @@
 
       if (error) throw error;
 
+      // Calculate stats
       const now = new Date();
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
@@ -303,6 +226,7 @@
         byPhase: {}
       };
 
+      // Group by phase
       data.forEach(opp => {
         const phase = opp.shipley_phase || 'gate_1';
         if (!stats.byPhase[phase]) {
@@ -319,16 +243,26 @@
     }
   }
 
+  /**
+   * Get opportunities grouped by Shipley phase
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
   async function getOpportunitiesByPhase() {
     const { data, error } = await getOpportunities({ orderBy: 'due_date', ascending: true });
     
     if (error) return { data: null, error };
 
+    // Initialize all phases
     const grouped = {};
     Object.keys(SHIPLEY_PHASES).forEach(phase => {
-      grouped[phase] = { ...SHIPLEY_PHASES[phase], phase: phase, items: [] };
+      grouped[phase] = {
+        ...SHIPLEY_PHASES[phase],
+        phase: phase,
+        items: []
+      };
     });
 
+    // Group opportunities
     (data || []).forEach(opp => {
       const phase = opp.shipleyPhase || 'gate_1';
       if (grouped[phase]) {
@@ -336,9 +270,17 @@
       }
     });
 
-    return { data: grouped, error: null };
+    // Convert to array sorted by order
+    const phasesArray = Object.values(grouped).sort((a, b) => a.order - b.order);
+
+    return { data: phasesArray, error: null };
   }
 
+  /**
+   * Create a new opportunity
+   * @param {Object} opportunityData - Opportunity data in frontend format
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
   async function createOpportunity(opportunityData) {
     if (!supabase) {
       if (!initSupabase()) {
@@ -347,8 +289,13 @@
     }
 
     try {
+      // Map to database format
       const dbData = mapToDatabase(opportunityData);
+      
+      // Remove id if present (let DB generate it)
       delete dbData.id;
+      
+      // Set timestamps
       dbData.created_at = new Date().toISOString();
       dbData.updated_at = new Date().toISOString();
 
@@ -359,6 +306,7 @@
         .single();
 
       if (error) throw error;
+
       return { data: mapToFrontend(data), error: null };
     } catch (error) {
       console.error('[MissionPulse] Error creating opportunity:', error);
@@ -366,6 +314,12 @@
     }
   }
 
+  /**
+   * Update an existing opportunity
+   * @param {string} id - Opportunity ID
+   * @param {Object} updates - Fields to update in frontend format
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
   async function updateOpportunity(id, updates) {
     if (!supabase) {
       if (!initSupabase()) {
@@ -374,7 +328,10 @@
     }
 
     try {
+      // Map to database format
       const dbData = mapToDatabase(updates);
+      
+      // Always update timestamp
       dbData.updated_at = new Date().toISOString();
 
       const { data, error } = await supabase
@@ -385,6 +342,7 @@
         .single();
 
       if (error) throw error;
+
       return { data: mapToFrontend(data), error: null };
     } catch (error) {
       console.error('[MissionPulse] Error updating opportunity:', error);
@@ -392,6 +350,11 @@
     }
   }
 
+  /**
+   * Delete an opportunity
+   * @param {string} id - Opportunity ID
+   * @returns {Promise<{data: {success: boolean}, error: Error|null}>}
+   */
   async function deleteOpportunity(id) {
     if (!supabase) {
       if (!initSupabase()) {
@@ -400,8 +363,13 @@
     }
 
     try {
-      const { error } = await supabase.from('opportunities').delete().eq('id', id);
+      const { error } = await supabase
+        .from('opportunities')
+        .delete()
+        .eq('id', id);
+
       if (error) throw error;
+
       return { data: { success: true, id }, error: null };
     } catch (error) {
       console.error('[MissionPulse] Error deleting opportunity:', error);
@@ -416,6 +384,11 @@
   let opportunitySubscription = null;
   let opportunityCallbacks = [];
 
+  /**
+   * Subscribe to real-time opportunity changes
+   * @param {Function} callback - Called on any change with { eventType, new, old }
+   * @returns {Function} Unsubscribe function
+   */
   function subscribeToOpportunities(callback) {
     if (!supabase) {
       if (!initSupabase()) {
@@ -426,6 +399,7 @@
 
     opportunityCallbacks.push(callback);
 
+    // Create subscription if this is the first subscriber
     if (!opportunitySubscription) {
       opportunitySubscription = supabase
         .channel('opportunities-changes')
@@ -451,12 +425,14 @@
         });
     }
 
+    // Return unsubscribe function
     return () => {
       const index = opportunityCallbacks.indexOf(callback);
       if (index > -1) {
         opportunityCallbacks.splice(index, 1);
       }
       
+      // Clean up subscription if no more callbacks
       if (opportunityCallbacks.length === 0 && opportunitySubscription) {
         opportunitySubscription.unsubscribe();
         opportunitySubscription = null;
@@ -464,8 +440,14 @@
     };
   }
 
+  /**
+   * Subscribe to connection status changes
+   * @param {Function} callback - Called with status string
+   * @returns {Function} Unsubscribe function
+   */
   function onConnectionChange(callback) {
     connectionListeners.push(callback);
+    // Immediately call with current status
     callback(connectionStatus);
     
     return () => {
@@ -476,53 +458,92 @@
     };
   }
 
+  /**
+   * Get current connection status
+   * @returns {string} 'connected' | 'disconnected' | 'connecting'
+   */
   function getConnectionStatus() {
     return connectionStatus;
   }
 
   // ============================================================
-  // UTILITIES
+  // UTILITY FUNCTIONS
   // ============================================================
 
+  /**
+   * Format currency value
+   * @param {number} value - Value in dollars
+   * @returns {string} Formatted string like "$45.2M"
+   */
   function formatCurrency(value) {
     if (!value) return '$0';
-    if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    if (value >= 1000000000) {
+      return `$${(value / 1000000000).toFixed(1)}B`;
+    }
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`;
+    }
+    if (value >= 1000) {
+      return `$${(value / 1000).toFixed(0)}K`;
+    }
     return `$${value.toLocaleString()}`;
   }
 
+  /**
+   * Get phase info by key
+   * @param {string} phaseKey - Phase key like 'pink_team'
+   * @returns {Object} Phase info with name, color, order
+   */
   function getPhaseInfo(phaseKey) {
     return SHIPLEY_PHASES[phaseKey] || SHIPLEY_PHASES.gate_1;
   }
 
+  /**
+   * Get all Shipley phases
+   * @returns {Array} Array of phase objects sorted by order
+   */
   function getShipleyPhases() {
     return Object.entries(SHIPLEY_PHASES)
       .map(([key, value]) => ({ key, ...value }))
       .sort((a, b) => a.order - b.order);
   }
 
-  function getClient() {
-    if (!supabase) initSupabase();
-    return supabase;
-  }
-
   // ============================================================
-  // EXPORT
+  // EXPORT MissionPulse NAMESPACE
   // ============================================================
   global.MissionPulse = {
-    signIn, signOut, getSession, getCurrentUser, getUserProfile,
-    onAuthStateChange, requireAuth,
-    getOpportunities, getPipelineStats, getOpportunitiesByPhase,
-    createOpportunity, updateOpportunity, deleteOpportunity,
-    subscribeToOpportunities, onConnectionChange, getConnectionStatus,
-    formatCurrency, getPhaseInfo, getShipleyPhases, mapToFrontend, mapToDatabase, getClient,
-    SHIPLEY_PHASES, SUPABASE_URL,
+    // CRUD Operations
+    getOpportunities,
+    getPipelineStats,
+    getOpportunitiesByPhase,
+    createOpportunity,
+    updateOpportunity,
+    deleteOpportunity,
+
+    // Real-time
+    subscribeToOpportunities,
+    onConnectionChange,
+    getConnectionStatus,
+
+    // Utilities
+    formatCurrency,
+    getPhaseInfo,
+    getShipleyPhases,
+    mapToFrontend,
+    mapToDatabase,
+
+    // Constants
+    SHIPLEY_PHASES,
+
+    // Initialization
     init: initSupabase
   };
 
+  // Auto-initialize when Supabase is available
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(initSupabase, 100));
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(initSupabase, 100);
+    });
   } else {
     setTimeout(initSupabase, 100);
   }

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 - M6 Iron Dome Writer</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Database & API Clients -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="render-api-client.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes typing { from { width: 0; } to { width: 100%; } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+    .animate-shimmer { 
+      background: linear-gradient(90deg, transparent, rgba(0,229,250,0.1), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+    }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ICONS
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      shieldCheck: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      trophy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      briefcase: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
+      user: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      link: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
+      menu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // CUI MARKING OPTIONS
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const CUI_MARKINGS = [
+      { value: 'CUI//PROPIN', label: 'CUI//PROPIN', color: '#F59E0B', desc: 'Proprietary Information' },
+      { value: 'CUI//FEDCON', label: 'CUI//FEDCON', color: '#EF4444', desc: 'Federal Contract Information' },
+      { value: 'UNCLASSIFIED', label: 'UNCLASSIFIED', color: '#22C55E', desc: 'Public Release' },
+      { value: 'CUI//SP-EXPT', label: 'CUI//SP-EXPT', color: '#A855F7', desc: 'Export Controlled' },
+      { value: 'CUI//SP-CTI', label: 'CUI//SP-CTI', color: '#EC4899', desc: 'Controlled Technical Information' },
+    ];
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // VOLUME CONTENT DATA
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const VOLUME_CONTENT = {
+      technical: {
+        title: 'Volume I: Technical Approach',
+        sections: [
+          {
+            id: 'tech-1',
+            title: '1.0 Executive Summary',
+            subsections: ['1.1 Understanding of Requirements', '1.2 Solution Overview', '1.3 Key Differentiators'],
+            content: `Our team brings unparalleled expertise in healthcare IT modernization, having successfully delivered 47 similar engagements across DHA, VA, and HHS. Our approach leverages a proven FHIR-native architecture that ensures interoperability from day one.
+
+[Citation: DHA Contract FA8773-21-C-0045, Performance Rating: Exceptional]
+
+The proposed solution incorporates machine learning algorithms trained on 2.3 million healthcare records, enabling predictive analytics that reduce adverse events by 34%. Our platform maintains HIPAA, FedRAMP High, and NIST 800-171 compliance through automated continuous monitoring.
+
+[Citation: VA OIG Report 2023-01234, p.12-15]
+
+Key technical innovations include our proprietary "HealthSync" middleware that reduces integration time from months to weeks, and our AI-powered clinical decision support system that has demonstrated 98.7% accuracy in clinical trials.`,
+            aiPercent: 68,
+            citations: 12,
+            wordCount: 2847
+          },
+          {
+            id: 'tech-2',
+            title: '2.0 Technical Solution',
+            subsections: ['2.1 Architecture Design', '2.2 Data Migration Strategy', '2.3 Security Framework', '2.4 Integration Approach'],
+            content: `The proposed architecture employs a microservices-based design pattern optimized for government cloud environments. Each service is independently deployable, horizontally scalable, and fault-tolerant.
+
+[Citation: NIST SP 800-53 Rev. 5, Control Family AC]
+
+Our data migration methodology follows a five-phase approach: Discovery, Assessment, Transformation, Validation, and Cutover. This methodology has achieved 99.97% data integrity across 23 previous migrations.
+
+[Citation: Past Performance Reference - DHA DHITS Program]
+
+Security is embedded at every layer through our "Defense in Depth" strategy, implementing zero-trust architecture principles with continuous verification and least-privilege access controls.`,
+            aiPercent: 72,
+            citations: 8,
+            wordCount: 4231
+          },
+          {
+            id: 'tech-3',
+            title: '3.0 Quality Assurance',
+            subsections: ['3.1 QA Methodology', '3.2 Testing Strategy', '3.3 Defect Management'],
+            content: `Our ISO 9001:2015 certified quality management system ensures consistent, high-quality deliverables. We employ a comprehensive testing pyramid that includes unit tests (85% coverage minimum), integration tests, and end-to-end validation.
+
+[Citation: ISO 9001:2015 Certificate #QMS-2024-8847]
+
+Automated regression testing runs continuously through our CI/CD pipeline, catching 94% of defects before they reach production. Our defect density target is <0.5 defects per KLOC, consistently exceeded across all delivered programs.`,
+            aiPercent: 61,
+            citations: 5,
+            wordCount: 1856
+          }
+        ],
+        totalWordCount: 8934,
+        pageCount: 32
+      },
+      management: {
+        title: 'Volume II: Management Approach',
+        sections: [
+          {
+            id: 'mgmt-1',
+            title: '1.0 Program Management',
+            subsections: ['1.1 Management Structure', '1.2 Communication Plan', '1.3 Risk Management'],
+            content: `Our Program Manager, Jane Smith, PMP, brings 18 years of federal healthcare IT experience and has successfully led programs totaling $450M in contract value. She will be supported by a dedicated management team with an average of 12 years of relevant experience.
+
+[Citation: Resume - Jane Smith, Attachment J-2]
+
+The management structure follows a flat, agile-friendly organization that enables rapid decision-making while maintaining clear accountability. Daily standups, weekly sprint reviews, and monthly executive briefings ensure continuous alignment with government priorities.
+
+[Citation: PMI PMBOK Guide, 7th Edition]
+
+Our risk management approach identifies risks proactively using Monte Carlo simulations and maintains a risk register with quantified impact assessments. Historical data shows our risk mitigation strategies have prevented 87% of identified risks from materializing.`,
+            aiPercent: 58,
+            citations: 9,
+            wordCount: 3421
+          },
+          {
+            id: 'mgmt-2',
+            title: '2.0 Staffing Approach',
+            subsections: ['2.1 Key Personnel', '2.2 Recruitment Strategy', '2.3 Retention Plan'],
+            content: `All key personnel exceed the RFP's minimum qualifications by an average of 40%. Our Technical Lead holds TS/SCI clearance with current FS Poly and has delivered three similar healthcare modernization programs.
+
+[Citation: SF-86 Verification, Security Office Reference]
+
+Our retention rate for key personnel exceeds 94%, significantly above industry average of 78%. This stability is achieved through competitive compensation, professional development opportunities, and a culture of mission-focused excellence.`,
+            aiPercent: 64,
+            citations: 6,
+            wordCount: 2156
+          }
+        ],
+        totalWordCount: 5577,
+        pageCount: 18
+      },
+      pastperf: {
+        title: 'Volume III: Past Performance',
+        sections: [
+          {
+            id: 'pp-1',
+            title: '1.0 Relevant Experience',
+            subsections: ['1.1 Contract References', '1.2 Performance Ratings', '1.3 Relevance Matrix'],
+            content: `CONTRACT REFERENCE 1: DHA Healthcare Data Platform (DHITS)
+Contract Number: FA8773-21-C-0045
+Value: $87.5M | Period: 2021-2026
+CPARS Rating: EXCEPTIONAL across all categories
+
+Delivered a cloud-native healthcare data platform serving 9.6 million beneficiaries across 450+ military treatment facilities. Achieved 99.99% uptime and reduced data processing time by 67%.
+
+[Citation: CPARS Report FA8773-21-C-0045, FY2023]
+
+CONTRACT REFERENCE 2: VA EHR Modernization Support
+Contract Number: 36C10X21D0047
+Value: $45.2M | Period: 2020-2025
+CPARS Rating: VERY GOOD to EXCEPTIONAL
+
+Provided technical support for VA's EHR modernization, including data migration, interface development, and clinical workflow optimization. Zero security incidents over 4+ years of performance.
+
+[Citation: VA CO Letter of Recommendation, Oct 2023]`,
+            aiPercent: 45,
+            citations: 14,
+            wordCount: 4892
+          },
+          {
+            id: 'pp-2',
+            title: '2.0 Subcontractor Experience',
+            subsections: ['2.1 Teaming Partners', '2.2 Joint Performance History'],
+            content: `Our teaming partner, TechHealth Solutions (SDVOSB), brings specialized expertise in clinical informatics and has collaborated with our team on three previous DHA programs with combined value exceeding $120M.
+
+[Citation: Teaming Agreement TA-2024-0156]
+
+Together, we have achieved an average CPARS rating of 4.7/5.0 across all joint efforts, demonstrating our ability to integrate seamlessly and deliver exceptional results as a unified team.`,
+            aiPercent: 52,
+            citations: 7,
+            wordCount: 2134
+          }
+        ],
+        totalWordCount: 7026,
+        pageCount: 24
+      },
+      staffing: {
+        title: 'Volume IV: Staffing Plan',
+        sections: [
+          {
+            id: 'staff-1',
+            title: '1.0 Organizational Structure',
+            subsections: ['1.1 Org Chart', '1.2 Reporting Lines', '1.3 Matrix Management'],
+            content: `The proposed organizational structure aligns directly with the PWS task areas, ensuring clear accountability and streamlined communication. Each functional area is led by a Subject Matter Expert with direct access to the Program Manager.
+
+[Citation: PWS Section 3.0 Task Requirements]
+
+Our matrix management approach enables resource flexibility while maintaining technical depth. Cross-functional teams are empowered to make decisions at the lowest appropriate level, reducing bureaucratic delays.
+
+The org chart (Attachment J-5) illustrates reporting relationships and spans of control optimized for a program of this scope and complexity.`,
+            aiPercent: 71,
+            citations: 4,
+            wordCount: 1876
+          },
+          {
+            id: 'staff-2',
+            title: '2.0 Labor Categories',
+            subsections: ['2.1 LCAT Definitions', '2.2 Qualifications Matrix', '2.3 Labor Mix Analysis'],
+            content: `All proposed labor categories meet or exceed the minimum qualifications specified in Section H. Our labor mix optimizes cost-effectiveness while ensuring appropriate expertise for each task area.
+
+LCAT: Senior Software Engineer
+Proposed: 8 FTEs | Qualifications: BS + 8 years (exceeds min by 2 years)
+Clearance: SECRET minimum, 4 with TS
+
+LCAT: Data Architect  
+Proposed: 3 FTEs | Qualifications: MS + 10 years
+Clearance: TS/SCI (all personnel)
+
+[Citation: Section H Labor Category Requirements]
+
+Our labor mix analysis demonstrates a 15% cost savings compared to typical market rates while maintaining premium qualifications, achieved through our efficient recruiting pipeline and strong retention programs.`,
+            aiPercent: 66,
+            citations: 8,
+            wordCount: 3245
+          },
+          {
+            id: 'staff-3',
+            title: '3.0 Transition Plan',
+            subsections: ['3.1 Phase-In Schedule', '3.2 Knowledge Transfer', '3.3 Risk Mitigation'],
+            content: `Our 90-day transition plan ensures seamless continuity of operations with zero service disruption. The plan incorporates lessons learned from 15 previous transitions and follows a proven three-phase methodology.
+
+Phase 1 (Days 1-30): Knowledge capture and documentation
+Phase 2 (Days 31-60): Parallel operations and validation
+Phase 3 (Days 61-90): Full operational capability and optimization
+
+[Citation: Transition Plan Template TP-2024-GOV]
+
+All incumbent staff meeting our qualifications will be offered positions, ensuring critical institutional knowledge is retained. Our historical transition success rate is 100% with an average of 2 weeks ahead of schedule.`,
+            aiPercent: 74,
+            citations: 5,
+            wordCount: 2567
+          }
+        ],
+        totalWordCount: 7688,
+        pageCount: 26
+      }
+    };
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // COMPONENTS
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+    // Stats Bar Component
+    const StatsBar = ({ aiPercent, humanReviewed, citations, wordCount }) => (
+      <div className="flex items-center gap-4 px-4 py-2 bg-slate-800/50 border-b border-slate-700/50">
+        <div className="flex items-center gap-2">
+          <Icon name="cpu" className="w-4 h-4 text-cyan-400" />
+          <div className="flex items-center">
+            <div className="h-2 w-24 bg-slate-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-500"
+                style={{ width: `${aiPercent}%` }}
+              />
+            </div>
+            <span className="text-xs text-cyan-400 ml-2 font-medium">{aiPercent}% AI</span>
+          </div>
+        </div>
+        <div className="h-4 w-px bg-slate-600" />
+        <div className="flex items-center gap-2">
+          <Icon name="user" className="w-4 h-4 text-emerald-400" />
+          <span className="text-xs text-emerald-400 font-medium">
+            {humanReviewed ? '100% Human Reviewed' : 'Pending Review'}
+          </span>
+          {humanReviewed && <Icon name="check" className="w-3 h-3 text-emerald-400" />}
+        </div>
+        <div className="h-4 w-px bg-slate-600" />
+        <div className="flex items-center gap-2">
+          <Icon name="link" className="w-4 h-4 text-purple-400" />
+          <span className="text-xs text-purple-400 font-medium">{citations} Citations</span>
+        </div>
+        <div className="h-4 w-px bg-slate-600" />
+        <div className="flex items-center gap-2">
+          <Icon name="fileText" className="w-4 h-4 text-slate-400" />
+          <span className="text-xs text-slate-400">{wordCount.toLocaleString()} words</span>
+        </div>
+      </div>
+    );
+
+    // CUI Dropdown Component
+    const CUIDropdown = ({ value, onChange }) => {
+      const [isOpen, setIsOpen] = useState(false);
+      const selected = CUI_MARKINGS.find(m => m.value === value) || CUI_MARKINGS[0];
+
+      return (
+        <div className="relative">
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-800 hover:bg-slate-700 transition-all"
+          >
+            <Icon name="lock" className="w-4 h-4" style={{ color: selected.color }} />
+            <span className="text-sm font-medium text-white">{selected.label}</span>
+            <Icon name="chevronDown" className="w-3 h-3 text-slate-400" />
+          </button>
+          {isOpen && (
+            <div className="absolute top-full left-0 mt-1 w-64 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 overflow-hidden animate-fadeIn">
+              {CUI_MARKINGS.map(marking => (
+                <button
+                  key={marking.value}
+                  onClick={() => { onChange(marking.value); setIsOpen(false); }}
+                  className={`w-full px-3 py-2 flex items-center gap-3 hover:bg-slate-700 transition-all ${value === marking.value ? 'bg-slate-700/50' : ''}`}
+                >
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: marking.color }} />
+                  <div className="text-left">
+                    <div className="text-sm font-medium text-white">{marking.label}</div>
+                    <div className="text-xs text-slate-400">{marking.desc}</div>
+                  </div>
+                  {value === marking.value && (
+                    <Icon name="check" className="w-4 h-4 text-emerald-400 ml-auto" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // TOC Sidebar Component
+    const TOCSidebar = ({ sections, activeSection, onSelectSection, isCollapsed, onToggle }) => (
+      <div className={`border-r border-slate-700/50 bg-slate-900/50 transition-all duration-300 ${isCollapsed ? 'w-12' : 'w-64'}`}>
+        <div className="p-3 border-b border-slate-700/50 flex items-center justify-between">
+          {!isCollapsed && <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Outline</span>}
+          <button
+            onClick={onToggle}
+            className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-all"
+          >
+            <Icon name={isCollapsed ? 'chevronRight' : 'x'} className="w-4 h-4 text-slate-400" />
+          </button>
+        </div>
+        {!isCollapsed && (
+          <div className="p-2 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-thin">
+            {sections.map((section, idx) => (
+              <div key={section.id} className="mb-2">
+                <button
+                  onClick={() => onSelectSection(section.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-all ${
+                    activeSection === section.id 
+                      ? 'bg-cyan-500/20 border-l-2 border-cyan-400' 
+                      : 'hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className={`text-sm font-medium ${activeSection === section.id ? 'text-cyan-400' : 'text-white'}`}>
+                    {section.title}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-slate-500">{section.wordCount.toLocaleString()} words</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-purple-400">{section.citations} refs</span>
+                  </div>
+                </button>
+                {activeSection === section.id && section.subsections && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    {section.subsections.map((sub, subIdx) => (
+                      <div key={subIdx} className="text-xs text-slate-400 px-3 py-1 hover:text-cyan-400 cursor-pointer transition-all">
+                        {sub}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {isCollapsed && (
+          <div className="p-2">
+            {sections.map((section, idx) => (
+              <button
+                key={section.id}
+                onClick={() => { onToggle(); onSelectSection(section.id); }}
+                className={`w-full p-2 rounded-lg mb-1 transition-all ${
+                  activeSection === section.id ? 'bg-cyan-500/20' : 'hover:bg-slate-800/50'
+                }`}
+                title={section.title}
+              >
+                <span className={`text-xs font-bold ${activeSection === section.id ? 'text-cyan-400' : 'text-slate-400'}`}>
+                  {idx + 1}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+
+    // Volume Tab Component
+    const VolumeTab = ({ id, title, icon, isActive, onClick }) => (
+      <button
+        onClick={() => onClick(id)}
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg transition-all border-b-2 ${
+          isActive 
+            ? 'bg-slate-800 border-cyan-400 text-white' 
+            : 'bg-slate-900/50 border-transparent text-slate-400 hover:text-white hover:bg-slate-800/50'
+        }`}
+      >
+        <Icon name={icon} className="w-4 h-4" />
+        <span className="text-sm font-medium">{title}</span>
+      </button>
+    );
+
+    // Export Buttons Component
+    const ExportButtons = ({ onExport }) => (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onExport('word')}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 transition-all text-white text-sm font-medium"
+        >
+          <Icon name="download" className="w-4 h-4" />
+          Word
+        </button>
+        <button
+          onClick={() => onExport('pdf')}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 transition-all text-white text-sm font-medium"
+        >
+          <Icon name="download" className="w-4 h-4" />
+          PDF
+        </button>
+      </div>
+    );
+
+    // Content Editor Component
+    const ContentEditor = ({ section, cuiMarking }) => {
+      const marking = CUI_MARKINGS.find(m => m.value === cuiMarking);
+      
+      // Highlight citations in the content
+      const renderContent = (text) => {
+        const parts = text.split(/(\[Citation:[^\]]+\])/g);
+        return parts.map((part, idx) => {
+          if (part.startsWith('[Citation:')) {
+            return (
+              <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-sm mx-1">
+                <Icon name="link" className="w-3 h-3" />
+                {part.replace('[Citation:', '').replace(']', '')}
+              </span>
+            );
+          }
+          return <span key={idx}>{part}</span>;
+        });
+      };
+
+      return (
+        <div className="flex-1 flex flex-col">
+          {/* CUI Banner */}
+          <div 
+            className="py-2 px-4 text-center font-bold text-sm"
+            style={{ backgroundColor: marking.color, color: marking.color === '#22C55E' ? '#000' : '#fff' }}
+          >
+            {cuiMarking} - CONTROLLED UNCLASSIFIED INFORMATION
+          </div>
+          
+          {/* Content Area */}
+          <div className="flex-1 p-6 overflow-y-auto scrollbar-thin">
+            <div className="max-w-4xl mx-auto">
+              {/* Section Header */}
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-white mb-2">{section.title}</h2>
+                <div className="flex items-center gap-4">
+                  <StatsBar 
+                    aiPercent={section.aiPercent} 
+                    humanReviewed={true}
+                    citations={section.citations}
+                    wordCount={section.wordCount}
+                  />
+                </div>
+              </div>
+              
+              {/* Subsections */}
+              {section.subsections && (
+                <div className="mb-6 p-4 rounded-lg bg-slate-800/30 border border-slate-700/50">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">In This Section</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {section.subsections.map((sub, idx) => (
+                      <span key={idx} className="px-2 py-1 rounded bg-slate-700/50 text-sm text-slate-300">
+                        {sub}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Main Content */}
+              <div className="prose prose-invert max-w-none">
+                <div className="text-slate-200 leading-relaxed whitespace-pre-line font-serif">
+                  {renderContent(section.content)}
+                </div>
+              </div>
+              
+              {/* AI Attribution Footer */}
+              <div className="mt-8 p-4 rounded-lg bg-slate-800/30 border border-slate-700/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                      <Icon name="cpu" className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-white">AI-Assisted Content</div>
+                      <div className="text-xs text-slate-400">{section.aiPercent}% generated â€¢ {100 - section.aiPercent}% human-written</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-all">
+                      <Icon name="edit" className="w-4 h-4 text-slate-300" />
+                    </button>
+                    <button className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-all">
+                      <Icon name="eye" className="w-4 h-4 text-slate-300" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Footer */}
+          <div className="p-3 border-t border-slate-700/50 bg-slate-900/80">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                AI GENERATED - REQUIRES HUMAN REVIEW â€¢ Last saved: 2 minutes ago
+              </span>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span>Times New Roman 12pt</span>
+                <span className="text-slate-600">â€¢</span>
+                <span>1" margins</span>
+                <span className="text-slate-600">â€¢</span>
+                <span>Section L Compliant</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // MAIN COMPONENT
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    const IronDomeWriter = () => {
+      const [activeVolume, setActiveVolume] = useState('technical');
+      const [activeSection, setActiveSection] = useState('tech-1');
+      const [cuiMarking, setCuiMarking] = useState('CUI//PROPIN');
+      const [tocCollapsed, setTocCollapsed] = useState(false);
+      const [showExportModal, setShowExportModal] = useState(false);
+
+      const currentVolume = VOLUME_CONTENT[activeVolume];
+      const currentSection = currentVolume.sections.find(s => s.id === activeSection) || currentVolume.sections[0];
+
+      // Calculate total stats for current volume
+      const totalCitations = currentVolume.sections.reduce((acc, s) => acc + s.citations, 0);
+      const avgAiPercent = Math.round(currentVolume.sections.reduce((acc, s) => acc + s.aiPercent, 0) / currentVolume.sections.length);
+
+      const handleExport = (format) => {
+        setShowExportModal(true);
+        setTimeout(() => setShowExportModal(false), 2000);
+      };
+
+      const handleVolumeChange = (volumeId) => {
+        setActiveVolume(volumeId);
+        setActiveSection(VOLUME_CONTENT[volumeId].sections[0].id);
+      };
+
+      return (
+        <div className="min-h-screen bg-[#00050F] flex flex-col">
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg shadow-red-500/30">
+                  <Icon name="shieldCheck" className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="font-bold text-white flex items-center gap-2">
+                    Iron Dome Writer
+                    <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-xs font-medium">M6</span>
+                  </h1>
+                  <p className="text-xs text-slate-400">CUI-Protected Proposal Drafting</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <CUIDropdown value={cuiMarking} onChange={setCuiMarking} />
+                <ExportButtons onExport={handleExport} />
+              </div>
+            </div>
+          </header>
+
+          {/* Volume Tabs */}
+          <div className="bg-slate-900/50 border-b border-slate-700/50 px-4">
+            <div className="flex items-center gap-1">
+              <VolumeTab 
+                id="technical" 
+                title="Technical" 
+                icon="fileText" 
+                isActive={activeVolume === 'technical'} 
+                onClick={handleVolumeChange} 
+              />
+              <VolumeTab 
+                id="management" 
+                title="Management" 
+                icon="briefcase" 
+                isActive={activeVolume === 'management'} 
+                onClick={handleVolumeChange} 
+              />
+              <VolumeTab 
+                id="pastperf" 
+                title="Past Performance" 
+                icon="trophy" 
+                isActive={activeVolume === 'pastperf'} 
+                onClick={handleVolumeChange} 
+              />
+              <VolumeTab 
+                id="staffing" 
+                title="Staffing" 
+                icon="users" 
+                isActive={activeVolume === 'staffing'} 
+                onClick={handleVolumeChange} 
+              />
+            </div>
+          </div>
+
+          {/* Volume Summary Bar */}
+          <div className="bg-slate-800/30 border-b border-slate-700/50 px-4 py-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-white">{currentVolume.title}</h2>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xs text-slate-400">{currentVolume.pageCount} pages</span>
+                  <span className="text-xs text-slate-400">â€¢</span>
+                  <span className="text-xs text-slate-400">{currentVolume.totalWordCount.toLocaleString()} words</span>
+                  <span className="text-xs text-slate-400">â€¢</span>
+                  <span className="text-xs text-purple-400">{totalCitations} citations</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                {/* Overall Stats */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700/50">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                    <span className="text-xs text-cyan-400 font-medium">{avgAiPercent}% AI</span>
+                  </div>
+                  <span className="text-slate-500">/</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-xs text-emerald-400 font-medium">100% Human Reviewed</span>
+                  </div>
+                </div>
+                {/* Citation Badge */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/30">
+                  <Icon name="link" className="w-4 h-4 text-purple-400" />
+                  <span className="text-sm font-bold text-purple-400">{totalCitations}</span>
+                  <span className="text-xs text-purple-300">Citations</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* TOC Sidebar */}
+            <TOCSidebar 
+              sections={currentVolume.sections}
+              activeSection={activeSection}
+              onSelectSection={setActiveSection}
+              isCollapsed={tocCollapsed}
+              onToggle={() => setTocCollapsed(!tocCollapsed)}
+            />
+
+            {/* Content Editor */}
+            <ContentEditor section={currentSection} cuiMarking={cuiMarking} />
+          </div>
+
+          {/* Export Modal */}
+          {showExportModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-slate-800 rounded-2xl p-6 shadow-2xl animate-fadeIn">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Icon name="check" className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Export Initiated</h3>
+                    <p className="text-sm text-slate-400">Your document is being prepared...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer className="bg-slate-900/80 border-t border-slate-700/50 px-4 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">MissionPulse v12.0 â€¢ Iron Dome Writer</span>
+              <span className="text-xs text-slate-600">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<IronDomeWriter />);
+  </script>
+</body>
+</html>

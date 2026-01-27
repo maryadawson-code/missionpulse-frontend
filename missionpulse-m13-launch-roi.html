@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse M13 - Launch & ROI Dashboard</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Database & API Clients -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="render-api-client.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Space Grotesk', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes checkBounce { 0% { transform: scale(0); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); } 50% { box-shadow: 0 0 40px rgba(0, 229, 250, 0.6), 0 0 60px rgba(0, 229, 250, 0.3); } }
+    @keyframes confetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+    @keyframes rocketLaunch { 0% { transform: translateY(0); } 100% { transform: translateY(-150vh) rotate(5deg); } }
+    @keyframes countdownPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+    @keyframes readyGlow { 0%, 100% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); } 50% { box-shadow: 0 0 60px rgba(16, 185, 129, 0.8), 0 0 90px rgba(16, 185, 129, 0.4); } }
+    @keyframes barFill { from { width: 0%; } }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-slide-in { animation: slideIn 0.5s ease-out forwards; }
+    .animate-check { animation: checkBounce 0.4s ease-out forwards; }
+    .animate-glow { animation: glow 2s ease-in-out infinite; }
+    .animate-ready-glow { animation: readyGlow 1.5s ease-in-out infinite; }
+    .animate-countdown { animation: countdownPulse 0.6s ease-in-out infinite; }
+    .animate-bar-fill { animation: barFill 1s ease-out forwards; }
+    .animate-fade-up { animation: fadeInUp 0.6s ease-out forwards; }
+    
+    .confetti-piece { position: fixed; animation: confetti 3s ease-out forwards; pointer-events: none; z-index: 1000; }
+    .rocket-launch { animation: rocketLaunch 2s ease-in forwards; }
+    
+    .glass-card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.7) 100%);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 229, 250, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Icons
+    const Icons = {
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>,
+      rocket: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      trending: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+      document: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      chart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      send: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // Pre-submission Checklist Items (8 items)
+    const CHECKLIST_ITEMS = [
+      { id: 1, label: 'Technical Volume Complete', section: 'L.4', reviewer: 'Sarah Chen, SA' },
+      { id: 2, label: 'Management Volume Finalized', section: 'L.5', reviewer: 'Marcus Williams, PM' },
+      { id: 3, label: 'Past Performance Validated', section: 'L.6', reviewer: 'Jennifer Park, QA' },
+      { id: 4, label: 'Cost/Price Volume Locked', section: 'L.7', reviewer: 'David Kim, FIN' },
+      { id: 5, label: 'Compliance Matrix 100%', section: 'M.1-M.8', reviewer: 'AI Compliance Agent' },
+      { id: 6, label: 'Executive Summary Approved', section: 'L.1', reviewer: 'CEO - Mary Womack' },
+      { id: 7, label: 'CUI Marking Verified', section: 'All', reviewer: 'Security Officer' },
+      { id: 8, label: 'Final PDF Generated', section: 'Export', reviewer: 'System' },
+    ];
+
+    // Timeline comparison data
+    const TIMELINE_DATA = [
+      { phase: 'RFP Analysis', traditional: 5, ai: 1 },
+      { phase: 'Compliance Matrix', traditional: 7, ai: 2 },
+      { phase: 'Technical Writing', traditional: 15, ai: 6 },
+      { phase: 'Pricing/BOE', traditional: 8, ai: 3 },
+      { phase: 'Review Cycles', traditional: 7, ai: 4 },
+      { phase: 'Final Production', traditional: 3, ai: 2 },
+    ];
+
+    // Confetti Generator (150 pieces)
+    const createConfetti = (count = 150) => {
+      const colors = ['#00E5FA', '#FFD700', '#10b981', '#8B5CF6', '#EC4899', '#F59E0B', '#00BDAE'];
+      const shapes = ['â—', 'â– ', 'â–²', 'â˜…', 'â—†', 'â™¦', 'âœ¦'];
+      const confetti = [];
+      for (let i = 0; i < count; i++) {
+        confetti.push({
+          id: i,
+          left: Math.random() * 100,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          shape: shapes[Math.floor(Math.random() * shapes.length)],
+          delay: Math.random() * 2,
+          duration: 2 + Math.random() * 2,
+          size: 10 + Math.random() * 20,
+        });
+      }
+      return confetti;
+    };
+
+    // Animated Counter
+    const AnimatedCounter = ({ end, duration = 1000, prefix = '', suffix = '' }) => {
+      const [count, setCount] = useState(0);
+      useEffect(() => {
+        let start = 0;
+        const increment = end / (duration / 16);
+        const timer = setInterval(() => {
+          start += increment;
+          if (start >= end) { setCount(end); clearInterval(timer); } 
+          else { setCount(Math.floor(start)); }
+        }, 16);
+        return () => clearInterval(timer);
+      }, [end, duration]);
+      return <span>{prefix}{count.toLocaleString()}{suffix}</span>;
+    };
+
+    // Timeline Bar
+    const TimelineBar = ({ label, traditional, ai, maxDays }) => (
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-sm text-slate-300">{label}</span>
+          <span className="text-xs text-slate-500 font-mono">{ai}d vs {traditional}d</span>
+        </div>
+        <div className="relative h-6 bg-slate-800/50 rounded overflow-hidden">
+          <div className="absolute top-0 left-0 h-full bg-red-500/30 border-r-2 border-red-400" style={{ width: `${(traditional / maxDays) * 100}%` }} />
+          <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-500 to-teal-500 animate-bar-fill" style={{ width: `${(ai / maxDays) * 100}%` }}>
+            <div className="absolute right-0 top-0 h-full w-1 bg-white/50" />
+          </div>
+        </div>
+      </div>
+    );
+
+    // Main Component
+    const LaunchAndROI = () => {
+      const [stage, setStage] = useState('checklist');
+      const [checkedItems, setCheckedItems] = useState([]);
+      const [countdown, setCountdown] = useState(5);
+      const [confetti, setConfetti] = useState([]);
+      const [showROI, setShowROI] = useState(false);
+      
+      const allChecked = checkedItems.length === CHECKLIST_ITEMS.length;
+      
+      // Auto-check with 100ms stagger
+      useEffect(() => {
+        if (stage === 'checklist' && checkedItems.length < CHECKLIST_ITEMS.length) {
+          const timer = setTimeout(() => {
+            setCheckedItems(prev => [...prev, CHECKLIST_ITEMS[prev.length].id]);
+          }, 100);
+          return () => clearTimeout(timer);
+        }
+      }, [checkedItems, stage]);
+      
+      // Handle submission
+      const handleSubmit = () => {
+        setStage('countdown');
+        let c = 5;
+        const interval = setInterval(() => {
+          c--;
+          setCountdown(c);
+          if (c === 0) {
+            clearInterval(interval);
+            setStage('launching');
+            setTimeout(() => {
+              setStage('complete');
+              setConfetti(createConfetti(150));
+              setTimeout(() => setShowROI(true), 1000);
+            }, 2000);
+          }
+        }, 800);
+      };
+      
+      // Clear confetti
+      useEffect(() => {
+        if (confetti.length > 0) {
+          const timer = setTimeout(() => setConfetti([]), 5000);
+          return () => clearTimeout(timer);
+        }
+      }, [confetti]);
+
+      return (
+        <div className="min-h-screen bg-[#00050F] text-white p-6">
+          {/* Confetti */}
+          {confetti.map(piece => (
+            <div key={piece.id} className="confetti-piece" style={{
+              left: `${piece.left}%`, top: '-20px', color: piece.color,
+              fontSize: `${piece.size}px`, animationDelay: `${piece.delay}s`, animationDuration: `${piece.duration}s`,
+            }}>{piece.shape}</div>
+          ))}
+          
+          {/* Header */}
+          <div className="max-w-6xl mx-auto mb-8">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <Icon name="rocket" className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">M13: Launch & ROI Dashboard</h1>
+                <p className="text-slate-400 text-sm">DHA Healthcare Data Platform â€¢ FA8052-26-R-0001</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-6xl mx-auto">
+            {/* Checklist Stage */}
+            {stage === 'checklist' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Checklist */}
+                <div className="glass-card rounded-2xl p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                      <Icon name="document" className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Pre-Submission Checklist</h2>
+                      <p className="text-sm text-slate-400">{checkedItems.length} of {CHECKLIST_ITEMS.length} complete</p>
+                    </div>
+                  </div>
+                  
+                  {/* Progress */}
+                  <div className="h-2 bg-slate-800 rounded-full mb-6 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-300" style={{ width: `${(checkedItems.length / CHECKLIST_ITEMS.length) * 100}%` }} />
+                  </div>
+                  
+                  {/* Items */}
+                  <div className="space-y-3">
+                    {CHECKLIST_ITEMS.map((item, index) => {
+                      const isChecked = checkedItems.includes(item.id);
+                      return (
+                        <div key={item.id} className={`flex items-center gap-4 p-3 rounded-xl transition-all duration-300 ${isChecked ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-slate-800/30 border border-slate-700/50'}`}
+                          style={{ opacity: isChecked ? 1 : 0.5, animation: isChecked ? `slideIn 0.3s ease-out ${index * 0.1}s both` : 'none' }}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50' : 'border-2 border-slate-600'}`}>
+                            {isChecked && <div className="animate-check"><Icon name="check" className="w-4 h-4 text-white" /></div>}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${isChecked ? 'text-white' : 'text-slate-400'}`}>{item.label}</span>
+                              <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">{item.section}</span>
+                            </div>
+                            <p className="text-xs text-slate-500">Reviewed by: {item.reviewer}</p>
+                          </div>
+                          {isChecked && <span className="text-xs text-emerald-400 font-medium">âœ“ VERIFIED</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Ready Banner */}
+                  {allChecked && (
+                    <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/50 animate-ready-glow">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center animate-pulse">
+                            <Icon name="shield" className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-emerald-400 text-lg">READY FOR SUBMISSION</div>
+                            <div className="text-sm text-emerald-300/70">All gates passed â€¢ Compliance verified</div>
+                          </div>
+                        </div>
+                        <button onClick={handleSubmit} className="px-6 py-3 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 font-bold rounded-xl shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 transition-all hover:scale-105 flex items-center gap-2">
+                          <Icon name="send" className="w-5 h-5" />SUBMIT PROPOSAL
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* ROI Preview */}
+                <div className="space-y-6">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="glass-card rounded-xl p-4 text-center">
+                      <div className="w-10 h-10 mx-auto mb-2 rounded-lg bg-cyan-500/20 flex items-center justify-center"><Icon name="clock" className="w-5 h-5 text-cyan-400" /></div>
+                      <div className="text-2xl font-bold text-cyan-400 font-mono">340</div>
+                      <div className="text-xs text-slate-400">Hours Saved</div>
+                      <div className="text-xs text-slate-500 mt-1">180 vs 520 manual</div>
+                    </div>
+                    <div className="glass-card rounded-xl p-4 text-center">
+                      <div className="w-10 h-10 mx-auto mb-2 rounded-lg bg-emerald-500/20 flex items-center justify-center"><Icon name="dollar" className="w-5 h-5 text-emerald-400" /></div>
+                      <div className="text-2xl font-bold text-emerald-400 font-mono">$127.5K</div>
+                      <div className="text-xs text-slate-400">Cost Savings</div>
+                      <div className="text-xs text-slate-500 mt-1">B&P reduction</div>
+                    </div>
+                    <div className="glass-card rounded-xl p-4 text-center">
+                      <div className="w-10 h-10 mx-auto mb-2 rounded-lg bg-amber-500/20 flex items-center justify-center"><Icon name="trending" className="w-5 h-5 text-amber-400" /></div>
+                      <div className="text-2xl font-bold text-amber-400 font-mono">+18%</div>
+                      <div className="text-xs text-slate-400">Win Probability</div>
+                      <div className="text-xs text-slate-500 mt-1">54% â†’ 72%</div>
+                    </div>
+                  </div>
+                  
+                  {/* Timeline */}
+                  <div className="glass-card rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold flex items-center gap-2"><Icon name="chart" className="w-5 h-5 text-cyan-400" />Timeline Comparison</h3>
+                      <div className="flex items-center gap-4 text-xs">
+                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gradient-to-r from-cyan-500 to-teal-500"></span>AI (18d)</span>
+                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500/30 border border-red-400"></span>Traditional (45d)</span>
+                      </div>
+                    </div>
+                    {TIMELINE_DATA.map(item => <TimelineBar key={item.phase} label={item.phase} traditional={item.traditional} ai={item.ai} maxDays={15} />)}
+                    <div className="mt-4 pt-4 border-t border-slate-700/50 flex justify-between items-center">
+                      <span className="text-slate-400">Total Cycle Time</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-red-400 line-through">45 days</span>
+                        <span className="text-xl font-bold text-cyan-400">18 days</span>
+                        <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-xs font-bold">60% FASTER</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Countdown */}
+            {stage === 'countdown' && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <div className="text-[12rem] font-bold text-amber-400 animate-countdown font-mono leading-none">{countdown}</div>
+                <p className="text-2xl text-white mt-4 animate-pulse">Initiating Launch Sequence...</p>
+                <div className="flex items-center gap-2 mt-4 text-slate-400">
+                  <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></div>
+                  <span>Preparing final package</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Launching */}
+            {stage === 'launching' && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <div className="rocket-launch"><div className="w-32 h-32 mx-auto"><Icon name="rocket" className="w-full h-full text-amber-400" /></div></div>
+                <p className="text-3xl text-white mt-8 font-bold">ðŸš€ LAUNCHING...</p>
+                <div className="mt-4 w-64 h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-amber-400 to-yellow-500 animate-pulse" style={{ width: '100%' }}></div>
+                </div>
+              </div>
+            )}
+            
+            {/* Complete */}
+            {stage === 'complete' && (
+              <div className="animate-fade-up">
+                <div className="text-center mb-8">
+                  <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/50 animate-glow">
+                    <Icon name="check" className="w-12 h-12 text-white" />
+                  </div>
+                  <h2 className="text-4xl font-bold text-white mb-2">ðŸŽ‰ Proposal Submitted!</h2>
+                  <p className="text-xl text-emerald-400">DHA Healthcare Data Platform â€¢ FA8052-26-R-0001</p>
+                  <p className="text-slate-400 mt-2">Submitted: {new Date().toLocaleString()}</p>
+                </div>
+                
+                {showROI && (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-up">
+                      <div className="glass-card rounded-2xl p-6 text-center animate-glow">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                          <Icon name="clock" className="w-8 h-8 text-white" />
+                        </div>
+                        <div className="text-5xl font-bold text-cyan-400 font-mono"><AnimatedCounter end={340} duration={1500} /></div>
+                        <div className="text-lg text-white mt-2">Hours Saved</div>
+                        <div className="text-sm text-slate-400 mt-1">180 AI-assisted vs 520 manual</div>
+                        <div className="mt-4 pt-4 border-t border-slate-700/50">
+                          <div className="flex justify-between text-sm"><span className="text-slate-400">Efficiency Gain</span><span className="text-cyan-400 font-bold">65%</span></div>
+                        </div>
+                      </div>
+                      <div className="glass-card rounded-2xl p-6 text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                          <Icon name="dollar" className="w-8 h-8 text-white" />
+                        </div>
+                        <div className="text-5xl font-bold text-emerald-400 font-mono">$<AnimatedCounter end={127500} duration={1500} /></div>
+                        <div className="text-lg text-white mt-2">Cost Savings</div>
+                        <div className="text-sm text-slate-400 mt-1">B&P budget reduction this pursuit</div>
+                        <div className="mt-4 pt-4 border-t border-slate-700/50">
+                          <div className="flex justify-between text-sm"><span className="text-slate-400">Annual Projection</span><span className="text-emerald-400 font-bold">$510K</span></div>
+                        </div>
+                      </div>
+                      <div className="glass-card rounded-2xl p-6 text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                          <Icon name="trending" className="w-8 h-8 text-white" />
+                        </div>
+                        <div className="text-5xl font-bold text-amber-400 font-mono">+<AnimatedCounter end={18} duration={1500} />%</div>
+                        <div className="text-lg text-white mt-2">Win Probability Boost</div>
+                        <div className="text-sm text-slate-400 mt-1">From 54% baseline to 72%</div>
+                        <div className="mt-4 pt-4 border-t border-slate-700/50">
+                          <div className="flex justify-between text-sm"><span className="text-slate-400">Contract Value</span><span className="text-amber-400 font-bold">$12.5M</span></div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="glass-card rounded-2xl p-6 mt-6 animate-fade-up" style={{ animationDelay: '0.3s' }}>
+                      <h3 className="text-xl font-semibold mb-6 flex items-center gap-3"><Icon name="chart" className="w-6 h-6 text-cyan-400" />Proposal Cycle: AI-Assisted vs Traditional</h3>
+                      <div className="grid grid-cols-2 gap-8">
+                        <div>{TIMELINE_DATA.map(item => <TimelineBar key={item.phase} label={item.phase} traditional={item.traditional} ai={item.ai} maxDays={15} />)}</div>
+                        <div className="flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="mb-6"><div className="text-sm text-slate-400 mb-1">Traditional Method</div><div className="text-4xl font-bold text-red-400 line-through opacity-60">45 days</div></div>
+                            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center animate-pulse"><Icon name="trending" className="w-8 h-8 text-white" /></div>
+                            <div><div className="text-sm text-slate-400 mb-1">AI-Assisted</div><div className="text-5xl font-bold text-cyan-400">18 days</div></div>
+                            <div className="mt-4 px-4 py-2 rounded-full bg-emerald-500/20 border border-emerald-500/50 inline-block"><span className="text-emerald-400 font-bold">60% Faster Delivery</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <footer className="max-w-6xl mx-auto mt-8 pt-6 border-t border-slate-800">
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>Mission Meets Tech â€¢ MissionPulse v12.0</span>
+              <span>AI GENERATED - REQUIRES HUMAN REVIEW</span>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<LaunchAndROI />);
+  </script>
+</body>
+</html>
