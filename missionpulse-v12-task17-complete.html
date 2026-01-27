@@ -588,73 +588,68 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
 // Each renders functional UI for its purpose
 // ============================================================
 
-// M1: Pipeline Intelligence - Connected to Supabase
+// M1: Pipeline Intelligence
 const M1_Pipeline = ({ roleContext }) => {
-  const [opportunities, setOpportunities] = useState([]);
-  const [stats, setStats] = useState({ total: 0, totalValue: 0, avgPwin: 0, dueThisMonth: 0 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Demo data as fallback
+  const DEMO_OPPORTUNITIES = [
+    { id: 'OPP-2026-DHA-001', name: 'DHA MHS GENESIS Cloud Migration', agency: 'DHA', ceiling: 98450210, priority: 'P-0', phase: 'Pink Team', pWin: 72, daysRemaining: 37 },
+    { id: 'OPP-2026-VA-003', name: 'VA Enterprise Cloud Hosting', agency: 'VA', ceiling: 45000000, priority: 'P-1', phase: 'Blue Team', pWin: 58, daysRemaining: 82 },
+    { id: 'OPP-2026-CMS-008', name: 'CMS Data Analytics Modernization', agency: 'CMS', ceiling: 125000000, priority: 'P-0', phase: 'Red Team', pWin: 68, daysRemaining: 127 },
+    { id: 'OPP-2026-IHS-012', name: 'IHS Telehealth Expansion', agency: 'IHS', ceiling: 32000000, priority: 'P-1', phase: 'Gold Team', pWin: 81, daysRemaining: 14 },
+    { id: 'OPP-2026-CMS-015', name: 'CMS Quality Payment Program', agency: 'CMS', ceiling: 78000000, priority: 'P-0', phase: 'Gate 2', pWin: 45, daysRemaining: 156 },
+  ];
+  const DEMO_STATS = { total: 12, totalValue: 847000000, avgPwin: 64, dueThisMonth: 3 };
 
-  // Fetch data from Supabase on mount
+  const [opportunities, setOpportunities] = useState(DEMO_OPPORTUNITIES);
+  const [stats, setStats] = useState(DEMO_STATS);
+  const [loading, setLoading] = useState(true);
+  const [dataSource, setDataSource] = useState('demo');
+
   useEffect(() => {
     async function loadData() {
       try {
-        setLoading(true);
-        // Check if MissionPulse API is available
-        if (typeof MissionPulse !== 'undefined') {
-          const [opps, pipelineStats] = await Promise.all([
-            MissionPulse.getOpportunities(),
-            MissionPulse.getPipelineStats()
-          ]);
-          setOpportunities(opps || []);
-          setStats(pipelineStats || { total: 0, totalValue: 0, avgPwin: 0, dueThisMonth: 0 });
+        // Check if MissionPulse Supabase client is available
+        if (typeof MissionPulse !== 'undefined' && MissionPulse.getOpportunities) {
+          const opps = await MissionPulse.getOpportunities();
+          
+          // Verify we got an array back (not an error object)
+          if (Array.isArray(opps) && opps.length > 0) {
+            setOpportunities(opps);
+            setDataSource('supabase');
+            
+            // Calculate stats from real data
+            const totalValue = opps.reduce((sum, o) => sum + (o.ceiling || 0), 0);
+            const avgPwin = opps.reduce((sum, o) => sum + (o.pwin || o.pWin || 0), 0) / opps.length;
+            const now = new Date();
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const dueThisMonth = opps.filter(o => {
+              const due = new Date(o.dueDate || o.due_date);
+              return due <= endOfMonth;
+            }).length;
+            
+            setStats({ total: opps.length, totalValue, avgPwin, dueThisMonth });
+            console.log('[M1_Pipeline] Loaded', opps.length, 'opportunities from Supabase');
+          } else {
+            console.log('[M1_Pipeline] No data from Supabase, using demo data');
+            setDataSource('demo');
+          }
         } else {
-          // Fallback to demo data if Supabase not loaded
-          setOpportunities([
-            { id: 'OPP-2026-DHA-001', title: 'DHA MHS GENESIS Cloud Migration', agency: 'DHA', ceiling: 98450210, priority: 'P-0', phase: 'pink_team', pwin: 72, dueDate: new Date(Date.now() + 37*24*60*60*1000) },
-            { id: 'OPP-2026-VA-003', title: 'VA Enterprise Cloud Hosting', agency: 'VA', ceiling: 45000000, priority: 'P-1', phase: 'blue_team', pwin: 58, dueDate: new Date(Date.now() + 82*24*60*60*1000) },
-            { id: 'OPP-2026-CMS-008', title: 'CMS Data Analytics Modernization', agency: 'CMS', ceiling: 125000000, priority: 'P-0', phase: 'red_team', pwin: 68, dueDate: new Date(Date.now() + 127*24*60*60*1000) },
-          ]);
-          setStats({ total: 12, totalValue: 847000000, avgPwin: 64, dueThisMonth: 3 });
+          console.log('[M1_Pipeline] Supabase client not available, using demo data');
+          setDataSource('demo');
         }
       } catch (err) {
-        console.error('Failed to load pipeline data:', err);
-        setError(err.message);
+        console.warn('[M1_Pipeline] Error loading data, using demo:', err.message);
+        setDataSource('demo');
       } finally {
         setLoading(false);
       }
     }
-    loadData();
     
-    // Subscribe to real-time updates if available
-    let unsubscribe;
-    if (typeof MissionPulse !== 'undefined' && MissionPulse.subscribeToOpportunities) {
-      unsubscribe = MissionPulse.subscribeToOpportunities((payload) => {
-        loadData(); // Refresh on changes
-      });
-    }
-    return () => unsubscribe?.();
+    // Small delay to let Supabase initialize
+    setTimeout(loadData, 500);
   }, []);
 
-  // Calculate days remaining from due date
-  const getDaysRemaining = (dueDate) => {
-    if (!dueDate) return 999;
-    const due = new Date(dueDate);
-    const now = new Date();
-    return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
-  };
-
-  // Get phase display name
-  const getPhaseDisplay = (phase) => {
-    const phaseMap = {
-      'gate_1': 'Gate 1', 'gate_2': 'Gate 2', 'gate_3': 'Gate 3',
-      'pink_team': 'Pink Team', 'red_team': 'Red Team', 'blue_team': 'Blue Team',
-      'gold_team': 'Gold Team', 'submitted': 'Submitted', 'awarded': 'Awarded'
-    };
-    return phaseMap[phase] || phase;
-  };
-
-  // Format currency
+  // Format currency helper
   const formatCurrency = (value) => {
     if (!value) return '$0';
     if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
@@ -667,29 +662,29 @@ const M1_Pipeline = ({ roleContext }) => {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-400">Loading pipeline data...</p>
+          <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-slate-400 text-sm">Loading pipeline...</p>
         </div>
       </div>
     );
   }
-
+  
   return (
     <div className="p-6 space-y-6 animate-fadeIn">
-      {/* Connection Status */}
-      {typeof MissionPulse !== 'undefined' && (
-        <div className="flex items-center gap-2 text-xs text-emerald-400">
-          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-          Live data from Supabase
-        </div>
-      )}
+      {/* Data Source Indicator */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className={`w-2 h-2 rounded-full ${dataSource === 'supabase' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+        <span className={dataSource === 'supabase' ? 'text-emerald-400' : 'text-amber-400'}>
+          {dataSource === 'supabase' ? 'Live data from Supabase' : 'Demo mode (Supabase not connected)'}
+        </span>
+      </div>
       
       {/* Stats Row */}
       <div className="grid grid-cols-4 gap-4">
-        <Card><p className="text-xs text-slate-400 mb-1">Active Pursuits</p><p className="text-2xl font-bold text-white">{stats.total || opportunities.length}</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Active Pursuits</p><p className="text-2xl font-bold text-white">{stats.total}</p></Card>
         <Card><p className="text-xs text-slate-400 mb-1">Pipeline Value</p><p className="text-2xl font-bold text-emerald-400">{formatCurrency(stats.totalValue)}</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Avg Win Probability</p><p className="text-2xl font-bold text-cyan-400">{Math.round(stats.avgPwin || 0)}%</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Due This Month</p><p className="text-2xl font-bold text-amber-400">{stats.dueThisMonth || 0}</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Avg Win Probability</p><p className="text-2xl font-bold text-cyan-400">{Math.round(stats.avgPwin)}%</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Due This Month</p><p className="text-2xl font-bold text-amber-400">{stats.dueThisMonth}</p></Card>
       </div>
       
       {/* Opportunities Table */}
@@ -698,61 +693,50 @@ const M1_Pipeline = ({ roleContext }) => {
           <h3 className="text-lg font-semibold text-white">Active Opportunities</h3>
           <Button variant="primary" size="sm" icon="plus">Add Opportunity</Button>
         </div>
-        {opportunities.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">
-            <Icon name="filter" className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No opportunities found</p>
-            <p className="text-sm mt-2">Add your first opportunity to get started</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-800/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Priority</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Days Left</th>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-800/50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Priority</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Days Left</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {opportunities.map(opp => (
+                <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
+                  <td className="px-4 py-3">
+                    <p className="text-sm font-medium text-white">{opp.title || opp.name}</p>
+                    <p className="text-xs text-slate-500">{opp.id}</p>
+                  </td>
+                  <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
+                  <td className="px-4 py-3 text-sm text-emerald-400 font-mono">{formatCurrency(opp.ceiling)}</td>
+                  <td className="px-4 py-3">
+                    <Badge color={opp.priority === 'P-0' ? '#ef4444' : '#f59e0b'}>{opp.priority || 'P-1'}</Badge>
+                  </td>
+                  <td className="px-4 py-3"><Badge color="#8b5cf6">{opp.phase}</Badge></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pwin || opp.pWin || 0}%` }} />
+                      </div>
+                      <span className="text-sm text-cyan-400">{opp.pwin || opp.pWin || 0}%</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-sm font-medium ${(opp.daysRemaining || 999) < 45 ? 'text-red-400' : 'text-slate-300'}`}>
+                      {opp.daysRemaining || '—'}d
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {opportunities.map(opp => {
-                  const daysRemaining = getDaysRemaining(opp.dueDate);
-                  return (
-                    <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-white">{opp.title || opp.name}</p>
-                        <p className="text-xs text-slate-500">{opp.id}</p>
-                      </td>
-                      <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
-                      <td className="px-4 py-3 text-sm text-emerald-400 font-mono">{formatCurrency(opp.ceiling)}</td>
-                      <td className="px-4 py-3">
-                        <Badge color={opp.priority === 'P-0' ? '#ef4444' : '#f59e0b'}>{opp.priority || 'P-1'}</Badge>
-                      </td>
-                      <td className="px-4 py-3"><Badge color="#8b5cf6">{getPhaseDisplay(opp.phase)}</Badge></td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                            <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pwin || 0}%` }} />
-                          </div>
-                          <span className="text-sm text-cyan-400">{opp.pwin || 0}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-sm font-medium ${daysRemaining < 45 ? 'text-red-400' : 'text-slate-300'}`}>
-                          {daysRemaining}d
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   );
@@ -1523,7 +1507,7 @@ function App() {
       {/* Global Footer */}
       <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-50">
         <span className="text-[10px] text-slate-500 tracking-wider">
-          AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 Ultimate • © 2026 Mission Meets Tech
+          AI GENERATED - REQUIRES HUMAN REVIEW â€¢ MissionPulse v12.0 Ultimate â€¢ Â© 2026 Mission Meets Tech
         </span>
       </div>
     </RoleContext.Provider>
@@ -1535,7 +1519,7 @@ function App() {
 // ============================================================
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
-    <!-- AI Chat Widget - Capture Agent for Dashboard -->
+    <!-- AI Chat Widget - Capture Agent -->
     <script src="ai-chat-widget.js" data-agent="capture"></script>
 </body>
 </html>
