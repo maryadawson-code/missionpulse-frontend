@@ -3,447 +3,620 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - Dashboard</title>
+  <title>MissionPulse v12.0 - Partner Demo</title>
+  <!-- Supabase Auth -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-client.js"></script>
+  <!-- React -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
-    .glass-card {
-      background: rgba(30, 41, 59, 0.5);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(71, 85, 105, 0.5);
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes bounce { 0%, 100% { transform: translateY(-25%); } 50% { transform: translateY(0); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-bounce { animation: bounce 1s infinite; }
+    /* Auth Loading Screen */
+    #auth-loading {
+      position: fixed;
+      inset: 0;
+      background: #00050F;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.3s ease;
     }
-    .cyan-glow { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
-    .phase-badge {
-      font-size: 0.65rem;
-      padding: 0.25rem 0.5rem;
-      border-radius: 9999px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+    #auth-loading.hidden {
+      opacity: 0;
+      pointer-events: none;
     }
-    .loading-spinner {
-      border: 3px solid rgba(0, 229, 250, 0.1);
-      border-top: 3px solid #00E5FA;
+    .auth-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid #1e3a5f;
+      border-top-color: #00E5FA;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
+      animation: spin 0.8s linear infinite;
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .auth-text {
+      color: #94a3b8;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+    }
   </style>
 </head>
-<body class="bg-[#00050F] text-white">
-  
-  <!-- Debug Banner -->
-  <div id="debug-banner" class="bg-amber-500/20 border-b border-amber-500/50 px-4 py-2 text-center">
-    <p class="text-amber-400 text-sm" id="debug-status">🔧 Initializing...</p>
+<body>
+  <!-- Auth Loading Overlay -->
+  <div id="auth-loading">
+    <div class="auth-spinner"></div>
+    <p class="auth-text">Authenticating...</p>
   </div>
 
-  <!-- Main App -->
-  <div id="app">
-    <!-- Header -->
-    <header class="bg-slate-900/80 border-b border-slate-700/50 px-6 py-4">
-      <div class="max-w-7xl mx-auto flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-xl font-bold text-white">MissionPulse</h1>
-            <p class="text-xs text-slate-400">Mission Meets Tech</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-4">
-          <div class="text-right">
-            <p class="text-sm font-medium text-white" id="user-name">Mary Womack</p>
-            <p class="text-xs text-cyan-400" id="user-role">Capture Manager</p>
-          </div>
-        </div>
-      </div>
-    </header>
+  <div id="root"></div>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-6 py-8">
-      <!-- KPI Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div class="glass-card rounded-2xl p-5 cyan-glow">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-slate-400 text-sm">Active Opportunities</span>
-            <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-          </div>
-          <p class="text-3xl font-bold text-white" id="kpi-count">--</p>
-          <p class="text-xs text-emerald-400 mt-1">↑ Pipeline Active</p>
-        </div>
-
-        <div class="glass-card rounded-2xl p-5">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-slate-400 text-sm">Pipeline Value</span>
-            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <p class="text-3xl font-bold text-white" id="kpi-value">--</p>
-          <p class="text-xs text-slate-400 mt-1">Total Contract Value</p>
-        </div>
-
-        <div class="glass-card rounded-2xl p-5">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-slate-400 text-sm">Avg Win Probability</span>
-            <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            </div>
-          </div>
-          <p class="text-3xl font-bold text-white" id="kpi-pwin">--</p>
-          <p class="text-xs text-slate-400 mt-1">Weighted Average</p>
-        </div>
-
-        <div class="glass-card rounded-2xl p-5">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-slate-400 text-sm">Next Due Date</span>
-            <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <p class="text-3xl font-bold text-white" id="kpi-next-due">--</p>
-          <p class="text-xs text-slate-400 mt-1" id="kpi-next-opp">Loading...</p>
-        </div>
-      </div>
-
-      <!-- Section Header -->
-      <div class="flex items-center justify-between mb-6">
-        <h2 class="text-lg font-semibold text-white">Active Pipeline</h2>
-        <div class="flex items-center gap-2">
-          <select id="filter-phase" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-            <option value="">All Phases</option>
-            <option value="identified">Identified</option>
-            <option value="capture">Capture</option>
-            <option value="gate_1">Gate 1</option>
-            <option value="blue_team">Blue Team</option>
-            <option value="pink_team">Pink Team</option>
-            <option value="red_team">Red Team</option>
-            <option value="gold_team">Gold Team</option>
-            <option value="submitted">Submitted</option>
-          </select>
-          <select id="filter-priority" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-            <option value="">All Priorities</option>
-            <option value="P-0">P-0 (Must Win)</option>
-            <option value="P-1">P-1 (Active)</option>
-            <option value="P-2">P-2 (Pipeline)</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Opportunities Grid -->
-      <div id="opportunities-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div class="glass-card rounded-2xl p-8 text-center col-span-full">
-          <div class="loading-spinner mx-auto mb-4"></div>
-          <p class="text-slate-400">Loading opportunities...</p>
-        </div>
-      </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="border-t border-slate-800 px-6 py-4 mt-8">
-      <div class="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-500">
-        <span>Mission Meets Tech • MissionPulse v1.0</span>
-        <span>AI GENERATED - REQUIRES HUMAN REVIEW</span>
-      </div>
-    </footer>
-  </div>
-
+  <!-- Auth Check Script -->
   <script>
-    // ============================================
-    // SUPABASE CONFIGURATION - LEGACY KEY
-    // ============================================
-    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
-    
-    let supabase;
-    let allOpportunities = [];
-
-    // Debug helper
-    function updateDebug(message, isError = false) {
-      const banner = document.getElementById('debug-status');
-      banner.textContent = message;
-      banner.parentElement.className = isError 
-        ? 'bg-red-500/20 border-b border-red-500/50 px-4 py-2 text-center'
-        : 'bg-emerald-500/20 border-b border-emerald-500/50 px-4 py-2 text-center';
-      banner.className = isError ? 'text-red-400 text-sm' : 'text-emerald-400 text-sm';
-      console.log(isError ? '❌' : '✅', message);
-    }
-
-    // ============================================
-    // INITIALIZATION
-    // ============================================
-    async function init() {
-      updateDebug('🔧 Step 1: Initializing Supabase client...');
-      
+    (async function checkAuth() {
       try {
-        // Initialize Supabase
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        updateDebug('✅ Step 2: Supabase client created, fetching data...');
-        
-        // Skip auth check - just load data directly (RLS is disabled)
-        await loadOpportunities();
-        
-      } catch (err) {
-        updateDebug('❌ Error: ' + err.message, true);
-        console.error('Full error:', err);
-        showErrorInGrid('Initialization failed: ' + err.message);
-      }
-    }
-
-    // ============================================
-    // LOAD OPPORTUNITIES
-    // ============================================
-    async function loadOpportunities() {
-      updateDebug('📊 Step 3: Querying opportunities table...');
-      
-      try {
-        const { data, error } = await supabase
-          .from('opportunities')
-          .select('*')
-          .eq('is_archived', false)
-          .order('proposal_due', { ascending: true });
-        
-        if (error) {
-          updateDebug('❌ Database error: ' + error.message, true);
-          console.error('Supabase error:', error);
-          showErrorInGrid('Database error: ' + error.message + ' (Code: ' + error.code + ')');
+        const user = await MissionPulse.getCurrentUser();
+        if (!user) {
+          // Not logged in - redirect to login
+          window.location.href = 'login.html';
           return;
         }
-        
-        if (!data || data.length === 0) {
-          updateDebug('⚠️ No opportunities found (table may be empty)', true);
-          showErrorInGrid('No opportunities found. Check that data exists and is_archived = false.');
-          return;
-        }
-        
-        updateDebug('✅ SUCCESS! Loaded ' + data.length + ' opportunities - Pipeline: ' + formatCurrency(data.reduce((s,o) => s + (parseFloat(o.estimated_value)||0), 0)));
-        allOpportunities = data;
-        
-        updateKPIs(allOpportunities);
-        renderOpportunities(allOpportunities);
-        
-      } catch (err) {
-        updateDebug('❌ Fetch error: ' + err.message, true);
-        console.error('Fetch error:', err);
-        showErrorInGrid('Failed to fetch: ' + err.message);
+        // User is logged in - hide loading and show app
+        document.getElementById('auth-loading').classList.add('hidden');
+        // Store user for React app
+        window.currentUser = user;
+        // Also get full profile
+        MissionPulse.getUserProfile().then(profile => {
+          window.userProfile = profile;
+          window.dispatchEvent(new CustomEvent('userReady', { detail: profile }));
+        });
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        window.location.href = 'login.html';
       }
-    }
+    })();
+  </script>
 
-    // ============================================
-    // UPDATE KPIs
-    // ============================================
-    function updateKPIs(opportunities) {
-      document.getElementById('kpi-count').textContent = opportunities.length;
-      
-      const totalValue = opportunities.reduce((sum, opp) => sum + (parseFloat(opp.estimated_value) || 0), 0);
-      document.getElementById('kpi-value').textContent = formatCurrency(totalValue);
-      
-      const avgPwin = opportunities.length > 0 
-        ? Math.round(opportunities.reduce((sum, opp) => sum + (opp.pwin || 0), 0) / opportunities.length)
-        : 0;
-      document.getElementById('kpi-pwin').textContent = avgPwin + '%';
-      
-      const futureOpps = opportunities.filter(opp => opp.proposal_due && new Date(opp.proposal_due) > new Date());
-      if (futureOpps.length > 0) {
-        const nextOpp = futureOpps[0];
-        const daysUntil = Math.ceil((new Date(nextOpp.proposal_due) - new Date()) / (1000 * 60 * 60 * 24));
-        document.getElementById('kpi-next-due').textContent = daysUntil + ' days';
-        document.getElementById('kpi-next-opp').textContent = truncate(nextOpp.title, 25);
-      } else {
-        document.getElementById('kpi-next-due').textContent = '--';
-        document.getElementById('kpi-next-opp').textContent = 'No upcoming';
-      }
-    }
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-    // ============================================
-    // RENDER OPPORTUNITIES
-    // ============================================
-    function renderOpportunities(opportunities) {
-      const grid = document.getElementById('opportunities-grid');
-      
-      grid.innerHTML = opportunities.map(opp => `
-        <div class="glass-card rounded-2xl p-5 hover:border-cyan-500/50 transition-all cursor-pointer">
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex-1">
-              <h3 class="font-semibold text-white text-sm leading-tight mb-1">${escapeHtml(opp.title)}</h3>
-              <p class="text-xs text-cyan-400">${escapeHtml(opp.agency || 'No Agency')}</p>
-            </div>
-            <span class="phase-badge ${getPhaseColor(opp.phase)}">${formatPhase(opp.phase)}</span>
-          </div>
-          
-          <div class="flex items-center gap-2 mb-3">
-            <span class="px-2 py-0.5 rounded text-xs font-medium ${getPriorityColor(opp.priority)}">${opp.priority || 'P-2'}</span>
-            ${opp.go_no_go === 'go' ? '<span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400">GO</span>' : ''}
-            ${opp.go_no_go === 'no-go' ? '<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">NO-GO</span>' : ''}
-          </div>
-          
-          <div class="grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <p class="text-slate-500">Value</p>
-              <p class="text-white font-medium">${formatCurrency(opp.estimated_value)}</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Win Probability</p>
-              <p class="text-white font-medium">${opp.pwin || 0}%</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Due Date</p>
-              <p class="text-white font-medium">${formatDate(opp.proposal_due)}</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Days Left</p>
-              <p class="text-white font-medium ${getDaysColor(opp.proposal_due)}">${getDaysRemaining(opp.proposal_due)}</p>
-            </div>
-          </div>
-          
-          ${opp.solicitation_number ? `
-            <div class="mt-3 pt-3 border-t border-slate-700">
-              <p class="text-xs text-slate-500">Sol #: <span class="text-slate-400">${escapeHtml(opp.solicitation_number)}</span></p>
-            </div>
-          ` : ''}
-        </div>
-      `).join('');
-    }
+    // Simple SVG Icons as components
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      mic: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>,
+      upload: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+      calculator: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+      shieldCheck: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      presentation: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      rocket: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      handshake: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      play: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      chevronLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+      star: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
+      trophy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      loader: () => <svg className="w-full h-full animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      send: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      user: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+      activity: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      swords: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
+      type: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>,
+      kanban: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
+      arrowRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>,
+      logout: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
+    };
 
-    function showErrorInGrid(message) {
-      const grid = document.getElementById('opportunities-grid');
-      grid.innerHTML = `
-        <div class="glass-card rounded-2xl p-8 text-center col-span-full border border-red-500/30">
-          <div class="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h3 class="text-lg font-medium text-white mb-2">Error Loading Data</h3>
-          <p class="text-red-400 text-sm mb-4">${escapeHtml(message)}</p>
-          <button onclick="loadOpportunities()" class="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-400 transition-all">
-            Try Again
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    const DEMO_SCENES = [
+      { id: 1, title: 'Parking Lot Intel', subtitle: 'Voice-to-Intel Capture', icon: 'mic', color: '#00E5FA' },
+      { id: 2, title: 'Instant Compliance', subtitle: 'RFP Shredder', icon: 'upload', color: '#8B5CF6' },
+      { id: 3, title: 'Green Team Miracle', subtitle: 'LCAT Mapping', icon: 'calculator', color: '#00D29F' },
+      { id: 4, title: 'Iron Dome Drafter', subtitle: 'CUI & Auto-DTP', icon: 'shieldCheck', color: '#EF4444' },
+      { id: 5, title: 'Frenemy View', subtitle: 'Data Masking', icon: 'eye', color: '#F59E0B' },
+      { id: 6, title: 'Orals Studio', subtitle: 'Slide Generation', icon: 'presentation', color: '#A855F7' },
+      { id: 7, title: 'Crisis Room', subtitle: 'EN Analyzer', icon: 'alert', color: '#EC4899' },
+      { id: 8, title: 'Launch Sequence', subtitle: 'Submit & ROI', icon: 'rocket', color: '#FFD700' },
+      { id: 9, title: 'The Handoff', subtitle: 'Post-Award', icon: 'handshake', color: '#00BDAE' },
+    ];
+
+    const Card = ({ children, className = '', glow = false, onClick }) => (
+      <div onClick={onClick} className={`bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl transition-all duration-300 ${onClick ? 'cursor-pointer hover:border-cyan-500/50' : ''} ${glow ? 'shadow-lg shadow-cyan-500/20 border-cyan-500/30' : ''} ${className}`}>{children}</div>
+    );
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, className = '', disabled = false, pulse = false, ...props }) => {
+      const variants = { 
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400 shadow-lg shadow-cyan-500/25', 
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600', 
+        success: 'bg-emerald-500 text-white hover:bg-emerald-400', 
+        ghost: 'bg-transparent text-slate-400 hover:text-white hover:bg-slate-700/50', 
+        gold: 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 hover:from-amber-300 hover:to-yellow-400 shadow-lg shadow-amber-500/25',
+        danger: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base', xl: 'px-8 py-4 text-lg' };
+      return (
+        <button className={`inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${pulse ? 'animate-pulse' : ''} ${className}`} disabled={disabled} {...props}>
+          {icon && <Icon name={icon} className="w-4 h-4" />}{children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm', icon }) => {
+      const variants = { 
+        default: 'bg-slate-700 text-slate-300', 
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30', 
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', 
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30', 
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30' 
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return <span className={`inline-flex items-center gap-1.5 rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>{icon && <Icon name={icon} className="w-3 h-3" />}{children}</span>;
+    };
+
+    // User Menu Component
+    const UserMenu = ({ user, onLogout }) => {
+      const [open, setOpen] = useState(false);
+      const displayName = user?.full_name || user?.email?.split('@')[0] || 'User';
+      const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const role = user?.role?.name || 'User';
+      
+      return (
+        <div className="relative">
+          <button onClick={() => setOpen(!open)} className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-700/50 transition-colors">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center text-xs font-bold text-white">
+              {initials}
+            </div>
+            <div className="hidden sm:block text-left">
+              <div className="text-sm font-medium text-white">{displayName}</div>
+              <div className="text-xs text-slate-400">{role}</div>
+            </div>
           </button>
+          {open && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+              <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="p-3 border-b border-slate-700">
+                  <div className="text-sm font-medium text-white">{displayName}</div>
+                  <div className="text-xs text-slate-400">{user?.email}</div>
+                </div>
+                <div className="p-1">
+                  <button onClick={onLogout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                    <Icon name="logout" className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      `;
-    }
+      );
+    };
 
-    // ============================================
-    // FILTERS
-    // ============================================
-    function applyFilters() {
-      const phaseFilter = document.getElementById('filter-phase').value;
-      const priorityFilter = document.getElementById('filter-priority').value;
-      
-      let filtered = [...allOpportunities];
-      
-      if (phaseFilter) filtered = filtered.filter(opp => opp.phase === phaseFilter);
-      if (priorityFilter) filtered = filtered.filter(opp => opp.priority === priorityFilter);
-      
-      updateKPIs(filtered);
-      renderOpportunities(filtered);
-    }
-
-    // ============================================
-    // HELPER FUNCTIONS
-    // ============================================
-    function formatCurrency(value) {
-      if (!value) return '$0';
-      const num = parseFloat(value);
-      if (num >= 1000000000) return '$' + (num / 1000000000).toFixed(1) + 'B';
-      if (num >= 1000000) return '$' + (num / 1000000).toFixed(1) + 'M';
-      if (num >= 1000) return '$' + (num / 1000).toFixed(0) + 'K';
-      return '$' + num.toLocaleString();
-    }
-    
-    function formatDate(dateStr) {
-      if (!dateStr) return 'TBD';
-      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-    
-    function getDaysRemaining(dateStr) {
-      if (!dateStr) return '--';
-      const days = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
-      if (days < 0) return 'Overdue';
-      if (days === 0) return 'Today';
-      if (days === 1) return '1 day';
-      return days + ' days';
-    }
-    
-    function getDaysColor(dateStr) {
-      if (!dateStr) return 'text-slate-400';
-      const days = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
-      if (days < 0) return 'text-red-400';
-      if (days <= 7) return 'text-red-400';
-      if (days <= 30) return 'text-amber-400';
-      return 'text-emerald-400';
-    }
-    
-    function formatPhase(phase) {
-      if (!phase) return 'Unknown';
-      return phase.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    }
-    
-    function getPhaseColor(phase) {
-      const colors = {
-        'identified': 'bg-slate-500/20 text-slate-400',
-        'capture': 'bg-purple-500/20 text-purple-400',
-        'gate_1': 'bg-blue-500/20 text-blue-400',
-        'blue_team': 'bg-blue-500/20 text-blue-400',
-        'pink_team': 'bg-pink-500/20 text-pink-400',
-        'red_team': 'bg-red-500/20 text-red-400',
-        'gold_team': 'bg-amber-500/20 text-amber-400',
-        'submitted': 'bg-emerald-500/20 text-emerald-400',
-        'awarded': 'bg-emerald-500/20 text-emerald-400',
-        'proposal': 'bg-cyan-500/20 text-cyan-400',
-        'pursuit': 'bg-purple-500/20 text-purple-400',
-        'opportunity': 'bg-slate-500/20 text-slate-400'
+    // Scene 1: Voice Capture
+    const VoiceCaptureScene = ({ onComplete }) => {
+      const [stage, setStage] = useState('idle');
+      const [transcript, setTranscript] = useState('');
+      const handleMicClick = () => {
+        if (stage === 'idle') {
+          setStage('listening');
+          setTimeout(() => { 
+            setStage('processing'); 
+            setTimeout(() => { 
+              setTranscript("Client mentioned legacy vendor hasn't upgraded since 2019. Frustrated with lack of innovation. Decision timeline: 90 days. Key contact: Dr. Sarah Chen."); 
+              setStage('complete'); 
+              setTimeout(onComplete, 2000); 
+            }, 1500); 
+          }, 2000);
+        }
       };
-      return colors[phase] || 'bg-slate-500/20 text-slate-400';
-    }
-    
-    function getPriorityColor(priority) {
-      const colors = {
-        'P-0': 'bg-red-500/20 text-red-400',
-        'P-1': 'bg-amber-500/20 text-amber-400',
-        'P-2': 'bg-blue-500/20 text-blue-400',
-        'critical': 'bg-red-500/20 text-red-400',
-        'high': 'bg-amber-500/20 text-amber-400',
-        'medium': 'bg-blue-500/20 text-blue-400',
-        'low': 'bg-slate-500/20 text-slate-400'
+      return (
+        <div className="h-full flex flex-col items-center justify-center p-8">
+          <div className="w-72 h-[480px] bg-slate-900 rounded-[2.5rem] border-4 border-slate-700 shadow-2xl overflow-hidden relative">
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-5 bg-slate-800 rounded-b-xl" />
+            <div className="p-5 pt-8 h-full flex flex-col">
+              <div className="text-center mb-4">
+                <Badge variant="primary" size="xs" icon="activity">CAPTURE COMMANDER</Badge>
+                <h3 className="text-base font-bold text-white mt-2">Voice Intel Capture</h3>
+              </div>
+              <div className="flex-1 flex items-center justify-center">
+                <button onClick={handleMicClick} className={`relative w-20 h-20 rounded-full transition-all duration-300 flex items-center justify-center ${stage === 'listening' ? 'bg-gradient-to-br from-cyan-500 to-teal-500 scale-110' : stage === 'processing' ? 'bg-gradient-to-br from-amber-500 to-orange-500' : 'bg-slate-700 hover:bg-slate-600'}`}>
+                  {stage === 'processing' ? (<Icon name="loader" className="w-8 h-8 text-white" />) : (<Icon name="mic" className="w-8 h-8 text-white" />)}
+                  {stage === 'listening' && <span className="absolute inset-0 rounded-full animate-ping bg-cyan-400/40" />}
+                </button>
+              </div>
+              <div className="bg-slate-800/80 rounded-xl p-3 mb-2">
+                <p className="text-xs text-white min-h-[50px]">{transcript || (stage === 'idle' ? 'Tap mic to record...' : stage === 'listening' ? '🎤 Listening...' : '⏳ Processing...')}</p>
+              </div>
+              {stage === 'complete' && (
+                <Card className="p-3 border-cyan-500/50 bg-cyan-500/10" glow>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon name="target" className="w-4 h-4 text-cyan-400" />
+                    <span className="font-semibold text-white text-sm">Win Strategy Card</span>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    <Badge variant="danger" size="xs">⚠️ Ghost</Badge>
+                    <Badge variant="warning" size="xs">⏰ 90 Days</Badge>
+                  </div>
+                </Card>
+              )}
+            </div>
+          </div>
+          <p className="mt-4 text-slate-400 text-sm">{stage === 'idle' ? '👆 Tap microphone to start' : stage === 'complete' ? '✓ Win Strategy auto-generated!' : ''}</p>
+        </div>
+      );
+    };
+
+    // Scene 2: Compliance
+    const ComplianceScene = ({ onComplete }) => {
+      const [stage, setStage] = useState('idle');
+      const [progress, setProgress] = useState(0);
+      const requirements = [
+        { id: 'L.4.1', text: 'Technical Approach (50 pages)', risk: 'low' }, 
+        { id: 'M.3.1', text: 'CMMI Level 5 Required', risk: 'high' }, 
+        { id: 'L.4.2', text: 'Past Performance (5 refs)', risk: 'low' }, 
+        { id: 'M.3.2', text: 'FedRAMP High Auth', risk: 'medium' }
+      ];
+      const handleDrop = () => { 
+        setStage('processing'); 
+        let p = 0; 
+        const interval = setInterval(() => { p += 10; setProgress(p); if (p >= 100) { clearInterval(interval); setStage('complete'); setTimeout(onComplete, 2000); } }, 150); 
       };
-      return colors[priority] || 'bg-slate-500/20 text-slate-400';
-    }
-    
-    function truncate(str, len) {
-      if (!str) return '';
-      return str.length > len ? str.substring(0, len) + '...' : str;
-    }
-    
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
+      return (
+        <div className="h-full p-6">
+          {stage === 'idle' && (
+            <div className="h-full flex items-center justify-center">
+              <div onClick={handleDrop} className="w-80 h-48 rounded-2xl border-2 border-dashed border-slate-600 bg-slate-800/50 hover:border-cyan-500 hover:bg-cyan-500/10 transition-all cursor-pointer flex flex-col items-center justify-center">
+                <Icon name="upload" className="w-12 h-12 text-slate-500 mb-3" />
+                <p className="text-white font-medium">Drop RFP Here</p>
+                <p className="text-slate-400 text-sm">Click to simulate</p>
+              </div>
+            </div>
+          )}
+          {stage === 'processing' && (
+            <div className="h-full flex flex-col items-center justify-center">
+              <div className="relative w-24 h-24 mb-4">
+                <svg className="w-24 h-24 transform -rotate-90">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="#00E5FA" strokeWidth="8" strokeDasharray={251} strokeDashoffset={251 - (progress / 100) * 251} strokeLinecap="round" />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-xl font-bold text-white">{progress}%</span>
+              </div>
+              <p className="text-white">Processing 100-page RFP...</p>
+            </div>
+          )}
+          {stage === 'complete' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white">Compliance Matrix Generated</h3>
+                <Badge variant="success">✓ Auto-Mapped</Badge>
+              </div>
+              <div className="space-y-2">
+                {requirements.map((req) => (
+                  <Card key={req.id} className={`p-3 ${req.risk === 'high' ? 'border-red-500/50 bg-red-500/10' : ''}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-cyan-400">{req.id}</span>
+                        <span className="text-white text-sm">{req.text}</span>
+                      </div>
+                      <Badge variant={req.risk === 'high' ? 'danger' : req.risk === 'medium' ? 'warning' : 'success'} size="xs">
+                        {req.risk === 'high' ? '⚠️ HIGH' : req.risk}
+                      </Badge>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // Scene 3: Pricing
+    const PricingScene = ({ onComplete }) => {
+      const [stage, setStage] = useState('idle');
+      const [selected, setSelected] = useState(null);
+      const options = [
+        { schedule: 'GSA IT 70', rate: 145.00, match: 95, rec: true }, 
+        { schedule: 'OASIS Pool 1', rate: 152.00, match: 88 }, 
+        { schedule: 'SEWP V', rate: 138.00, match: 82 }
+      ];
+      const handleMap = () => { setStage('scanning'); setTimeout(() => { setStage('complete'); setSelected(options[0]); setTimeout(onComplete, 2000); }, 2000); };
+      return (
+        <div className="h-full p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div><h3 className="text-xl font-bold text-white">Green Team Pricing</h3><p className="text-slate-400 text-sm">LCAT Mapping & Margin Analysis</p></div>
+            {stage === 'idle' && <Button onClick={handleMap} icon="zap" variant="gold">Map LCATs</Button>}
+          </div>
+          <Card className="p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center"><Icon name="user" className="w-5 h-5 text-white" /></div>
+              <div><h4 className="font-bold text-white">Software Engineer III</h4><p className="text-slate-400 text-sm">PWS Section 3.2.1</p></div>
+            </div>
+          </Card>
+          {stage === 'scanning' && (<div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30"><Icon name="loader" className="w-5 h-5 text-amber-400" /><span className="text-amber-400">Scanning contract vehicles...</span></div>)}
+          {stage === 'complete' && (
+            <div className="space-y-3">
+              {options.map((opt) => (
+                <div key={opt.schedule} onClick={() => setSelected(opt)} className={`p-4 rounded-xl border cursor-pointer transition-all ${selected?.schedule === opt.schedule ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-700 hover:border-slate-600'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${opt.rec ? 'bg-emerald-500/20' : 'bg-slate-700'}`}><span className="text-sm font-bold text-white">{opt.match}%</span></div>
+                      <div><span className="font-medium text-white">{opt.schedule}</span>{opt.rec && <Badge variant="success" size="xs" className="ml-2">⭐ Best</Badge>}</div>
+                    </div>
+                    <div className="text-right"><div className="text-xl font-bold text-emerald-400">${opt.rate.toFixed(2)}</div><div className="text-xs text-slate-400">/hour</div></div>
+                  </div>
+                </div>
+              ))}
+              {selected && (
+                <Card className="p-4 border-emerald-500/30 mt-4" glow>
+                  <div className="flex items-center gap-2 mb-3"><Icon name="calculator" className="w-4 h-4 text-emerald-400" /><span className="font-semibold text-white">Margin Calculator</span></div>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div><div className="text-xl font-bold text-white">${selected.rate}</div><div className="text-xs text-slate-400">Bill Rate</div></div>
+                    <div><div className="text-xl font-bold text-emerald-400">32%</div><div className="text-xs text-slate-400">Margin</div></div>
+                    <div><div className="text-xl font-bold text-cyan-400">$301K</div><div className="text-xs text-slate-400">Annual</div></div>
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // Scene 4: Security
+    const SecurityScene = ({ onComplete }) => {
+      const [text, setText] = useState('');
+      const [showCUI, setShowCUI] = useState(false);
+      const [showDTP, setShowDTP] = useState(false);
+      const sample = "Our proprietary algorithms leverage ML to optimize healthcare data governance. The HIPAA-compliant architecture ensures patient data protection.";
+      useEffect(() => { if (text.length < sample.length) { const t = setTimeout(() => setText(sample.slice(0, text.length + 1)), 25); return () => clearTimeout(t); } else if (!showCUI) { setTimeout(() => setShowCUI(true), 500); setTimeout(() => setShowDTP(true), 1200); setTimeout(onComplete, 2500); } }, [text, showCUI]);
+      return (
+        <div className="h-full p-6">
+          <Card className="p-3 mb-4 border-red-500/50 bg-red-500/10">
+            <div className="flex items-center gap-2"><Icon name="shieldCheck" className="w-5 h-5 text-red-400" /><span className="font-semibold text-white">Iron Dome Active</span><Badge variant="danger" size="xs">🔒 Secure</Badge></div>
+          </Card>
+          <Card className="overflow-hidden">
+            <div className={`p-2 bg-amber-500 text-center transition-all duration-500 ${showCUI ? 'opacity-100' : 'opacity-0 h-0 p-0'}`}><span className="text-amber-900 font-bold text-sm">CUI//PROPIN - CONTROLLED UNCLASSIFIED</span></div>
+            <div className="p-4 border-b border-slate-700">
+              <div className="flex items-center justify-between"><span className="text-white font-medium text-sm">Technical Volume - Section 3.2</span>{showDTP && <Badge variant="success" size="xs">✓ Auto-DTP</Badge>}</div>
+            </div>
+            <div className="p-4">
+              <p className={`text-white leading-relaxed transition-all duration-500 ${showDTP ? 'font-serif' : ''}`}>{text}<span className="animate-pulse">|</span></p>
+              {showDTP && (<div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"><div className="flex items-center gap-2"><Icon name="type" className="w-4 h-4 text-emerald-400" /><span className="text-sm text-white">Font: Times New Roman 12pt (per Section L)</span></div></div>)}
+            </div>
+          </Card>
+        </div>
+      );
+    };
+
+    // Scene 5: RBAC
+    const RBACScene = ({ onComplete }) => {
+      const [viewAsPartner, setViewAsPartner] = useState(false);
+      useEffect(() => { const timer = setTimeout(() => { setViewAsPartner(true); setTimeout(onComplete, 2500); }, 1500); return () => clearTimeout(timer); }, []);
+      return (
+        <div className="h-full p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-white">Dynamic Data Masking</h3>
+            <button onClick={() => setViewAsPartner(!viewAsPartner)} className={`w-48 h-10 rounded-xl transition-all relative ${viewAsPartner ? 'bg-amber-500' : 'bg-cyan-500'}`}>
+              <div className={`absolute w-24 h-8 bg-white rounded-lg shadow transition-all duration-300 flex items-center justify-center top-1 ${viewAsPartner ? 'left-[92px]' : 'left-1'}`}>
+                <span className={`font-semibold text-sm ${viewAsPartner ? 'text-amber-600' : 'text-cyan-600'}`}>{viewAsPartner ? 'Partner' : 'Capture Mgr'}</span>
+              </div>
+            </button>
+          </div>
+          <div className="flex gap-2 mb-4 overflow-hidden">
+            {['Dashboard', 'Strategy', 'Compliance', 'Pricing'].map(tab => { const hidden = viewAsPartner && (tab === 'Pricing' || tab === 'Strategy'); return <div key={tab} className={`px-3 py-1.5 rounded-lg transition-all duration-500 ${hidden ? 'w-0 opacity-0 px-0' : 'bg-slate-700 text-white text-sm'}`}>{!hidden && tab}</div>; })}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Card className={`p-4 relative transition-all duration-500 ${viewAsPartner ? 'opacity-50' : ''}`}>
+              <h4 className="font-semibold text-white mb-3 flex items-center gap-2"><Icon name="target" className="w-4 h-4 text-cyan-400" />Win Strategy</h4>
+              <div className={`transition-all duration-500 ${viewAsPartner ? 'blur-md' : ''}`}><div className="p-2 rounded bg-red-500/10 border border-red-500/30"><span className="text-sm text-white">Ghost: ACME Corp - No CMMI</span></div></div>
+              {viewAsPartner && (<div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 rounded-2xl"><Icon name="lock" className="w-6 h-6 text-amber-400" /></div>)}
+            </Card>
+            <Card className="p-4">
+              <h4 className="font-semibold text-white mb-3 flex items-center gap-2"><Icon name="clipboard" className="w-4 h-4 text-emerald-400" />Compliance</h4>
+              <div className="p-2 rounded bg-slate-700/50 flex items-center justify-between"><span className="text-sm text-white">Section L</span><Badge variant="success" size="xs">12/12</Badge></div>
+            </Card>
+          </div>
+          {viewAsPartner && (<div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30"><div className="flex items-center gap-2"><Icon name="shieldCheck" className="w-4 h-4 text-amber-400" /><span className="text-white text-sm">Partner Firewall Active - Pricing & Strategy hidden</span></div></div>)}
+        </div>
+      );
+    };
+
+    // Scene 6: Orals
+    const OralsScene = ({ onComplete }) => {
+      const [slides, setSlides] = useState([]);
+      const templates = ['Title', 'Summary', 'Tech', 'Past Perf', 'Personnel', 'Mgmt', 'Risk', 'Timeline', 'Value', 'Q&A'];
+      const handleGenerate = () => { let i = 0; const interval = setInterval(() => { setSlides(prev => [...prev, templates[i]]); i++; if (i >= templates.length) { clearInterval(interval); setTimeout(onComplete, 2000); } }, 200); };
+      return (
+        <div className="h-full p-6">
+          <div className="flex items-center justify-between mb-6"><div><h3 className="text-xl font-bold text-white">Orals Studio</h3><p className="text-slate-400 text-sm">Script-to-Slide Generation</p></div>{slides.length === 0 && <Button onClick={handleGenerate} icon="presentation" variant="gold">Generate Deck</Button>}</div>
+          {slides.length > 0 ? (<div className="grid grid-cols-5 gap-3">{slides.map((slide, i) => (<Card key={i} className="aspect-video p-2 bg-gradient-to-br from-slate-800 to-slate-900"><div className="h-1 w-8 bg-gradient-to-r from-cyan-500 to-teal-500 rounded mb-2" /><p className="text-xs font-bold text-white">{slide}</p><p className="text-xs text-slate-500">{i + 1}/10</p></Card>))}</div>) : (<Card className="p-8 text-center"><Icon name="presentation" className="w-12 h-12 text-slate-600 mx-auto mb-3" /><p className="text-white">Ready to generate 10-slide branded deck</p></Card>)}
+          {slides.length === 10 && (<div className="mt-4 text-center"><Badge variant="success" size="md">✓ 10 Slides Generated</Badge></div>)}
+        </div>
+      );
+    };
+
+    // Scene 7: Crisis
+    const CrisisScene = ({ onComplete }) => {
+      const [stage, setStage] = useState('idle');
+      const handleUpload = () => { setStage('analyzing'); setTimeout(() => { setStage('complete'); setTimeout(onComplete, 2500); }, 2000); };
+      return (
+        <div className="h-full p-6">
+          <Card className="p-3 mb-4 border-red-500 bg-red-500/20 animate-pulse"><div className="flex items-center gap-2"><Icon name="alert" className="w-5 h-5 text-red-400" /><span className="font-bold text-red-400">⚡ EVALUATION NOTICE</span><span className="text-white text-sm">Response due in 48 hours</span></div></Card>
+          {stage === 'idle' && (<Card className="p-6 text-center border-2 border-dashed border-red-500/50 cursor-pointer hover:bg-red-500/10" onClick={handleUpload}><Icon name="upload" className="w-10 h-10 text-red-400 mx-auto mb-2" /><p className="text-white">Upload EN PDF</p><p className="text-slate-400 text-sm">Click to simulate</p></Card>)}
+          {stage === 'analyzing' && (<Card className="p-6 text-center"><Icon name="loader" className="w-10 h-10 text-amber-400 mx-auto mb-2" /><p className="text-white">Analyzing tone and drafting response...</p></Card>)}
+          {stage === 'complete' && (<div className="space-y-4"><Card className="p-4"><Badge variant="warning" size="md">⚠️ Price Concern Detected</Badge><p className="text-slate-400 text-sm mt-2">AI detected skepticism about pricing sustainability</p></Card><Card className="p-4 border-red-500/30"><p className="text-xs text-red-400 mb-2">GOVERNMENT QUESTION:</p><p className="text-white text-sm italic">"Offeror's labor rates appear below market. Clarify methodology."</p></Card><Card className="p-4 border-emerald-500/30 bg-emerald-500/5" glow><div className="flex items-center gap-2 mb-2"><Icon name="cpu" className="w-4 h-4 text-emerald-400" /><span className="text-sm font-medium text-emerald-400">AI RESPONSE</span><Badge variant="success" size="xs">Non-Defensive</Badge></div><p className="text-white text-sm">Our rates reflect GSA Schedule pricing combined with our remote-first model. We've delivered 12 comparable contracts at these rates successfully.</p></Card></div>)}
+        </div>
+      );
+    };
+
+    // Scene 8: Launch
+    const LaunchScene = ({ onComplete }) => {
+      const [stage, setStage] = useState('idle');
+      const [countdown, setCountdown] = useState(5);
+      const handleSubmit = () => { setStage('countdown'); let c = 5; const interval = setInterval(() => { c--; setCountdown(c); if (c === 0) { clearInterval(interval); setStage('launching'); setTimeout(() => { setStage('complete'); setTimeout(onComplete, 2500); }, 1500); } }, 600); };
+      return (
+        <div className="h-full flex items-center justify-center p-6">
+          {stage === 'idle' && (<div className="text-center"><div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-2xl shadow-amber-500/50"><Icon name="rocket" className="w-12 h-12 text-white" /></div><h3 className="text-2xl font-bold text-white mb-2">Final Review Complete</h3><p className="text-slate-400 mb-6">All sections approved. Ready for submission.</p><Button onClick={handleSubmit} variant="gold" size="xl" icon="send">Submit Proposal</Button></div>)}
+          {stage === 'countdown' && (<div className="text-center"><div className="text-8xl font-bold text-amber-400 animate-pulse">{countdown}</div><p className="text-xl text-white mt-4">Initiating Launch...</p></div>)}
+          {stage === 'launching' && (<div className="text-center"><div className="animate-bounce"><Icon name="rocket" className="w-24 h-24 text-amber-400 mx-auto" /></div><p className="text-white mt-4">🚀 LAUNCHING...</p></div>)}
+          {stage === 'complete' && (<div className="text-center"><div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center"><Icon name="check" className="w-12 h-12 text-white" /></div><h3 className="text-2xl font-bold text-white mb-4">🎉 Proposal Submitted!</h3><Card className="p-6 max-w-md mx-auto" glow><div className="flex items-center justify-center gap-2 mb-4"><Icon name="trophy" className="w-5 h-5 text-amber-400" /><span className="font-semibold text-white">ROI Dashboard</span></div><div className="grid grid-cols-3 gap-4 text-center"><div><div className="text-2xl font-bold text-emerald-400">$12,400</div><div className="text-xs text-slate-400">B&P Saved</div></div><div><div className="text-2xl font-bold text-cyan-400">47%</div><div className="text-xs text-slate-400">Time Saved</div></div><div><div className="text-2xl font-bold text-amber-400">3.2x</div><div className="text-xs text-slate-400">ROI</div></div></div></Card></div>)}
+        </div>
+      );
+    };
+
+    // Scene 9: Handoff
+    const HandoffScene = ({ onComplete }) => {
+      const [stage, setStage] = useState('idle');
+      const handleInitiate = () => { setStage('complete'); setTimeout(onComplete, 2500); };
+      return (
+        <div className="h-full p-6">
+          <Card className="p-4 mb-6 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border-emerald-500/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center"><Icon name="trophy" className="w-6 h-6 text-white" /></div><div><div className="text-xl font-bold text-white">🏆 WE WON!</div><div className="text-emerald-400 text-sm">DHA Healthcare • $12.5M • 5yr IDIQ</div></div></div>
+              {stage === 'idle' && <Button onClick={handleInitiate} icon="arrowRight" variant="success">Initiate Project</Button>}
+            </div>
+          </Card>
+          {stage === 'complete' && (<div className="grid grid-cols-2 gap-4"><Card className="p-4"><div className="flex items-center gap-2 mb-3"><Icon name="kanban" className="w-4 h-4 text-purple-400" /><span className="font-semibold text-white">Jira Backlog</span><Badge variant="primary" size="xs">12 epics</Badge></div>{['Platform Setup', 'Data Migration', 'Training'].map(item => (<div key={item} className="p-2 rounded bg-slate-700/50 mb-2 flex items-center justify-between"><span className="text-white text-sm">{item}</span><Badge variant="primary" size="xs">Epic</Badge></div>))}</Card><Card className="p-4"><div className="flex items-center gap-2 mb-3"><Icon name="users" className="w-4 h-4 text-teal-400" /><span className="font-semibold text-white">HR Packet</span></div>{['Program Manager', 'Tech Lead', 'Data Architect'].map(role => (<div key={role} className="p-2 rounded bg-slate-700/50 mb-2 flex items-center justify-between"><span className="text-white text-sm">{role}</span><Badge variant="success" size="xs">Open</Badge></div>))}<Button variant="secondary" size="sm" icon="download" className="w-full mt-2">Export HR Packet</Button></Card></div>)}
+        </div>
+      );
+    };
+
+    // Scene Renderer
+    const SceneRenderer = ({ sceneId, onComplete }) => {
+      const scenes = { 1: VoiceCaptureScene, 2: ComplianceScene, 3: PricingScene, 4: SecurityScene, 5: RBACScene, 6: OralsScene, 7: CrisisScene, 8: LaunchScene, 9: HandoffScene };
+      const Scene = scenes[sceneId];
+      return Scene ? <Scene onComplete={onComplete} /> : null;
+    };
+
+    // Main App with Auth
+    function MissionPulseDemo() {
+      const [currentScene, setCurrentScene] = useState(0);
+      const [sceneComplete, setSceneComplete] = useState(false);
+      const [user, setUser] = useState(null);
+      const scene = DEMO_SCENES[currentScene - 1];
+      const goToScene = (i) => { setCurrentScene(i); setSceneComplete(false); };
+      const nextScene = () => currentScene < 9 && goToScene(currentScene + 1);
+      const prevScene = () => currentScene > 1 && goToScene(currentScene - 1);
+
+      // Get user on mount
+      useEffect(() => {
+        const handleUserReady = (e) => setUser(e.detail);
+        window.addEventListener('userReady', handleUserReady);
+        // Check if already available
+        if (window.userProfile) setUser(window.userProfile);
+        return () => window.removeEventListener('userReady', handleUserReady);
+      }, []);
+
+      const handleLogout = async () => {
+        await MissionPulse.signOut();
+      };
+
+      if (currentScene === 0) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center p-6">
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-3xl" />
+            </div>
+            {/* User menu in corner */}
+            {user && (
+              <div className="absolute top-4 right-4 z-20">
+                <UserMenu user={user} onLogout={handleLogout} />
+              </div>
+            )}
+            <div className="relative z-10 text-center max-w-2xl">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-500 mb-6 shadow-2xl shadow-cyan-500/30">
+                <Icon name="shield" className="w-12 h-12 text-white" />
+              </div>
+              <h1 className="text-4xl font-bold text-white mb-2">MissionPulse <span className="text-cyan-400">v12.0</span></h1>
+              <p className="text-cyan-400 mb-1">Ultimate Edition</p>
+              <p className="text-slate-400 mb-8">Intel-to-Execution • Shipley-Aligned • Human-in-the-Loop AI</p>
+              <Card className="p-6 mb-6 text-left">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2"><Icon name="target" className="w-4 h-4 text-cyan-400" />Demo Scenario</h3>
+                <p className="text-slate-300 text-sm">You are a <strong className="text-cyan-400">Capture Manager</strong> pursuing a <strong className="text-emerald-400">$100M DHA opportunity</strong> for a Healthcare Data Platform.</p>
+              </Card>
+              <div className="grid grid-cols-9 gap-2 mb-6">
+                {DEMO_SCENES.map((s, i) => (
+                  <div key={s.id} onClick={() => goToScene(i + 1)} className="p-2 rounded-lg bg-slate-800/50 border border-slate-700 text-center cursor-pointer hover:border-cyan-500/50 transition-all">
+                    <div className="w-4 h-4 mx-auto mb-1" style={{ color: s.color }}><Icon name={s.icon} className="w-4 h-4" /></div>
+                    <span className="text-xs text-slate-400">{i + 1}</span>
+                  </div>
+                ))}
+              </div>
+              <Button onClick={() => goToScene(1)} variant="gold" size="lg" icon="play">Start Demo</Button>
+              <p className="text-xs text-slate-500 mt-6">Mission Meets Tech • MissionPulse v12 • Confidential</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-[#00050F] flex flex-col">
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-4 py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center"><Icon name="shield" className="w-5 h-5 text-white" /></div>
+                <span className="font-bold text-white">MissionPulse</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="xs" icon="chevronLeft" onClick={prevScene} disabled={currentScene === 1} />
+                <div className="flex gap-1">{DEMO_SCENES.map((_, i) => (<button key={i} onClick={() => goToScene(i + 1)} className={`w-2.5 h-2.5 rounded-full transition-all ${i + 1 === currentScene ? 'bg-cyan-400 scale-125' : i + 1 < currentScene ? 'bg-emerald-500' : 'bg-slate-600'}`} />))}</div>
+                <Button variant="ghost" size="xs" icon="chevronRight" onClick={nextScene} disabled={currentScene === 9} />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="secondary" size="xs" icon="x" onClick={() => setCurrentScene(0)}>Exit</Button>
+                {user && <UserMenu user={user} onLogout={handleLogout} />}
+              </div>
+            </div>
+          </header>
+          <div className="bg-slate-800/50 border-b border-slate-700/50 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${scene.color}20` }}><div style={{ color: scene.color }}><Icon name={scene.icon} className="w-5 h-5" /></div></div>
+              <div><div className="flex items-center gap-2"><Badge variant="primary" size="xs">Scene {currentScene}/9</Badge><span className="font-bold text-white">{scene.title}</span></div><p className="text-slate-400 text-sm">{scene.subtitle}</p></div>
+            </div>
+          </div>
+          <main className="flex-1 overflow-auto"><SceneRenderer sceneId={currentScene} onComplete={() => setSceneComplete(true)} /></main>
+          <footer className="bg-slate-900/80 border-t border-slate-700/50 px-4 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">Mission Meets Tech • MissionPulse v12</span>
+              {sceneComplete && currentScene < 9 && <Button onClick={nextScene} size="sm" icon="chevronRight" pulse>Next: {DEMO_SCENES[currentScene]?.title}</Button>}
+              {sceneComplete && currentScene === 9 && <Button onClick={() => setCurrentScene(0)} variant="gold" size="sm" icon="trophy">Demo Complete!</Button>}
+              <span className="text-xs text-slate-600">AI GENERATED - HUMAN REVIEW</span>
+            </div>
+          </footer>
+        </div>
+      );
     }
 
-    // ============================================
-    // START THE APP
-    // ============================================
-    document.addEventListener('DOMContentLoaded', init);
+    ReactDOM.createRoot(document.getElementById('root')).render(<MissionPulseDemo />);
   </script>
 </body>
 </html>
