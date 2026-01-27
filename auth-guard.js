@@ -1,380 +1,472 @@
 /**
- * MissionPulse Auth Guard
- * =======================
- * Protects pages with authentication and RBAC checks
- * Include this script on every protected page AFTER supabase-client.js
+ * MissionPulse Auth Guard v2.0
+ * Route protection and session management
+ * 
+ * Features:
+ * - Automatic redirect to login for unauthenticated users
+ * - Role-based page access control
+ * - Session persistence check
+ * - Loading state management
+ * - Invisible RBAC (unavailable features don't render)
  * 
  * Usage:
- *   <script src="supabase-client.js"></script>
- *   <script src="auth-guard.js" data-required-roles="CEO,COO,Admin"></script>
+ * Include this script AFTER supabase-client.js on protected pages:
+ * <script src="supabase-client.js"></script>
+ * <script src="auth-guard.js"></script>
  * 
- * @version 1.0.0
- * @author Mission Meets Tech
+ * Configure via data attributes:
+ * <body data-require-auth="true" data-require-role="CEO,COO,Admin">
+ * 
+ * © 2026 Mission Meets Tech
  */
 
-(async function() {
-    'use strict';
+(function() {
+  'use strict';
 
-    // ============================================
-    // CONFIGURATION
-    // ============================================
-    const AUTH_CONFIG = {
-        loginPage: 'login.html',
-        dashboardPage: 'index.html',
-        unauthorizedPage: 'unauthorized.html',
-        sessionCheckInterval: 60000, // Check session every minute
-        maxIdleTime: 30 * 60 * 1000  // 30 minutes idle timeout
-    };
+  // ============================================================
+  // CONFIGURATION
+  // ============================================================
+  
+  const CONFIG = {
+    loginPage: '/login.html',
+    dashboardPage: '/index.html',
+    sessionCheckTimeout: 5000,
+    debugMode: false
+  };
 
-    // Get required roles from script tag data attribute
-    const currentScript = document.currentScript;
-    const requiredRoles = currentScript?.dataset?.requiredRoles?.split(',').map(r => r.trim()) || [];
-    const requiredPermissions = currentScript?.dataset?.requiredPermissions?.split(',').map(p => p.trim()) || [];
-    const isPublicPage = currentScript?.dataset?.public === 'true';
+  // Pages that don't require authentication
+  const PUBLIC_PAGES = [
+    '/login.html',
+    '/signup.html',
+    '/reset-password.html',
+    '/forgot-password.html',
+    '/404.html',
+    '/maintenance.html'
+  ];
 
-    // ============================================
-    // LOADING OVERLAY
-    // ============================================
-    function showLoadingOverlay() {
-        const overlay = document.createElement('div');
-        overlay.id = 'auth-loading-overlay';
-        overlay.innerHTML = `
-            <style>
-                #auth-loading-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: #00050F;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 99999;
-                    transition: opacity 0.3s ease;
-                }
-                #auth-loading-overlay.fade-out {
-                    opacity: 0;
-                    pointer-events: none;
-                }
-                .auth-spinner {
-                    width: 48px;
-                    height: 48px;
-                    border: 3px solid #1e3a5f;
-                    border-top-color: #00E5FA;
-                    border-radius: 50%;
-                    animation: auth-spin 0.8s linear infinite;
-                }
-                @keyframes auth-spin {
-                    to { transform: rotate(360deg); }
-                }
-            </style>
-            <div class="auth-spinner"></div>
-        `;
-        document.body.prepend(overlay);
+  // ============================================================
+  // UTILITY FUNCTIONS
+  // ============================================================
+
+  function log(...args) {
+    if (CONFIG.debugMode) {
+      console.log('[AuthGuard]', ...args);
     }
+  }
 
-    function hideLoadingOverlay() {
-        const overlay = document.getElementById('auth-loading-overlay');
-        if (overlay) {
-            overlay.classList.add('fade-out');
-            setTimeout(() => overlay.remove(), 300);
+  function getCurrentPage() {
+    const path = window.location.pathname;
+    // Handle both /page.html and /page/ formats
+    if (path === '/' || path === '') return '/index.html';
+    return path;
+  }
+
+  function isPublicPage() {
+    const currentPage = getCurrentPage();
+    return PUBLIC_PAGES.some(page => 
+      currentPage === page || 
+      currentPage.endsWith(page)
+    );
+  }
+
+  function redirectTo(url) {
+    if (window.location.pathname !== url) {
+      log('Redirecting to:', url);
+      window.location.href = url;
+    }
+  }
+
+  function getRequiredRoles() {
+    const body = document.body;
+    const roleAttr = body?.getAttribute('data-require-role');
+    if (!roleAttr) return null;
+    return roleAttr.split(',').map(r => r.trim());
+  }
+
+  function getModuleId() {
+    const body = document.body;
+    return body?.getAttribute('data-module-id') || null;
+  }
+
+  // ============================================================
+  // LOADING STATE MANAGEMENT
+  // ============================================================
+
+  function showLoadingOverlay() {
+    // Don't show overlay on public pages
+    if (isPublicPage()) return;
+
+    // Check if overlay already exists
+    if (document.getElementById('mp-auth-overlay')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'mp-auth-overlay';
+    overlay.innerHTML = `
+      <style>
+        #mp-auth-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: #00050F;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 99999;
+          transition: opacity 0.3s ease;
         }
-    }
-
-    // ============================================
-    // AUTH CHECK FUNCTIONS
-    // ============================================
-    async function checkAuthentication() {
-        try {
-            const user = await MissionPulse.getCurrentUser();
-            return user;
-        } catch (error) {
-            console.error('Auth check failed:', error);
-            return null;
+        #mp-auth-overlay.fade-out {
+          opacity: 0;
+          pointer-events: none;
         }
-    }
-
-    async function checkAuthorization(user) {
-        if (!user) return false;
-        if (requiredRoles.length === 0 && requiredPermissions.length === 0) return true;
-
-        try {
-            const profile = await MissionPulse.getUserProfile();
-            if (!profile) return false;
-
-            // Check roles
-            if (requiredRoles.length > 0) {
-                const hasRole = requiredRoles.includes(profile.role?.name);
-                if (!hasRole) return false;
-            }
-
-            // Check permissions
-            if (requiredPermissions.length > 0) {
-                for (const permission of requiredPermissions) {
-                    const hasPerm = await MissionPulse.hasPermission(permission);
-                    if (!hasPerm) return false;
-                }
-            }
-
-            return true;
-        } catch (error) {
-            console.error('Authorization check failed:', error);
-            return false;
+        .mp-loader {
+          width: 48px;
+          height: 48px;
+          border: 3px solid rgba(0, 229, 250, 0.2);
+          border-top-color: #00E5FA;
+          border-radius: 50%;
+          animation: mp-spin 1s linear infinite;
         }
-    }
-
-    // ============================================
-    // REDIRECT HELPERS
-    // ============================================
-    function redirectToLogin() {
-        const currentPath = window.location.pathname + window.location.search;
-        const returnUrl = encodeURIComponent(currentPath);
-        window.location.href = `${AUTH_CONFIG.loginPage}?returnUrl=${returnUrl}`;
-    }
-
-    function redirectToUnauthorized() {
-        window.location.href = AUTH_CONFIG.unauthorizedPage;
-    }
-
-    function redirectToDashboard() {
-        window.location.href = AUTH_CONFIG.dashboardPage;
-    }
-
-    // ============================================
-    // IDLE TIMEOUT TRACKING
-    // ============================================
-    let lastActivity = Date.now();
-
-    function updateActivity() {
-        lastActivity = Date.now();
-    }
-
-    function checkIdleTimeout() {
-        const idleTime = Date.now() - lastActivity;
-        if (idleTime > AUTH_CONFIG.maxIdleTime) {
-            console.log('Session timed out due to inactivity');
-            MissionPulse.signOut();
+        .mp-loader-text {
+          margin-top: 16px;
+          color: #94A3B8;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-size: 14px;
         }
-    }
-
-    function setupIdleTracking() {
-        // Track user activity
-        ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
-            document.addEventListener(event, updateActivity, { passive: true });
-        });
-
-        // Check idle timeout periodically
-        setInterval(checkIdleTimeout, 60000);
-    }
-
-    // ============================================
-    // SESSION MONITORING
-    // ============================================
-    function setupSessionMonitoring() {
-        // Listen for auth state changes
-        MissionPulse.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-                if (event === 'SIGNED_OUT' && !isPublicPage) {
-                    redirectToLogin();
-                }
-            }
-        });
-
-        // Periodic session check
-        setInterval(async () => {
-            const session = await MissionPulse.getSession();
-            if (!session && !isPublicPage) {
-                redirectToLogin();
-            }
-        }, AUTH_CONFIG.sessionCheckInterval);
-    }
-
-    // ============================================
-    // INJECT USER INFO INTO PAGE
-    // ============================================
-    async function injectUserInfo() {
-        const profile = await MissionPulse.getUserProfile();
-        if (!profile) return;
-
-        // Find and update user display elements
-        const userNameEl = document.querySelector('[data-user-name]');
-        const userEmailEl = document.querySelector('[data-user-email]');
-        const userAvatarEl = document.querySelector('[data-user-avatar]');
-        const userRoleEl = document.querySelector('[data-user-role]');
-        const companyNameEl = document.querySelector('[data-company-name]');
-
-        if (userNameEl) userNameEl.textContent = profile.full_name || profile.email;
-        if (userEmailEl) userEmailEl.textContent = profile.email;
-        if (userRoleEl) userRoleEl.textContent = profile.role?.name || 'User';
-        if (companyNameEl) companyNameEl.textContent = profile.company?.name || '';
-
-        if (userAvatarEl) {
-            if (profile.avatar_url) {
-                userAvatarEl.src = profile.avatar_url;
-            } else {
-                // Generate initials avatar
-                const initials = (profile.full_name || profile.email)
-                    .split(' ')
-                    .map(n => n[0])
-                    .join('')
-                    .toUpperCase()
-                    .slice(0, 2);
-                userAvatarEl.src = `https://ui-avatars.com/api/?name=${initials}&background=00E5FA&color=00050F&bold=true`;
-            }
+        @keyframes mp-spin {
+          to { transform: rotate(360deg); }
         }
-
-        // Store user info for other scripts
-        window.currentUser = profile;
-
-        // Dispatch custom event
-        window.dispatchEvent(new CustomEvent('userLoaded', { detail: profile }));
-    }
-
-    // ============================================
-    // RBAC UI CONTROL
-    // ============================================
-    async function applyRBAC() {
-        const profile = await MissionPulse.getUserProfile();
-        if (!profile) return;
-
-        // Hide elements based on role
-        document.querySelectorAll('[data-require-role]').forEach(async el => {
-            const roles = el.dataset.requireRole.split(',').map(r => r.trim());
-            if (!roles.includes(profile.role?.name)) {
-                el.remove(); // Invisible RBAC - remove entirely
-            }
-        });
-
-        // Hide elements based on permission
-        document.querySelectorAll('[data-require-permission]').forEach(async el => {
-            const perms = el.dataset.requirePermission.split(',').map(p => p.trim());
-            let hasAll = true;
-            for (const perm of perms) {
-                const has = await MissionPulse.hasPermission(perm);
-                if (!has) {
-                    hasAll = false;
-                    break;
-                }
-            }
-            if (!hasAll) {
-                el.remove(); // Invisible RBAC
-            }
-        });
-
-        // Show elements for specific roles
-        document.querySelectorAll('[data-show-for-role]').forEach(el => {
-            const roles = el.dataset.showForRole.split(',').map(r => r.trim());
-            if (!roles.includes(profile.role?.name)) {
-                el.style.display = 'none';
-            }
-        });
-
-        // Dispatch event when RBAC is applied
-        window.dispatchEvent(new CustomEvent('rbacApplied', { detail: profile }));
-    }
-
-    // ============================================
-    // LOGOUT BUTTON SETUP
-    // ============================================
-    function setupLogoutButtons() {
-        document.querySelectorAll('[data-logout]').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                await MissionPulse.signOut();
-            });
-        });
-    }
-
-    // ============================================
-    // MAIN GUARD EXECUTION
-    // ============================================
-    async function runAuthGuard() {
-        // Skip for public pages
-        if (isPublicPage) {
-            hideLoadingOverlay();
-            return;
-        }
-
-        // Check authentication
-        const user = await checkAuthentication();
-        
-        if (!user) {
-            redirectToLogin();
-            return;
-        }
-
-        // Check authorization (roles/permissions)
-        const authorized = await checkAuthorization(user);
-        
-        if (!authorized) {
-            redirectToUnauthorized();
-            return;
-        }
-
-        // User is authenticated and authorized
-        await injectUserInfo();
-        await applyRBAC();
-        setupLogoutButtons();
-        setupIdleTracking();
-        setupSessionMonitoring();
-
-        // Hide loading overlay
-        hideLoadingOverlay();
-
-        // Dispatch ready event
-        window.dispatchEvent(new CustomEvent('authReady'));
-    }
-
-    // ============================================
-    // INITIALIZE
-    // ============================================
+      </style>
+      <div class="mp-loader"></div>
+      <div class="mp-loader-text">Verifying access...</div>
+    `;
     
-    // Show loading immediately
-    if (!isPublicPage) {
-        showLoadingOverlay();
+    document.body.appendChild(overlay);
+  }
+
+  function hideLoadingOverlay() {
+    const overlay = document.getElementById('mp-auth-overlay');
+    if (overlay) {
+      overlay.classList.add('fade-out');
+      setTimeout(() => overlay.remove(), 300);
+    }
+  }
+
+  // ============================================================
+  // AUTH CHECK LOGIC
+  // ============================================================
+
+  async function checkAuth() {
+    log('Checking authentication...');
+    
+    // Skip auth check for public pages
+    if (isPublicPage()) {
+      log('Public page - skipping auth check');
+      return true;
     }
 
-    // Wait for DOM and MissionPulse to be ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', runAuthGuard);
-    } else {
-        runAuthGuard();
+    showLoadingOverlay();
+
+    // Wait for MissionPulse to be available
+    let attempts = 0;
+    while (typeof MissionPulse === 'undefined' && attempts < 50) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
     }
+
+    if (typeof MissionPulse === 'undefined') {
+      console.error('[AuthGuard] MissionPulse not loaded');
+      hideLoadingOverlay();
+      redirectTo(CONFIG.loginPage);
+      return false;
+    }
+
+    try {
+      const { data: user, error } = await MissionPulse.getCurrentUser();
+
+      if (error || !user) {
+        log('No authenticated user');
+        hideLoadingOverlay();
+        
+        // Store intended destination for post-login redirect
+        sessionStorage.setItem('mp_redirect_after_login', window.location.href);
+        
+        redirectTo(CONFIG.loginPage);
+        return false;
+      }
+
+      log('User authenticated:', user.email);
+      log('Profile:', user.profile);
+
+      // Check role requirements
+      const requiredRoles = getRequiredRoles();
+      if (requiredRoles && requiredRoles.length > 0) {
+        const userRole = user.profile?.roleId;
+        
+        if (!userRole || !requiredRoles.includes(userRole)) {
+          log('Role check failed. Required:', requiredRoles, 'User has:', userRole);
+          hideLoadingOverlay();
+          
+          // Show access denied or redirect to dashboard
+          showAccessDenied();
+          return false;
+        }
+        
+        log('Role check passed:', userRole);
+      }
+
+      // Check module access
+      const moduleId = getModuleId();
+      if (moduleId) {
+        const canAccess = MissionPulse.canAccessModule(moduleId);
+        if (!canAccess) {
+          log('Module access denied:', moduleId);
+          hideLoadingOverlay();
+          showAccessDenied();
+          return false;
+        }
+        log('Module access granted:', moduleId);
+      }
+
+      // All checks passed
+      hideLoadingOverlay();
+      initializeUserContext(user);
+      return true;
+
+    } catch (error) {
+      console.error('[AuthGuard] Auth check error:', error);
+      hideLoadingOverlay();
+      redirectTo(CONFIG.loginPage);
+      return false;
+    }
+  }
+
+  // ============================================================
+  // ACCESS DENIED HANDLING
+  // ============================================================
+
+  function showAccessDenied() {
+    const overlay = document.getElementById('mp-auth-overlay');
+    if (overlay) {
+      overlay.innerHTML = `
+        <style>
+          .mp-access-denied {
+            text-align: center;
+            padding: 40px;
+          }
+          .mp-access-denied h2 {
+            color: #EF4444;
+            font-size: 24px;
+            margin-bottom: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          }
+          .mp-access-denied p {
+            color: #94A3B8;
+            margin-bottom: 24px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          }
+          .mp-back-btn {
+            background: linear-gradient(135deg, #00E5FA, #00B8C8);
+            color: #00050F;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            transition: transform 0.2s;
+          }
+          .mp-back-btn:hover {
+            transform: scale(1.05);
+          }
+        </style>
+        <div class="mp-access-denied">
+          <h2>🔒 Access Restricted</h2>
+          <p>Your role doesn't have permission to access this module.</p>
+          <button class="mp-back-btn" onclick="window.location.href='${CONFIG.dashboardPage}'">
+            Return to Dashboard
+          </button>
+        </div>
+      `;
+    }
+  }
+
+  // ============================================================
+  // USER CONTEXT INITIALIZATION
+  // ============================================================
+
+  function initializeUserContext(user) {
+    // Make user data available globally
+    window.MP_USER = user;
+    window.MP_PROFILE = user.profile;
+
+    // Dispatch custom event for components to react
+    const event = new CustomEvent('mp:auth:ready', {
+      detail: { user, profile: user.profile }
+    });
+    document.dispatchEvent(event);
+
+    // Update any user display elements
+    updateUserDisplay(user.profile);
+    
+    // Apply RBAC to navigation
+    applyNavigationRBAC();
+
+    log('User context initialized');
+  }
+
+  function updateUserDisplay(profile) {
+    if (!profile) return;
+
+    // Update user name displays
+    const nameElements = document.querySelectorAll('[data-mp-user-name]');
+    nameElements.forEach(el => {
+      el.textContent = profile.fullName || profile.email;
+    });
+
+    // Update user role displays
+    const roleElements = document.querySelectorAll('[data-mp-user-role]');
+    roleElements.forEach(el => {
+      const roleInfo = MissionPulse.ROLES[profile.roleId];
+      el.textContent = roleInfo?.name || profile.roleId;
+    });
+
+    // Update user avatar displays
+    const avatarElements = document.querySelectorAll('[data-mp-user-avatar]');
+    avatarElements.forEach(el => {
+      if (profile.avatarUrl) {
+        el.src = profile.avatarUrl;
+      } else {
+        // Generate initials avatar
+        const initials = (profile.fullName || 'U')
+          .split(' ')
+          .map(n => n[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase();
+        el.alt = initials;
+      }
+    });
+
+    // Update user email displays
+    const emailElements = document.querySelectorAll('[data-mp-user-email]');
+    emailElements.forEach(el => {
+      el.textContent = profile.email;
+    });
+  }
+
+  // ============================================================
+  // RBAC NAVIGATION FILTERING
+  // ============================================================
+
+  function applyNavigationRBAC() {
+    // Get all navigation items with module requirements
+    const navItems = document.querySelectorAll('[data-require-module]');
+    
+    navItems.forEach(item => {
+      const moduleId = item.getAttribute('data-require-module');
+      const canAccess = MissionPulse.canAccessModule(moduleId);
+      
+      if (!canAccess) {
+        // Invisible RBAC - remove instead of disable
+        item.style.display = 'none';
+        item.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    // Handle permission-based elements
+    const permElements = document.querySelectorAll('[data-require-permission]');
+    
+    permElements.forEach(item => {
+      const permission = item.getAttribute('data-require-permission');
+      const hasAccess = MissionPulse.hasPermission(permission);
+      
+      if (!hasAccess) {
+        item.style.display = 'none';
+        item.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    log('Navigation RBAC applied');
+  }
+
+  // ============================================================
+  // AUTH STATE CHANGE LISTENER
+  // ============================================================
+
+  function setupAuthListener() {
+    if (typeof MissionPulse !== 'undefined') {
+      MissionPulse.onAuthStateChange((event, session) => {
+        log('Auth state changed:', event);
+
+        if (event === 'SIGNED_OUT') {
+          // Clear user context
+          window.MP_USER = null;
+          window.MP_PROFILE = null;
+          
+          // Redirect to login
+          if (!isPublicPage()) {
+            redirectTo(CONFIG.loginPage);
+          }
+        }
+
+        if (event === 'SIGNED_IN' && session) {
+          // Refresh the page to reinitialize with new user
+          if (isPublicPage()) {
+            const redirect = sessionStorage.getItem('mp_redirect_after_login');
+            sessionStorage.removeItem('mp_redirect_after_login');
+            redirectTo(redirect || CONFIG.dashboardPage);
+          }
+        }
+      });
+    }
+  }
+
+  // ============================================================
+  // LOGOUT HANDLER
+  // ============================================================
+
+  window.mpLogout = async function() {
+    try {
+      await MissionPulse.signOut();
+      redirectTo(CONFIG.loginPage);
+    } catch (error) {
+      console.error('[AuthGuard] Logout error:', error);
+      // Force redirect anyway
+      redirectTo(CONFIG.loginPage);
+    }
+  };
+
+  // ============================================================
+  // INITIALIZATION
+  // ============================================================
+
+  function init() {
+    log('Initializing AuthGuard...');
+    
+    // Run auth check
+    checkAuth().then(authenticated => {
+      if (authenticated) {
+        setupAuthListener();
+      }
+    });
+  }
+
+  // Run on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Export for manual use
+  window.MPAuthGuard = {
+    checkAuth,
+    isPublicPage,
+    getCurrentPage,
+    config: CONFIG
+  };
 
 })();
-
-// ============================================
-// GLOBAL HELPER FUNCTIONS
-// ============================================
-
-/**
- * Check if current user has role (synchronous check using cached data)
- * @param {string} role 
- * @returns {boolean}
- */
-function userHasRole(role) {
-    return window.currentUser?.role?.name === role;
-}
-
-/**
- * Check if current user is in list of roles
- * @param {string[]} roles 
- * @returns {boolean}
- */
-function userInRoles(roles) {
-    return roles.includes(window.currentUser?.role?.name);
-}
-
-/**
- * Get current user's company ID
- * @returns {string|null}
- */
-function getCurrentCompanyId() {
-    return window.currentUser?.company_id || null;
-}
-
-/**
- * Get current user's role name
- * @returns {string|null}
- */
-function getCurrentRole() {
-    return window.currentUser?.role?.name || null;
-}

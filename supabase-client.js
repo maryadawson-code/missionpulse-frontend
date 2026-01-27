@@ -1,780 +1,903 @@
 /**
- * MissionPulse Supabase Client
- * ============================
- * Authentication and data access layer for MissionPulse
+ * MissionPulse Supabase Client Module v2.0
+ * Complete Auth + CRUD + Real-time + RBAC
  * 
- * @version 1.0.0
- * @author Mission Meets Tech
+ * Provides MissionPulse namespace with:
+ * 
+ * AUTH:
+ * - signIn(email, password) - Authenticate user
+ * - signUp(email, password, metadata) - Register new user
+ * - signOut() - End session
+ * - getCurrentUser() - Get authenticated user with profile
+ * - onAuthStateChange(callback) - Subscribe to auth events
+ * - resetPassword(email) - Send password reset email
+ * 
+ * RBAC:
+ * - hasPermission(permission) - Check user permission
+ * - canAccessModule(moduleId) - Check module access
+ * - getUserRole() - Get current user's role
+ * 
+ * CRUD:
+ * - getOpportunities() - Fetch all opportunities
+ * - getPipelineStats() - Aggregate statistics
+ * - createOpportunity(data) - Create new opportunity
+ * - updateOpportunity(id, data) - Update existing
+ * - deleteOpportunity(id) - Delete opportunity
+ * - getOpportunitiesByPhase() - Grouped by Shipley phase
+ * 
+ * REAL-TIME:
+ * - subscribeToOpportunities(callback) - Real-time updates
+ * - onConnectionChange(callback) - Connection status
+ * 
+ * © 2026 Mission Meets Tech
  */
 
-// ============================================
-// CONFIGURATION
-// ============================================
-const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
-
-// Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ============================================
-// MISSIONPULSE GLOBAL OBJECT
-// ============================================
-const MissionPulse = {
-    // Expose supabase client for direct access if needed
-    client: supabase,
-
-    // ========================================
-    // AUTHENTICATION METHODS
-    // ========================================
-
-    /**
-     * Sign in with email and password
-     * @param {string} email 
-     * @param {string} password 
-     * @returns {Promise<{data, error}>}
-     */
-    async signIn(email, password) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
-
-        if (!error && data?.user) {
-            // Log auth event
-            await this.logAuthEvent('signin', data.user.id);
-            // Update last login
-            await supabase
-                .from('users')
-                .update({ last_login: new Date().toISOString() })
-                .eq('id', data.user.id);
-        }
-
-        return { data, error };
-    },
-
-    /**
-     * Sign up with email and password
-     * @param {string} email 
-     * @param {string} password 
-     * @param {Object} metadata - Additional user data (full_name, company_name)
-     * @returns {Promise<{data, error}>}
-     */
-    async signUp(email, password, metadata = {}) {
-        // First create the auth user
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: metadata.full_name,
-                    company_name: metadata.company_name
-                },
-                emailRedirectTo: `${window.location.origin}/login.html`
-            }
-        });
-
-        if (!error && data?.user && metadata.company_name) {
-            // Create company for new user
-            const { data: company, error: companyError } = await supabase
-                .from('companies')
-                .insert({
-                    name: metadata.company_name,
-                    subscription_tier: 'starter'
-                })
-                .select()
-                .single();
-
-            if (company) {
-                // Link user to company and set as Admin
-                await supabase
-                    .from('users')
-                    .update({
-                        company_id: company.id,
-                        role_id: 11 // Admin role
-                    })
-                    .eq('id', data.user.id);
-            }
-        }
-
-        return { data, error };
-    },
-
-    /**
-     * Sign in with OAuth provider
-     * @param {string} provider - 'google' or 'azure'
-     * @returns {Promise<{data, error}>}
-     */
-    async signInWithProvider(provider) {
-        const { data, error } = await supabase.auth.signInWithOAuth({
-            provider,
-            options: {
-                redirectTo: `${window.location.origin}/index.html`
-            }
-        });
-
-        return { data, error };
-    },
-
-    /**
-     * Sign out current user
-     * @returns {Promise<{error}>}
-     */
-    async signOut() {
-        const user = await this.getCurrentUser();
-        if (user) {
-            await this.logAuthEvent('signout', user.id);
-        }
-        
-        const { error } = await supabase.auth.signOut();
-        
-        if (!error) {
-            // Clear any cached data
-            sessionStorage.clear();
-            window.location.href = 'login.html';
-        }
-
-        return { error };
-    },
-
-    /**
-     * Send password reset email
-     * @param {string} email 
-     * @returns {Promise<{data, error}>}
-     */
-    async resetPassword(email) {
-        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/login.html?reset=true`
-        });
-
-        return { data, error };
-    },
-
-    /**
-     * Update user password
-     * @param {string} newPassword 
-     * @returns {Promise<{data, error}>}
-     */
-    async updatePassword(newPassword) {
-        const { data, error } = await supabase.auth.updateUser({
-            password: newPassword
-        });
-
-        return { data, error };
-    },
-
-    /**
-     * Get current authenticated user
-     * @returns {Promise<Object|null>}
-     */
-    async getCurrentUser() {
-        const { data: { user } } = await supabase.auth.getUser();
-        return user;
-    },
-
-    /**
-     * Get current session
-     * @returns {Promise<Object|null>}
-     */
-    async getSession() {
-        const { data: { session } } = await supabase.auth.getSession();
-        return session;
-    },
-
-    /**
-     * Get full user profile with company and role
-     * @returns {Promise<Object|null>}
-     */
-    async getUserProfile() {
-        const user = await this.getCurrentUser();
-        if (!user) return null;
-
-        const { data, error } = await supabase
-            .from('users')
-            .select(`
-                *,
-                company:companies(*),
-                role:roles(*)
-            `)
-            .eq('id', user.id)
-            .single();
-
-        return error ? null : data;
-    },
-
-    /**
-     * Listen for auth state changes
-     * @param {Function} callback 
-     * @returns {Object} subscription
-     */
-    onAuthStateChange(callback) {
-        return supabase.auth.onAuthStateChange((event, session) => {
-            callback(event, session);
-        });
-    },
-
-    // ========================================
-    // USER MANAGEMENT METHODS
-    // ========================================
-
-    /**
-     * Update current user's profile
-     * @param {Object} updates 
-     * @returns {Promise<{data, error}>}
-     */
-    async updateProfile(updates) {
-        const user = await this.getCurrentUser();
-        if (!user) return { error: { message: 'Not authenticated' } };
-
-        const { data, error } = await supabase
-            .from('users')
-            .update({
-                ...updates,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', user.id)
-            .select()
-            .single();
-
-        return { data, error };
-    },
-
-    /**
-     * Get all users in current company (Admin only)
-     * @returns {Promise<{data, error}>}
-     */
-    async getCompanyUsers() {
-        const { data, error } = await supabase
-            .from('users')
-            .select(`
-                *,
-                role:roles(name, description)
-            `)
-            .order('created_at', { ascending: false });
-
-        return { data, error };
-    },
-
-    /**
-     * Invite user to company
-     * @param {string} email 
-     * @param {number} roleId 
-     * @returns {Promise<{data, error}>}
-     */
-    async inviteUser(email, roleId) {
-        const profile = await this.getUserProfile();
-        if (!profile?.company_id) return { error: { message: 'No company found' } };
-
-        const { data, error } = await supabase
-            .from('invitations')
-            .insert({
-                company_id: profile.company_id,
-                email,
-                role_id: roleId,
-                invited_by: profile.id
-            })
-            .select()
-            .single();
-
-        // TODO: Send invitation email via Edge Function
-
-        return { data, error };
-    },
-
-    /**
-     * Update user role (Admin only)
-     * @param {string} userId 
-     * @param {number} roleId 
-     * @returns {Promise<{data, error}>}
-     */
-    async updateUserRole(userId, roleId) {
-        const { data, error } = await supabase
-            .from('users')
-            .update({ role_id: roleId })
-            .eq('id', userId)
-            .select()
-            .single();
-
-        await this.logActivity('user_role_updated', 'user', userId, { roleId });
-
-        return { data, error };
-    },
-
-    /**
-     * Deactivate user (Admin only)
-     * @param {string} userId 
-     * @returns {Promise<{data, error}>}
-     */
-    async deactivateUser(userId) {
-        const { data, error } = await supabase
-            .from('users')
-            .update({ is_active: false })
-            .eq('id', userId)
-            .select()
-            .single();
-
-        await this.logActivity('user_deactivated', 'user', userId);
-
-        return { data, error };
-    },
-
-    // ========================================
-    // RBAC / PERMISSIONS METHODS
-    // ========================================
-
-    /**
-     * Check if current user has specific permission
-     * @param {string} permission 
-     * @returns {Promise<boolean>}
-     */
-    async hasPermission(permission) {
-        const profile = await this.getUserProfile();
-        if (!profile?.role) return false;
-
-        const perms = profile.role.permissions;
-        return perms?.all === true || perms?.[permission] === true;
-    },
-
-    /**
-     * Check if current user has one of the specified roles
-     * @param {string[]} roles 
-     * @returns {Promise<boolean>}
-     */
-    async hasRole(roles) {
-        const profile = await this.getUserProfile();
-        if (!profile?.role) return false;
-
-        return roles.includes(profile.role.name);
-    },
-
-    /**
-     * Get all available roles
-     * @returns {Promise<{data, error}>}
-     */
-    async getRoles() {
-        const { data, error } = await supabase
-            .from('roles')
-            .select('*')
-            .order('id');
-
-        return { data, error };
-    },
-
-    // ========================================
-    // OPPORTUNITIES METHODS
-    // ========================================
-
-    /**
-     * Get all opportunities for current company
-     * @param {Object} filters 
-     * @returns {Promise<{data, error}>}
-     */
-    async getOpportunities(filters = {}) {
-        let query = supabase
-            .from('opportunities')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        // Apply filters
-        if (filters.shipley_phase) {
-            query = query.eq('shipley_phase', filters.shipley_phase);
-        }
-        if (filters.priority) {
-            query = query.eq('priority', filters.priority);
-        }
-        if (filters.status) {
-            query = query.eq('status', filters.status);
-        }
-
-        const { data, error } = await query;
-        return { data, error };
-    },
-
-    /**
-     * Get single opportunity by ID
-     * @param {string} id 
-     * @returns {Promise<{data, error}>}
-     */
-    async getOpportunity(id) {
-        const { data, error } = await supabase
-            .from('opportunities')
-            .select(`
-                *,
-                assignments:opportunity_assignments(*),
-                comments:opportunity_comments(*)
-            `)
-            .eq('id', id)
-            .single();
-
-        return { data, error };
-    },
-
-    /**
-     * Create new opportunity
-     * @param {Object} opportunity 
-     * @returns {Promise<{data, error}>}
-     */
-    async createOpportunity(opportunity) {
-        const profile = await this.getUserProfile();
-        
-        const { data, error } = await supabase
-            .from('opportunities')
-            .insert({
-                ...opportunity,
-                company_id: profile?.company_id,
-                created_by: profile?.id
-            })
-            .select()
-            .single();
-
-        if (data) {
-            await this.logActivity('opportunity_created', 'opportunity', data.id);
-        }
-
-        return { data, error };
-    },
-
-    /**
-     * Update opportunity
-     * @param {string} id 
-     * @param {Object} updates 
-     * @returns {Promise<{data, error}>}
-     */
-    async updateOpportunity(id, updates) {
-        const { data, error } = await supabase
-            .from('opportunities')
-            .update({
-                ...updates,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', id)
-            .select()
-            .single();
-
-        if (data) {
-            await this.logActivity('opportunity_updated', 'opportunity', id, updates);
-        }
-
-        return { data, error };
-    },
-
-    /**
-     * Delete opportunity
-     * @param {string} id 
-     * @returns {Promise<{error}>}
-     */
-    async deleteOpportunity(id) {
-        await this.logActivity('opportunity_deleted', 'opportunity', id);
-
-        const { error } = await supabase
-            .from('opportunities')
-            .delete()
-            .eq('id', id);
-
-        return { error };
-    },
-
-    // ========================================
-    // DASHBOARD / ANALYTICS METHODS
-    // ========================================
-
-    /**
-     * Get dashboard KPIs
-     * @returns {Promise<Object>}
-     */
-    async getDashboardKPIs() {
-        const { data: opportunities } = await this.getOpportunities();
-        
-        if (!opportunities) return null;
-
-        const activeOpps = opportunities.filter(o => o.status === 'active');
-        const totalValue = activeOpps.reduce((sum, o) => sum + (o.value || 0), 0);
-        const avgPwin = activeOpps.length > 0 
-            ? activeOpps.reduce((sum, o) => sum + (o.pwin || 0), 0) / activeOpps.length 
-            : 0;
-
-        // Group by phase
-        const byPhase = {};
-        opportunities.forEach(o => {
-            const phase = o.shipley_phase || 'Unknown';
-            byPhase[phase] = (byPhase[phase] || 0) + 1;
-        });
-
-        // Upcoming deadlines (next 30 days)
-        const thirtyDaysFromNow = new Date();
-        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-        const upcomingDeadlines = opportunities.filter(o => {
-            if (!o.due_date) return false;
-            const due = new Date(o.due_date);
-            return due >= new Date() && due <= thirtyDaysFromNow;
-        }).length;
-
-        return {
-            totalOpportunities: opportunities.length,
-            activeOpportunities: activeOpps.length,
-            pipelineValue: totalValue,
-            averagePwin: Math.round(avgPwin),
-            upcomingDeadlines,
-            byPhase
-        };
-    },
-
-    // ========================================
-    // TEAM MEMBERS (BOE/Pricing)
-    // ========================================
-
-    /**
-     * Get team members for an opportunity
-     * @param {string} opportunityId 
-     * @returns {Promise<{data, error}>}
-     */
-    async getTeamMembers(opportunityId) {
-        const { data, error } = await supabase
-            .from('team_members')
-            .select('*')
-            .eq('opportunity_id', opportunityId)
-            .order('created_at');
-
-        return { data, error };
-    },
-
-    /**
-     * Create team member
-     * @param {Object} member 
-     * @returns {Promise<{data, error}>}
-     */
-    async createTeamMember(member) {
-        const { data, error } = await supabase
-            .from('team_members')
-            .insert(member)
-            .select()
-            .single();
-
-        return { data, error };
-    },
-
-    /**
-     * Update team member
-     * @param {string} id 
-     * @param {Object} updates 
-     * @returns {Promise<{data, error}>}
-     */
-    async updateTeamMember(id, updates) {
-        const { data, error } = await supabase
-            .from('team_members')
-            .update(updates)
-            .eq('id', id)
-            .select()
-            .single();
-
-        return { data, error };
-    },
-
-    /**
-     * Delete team member
-     * @param {string} id 
-     * @returns {Promise<{error}>}
-     */
-    async deleteTeamMember(id) {
-        const { error } = await supabase
-            .from('team_members')
-            .delete()
-            .eq('id', id);
-
-        return { error };
-    },
-
-    // ========================================
-    // PLAYBOOK / LESSONS LEARNED
-    // ========================================
-
-    /**
-     * Get playbook lessons
-     * @param {Object} filters 
-     * @returns {Promise<{data, error}>}
-     */
-    async getPlaybookLessons(filters = {}) {
-        let query = supabase
-            .from('playbook_lessons')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (filters.category) {
-            query = query.eq('category', filters.category);
-        }
-        if (filters.is_golden) {
-            query = query.eq('is_golden', true);
-        }
-
-        const { data, error } = await query;
-        return { data, error };
-    },
-
-    /**
-     * Create playbook lesson
-     * @param {Object} lesson 
-     * @returns {Promise<{data, error}>}
-     */
-    async createPlaybookLesson(lesson) {
-        const profile = await this.getUserProfile();
-
-        const { data, error } = await supabase
-            .from('playbook_lessons')
-            .insert({
-                ...lesson,
-                company_id: profile?.company_id,
-                created_by: profile?.id
-            })
-            .select()
-            .single();
-
-        return { data, error };
-    },
-
-    /**
-     * Toggle lesson golden status
-     * @param {string} id 
-     * @param {boolean} isGolden 
-     * @returns {Promise<{data, error}>}
-     */
-    async toggleGoldenLesson(id, isGolden) {
-        const { data, error } = await supabase
-            .from('playbook_lessons')
-            .update({ is_golden: isGolden })
-            .eq('id', id)
-            .select()
-            .single();
-
-        return { data, error };
-    },
-
-    // ========================================
-    // ACTIVITY LOGGING
-    // ========================================
-
-    /**
-     * Log user activity
-     * @param {string} action 
-     * @param {string} entityType 
-     * @param {string} entityId 
-     * @param {Object} metadata 
-     */
-    async logActivity(action, entityType, entityId, metadata = {}) {
-        const user = await this.getCurrentUser();
-        
-        await supabase.from('activity_log').insert({
-            user_id: user?.id,
-            action,
-            entity_type: entityType,
-            entity_id: entityId,
-            metadata,
-            created_at: new Date().toISOString()
-        });
-    },
-
-    /**
-     * Log auth event
-     * @param {string} eventType 
-     * @param {string} userId 
-     */
-    async logAuthEvent(eventType, userId) {
-        await supabase.from('auth_audit_log').insert({
-            user_id: userId,
-            event_type: eventType,
-            ip_address: null, // Would need server-side to capture
-            user_agent: navigator.userAgent,
-            metadata: {
-                timestamp: new Date().toISOString()
-            }
-        });
-    },
-
-    /**
-     * Get activity log
-     * @param {Object} filters 
-     * @returns {Promise<{data, error}>}
-     */
-    async getActivityLog(filters = {}) {
-        let query = supabase
-            .from('activity_log')
-            .select(`
-                *,
-                user:users(full_name, email)
-            `)
-            .order('created_at', { ascending: false })
-            .limit(filters.limit || 50);
-
-        if (filters.entityType) {
-            query = query.eq('entity_type', filters.entityType);
-        }
-        if (filters.entityId) {
-            query = query.eq('entity_id', filters.entityId);
-        }
-
-        const { data, error } = await query;
-        return { data, error };
-    },
-
-    // ========================================
-    // REAL-TIME SUBSCRIPTIONS
-    // ========================================
-
-    /**
-     * Subscribe to opportunity changes
-     * @param {Function} callback 
-     * @returns {Object} subscription
-     */
-    subscribeToOpportunities(callback) {
-        return supabase
-            .channel('opportunities-changes')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'opportunities' },
-                callback
-            )
-            .subscribe();
-    },
-
-    /**
-     * Subscribe to notifications
-     * @param {Function} callback 
-     * @returns {Object} subscription
-     */
-    subscribeToNotifications(callback) {
-        return supabase
-            .channel('notifications-changes')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'notifications' },
-                callback
-            )
-            .subscribe();
-    },
-
-    /**
-     * Unsubscribe from channel
-     * @param {Object} subscription 
-     */
-    unsubscribe(subscription) {
-        if (subscription) {
-            supabase.removeChannel(subscription);
-        }
+(function(global) {
+  'use strict';
+
+  // ============================================================
+  // SUPABASE CONFIGURATION
+  // ============================================================
+  const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+
+  // Initialize Supabase client
+  let supabase = null;
+  let connectionStatus = 'disconnected';
+  let connectionListeners = [];
+  let currentUser = null;
+  let currentUserProfile = null;
+
+  function initSupabase() {
+    if (typeof global.supabase !== 'undefined' && global.supabase.createClient) {
+      supabase = global.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      connectionStatus = 'connected';
+      notifyConnectionListeners();
+      console.log('[MissionPulse] Supabase client initialized');
+      
+      // Check for existing session
+      checkExistingSession();
+      return true;
     }
-};
+    console.warn('[MissionPulse] Supabase library not loaded');
+    return false;
+  }
 
-// Make MissionPulse globally available
-window.MissionPulse = MissionPulse;
+  function getClient() {
+    if (!supabase) {
+      initSupabase();
+    }
+    return supabase;
+  }
 
-// ============================================
-// AUTO-INITIALIZE ON LOAD
-// ============================================
-document.addEventListener('DOMContentLoaded', () => {
-    // Set up auth state listener
-    MissionPulse.onAuthStateChange((event, session) => {
-        console.log('Auth state changed:', event);
-        
-        if (event === 'SIGNED_OUT') {
-            // Clear any cached data
-            sessionStorage.clear();
+  function notifyConnectionListeners() {
+    connectionListeners.forEach(cb => cb(connectionStatus));
+  }
+
+  // ============================================================
+  // AUTHENTICATION SYSTEM
+  // ============================================================
+
+  /**
+   * Check for existing session on page load
+   */
+  async function checkExistingSession() {
+    try {
+      const { data: { session } } = await getClient().auth.getSession();
+      if (session?.user) {
+        currentUser = session.user;
+        await loadUserProfile(session.user.email);
+      }
+    } catch (error) {
+      console.warn('[MissionPulse] Session check failed:', error.message);
+    }
+  }
+
+  /**
+   * Load user profile from users table
+   * @param {string} email - User email
+   */
+  async function loadUserProfile(email) {
+    try {
+      const { data, error } = await getClient()
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (error) {
+        console.warn('[MissionPulse] Profile load failed:', error.message);
+        return null;
+      }
+
+      currentUserProfile = mapUserFromDB(data);
+      return currentUserProfile;
+    } catch (error) {
+      console.error('[MissionPulse] Profile load error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Sign in with email and password
+   * @param {string} email 
+   * @param {string} password 
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function signIn(email, password) {
+    try {
+      const { data, error } = await getClient().auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) throw error;
+
+      currentUser = data.user;
+      await loadUserProfile(email);
+
+      // Update last login
+      if (currentUserProfile?.id) {
+        await getClient()
+          .from('users')
+          .update({ last_login: new Date().toISOString() })
+          .eq('id', currentUserProfile.id);
+      }
+
+      return { 
+        data: { 
+          user: currentUser, 
+          profile: currentUserProfile,
+          session: data.session 
+        }, 
+        error: null 
+      };
+    } catch (error) {
+      console.error('[MissionPulse] Sign in error:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Sign up new user
+   * @param {string} email 
+   * @param {string} password 
+   * @param {Object} metadata - { fullName, roleId }
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function signUp(email, password, metadata = {}) {
+    try {
+      const { data, error } = await getClient().auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: metadata.fullName || '',
+            role_id: metadata.roleId || 'Partner'
+          }
         }
+      });
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Sign up error:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Sign out current user
+   * @returns {Promise<{error: Error|null}>}
+   */
+  async function signOut() {
+    try {
+      const { error } = await getClient().auth.signOut();
+      if (error) throw error;
+      
+      currentUser = null;
+      currentUserProfile = null;
+      
+      return { error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Sign out error:', error);
+      return { error };
+    }
+  }
+
+  /**
+   * Get current authenticated user with profile
+   * @returns {Promise<{data: Object|null, error: Error|null}>}
+   */
+  async function getCurrentUser() {
+    try {
+      const { data: { user } } = await getClient().auth.getUser();
+      
+      if (!user) {
+        return { data: null, error: null };
+      }
+
+      currentUser = user;
+      
+      if (!currentUserProfile || currentUserProfile.email !== user.email) {
+        await loadUserProfile(user.email);
+      }
+
+      return { 
+        data: { 
+          ...user, 
+          profile: currentUserProfile 
+        }, 
+        error: null 
+      };
+    } catch (error) {
+      console.error('[MissionPulse] Get current user error:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Subscribe to auth state changes
+   * @param {Function} callback - (event, session) => void
+   * @returns {Object} Subscription object with unsubscribe method
+   */
+  function onAuthStateChange(callback) {
+    return getClient().auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        currentUser = session.user;
+        await loadUserProfile(session.user.email);
+      } else if (event === 'SIGNED_OUT') {
+        currentUser = null;
+        currentUserProfile = null;
+      }
+      callback(event, session);
     });
-});
+  }
+
+  /**
+   * Send password reset email
+   * @param {string} email 
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function resetPassword(email) {
+    try {
+      const { data, error } = await getClient().auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password.html`
+      });
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Password reset error:', error);
+      return { data: null, error };
+    }
+  }
+
+  // ============================================================
+  // ROLE-BASED ACCESS CONTROL (RBAC)
+  // ============================================================
+
+  /**
+   * Role definitions with permissions and module access
+   */
+  const ROLES = {
+    CEO: {
+      name: 'Chief Executive Officer',
+      level: 100,
+      modules: ['*'],
+      permissions: ['*']
+    },
+    COO: {
+      name: 'Chief Operating Officer',
+      level: 90,
+      modules: ['dashboard', 'pipeline', 'warroom', 'compliance', 'pricing', 'partners', 'reports'],
+      permissions: ['view_all', 'edit_all', 'approve_gonogo', 'manage_team']
+    },
+    Admin: {
+      name: 'System Administrator',
+      level: 95,
+      modules: ['*'],
+      permissions: ['*', 'manage_users', 'manage_system']
+    },
+    CAP: {
+      name: 'Capture Manager',
+      level: 70,
+      modules: ['dashboard', 'pipeline', 'warroom', 'blackhat', 'partners', 'orals'],
+      permissions: ['view_all', 'edit_capture', 'manage_competitors']
+    },
+    PM: {
+      name: 'Proposal Manager',
+      level: 70,
+      modules: ['dashboard', 'pipeline', 'warroom', 'compliance', 'schedule', 'documents'],
+      permissions: ['view_all', 'edit_proposal', 'manage_schedule']
+    },
+    SA: {
+      name: 'Solution Architect',
+      level: 60,
+      modules: ['dashboard', 'compliance', 'technical', 'documents'],
+      permissions: ['view_assigned', 'edit_technical']
+    },
+    FIN: {
+      name: 'Financial Analyst',
+      level: 60,
+      modules: ['dashboard', 'pricing', 'staffing', 'reports'],
+      permissions: ['view_financial', 'edit_pricing']
+    },
+    CON: {
+      name: 'Contracts Specialist',
+      level: 60,
+      modules: ['dashboard', 'compliance', 'irondome', 'contracts'],
+      permissions: ['view_compliance', 'edit_compliance']
+    },
+    DEL: {
+      name: 'Delivery Lead',
+      level: 60,
+      modules: ['dashboard', 'staffing', 'partners', 'schedule'],
+      permissions: ['view_staffing', 'edit_staffing']
+    },
+    QA: {
+      name: 'Quality Assurance',
+      level: 50,
+      modules: ['dashboard', 'compliance', 'reviews', 'documents'],
+      permissions: ['view_all', 'edit_reviews']
+    },
+    Partner: {
+      name: 'Teaming Partner',
+      level: 20,
+      modules: ['dashboard', 'assigned'],
+      permissions: ['view_assigned']
+    }
+  };
+
+  /**
+   * Module definitions for navigation
+   */
+  const MODULES = {
+    dashboard: { name: 'Dashboard', icon: 'home', path: '/index.html' },
+    pipeline: { name: 'Pipeline', icon: 'chart-bar', path: '/pipeline.html' },
+    warroom: { name: 'War Room', icon: 'users', path: '/warroom.html' },
+    compliance: { name: 'Compliance', icon: 'shield-check', path: '/compliance.html' },
+    irondome: { name: 'Iron Dome', icon: 'shield', path: '/irondome.html' },
+    blackhat: { name: 'Black Hat', icon: 'eye', path: '/blackhat.html' },
+    pricing: { name: 'Pricing', icon: 'currency-dollar', path: '/pricing.html' },
+    staffing: { name: 'Staffing', icon: 'user-group', path: '/staffing.html' },
+    partners: { name: 'Partners', icon: 'link', path: '/partners.html' },
+    orals: { name: 'Orals Studio', icon: 'presentation', path: '/orals.html' },
+    documents: { name: 'Documents', icon: 'document', path: '/documents.html' },
+    reports: { name: 'Reports', icon: 'chart-pie', path: '/reports.html' },
+    admin: { name: 'Admin', icon: 'cog', path: '/admin.html' }
+  };
+
+  /**
+   * Get current user's role ID
+   * @returns {string|null}
+   */
+  function getUserRole() {
+    return currentUserProfile?.roleId || null;
+  }
+
+  /**
+   * Get current user's role definition
+   * @returns {Object|null}
+   */
+  function getUserRoleDefinition() {
+    const roleId = getUserRole();
+    return roleId ? ROLES[roleId] : null;
+  }
+
+  /**
+   * Check if user has a specific permission
+   * @param {string} permission 
+   * @returns {boolean}
+   */
+  function hasPermission(permission) {
+    const role = getUserRoleDefinition();
+    if (!role) return false;
+    
+    // Wildcard permissions
+    if (role.permissions.includes('*')) return true;
+    
+    return role.permissions.includes(permission);
+  }
+
+  /**
+   * Check if user can access a specific module
+   * @param {string} moduleId 
+   * @returns {boolean}
+   */
+  function canAccessModule(moduleId) {
+    const role = getUserRoleDefinition();
+    if (!role) return false;
+    
+    // Wildcard access
+    if (role.modules.includes('*')) return true;
+    
+    return role.modules.includes(moduleId);
+  }
+
+  /**
+   * Get all accessible modules for current user
+   * @returns {Array<Object>}
+   */
+  function getAccessibleModules() {
+    const role = getUserRoleDefinition();
+    if (!role) return [];
+
+    if (role.modules.includes('*')) {
+      return Object.entries(MODULES).map(([id, module]) => ({ id, ...module }));
+    }
+
+    return role.modules
+      .filter(id => MODULES[id])
+      .map(id => ({ id, ...MODULES[id] }));
+  }
+
+  /**
+   * Check if current user is authenticated
+   * @returns {boolean}
+   */
+  function isAuthenticated() {
+    return currentUser !== null;
+  }
+
+  // ============================================================
+  // FIELD MAPPING: snake_case (DB) <-> camelCase (Frontend)
+  // ============================================================
+
+  const fieldMapping = {
+    toFrontend: {
+      id: 'id',
+      name: 'name',
+      agency: 'agency',
+      contract_value: 'contractValue',
+      priority: 'priority',
+      shipley_phase: 'shipleyPhase',
+      win_probability: 'winProbability',
+      due_date: 'dueDate',
+      solicitation_number: 'solicitationNumber',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+      description: 'description',
+      contract_type: 'contractType',
+      set_aside: 'setAside',
+      naics_code: 'naicsCode',
+      primary_contact: 'primaryContact',
+      company_id: 'companyId'
+    },
+    toDatabase: {
+      id: 'id',
+      name: 'name',
+      agency: 'agency',
+      contractValue: 'contract_value',
+      priority: 'priority',
+      shipleyPhase: 'shipley_phase',
+      winProbability: 'win_probability',
+      dueDate: 'due_date',
+      solicitationNumber: 'solicitation_number',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+      description: 'description',
+      contractType: 'contract_type',
+      setAside: 'set_aside',
+      naicsCode: 'naics_code',
+      primaryContact: 'primary_contact',
+      companyId: 'company_id'
+    }
+  };
+
+  const userFieldMapping = {
+    toFrontend: {
+      id: 'id',
+      company_id: 'companyId',
+      email: 'email',
+      full_name: 'fullName',
+      role_id: 'roleId',
+      avatar_url: 'avatarUrl',
+      phone: 'phone',
+      is_active: 'isActive',
+      last_login: 'lastLogin',
+      preferences: 'preferences',
+      created_at: 'createdAt'
+    }
+  };
+
+  function mapToFrontend(record) {
+    if (!record) return null;
+    const mapped = {};
+    Object.keys(record).forEach(key => {
+      const frontendKey = fieldMapping.toFrontend[key] || key;
+      mapped[frontendKey] = record[key];
+    });
+    
+    if (mapped.dueDate) {
+      const dueDate = new Date(mapped.dueDate);
+      const today = new Date();
+      const diffTime = dueDate - today;
+      mapped.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+    
+    mapped.phase = mapShipleyPhaseToDisplay(mapped.shipleyPhase);
+    mapped.ceiling = mapped.contractValue;
+    mapped.pWin = mapped.winProbability;
+    
+    return mapped;
+  }
+
+  function mapToDatabase(data) {
+    if (!data) return null;
+    const mapped = {};
+    Object.keys(data).forEach(key => {
+      const dbKey = fieldMapping.toDatabase[key];
+      if (dbKey) {
+        mapped[dbKey] = data[key];
+      }
+    });
+    return mapped;
+  }
+
+  function mapUserFromDB(record) {
+    if (!record) return null;
+    const mapped = {};
+    Object.keys(record).forEach(key => {
+      const frontendKey = userFieldMapping.toFrontend[key] || key;
+      mapped[frontendKey] = record[key];
+    });
+    return mapped;
+  }
+
+  // Shipley phase display mapping
+  const SHIPLEY_PHASES = {
+    'gate_1': { name: 'Gate 1', color: '#94a3b8', order: 1 },
+    'blue_team': { name: 'Blue Team', color: '#60a5fa', order: 2 },
+    'pink_team': { name: 'Pink Team', color: '#f472b6', order: 3 },
+    'red_team': { name: 'Red Team', color: '#ef4444', order: 4 },
+    'gold_team': { name: 'Gold Team', color: '#fbbf24', order: 5 },
+    'submitted': { name: 'Submitted', color: '#22c55e', order: 6 },
+    'awarded': { name: 'Awarded', color: '#8b5cf6', order: 7 },
+    'lost': { name: 'Lost', color: '#64748b', order: 8 }
+  };
+
+  function mapShipleyPhaseToDisplay(phase) {
+    if (!phase) return 'Gate 1';
+    const phaseInfo = SHIPLEY_PHASES[phase];
+    return phaseInfo ? phaseInfo.name : phase;
+  }
+
+  // ============================================================
+  // CRUD OPERATIONS
+  // ============================================================
+
+  async function getOpportunities(options = {}) {
+    if (!getClient()) {
+      return { data: null, error: new Error('Supabase not initialized') };
+    }
+
+    try {
+      let query = getClient()
+        .from('opportunities')
+        .select('*');
+
+      const orderBy = options.orderBy || 'due_date';
+      const ascending = options.ascending !== undefined ? options.ascending : true;
+      query = query.order(orderBy, { ascending });
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const mappedData = (data || []).map(mapToFrontend);
+      return { data: mappedData, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error fetching opportunities:', error);
+      return { data: null, error };
+    }
+  }
+
+  async function getPipelineStats() {
+    if (!getClient()) {
+      return { data: null, error: new Error('Supabase not initialized') };
+    }
+
+    try {
+      const { data, error } = await getClient()
+        .from('opportunities')
+        .select('contract_value, win_probability, due_date, shipley_phase');
+
+      if (error) throw error;
+
+      const now = new Date();
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const stats = {
+        totalCount: data.length,
+        totalValue: data.reduce((sum, opp) => sum + (opp.contract_value || 0), 0),
+        avgPwin: data.length > 0 
+          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || 0), 0) / data.length)
+          : 0,
+        dueThisMonth: data.filter(opp => {
+          if (!opp.due_date) return false;
+          const dueDate = new Date(opp.due_date);
+          return dueDate >= now && dueDate <= monthEnd;
+        }).length,
+        byPhase: {}
+      };
+
+      data.forEach(opp => {
+        const phase = opp.shipley_phase || 'gate_1';
+        if (!stats.byPhase[phase]) {
+          stats.byPhase[phase] = { count: 0, value: 0 };
+        }
+        stats.byPhase[phase].count++;
+        stats.byPhase[phase].value += opp.contract_value || 0;
+      });
+
+      return { data: stats, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error fetching pipeline stats:', error);
+      return { data: null, error };
+    }
+  }
+
+  async function getOpportunitiesByPhase() {
+    const { data, error } = await getOpportunities({ orderBy: 'due_date', ascending: true });
+    
+    if (error) return { data: null, error };
+
+    const grouped = {};
+    Object.keys(SHIPLEY_PHASES).forEach(phase => {
+      grouped[phase] = {
+        ...SHIPLEY_PHASES[phase],
+        phase: phase,
+        items: []
+      };
+    });
+
+    (data || []).forEach(opp => {
+      const phase = opp.shipleyPhase || 'gate_1';
+      if (grouped[phase]) {
+        grouped[phase].items.push(opp);
+      }
+    });
+
+    return { data: grouped, error: null };
+  }
+
+  async function createOpportunity(opportunityData) {
+    if (!getClient()) {
+      return { data: null, error: new Error('Supabase not initialized') };
+    }
+
+    try {
+      const dbData = mapToDatabase(opportunityData);
+      delete dbData.id;
+      dbData.created_at = new Date().toISOString();
+      dbData.updated_at = new Date().toISOString();
+
+      // Add company_id from current user
+      if (currentUserProfile?.companyId) {
+        dbData.company_id = currentUserProfile.companyId;
+      }
+
+      const { data, error } = await getClient()
+        .from('opportunities')
+        .insert([dbData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { data: mapToFrontend(data), error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error creating opportunity:', error);
+      return { data: null, error };
+    }
+  }
+
+  async function updateOpportunity(id, updates) {
+    if (!getClient()) {
+      return { data: null, error: new Error('Supabase not initialized') };
+    }
+
+    try {
+      const dbData = mapToDatabase(updates);
+      dbData.updated_at = new Date().toISOString();
+
+      const { data, error } = await getClient()
+        .from('opportunities')
+        .update(dbData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { data: mapToFrontend(data), error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error updating opportunity:', error);
+      return { data: null, error };
+    }
+  }
+
+  async function deleteOpportunity(id) {
+    if (!getClient()) {
+      return { data: null, error: new Error('Supabase not initialized') };
+    }
+
+    try {
+      const { error } = await getClient()
+        .from('opportunities')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      return { data: { success: true, id }, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error deleting opportunity:', error);
+      return { data: null, error };
+    }
+  }
+
+  // ============================================================
+  // REAL-TIME SUBSCRIPTIONS
+  // ============================================================
+
+  let opportunitySubscription = null;
+  let opportunityCallbacks = [];
+
+  function subscribeToOpportunities(callback) {
+    if (!getClient()) {
+      console.error('[MissionPulse] Cannot subscribe - Supabase not initialized');
+      return () => {};
+    }
+
+    opportunityCallbacks.push(callback);
+
+    if (!opportunitySubscription) {
+      opportunitySubscription = getClient()
+        .channel('opportunities-changes')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'opportunities' },
+          (payload) => {
+            const event = {
+              eventType: payload.eventType,
+              new: payload.new ? mapToFrontend(payload.new) : null,
+              old: payload.old ? mapToFrontend(payload.old) : null
+            };
+            opportunityCallbacks.forEach(cb => cb(event));
+          }
+        )
+        .subscribe((status) => {
+          console.log('[MissionPulse] Subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            connectionStatus = 'connected';
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            connectionStatus = 'disconnected';
+          }
+          notifyConnectionListeners();
+        });
+    }
+
+    return () => {
+      const index = opportunityCallbacks.indexOf(callback);
+      if (index > -1) {
+        opportunityCallbacks.splice(index, 1);
+      }
+      
+      if (opportunityCallbacks.length === 0 && opportunitySubscription) {
+        opportunitySubscription.unsubscribe();
+        opportunitySubscription = null;
+      }
+    };
+  }
+
+  function onConnectionChange(callback) {
+    connectionListeners.push(callback);
+    callback(connectionStatus);
+    
+    return () => {
+      const index = connectionListeners.indexOf(callback);
+      if (index > -1) {
+        connectionListeners.splice(index, 1);
+      }
+    };
+  }
+
+  function getConnectionStatus() {
+    return connectionStatus;
+  }
+
+  // ============================================================
+  // UTILITY FUNCTIONS
+  // ============================================================
+
+  function formatCurrency(value) {
+    if (!value) return '$0';
+    if (value >= 1000000000) {
+      return `$${(value / 1000000000).toFixed(1)}B`;
+    }
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`;
+    }
+    if (value >= 1000) {
+      return `$${(value / 1000).toFixed(0)}K`;
+    }
+    return `$${value.toLocaleString()}`;
+  }
+
+  function getPhaseInfo(phaseKey) {
+    return SHIPLEY_PHASES[phaseKey] || SHIPLEY_PHASES.gate_1;
+  }
+
+  function getShipleyPhases() {
+    return Object.entries(SHIPLEY_PHASES)
+      .map(([key, value]) => ({ key, ...value }))
+      .sort((a, b) => a.order - b.order);
+  }
+
+  // ============================================================
+  // EXPORT MissionPulse NAMESPACE
+  // ============================================================
+  global.MissionPulse = {
+    // Authentication
+    signIn,
+    signUp,
+    signOut,
+    getCurrentUser,
+    onAuthStateChange,
+    resetPassword,
+    isAuthenticated,
+
+    // RBAC
+    getUserRole,
+    getUserRoleDefinition,
+    hasPermission,
+    canAccessModule,
+    getAccessibleModules,
+    ROLES,
+    MODULES,
+
+    // CRUD Operations
+    getOpportunities,
+    getPipelineStats,
+    getOpportunitiesByPhase,
+    createOpportunity,
+    updateOpportunity,
+    deleteOpportunity,
+
+    // Real-time
+    subscribeToOpportunities,
+    onConnectionChange,
+    getConnectionStatus,
+
+    // Utilities
+    formatCurrency,
+    getPhaseInfo,
+    getShipleyPhases,
+    mapToFrontend,
+    mapToDatabase,
+
+    // Constants
+    SHIPLEY_PHASES,
+
+    // Initialization
+    init: initSupabase,
+    
+    // Config (read-only)
+    config: {
+      url: SUPABASE_URL,
+      initialized: () => supabase !== null
+    }
+  };
+
+  // Auto-initialize when Supabase is available
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(initSupabase, 100);
+    });
+  } else {
+    setTimeout(initSupabase, 100);
+  }
+
+})(typeof window !== 'undefined' ? window : global);
