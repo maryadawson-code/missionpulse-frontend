@@ -1,948 +1,780 @@
 /**
- * MissionPulse Supabase Client Module
- * Sprint 8: Enhanced with Activity Logging and Bulk Operations
+ * MissionPulse Supabase Client
+ * ============================
+ * Authentication and data access layer for MissionPulse
  * 
- * Provides MissionPulse namespace with:
- * - CRUD Operations: getOpportunities, createOpportunity, updateOpportunity, deleteOpportunity
- * - Bulk Operations: bulkUpdateOpportunities, bulkDeleteOpportunities
- * - Activity Logging: logActivity, getActivities, getRecentActivities
- * - Stats & Grouping: getPipelineStats, getOpportunitiesByPhase, getUniqueAgencies
- * - Real-time: subscribeToOpportunities, subscribeToActivities
- * - Utilities: formatCurrency, getPhaseInfo, getShipleyPhases
- * 
- * © 2026 Mission Meets Tech
+ * @version 1.0.0
+ * @author Mission Meets Tech
  */
 
-(function(global) {
-  'use strict';
+// ============================================
+// CONFIGURATION
+// ============================================
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
 
-  // ============================================================
-  // SUPABASE CONFIGURATION
-  // ============================================================
-  const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+// Initialize Supabase client
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Initialize Supabase client
-  let supabase = null;
-  let connectionStatus = 'disconnected';
-  let connectionListeners = [];
+// ============================================
+// MISSIONPULSE GLOBAL OBJECT
+// ============================================
+const MissionPulse = {
+    // Expose supabase client for direct access if needed
+    client: supabase,
 
-  function initSupabase() {
-    if (typeof global.supabase !== 'undefined' && global.supabase.createClient) {
-      supabase = global.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      connectionStatus = 'connected';
-      notifyConnectionListeners();
-      console.log('[MissionPulse] Supabase client initialized');
-      return true;
-    }
-    console.warn('[MissionPulse] Supabase library not loaded');
-    return false;
-  }
+    // ========================================
+    // AUTHENTICATION METHODS
+    // ========================================
 
-  function notifyConnectionListeners() {
-    connectionListeners.forEach(cb => cb(connectionStatus));
-  }
+    /**
+     * Sign in with email and password
+     * @param {string} email 
+     * @param {string} password 
+     * @returns {Promise<{data, error}>}
+     */
+    async signIn(email, password) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        });
 
-  // ============================================================
-  // FIELD MAPPING: snake_case (DB) <-> camelCase (Frontend)
-  // ============================================================
-  const fieldMapping = {
-    // DB -> Frontend
-    toFrontend: {
-      id: 'id',
-      name: 'name',
-      agency: 'agency',
-      contract_value: 'contractValue',
-      priority: 'priority',
-      shipley_phase: 'shipleyPhase',
-      win_probability: 'winProbability',
-      due_date: 'dueDate',
-      solicitation_number: 'solicitationNumber',
-      created_at: 'createdAt',
-      updated_at: 'updatedAt',
-      description: 'description',
-      contract_type: 'contractType',
-      set_aside: 'setAside',
-      naics_code: 'naicsCode',
-      primary_contact: 'primaryContact'
+        if (!error && data?.user) {
+            // Log auth event
+            await this.logAuthEvent('signin', data.user.id);
+            // Update last login
+            await supabase
+                .from('users')
+                .update({ last_login: new Date().toISOString() })
+                .eq('id', data.user.id);
+        }
+
+        return { data, error };
     },
-    // Frontend -> DB
-    toDatabase: {
-      id: 'id',
-      name: 'name',
-      agency: 'agency',
-      contractValue: 'contract_value',
-      priority: 'priority',
-      shipleyPhase: 'shipley_phase',
-      winProbability: 'win_probability',
-      dueDate: 'due_date',
-      solicitationNumber: 'solicitation_number',
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
-      description: 'description',
-      contractType: 'contract_type',
-      setAside: 'set_aside',
-      naicsCode: 'naics_code',
-      primaryContact: 'primary_contact'
-    }
-  };
 
-  // Map DB record to frontend format
-  function mapToFrontend(record) {
-    if (!record) return null;
-    const mapped = {};
-    Object.keys(record).forEach(key => {
-      const frontendKey = fieldMapping.toFrontend[key] || key;
-      mapped[frontendKey] = record[key];
-    });
-    
-    // Compute derived fields
-    if (mapped.dueDate) {
-      const dueDate = new Date(mapped.dueDate);
-      const today = new Date();
-      const diffTime = dueDate - today;
-      mapped.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    }
-    
-    // Map shipley_phase to display phase
-    mapped.phase = mapShipleyPhaseToDisplay(mapped.shipleyPhase);
-    
-    // Format ceiling from contract_value
-    mapped.ceiling = mapped.contractValue;
-    
-    // Map win_probability to pWin
-    mapped.pWin = mapped.winProbability;
-    
-    return mapped;
-  }
-
-  // Map frontend data to DB format
-  function mapToDatabase(data) {
-    if (!data) return null;
-    const mapped = {};
-    Object.keys(data).forEach(key => {
-      const dbKey = fieldMapping.toDatabase[key];
-      if (dbKey) {
-        mapped[dbKey] = data[key];
-      }
-    });
-    return mapped;
-  }
-
-  // Shipley phase display mapping
-  const SHIPLEY_PHASES = {
-    'gate_1': { name: 'Gate 1', color: '#94a3b8', order: 1 },
-    'blue_team': { name: 'Blue Team', color: '#60a5fa', order: 2 },
-    'pink_team': { name: 'Pink Team', color: '#f472b6', order: 3 },
-    'red_team': { name: 'Red Team', color: '#ef4444', order: 4 },
-    'gold_team': { name: 'Gold Team', color: '#fbbf24', order: 5 },
-    'submitted': { name: 'Submitted', color: '#22c55e', order: 6 },
-    'awarded': { name: 'Awarded', color: '#8b5cf6', order: 7 },
-    'lost': { name: 'Lost', color: '#64748b', order: 8 }
-  };
-
-  function mapShipleyPhaseToDisplay(phase) {
-    if (!phase) return 'Gate 1';
-    const phaseInfo = SHIPLEY_PHASES[phase];
-    return phaseInfo ? phaseInfo.name : phase;
-  }
-
-  // ============================================================
-  // CRUD OPERATIONS
-  // ============================================================
-
-  /**
-   * Fetch all opportunities
-   * @param {Object} options - Query options
-   * @param {string} options.orderBy - Field to order by
-   * @param {boolean} options.ascending - Sort direction
-   * @returns {Promise<{data: Array, error: Error|null}>}
-   */
-  async function getOpportunities(options = {}) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      let query = supabase
-        .from('opportunities')
-        .select('*');
-
-      // Apply ordering
-      const orderBy = options.orderBy || 'due_date';
-      const ascending = options.ascending !== undefined ? options.ascending : true;
-      query = query.order(orderBy, { ascending });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Map all records to frontend format
-      const mappedData = (data || []).map(mapToFrontend);
-      
-      return { data: mappedData, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error fetching opportunities:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Get pipeline statistics
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function getPipelineStats() {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('opportunities')
-        .select('contract_value, win_probability, due_date, shipley_phase');
-
-      if (error) throw error;
-
-      // Calculate stats
-      const now = new Date();
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-      const stats = {
-        totalCount: data.length,
-        totalValue: data.reduce((sum, opp) => sum + (opp.contract_value || 0), 0),
-        avgPwin: data.length > 0 
-          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || 0), 0) / data.length)
-          : 0,
-        dueThisMonth: data.filter(opp => {
-          if (!opp.due_date) return false;
-          const dueDate = new Date(opp.due_date);
-          return dueDate >= now && dueDate <= monthEnd;
-        }).length,
-        byPhase: {}
-      };
-
-      // Group by phase
-      data.forEach(opp => {
-        const phase = opp.shipley_phase || 'gate_1';
-        if (!stats.byPhase[phase]) {
-          stats.byPhase[phase] = { count: 0, value: 0 };
-        }
-        stats.byPhase[phase].count++;
-        stats.byPhase[phase].value += opp.contract_value || 0;
-      });
-
-      return { data: stats, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error fetching pipeline stats:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Get opportunities grouped by Shipley phase
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function getOpportunitiesByPhase() {
-    const { data, error } = await getOpportunities({ orderBy: 'due_date', ascending: true });
-    
-    if (error) return { data: null, error };
-
-    // Initialize all phases
-    const grouped = {};
-    Object.keys(SHIPLEY_PHASES).forEach(phase => {
-      grouped[phase] = {
-        ...SHIPLEY_PHASES[phase],
-        phase: phase,
-        items: []
-      };
-    });
-
-    // Group opportunities
-    (data || []).forEach(opp => {
-      const phase = opp.shipleyPhase || 'gate_1';
-      if (grouped[phase]) {
-        grouped[phase].items.push(opp);
-      }
-    });
-
-    // Convert to array sorted by order
-    const phasesArray = Object.values(grouped).sort((a, b) => a.order - b.order);
-
-    return { data: phasesArray, error: null };
-  }
-
-  /**
-   * Create a new opportunity
-   * @param {Object} opportunityData - Opportunity data in frontend format
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function createOpportunity(opportunityData) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      // Map to database format
-      const dbData = mapToDatabase(opportunityData);
-      
-      // Remove id if present (let DB generate it)
-      delete dbData.id;
-      
-      // Set timestamps
-      dbData.created_at = new Date().toISOString();
-      dbData.updated_at = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from('opportunities')
-        .insert([dbData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Log activity
-      await logActivity({
-        opportunityId: data.id,
-        action: 'created',
-        userId: 'system'
-      });
-
-      return { data: mapToFrontend(data), error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error creating opportunity:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Update an existing opportunity
-   * @param {string} id - Opportunity ID
-   * @param {Object} updates - Fields to update in frontend format
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function updateOpportunity(id, updates) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      // Get current opportunity for activity logging
-      const { data: currentOpp } = await supabase
-        .from('opportunities')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      // Map to database format
-      const dbData = mapToDatabase(updates);
-      
-      // Always update timestamp
-      dbData.updated_at = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from('opportunities')
-        .update(dbData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Log activity for phase changes
-      if (updates.shipleyPhase && currentOpp && currentOpp.shipley_phase !== updates.shipleyPhase) {
-        await logActivity({
-          opportunityId: id,
-          action: 'phase_changed',
-          fieldChanged: 'shipley_phase',
-          oldValue: currentOpp.shipley_phase,
-          newValue: updates.shipleyPhase,
-          userId: 'system'
-        });
-      } else if (Object.keys(updates).length > 0) {
-        // Log general update
-        const changedFields = Object.keys(updates).filter(k => k !== 'updatedAt');
-        await logActivity({
-          opportunityId: id,
-          action: 'updated',
-          fieldChanged: changedFields.join(', '),
-          userId: 'system'
-        });
-      }
-
-      return { data: mapToFrontend(data), error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error updating opportunity:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Delete an opportunity
-   * @param {string} id - Opportunity ID
-   * @returns {Promise<{data: {success: boolean}, error: Error|null}>}
-   */
-  async function deleteOpportunity(id) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      // Get opportunity name before deletion for activity log
-      const { data: opp } = await supabase
-        .from('opportunities')
-        .select('name')
-        .eq('id', id)
-        .single();
-
-      const { error } = await supabase
-        .from('opportunities')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      // Note: Activity log entry will be deleted via CASCADE
-
-      return { data: { success: true, id, name: opp?.name }, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error deleting opportunity:', error);
-      return { data: null, error };
-    }
-  }
-
-  // ============================================================
-  // BULK OPERATIONS
-  // ============================================================
-
-  /**
-   * Bulk update multiple opportunities
-   * @param {Array<string>} ids - Array of opportunity IDs
-   * @param {Object} updates - Fields to update in frontend format
-   * @returns {Promise<{data: {success: boolean, count: number}, error: Error|null}>}
-   */
-  async function bulkUpdateOpportunities(ids, updates) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    if (!ids || ids.length === 0) {
-      return { data: { success: true, count: 0 }, error: null };
-    }
-
-    try {
-      // Map to database format
-      const dbData = mapToDatabase(updates);
-      dbData.updated_at = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from('opportunities')
-        .update(dbData)
-        .in('id', ids)
-        .select();
-
-      if (error) throw error;
-
-      // Log activity for each updated opportunity
-      for (const id of ids) {
-        if (updates.shipleyPhase) {
-          await logActivity({
-            opportunityId: id,
-            action: 'phase_changed',
-            fieldChanged: 'shipley_phase',
-            newValue: updates.shipleyPhase,
-            userId: 'system'
-          });
-        } else {
-          await logActivity({
-            opportunityId: id,
-            action: 'updated',
-            fieldChanged: Object.keys(updates).join(', '),
-            userId: 'system'
-          });
-        }
-      }
-
-      return { data: { success: true, count: data?.length || 0 }, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error bulk updating opportunities:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Bulk delete multiple opportunities
-   * @param {Array<string>} ids - Array of opportunity IDs
-   * @returns {Promise<{data: {success: boolean, count: number}, error: Error|null}>}
-   */
-  async function bulkDeleteOpportunities(ids) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    if (!ids || ids.length === 0) {
-      return { data: { success: true, count: 0 }, error: null };
-    }
-
-    try {
-      const { error } = await supabase
-        .from('opportunities')
-        .delete()
-        .in('id', ids);
-
-      if (error) throw error;
-
-      // Note: Activity logs cascade deleted automatically
-
-      return { data: { success: true, count: ids.length }, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error bulk deleting opportunities:', error);
-      return { data: null, error };
-    }
-  }
-
-  // ============================================================
-  // ACTIVITY LOGGING
-  // ============================================================
-
-  /**
-   * Log an activity
-   * @param {Object} activityData - Activity data
-   * @param {string} activityData.opportunityId - Related opportunity ID (optional for deleted items)
-   * @param {string} activityData.action - Action type: 'created', 'updated', 'phase_changed', 'deleted'
-   * @param {string} activityData.fieldChanged - Field that was changed (optional)
-   * @param {string} activityData.oldValue - Previous value (optional)
-   * @param {string} activityData.newValue - New value (optional)
-   * @param {string} activityData.userId - User who performed action
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function logActivity(activityData) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const dbData = {
-        opportunity_id: activityData.opportunityId || null,
-        action: activityData.action,
-        field_changed: activityData.fieldChanged || null,
-        old_value: activityData.oldValue || null,
-        new_value: activityData.newValue || null,
-        user_id: activityData.userId || 'system',
-        created_at: new Date().toISOString()
-      };
-
-      const { data, error } = await supabase
-        .from('activity_log')
-        .insert([dbData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      return { data, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error logging activity:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Get activities for a specific opportunity
-   * @param {string} opportunityId - Opportunity ID
-   * @param {Object} options - Query options
-   * @returns {Promise<{data: Array, error: Error|null}>}
-   */
-  async function getActivities(opportunityId, options = {}) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const limit = options.limit || 50;
-
-      const { data, error } = await supabase
-        .from('activity_log')
-        .select('*, opportunities(name)')
-        .eq('opportunity_id', opportunityId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error fetching activities:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Get recent activities across all opportunities
-   * @param {Object} options - Query options
-   * @param {number} options.limit - Max activities to return (default 20)
-   * @param {number} options.offset - Offset for pagination
-   * @param {string} options.action - Filter by action type
-   * @param {string} options.since - Filter activities since timestamp (ISO string)
-   * @returns {Promise<{data: Array, hasMore: boolean, error: Error|null}>}
-   */
-  async function getRecentActivities(options = {}) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: null, hasMore: false, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const limit = options.limit || 20;
-      const offset = options.offset || 0;
-
-      let query = supabase
-        .from('activity_log')
-        .select('*, opportunities(id, name)', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      // Filter by action type
-      if (options.action) {
-        query = query.eq('action', options.action);
-      }
-
-      // Filter by time
-      if (options.since) {
-        query = query.gte('created_at', options.since);
-      }
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-
-      const hasMore = count ? (offset + limit) < count : false;
-
-      // Map data to include opportunity name
-      const mappedData = (data || []).map(activity => ({
-        id: activity.id,
-        opportunityId: activity.opportunity_id,
-        opportunityName: activity.opportunities?.name || 'Deleted Opportunity',
-        action: activity.action,
-        fieldChanged: activity.field_changed,
-        oldValue: activity.old_value,
-        newValue: activity.new_value,
-        userId: activity.user_id,
-        createdAt: activity.created_at,
-        isDeleted: !activity.opportunities
-      }));
-
-      return { data: mappedData, hasMore, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error fetching recent activities:', error);
-      return { data: null, hasMore: false, error };
-    }
-  }
-
-  /**
-   * Get count of activities in the last 24 hours
-   * @returns {Promise<{data: number, error: Error|null}>}
-   */
-  async function getActivityCount24h() {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: 0, error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-      const { count, error } = await supabase
-        .from('activity_log')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', since);
-
-      if (error) throw error;
-
-      return { data: count || 0, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error counting activities:', error);
-      return { data: 0, error };
-    }
-  }
-
-  // ============================================================
-  // REAL-TIME SUBSCRIPTIONS
-  // ============================================================
-
-  let opportunitySubscription = null;
-  let opportunityCallbacks = [];
-  let activitySubscription = null;
-  let activityCallbacks = [];
-
-  /**
-   * Subscribe to real-time opportunity changes
-   * @param {Function} callback - Called on any change with { eventType, new, old }
-   * @returns {Function} Unsubscribe function
-   */
-  function subscribeToOpportunities(callback) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        console.error('[MissionPulse] Cannot subscribe - Supabase not initialized');
-        return () => {};
-      }
-    }
-
-    opportunityCallbacks.push(callback);
-
-    // Create subscription if this is the first subscriber
-    if (!opportunitySubscription) {
-      opportunitySubscription = supabase
-        .channel('opportunities-changes')
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'opportunities' },
-          (payload) => {
-            const event = {
-              eventType: payload.eventType,
-              new: payload.new ? mapToFrontend(payload.new) : null,
-              old: payload.old ? mapToFrontend(payload.old) : null
-            };
-            opportunityCallbacks.forEach(cb => cb(event));
-          }
-        )
-        .subscribe((status) => {
-          console.log('[MissionPulse] Subscription status:', status);
-          if (status === 'SUBSCRIBED') {
-            connectionStatus = 'connected';
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            connectionStatus = 'disconnected';
-          }
-          notifyConnectionListeners();
-        });
-    }
-
-    // Return unsubscribe function
-    return () => {
-      const index = opportunityCallbacks.indexOf(callback);
-      if (index > -1) {
-        opportunityCallbacks.splice(index, 1);
-      }
-      
-      // Clean up subscription if no more callbacks
-      if (opportunityCallbacks.length === 0 && opportunitySubscription) {
-        opportunitySubscription.unsubscribe();
-        opportunitySubscription = null;
-      }
-    };
-  }
-
-  /**
-   * Subscribe to real-time activity log changes
-   * @param {Function} callback - Called on any new activity
-   * @returns {Function} Unsubscribe function
-   */
-  function subscribeToActivities(callback) {
-    if (!supabase) {
-      if (!initSupabase()) {
-        console.error('[MissionPulse] Cannot subscribe - Supabase not initialized');
-        return () => {};
-      }
-    }
-
-    activityCallbacks.push(callback);
-
-    // Create subscription if this is the first subscriber
-    if (!activitySubscription) {
-      activitySubscription = supabase
-        .channel('activity-changes')
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'activity_log' },
-          async (payload) => {
-            // Fetch the full activity with opportunity name
-            const { data } = await getRecentActivities({ limit: 1 });
-            if (data && data[0]) {
-              activityCallbacks.forEach(cb => cb(data[0]));
+    /**
+     * Sign up with email and password
+     * @param {string} email 
+     * @param {string} password 
+     * @param {Object} metadata - Additional user data (full_name, company_name)
+     * @returns {Promise<{data, error}>}
+     */
+    async signUp(email, password, metadata = {}) {
+        // First create the auth user
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: metadata.full_name,
+                    company_name: metadata.company_name
+                },
+                emailRedirectTo: `${window.location.origin}/login.html`
             }
-          }
-        )
-        .subscribe();
+        });
+
+        if (!error && data?.user && metadata.company_name) {
+            // Create company for new user
+            const { data: company, error: companyError } = await supabase
+                .from('companies')
+                .insert({
+                    name: metadata.company_name,
+                    subscription_tier: 'starter'
+                })
+                .select()
+                .single();
+
+            if (company) {
+                // Link user to company and set as Admin
+                await supabase
+                    .from('users')
+                    .update({
+                        company_id: company.id,
+                        role_id: 11 // Admin role
+                    })
+                    .eq('id', data.user.id);
+            }
+        }
+
+        return { data, error };
+    },
+
+    /**
+     * Sign in with OAuth provider
+     * @param {string} provider - 'google' or 'azure'
+     * @returns {Promise<{data, error}>}
+     */
+    async signInWithProvider(provider) {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider,
+            options: {
+                redirectTo: `${window.location.origin}/index.html`
+            }
+        });
+
+        return { data, error };
+    },
+
+    /**
+     * Sign out current user
+     * @returns {Promise<{error}>}
+     */
+    async signOut() {
+        const user = await this.getCurrentUser();
+        if (user) {
+            await this.logAuthEvent('signout', user.id);
+        }
+        
+        const { error } = await supabase.auth.signOut();
+        
+        if (!error) {
+            // Clear any cached data
+            sessionStorage.clear();
+            window.location.href = 'login.html';
+        }
+
+        return { error };
+    },
+
+    /**
+     * Send password reset email
+     * @param {string} email 
+     * @returns {Promise<{data, error}>}
+     */
+    async resetPassword(email) {
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/login.html?reset=true`
+        });
+
+        return { data, error };
+    },
+
+    /**
+     * Update user password
+     * @param {string} newPassword 
+     * @returns {Promise<{data, error}>}
+     */
+    async updatePassword(newPassword) {
+        const { data, error } = await supabase.auth.updateUser({
+            password: newPassword
+        });
+
+        return { data, error };
+    },
+
+    /**
+     * Get current authenticated user
+     * @returns {Promise<Object|null>}
+     */
+    async getCurrentUser() {
+        const { data: { user } } = await supabase.auth.getUser();
+        return user;
+    },
+
+    /**
+     * Get current session
+     * @returns {Promise<Object|null>}
+     */
+    async getSession() {
+        const { data: { session } } = await supabase.auth.getSession();
+        return session;
+    },
+
+    /**
+     * Get full user profile with company and role
+     * @returns {Promise<Object|null>}
+     */
+    async getUserProfile() {
+        const user = await this.getCurrentUser();
+        if (!user) return null;
+
+        const { data, error } = await supabase
+            .from('users')
+            .select(`
+                *,
+                company:companies(*),
+                role:roles(*)
+            `)
+            .eq('id', user.id)
+            .single();
+
+        return error ? null : data;
+    },
+
+    /**
+     * Listen for auth state changes
+     * @param {Function} callback 
+     * @returns {Object} subscription
+     */
+    onAuthStateChange(callback) {
+        return supabase.auth.onAuthStateChange((event, session) => {
+            callback(event, session);
+        });
+    },
+
+    // ========================================
+    // USER MANAGEMENT METHODS
+    // ========================================
+
+    /**
+     * Update current user's profile
+     * @param {Object} updates 
+     * @returns {Promise<{data, error}>}
+     */
+    async updateProfile(updates) {
+        const user = await this.getCurrentUser();
+        if (!user) return { error: { message: 'Not authenticated' } };
+
+        const { data, error } = await supabase
+            .from('users')
+            .update({
+                ...updates,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id)
+            .select()
+            .single();
+
+        return { data, error };
+    },
+
+    /**
+     * Get all users in current company (Admin only)
+     * @returns {Promise<{data, error}>}
+     */
+    async getCompanyUsers() {
+        const { data, error } = await supabase
+            .from('users')
+            .select(`
+                *,
+                role:roles(name, description)
+            `)
+            .order('created_at', { ascending: false });
+
+        return { data, error };
+    },
+
+    /**
+     * Invite user to company
+     * @param {string} email 
+     * @param {number} roleId 
+     * @returns {Promise<{data, error}>}
+     */
+    async inviteUser(email, roleId) {
+        const profile = await this.getUserProfile();
+        if (!profile?.company_id) return { error: { message: 'No company found' } };
+
+        const { data, error } = await supabase
+            .from('invitations')
+            .insert({
+                company_id: profile.company_id,
+                email,
+                role_id: roleId,
+                invited_by: profile.id
+            })
+            .select()
+            .single();
+
+        // TODO: Send invitation email via Edge Function
+
+        return { data, error };
+    },
+
+    /**
+     * Update user role (Admin only)
+     * @param {string} userId 
+     * @param {number} roleId 
+     * @returns {Promise<{data, error}>}
+     */
+    async updateUserRole(userId, roleId) {
+        const { data, error } = await supabase
+            .from('users')
+            .update({ role_id: roleId })
+            .eq('id', userId)
+            .select()
+            .single();
+
+        await this.logActivity('user_role_updated', 'user', userId, { roleId });
+
+        return { data, error };
+    },
+
+    /**
+     * Deactivate user (Admin only)
+     * @param {string} userId 
+     * @returns {Promise<{data, error}>}
+     */
+    async deactivateUser(userId) {
+        const { data, error } = await supabase
+            .from('users')
+            .update({ is_active: false })
+            .eq('id', userId)
+            .select()
+            .single();
+
+        await this.logActivity('user_deactivated', 'user', userId);
+
+        return { data, error };
+    },
+
+    // ========================================
+    // RBAC / PERMISSIONS METHODS
+    // ========================================
+
+    /**
+     * Check if current user has specific permission
+     * @param {string} permission 
+     * @returns {Promise<boolean>}
+     */
+    async hasPermission(permission) {
+        const profile = await this.getUserProfile();
+        if (!profile?.role) return false;
+
+        const perms = profile.role.permissions;
+        return perms?.all === true || perms?.[permission] === true;
+    },
+
+    /**
+     * Check if current user has one of the specified roles
+     * @param {string[]} roles 
+     * @returns {Promise<boolean>}
+     */
+    async hasRole(roles) {
+        const profile = await this.getUserProfile();
+        if (!profile?.role) return false;
+
+        return roles.includes(profile.role.name);
+    },
+
+    /**
+     * Get all available roles
+     * @returns {Promise<{data, error}>}
+     */
+    async getRoles() {
+        const { data, error } = await supabase
+            .from('roles')
+            .select('*')
+            .order('id');
+
+        return { data, error };
+    },
+
+    // ========================================
+    // OPPORTUNITIES METHODS
+    // ========================================
+
+    /**
+     * Get all opportunities for current company
+     * @param {Object} filters 
+     * @returns {Promise<{data, error}>}
+     */
+    async getOpportunities(filters = {}) {
+        let query = supabase
+            .from('opportunities')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        // Apply filters
+        if (filters.shipley_phase) {
+            query = query.eq('shipley_phase', filters.shipley_phase);
+        }
+        if (filters.priority) {
+            query = query.eq('priority', filters.priority);
+        }
+        if (filters.status) {
+            query = query.eq('status', filters.status);
+        }
+
+        const { data, error } = await query;
+        return { data, error };
+    },
+
+    /**
+     * Get single opportunity by ID
+     * @param {string} id 
+     * @returns {Promise<{data, error}>}
+     */
+    async getOpportunity(id) {
+        const { data, error } = await supabase
+            .from('opportunities')
+            .select(`
+                *,
+                assignments:opportunity_assignments(*),
+                comments:opportunity_comments(*)
+            `)
+            .eq('id', id)
+            .single();
+
+        return { data, error };
+    },
+
+    /**
+     * Create new opportunity
+     * @param {Object} opportunity 
+     * @returns {Promise<{data, error}>}
+     */
+    async createOpportunity(opportunity) {
+        const profile = await this.getUserProfile();
+        
+        const { data, error } = await supabase
+            .from('opportunities')
+            .insert({
+                ...opportunity,
+                company_id: profile?.company_id,
+                created_by: profile?.id
+            })
+            .select()
+            .single();
+
+        if (data) {
+            await this.logActivity('opportunity_created', 'opportunity', data.id);
+        }
+
+        return { data, error };
+    },
+
+    /**
+     * Update opportunity
+     * @param {string} id 
+     * @param {Object} updates 
+     * @returns {Promise<{data, error}>}
+     */
+    async updateOpportunity(id, updates) {
+        const { data, error } = await supabase
+            .from('opportunities')
+            .update({
+                ...updates,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (data) {
+            await this.logActivity('opportunity_updated', 'opportunity', id, updates);
+        }
+
+        return { data, error };
+    },
+
+    /**
+     * Delete opportunity
+     * @param {string} id 
+     * @returns {Promise<{error}>}
+     */
+    async deleteOpportunity(id) {
+        await this.logActivity('opportunity_deleted', 'opportunity', id);
+
+        const { error } = await supabase
+            .from('opportunities')
+            .delete()
+            .eq('id', id);
+
+        return { error };
+    },
+
+    // ========================================
+    // DASHBOARD / ANALYTICS METHODS
+    // ========================================
+
+    /**
+     * Get dashboard KPIs
+     * @returns {Promise<Object>}
+     */
+    async getDashboardKPIs() {
+        const { data: opportunities } = await this.getOpportunities();
+        
+        if (!opportunities) return null;
+
+        const activeOpps = opportunities.filter(o => o.status === 'active');
+        const totalValue = activeOpps.reduce((sum, o) => sum + (o.value || 0), 0);
+        const avgPwin = activeOpps.length > 0 
+            ? activeOpps.reduce((sum, o) => sum + (o.pwin || 0), 0) / activeOpps.length 
+            : 0;
+
+        // Group by phase
+        const byPhase = {};
+        opportunities.forEach(o => {
+            const phase = o.shipley_phase || 'Unknown';
+            byPhase[phase] = (byPhase[phase] || 0) + 1;
+        });
+
+        // Upcoming deadlines (next 30 days)
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        const upcomingDeadlines = opportunities.filter(o => {
+            if (!o.due_date) return false;
+            const due = new Date(o.due_date);
+            return due >= new Date() && due <= thirtyDaysFromNow;
+        }).length;
+
+        return {
+            totalOpportunities: opportunities.length,
+            activeOpportunities: activeOpps.length,
+            pipelineValue: totalValue,
+            averagePwin: Math.round(avgPwin),
+            upcomingDeadlines,
+            byPhase
+        };
+    },
+
+    // ========================================
+    // TEAM MEMBERS (BOE/Pricing)
+    // ========================================
+
+    /**
+     * Get team members for an opportunity
+     * @param {string} opportunityId 
+     * @returns {Promise<{data, error}>}
+     */
+    async getTeamMembers(opportunityId) {
+        const { data, error } = await supabase
+            .from('team_members')
+            .select('*')
+            .eq('opportunity_id', opportunityId)
+            .order('created_at');
+
+        return { data, error };
+    },
+
+    /**
+     * Create team member
+     * @param {Object} member 
+     * @returns {Promise<{data, error}>}
+     */
+    async createTeamMember(member) {
+        const { data, error } = await supabase
+            .from('team_members')
+            .insert(member)
+            .select()
+            .single();
+
+        return { data, error };
+    },
+
+    /**
+     * Update team member
+     * @param {string} id 
+     * @param {Object} updates 
+     * @returns {Promise<{data, error}>}
+     */
+    async updateTeamMember(id, updates) {
+        const { data, error } = await supabase
+            .from('team_members')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        return { data, error };
+    },
+
+    /**
+     * Delete team member
+     * @param {string} id 
+     * @returns {Promise<{error}>}
+     */
+    async deleteTeamMember(id) {
+        const { error } = await supabase
+            .from('team_members')
+            .delete()
+            .eq('id', id);
+
+        return { error };
+    },
+
+    // ========================================
+    // PLAYBOOK / LESSONS LEARNED
+    // ========================================
+
+    /**
+     * Get playbook lessons
+     * @param {Object} filters 
+     * @returns {Promise<{data, error}>}
+     */
+    async getPlaybookLessons(filters = {}) {
+        let query = supabase
+            .from('playbook_lessons')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (filters.category) {
+            query = query.eq('category', filters.category);
+        }
+        if (filters.is_golden) {
+            query = query.eq('is_golden', true);
+        }
+
+        const { data, error } = await query;
+        return { data, error };
+    },
+
+    /**
+     * Create playbook lesson
+     * @param {Object} lesson 
+     * @returns {Promise<{data, error}>}
+     */
+    async createPlaybookLesson(lesson) {
+        const profile = await this.getUserProfile();
+
+        const { data, error } = await supabase
+            .from('playbook_lessons')
+            .insert({
+                ...lesson,
+                company_id: profile?.company_id,
+                created_by: profile?.id
+            })
+            .select()
+            .single();
+
+        return { data, error };
+    },
+
+    /**
+     * Toggle lesson golden status
+     * @param {string} id 
+     * @param {boolean} isGolden 
+     * @returns {Promise<{data, error}>}
+     */
+    async toggleGoldenLesson(id, isGolden) {
+        const { data, error } = await supabase
+            .from('playbook_lessons')
+            .update({ is_golden: isGolden })
+            .eq('id', id)
+            .select()
+            .single();
+
+        return { data, error };
+    },
+
+    // ========================================
+    // ACTIVITY LOGGING
+    // ========================================
+
+    /**
+     * Log user activity
+     * @param {string} action 
+     * @param {string} entityType 
+     * @param {string} entityId 
+     * @param {Object} metadata 
+     */
+    async logActivity(action, entityType, entityId, metadata = {}) {
+        const user = await this.getCurrentUser();
+        
+        await supabase.from('activity_log').insert({
+            user_id: user?.id,
+            action,
+            entity_type: entityType,
+            entity_id: entityId,
+            metadata,
+            created_at: new Date().toISOString()
+        });
+    },
+
+    /**
+     * Log auth event
+     * @param {string} eventType 
+     * @param {string} userId 
+     */
+    async logAuthEvent(eventType, userId) {
+        await supabase.from('auth_audit_log').insert({
+            user_id: userId,
+            event_type: eventType,
+            ip_address: null, // Would need server-side to capture
+            user_agent: navigator.userAgent,
+            metadata: {
+                timestamp: new Date().toISOString()
+            }
+        });
+    },
+
+    /**
+     * Get activity log
+     * @param {Object} filters 
+     * @returns {Promise<{data, error}>}
+     */
+    async getActivityLog(filters = {}) {
+        let query = supabase
+            .from('activity_log')
+            .select(`
+                *,
+                user:users(full_name, email)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(filters.limit || 50);
+
+        if (filters.entityType) {
+            query = query.eq('entity_type', filters.entityType);
+        }
+        if (filters.entityId) {
+            query = query.eq('entity_id', filters.entityId);
+        }
+
+        const { data, error } = await query;
+        return { data, error };
+    },
+
+    // ========================================
+    // REAL-TIME SUBSCRIPTIONS
+    // ========================================
+
+    /**
+     * Subscribe to opportunity changes
+     * @param {Function} callback 
+     * @returns {Object} subscription
+     */
+    subscribeToOpportunities(callback) {
+        return supabase
+            .channel('opportunities-changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'opportunities' },
+                callback
+            )
+            .subscribe();
+    },
+
+    /**
+     * Subscribe to notifications
+     * @param {Function} callback 
+     * @returns {Object} subscription
+     */
+    subscribeToNotifications(callback) {
+        return supabase
+            .channel('notifications-changes')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'notifications' },
+                callback
+            )
+            .subscribe();
+    },
+
+    /**
+     * Unsubscribe from channel
+     * @param {Object} subscription 
+     */
+    unsubscribe(subscription) {
+        if (subscription) {
+            supabase.removeChannel(subscription);
+        }
     }
+};
 
-    // Return unsubscribe function
-    return () => {
-      const index = activityCallbacks.indexOf(callback);
-      if (index > -1) {
-        activityCallbacks.splice(index, 1);
-      }
-      
-      // Clean up subscription if no more callbacks
-      if (activityCallbacks.length === 0 && activitySubscription) {
-        activitySubscription.unsubscribe();
-        activitySubscription = null;
-      }
-    };
-  }
+// Make MissionPulse globally available
+window.MissionPulse = MissionPulse;
 
-  /**
-   * Subscribe to connection status changes
-   * @param {Function} callback - Called with status string
-   * @returns {Function} Unsubscribe function
-   */
-  function onConnectionChange(callback) {
-    connectionListeners.push(callback);
-    // Immediately call with current status
-    callback(connectionStatus);
-    
-    return () => {
-      const index = connectionListeners.indexOf(callback);
-      if (index > -1) {
-        connectionListeners.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Get current connection status
-   * @returns {string} 'connected' | 'disconnected' | 'connecting'
-   */
-  function getConnectionStatus() {
-    return connectionStatus;
-  }
-
-  // ============================================================
-  // UTILITY FUNCTIONS
-  // ============================================================
-
-  /**
-   * Format currency value
-   * @param {number} value - Value in dollars
-   * @returns {string} Formatted string like "$45.2M"
-   */
-  function formatCurrency(value) {
-    if (!value) return '$0';
-    if (value >= 1000000000) {
-      return `$${(value / 1000000000).toFixed(1)}B`;
-    }
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `$${(value / 1000).toFixed(0)}K`;
-    }
-    return `$${value.toLocaleString()}`;
-  }
-
-  /**
-   * Get phase info by key
-   * @param {string} phaseKey - Phase key like 'pink_team'
-   * @returns {Object} Phase info with name, color, order
-   */
-  function getPhaseInfo(phaseKey) {
-    return SHIPLEY_PHASES[phaseKey] || SHIPLEY_PHASES.gate_1;
-  }
-
-  /**
-   * Get all Shipley phases
-   * @returns {Array} Array of phase objects sorted by order
-   */
-  function getShipleyPhases() {
-    return Object.entries(SHIPLEY_PHASES)
-      .map(([key, value]) => ({ key, ...value }))
-      .sort((a, b) => a.order - b.order);
-  }
-
-  /**
-   * Get unique agencies from opportunities
-   * @returns {Promise<{data: Array<string>, error: Error|null}>}
-   */
-  async function getUniqueAgencies() {
-    if (!supabase) {
-      if (!initSupabase()) {
-        return { data: [], error: new Error('Supabase not initialized') };
-      }
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('opportunities')
-        .select('agency');
-
-      if (error) throw error;
-
-      // Get unique agencies
-      const agencies = [...new Set((data || []).map(d => d.agency).filter(Boolean))].sort();
-      
-      return { data: agencies, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Error fetching agencies:', error);
-      return { data: [], error };
-    }
-  }
-
-  // ============================================================
-  // EXPORT MissionPulse NAMESPACE
-  // ============================================================
-  global.MissionPulse = {
-    // CRUD Operations
-    getOpportunities,
-    getPipelineStats,
-    getOpportunitiesByPhase,
-    createOpportunity,
-    updateOpportunity,
-    deleteOpportunity,
-
-    // Bulk Operations
-    bulkUpdateOpportunities,
-    bulkDeleteOpportunities,
-
-    // Activity Logging
-    logActivity,
-    getActivities,
-    getRecentActivities,
-    getActivityCount24h,
-
-    // Real-time
-    subscribeToOpportunities,
-    subscribeToActivities,
-    onConnectionChange,
-    getConnectionStatus,
-
-    // Utilities
-    formatCurrency,
-    getPhaseInfo,
-    getShipleyPhases,
-    getUniqueAgencies,
-    mapToFrontend,
-    mapToDatabase,
-
-    // Constants
-    SHIPLEY_PHASES,
-
-    // Initialization
-    init: initSupabase
-  };
-
-  // Auto-initialize when Supabase is available
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(initSupabase, 100);
+// ============================================
+// AUTO-INITIALIZE ON LOAD
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Set up auth state listener
+    MissionPulse.onAuthStateChange((event, session) => {
+        console.log('Auth state changed:', event);
+        
+        if (event === 'SIGNED_OUT') {
+            // Clear any cached data
+            sessionStorage.clear();
+        }
     });
-  } else {
-    setTimeout(initSupabase, 100);
-  }
-
-})(typeof window !== 'undefined' ? window : global);
+});
