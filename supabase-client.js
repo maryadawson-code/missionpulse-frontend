@@ -1,7 +1,6 @@
 /**
  * MissionPulse Supabase Client Module
  * Sprint 2-3: Shared client with CRUD operations and real-time subscriptions
- * FIXED: Uses created_at instead of due_date (column doesn't exist)
  * 
  * Provides MissionPulse namespace with:
  * - getOpportunities() - Fetch all opportunities
@@ -12,7 +11,7 @@
  * - deleteOpportunity(id) - Delete opportunity
  * - getOpportunitiesByPhase() - Grouped by Shipley phase
  * 
- * © 2026 Mission Meets Tech
+ * Â© 2026 Mission Meets Tech
  */
 
 (function(global) {
@@ -52,10 +51,8 @@
     // DB -> Frontend
     toFrontend: {
       id: 'id',
-      title: 'name',          // Map title -> name for display
       name: 'name',
       agency: 'agency',
-      ceiling: 'ceiling',
       contract_value: 'contractValue',
       priority: 'priority',
       shipley_phase: 'shipleyPhase',
@@ -68,16 +65,13 @@
       contract_type: 'contractType',
       set_aside: 'setAside',
       naics_code: 'naicsCode',
-      primary_contact: 'primaryContact',
-      nickname: 'nickname',
-      company_id: 'companyId'
+      primary_contact: 'primaryContact'
     },
     // Frontend -> DB
     toDatabase: {
       id: 'id',
-      name: 'title',
+      name: 'name',
       agency: 'agency',
-      ceiling: 'ceiling',
       contractValue: 'contract_value',
       priority: 'priority',
       shipleyPhase: 'shipley_phase',
@@ -103,37 +97,22 @@
       mapped[frontendKey] = record[key];
     });
     
-    // Handle name fallback (title -> name)
-    if (!mapped.name && record.title) {
-      mapped.name = record.title;
-    }
-    
     // Compute derived fields
     if (mapped.dueDate) {
       const dueDate = new Date(mapped.dueDate);
       const today = new Date();
       const diffTime = dueDate - today;
       mapped.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    } else {
-      // Default days remaining if no due date
-      mapped.daysRemaining = 90;
     }
     
     // Map shipley_phase to display phase
     mapped.phase = mapShipleyPhaseToDisplay(mapped.shipleyPhase);
     
-    // Ensure ceiling is set
-    if (!mapped.ceiling && mapped.contractValue) {
-      mapped.ceiling = mapped.contractValue;
-    }
+    // Format ceiling from contract_value
+    mapped.ceiling = mapped.contractValue;
     
-    // Map win_probability to pWin with default
-    mapped.pWin = mapped.winProbability || 50;
-    
-    // Default priority
-    if (!mapped.priority) {
-      mapped.priority = 'P-1';
-    }
+    // Map win_probability to pWin
+    mapped.pWin = mapped.winProbability;
     
     return mapped;
   }
@@ -176,7 +155,7 @@
   /**
    * Fetch all opportunities
    * @param {Object} options - Query options
-   * @param {string} options.orderBy - Field to order by (default: created_at)
+   * @param {string} options.orderBy - Field to order by
    * @param {boolean} options.ascending - Sort direction
    * @returns {Promise<{data: Array, error: Error|null}>}
    */
@@ -192,9 +171,9 @@
         .from('opportunities')
         .select('*');
 
-      // FIXED: Use created_at as default (due_date column doesn't exist)
-      const orderBy = options.orderBy || 'created_at';
-      const ascending = options.ascending !== undefined ? options.ascending : false;
+      // Apply ordering
+      const orderBy = options.orderBy || 'due_date';
+      const ascending = options.ascending !== undefined ? options.ascending : true;
       query = query.order(orderBy, { ascending });
 
       const { data, error } = await query;
@@ -225,7 +204,7 @@
     try {
       const { data, error } = await supabase
         .from('opportunities')
-        .select('ceiling, win_probability, created_at, shipley_phase');
+        .select('contract_value, win_probability, due_date, shipley_phase');
 
       if (error) throw error;
 
@@ -235,9 +214,9 @@
 
       const stats = {
         totalCount: data.length,
-        totalValue: data.reduce((sum, opp) => sum + (opp.ceiling || 0), 0),
+        totalValue: data.reduce((sum, opp) => sum + (opp.contract_value || 0), 0),
         avgPwin: data.length > 0 
-          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || 50), 0) / data.length)
+          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || 0), 0) / data.length)
           : 0,
         dueThisMonth: data.filter(opp => {
           if (!opp.due_date) return false;
@@ -254,7 +233,7 @@
           stats.byPhase[phase] = { count: 0, value: 0 };
         }
         stats.byPhase[phase].count++;
-        stats.byPhase[phase].value += opp.ceiling || 0;
+        stats.byPhase[phase].value += opp.contract_value || 0;
       });
 
       return { data: stats, error: null };
@@ -269,7 +248,7 @@
    * @returns {Promise<{data: Object, error: Error|null}>}
    */
   async function getOpportunitiesByPhase() {
-    const { data, error } = await getOpportunities({ orderBy: 'created_at', ascending: false });
+    const { data, error } = await getOpportunities({ orderBy: 'due_date', ascending: true });
     
     if (error) return { data: null, error };
 
@@ -288,12 +267,13 @@
       const phase = opp.shipleyPhase || 'gate_1';
       if (grouped[phase]) {
         grouped[phase].items.push(opp);
-      } else {
-        grouped.gate_1.items.push(opp);
       }
     });
 
-    return { data: grouped, error: null };
+    // Convert to array sorted by order
+    const phasesArray = Object.values(grouped).sort((a, b) => a.order - b.order);
+
+    return { data: phasesArray, error: null };
   }
 
   /**
