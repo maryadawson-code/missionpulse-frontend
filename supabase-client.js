@@ -11,7 +11,7 @@
  * - deleteOpportunity(id) - Delete opportunity
  * - getOpportunitiesByPhase() - Grouped by Shipley phase
  * 
- * Â© 2026 Mission Meets Tech
+ * © 2026 Mission Meets Tech
  */
 
 (function(global) {
@@ -21,7 +21,7 @@
   // SUPABASE CONFIGURATION
   // ============================================================
   const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
 
   // Initialize Supabase client
   let supabase = null;
