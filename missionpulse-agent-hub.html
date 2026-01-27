@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Hub | MissionPulse AI Command Center</title>
+    <meta name="description" content="8 specialized AI agents for federal proposal development">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Database & API Clients -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="render-api-client.js"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+      
+      :root {
+        --mmt-cyan: #00E5FA;
+        --mmt-navy: #00050F;
+        --mmt-slate: #1e293b;
+      }
+      
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+        background: var(--mmt-navy); 
+        color: #e2e8f0;
+        min-height: 100vh;
+      }
+      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #0a1628; }
+      ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #475569; }
+      
+      .glass-panel { 
+        background: rgba(15, 23, 42, 0.8); 
+        backdrop-filter: blur(16px); 
+        border: 1px solid rgba(0, 229, 250, 0.15); 
+      }
+      
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+      @keyframes typing { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+      @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+      
+      .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+      .animate-pulse { animation: pulse 1.5s infinite; }
+      .typing-dot { animation: typing 1.4s infinite; }
+      .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+      .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+      
+      .chat-message { animation: slideIn 0.3s ease-out; }
+      
+      .agent-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px -5px rgba(0, 229, 250, 0.2); }
+      .agent-card { transition: all 0.2s ease; }
+      
+      .confidence-bar { transition: width 0.8s ease-out; }
+      
+      textarea:focus { outline: none; border-color: rgba(0, 229, 250, 0.5); }
+      
+      .gradient-border {
+        position: relative;
+        background: linear-gradient(135deg, rgba(0, 229, 250, 0.1), rgba(139, 92, 246, 0.1));
+      }
+      .gradient-border::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        padding: 1px;
+        background: linear-gradient(135deg, rgba(0, 229, 250, 0.3), rgba(139, 92, 246, 0.3));
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        mask-composite: exclude;
+        pointer-events: none;
+      }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+// ============================================================
+// MISSIONPULSE AGENT HUB - LIVE AI CHAT
+// 8 Specialized Agents | Real-time API Integration
+// © 2026 Mission Meets Tech
+// ============================================================
+
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ============================================================
+// AGENT DEFINITIONS
+// ============================================================
+const AGENTS = [
+  {
+    id: 'capture',
+    name: 'Capture Intelligence',
+    shortName: 'Capture',
+    icon: '🎯',
+    color: '#f472b6',
+    bgColor: 'rgba(244, 114, 182, 0.15)',
+    description: 'Win strategy development, opportunity scoring, competitive positioning',
+    capabilities: ['Opportunity Analysis', 'Win Probability', 'Capture Strategy', 'Go/No-Go Recommendations'],
+    samplePrompts: [
+      'Analyze this DHA opportunity for win probability',
+      'What are the key discriminators for this bid?',
+      'Recommend a teaming strategy for this SDVOSB set-aside'
+    ]
+  },
+  {
+    id: 'strategy',
+    name: 'Strategy Advisor',
+    shortName: 'Strategy',
+    icon: '♟️',
+    color: '#a78bfa',
+    bgColor: 'rgba(167, 139, 250, 0.15)',
+    description: 'Long-term positioning, market analysis, growth planning',
+    capabilities: ['Market Positioning', 'Growth Strategy', 'Portfolio Analysis', 'Strategic Planning'],
+    samplePrompts: [
+      'What agencies should we target next quarter?',
+      'How do we position against incumbent Leidos?',
+      'Recommend contract vehicles for healthcare IT'
+    ]
+  },
+  {
+    id: 'blackhat',
+    name: 'Black Hat Intel',
+    shortName: 'Black Hat',
+    icon: '🕵️',
+    color: '#ef4444',
+    bgColor: 'rgba(239, 68, 68, 0.15)',
+    description: 'Competitive intelligence, threat analysis, counter-strategies',
+    capabilities: ['Competitor Analysis', 'Threat Assessment', 'Ghost Strategies', 'Price-to-Win Intel'],
+    restricted: true,
+    samplePrompts: [
+      'Analyze Leidos weaknesses on this recompete',
+      'What is Booze Allen likely to bid?',
+      'Generate ghost language for incumbent'
+    ]
+  },
+  {
+    id: 'pricing',
+    name: 'Pricing Intelligence',
+    shortName: 'Pricing',
+    icon: '💰',
+    color: '#f59e0b',
+    bgColor: 'rgba(245, 158, 11, 0.15)',
+    description: 'LCAT mapping, BOE development, rate optimization',
+    capabilities: ['LCAT Pricing', 'BOE Builder', 'Wrap Rate Analysis', 'Competitive Pricing'],
+    samplePrompts: [
+      'Map our LCATs to GSA IT Schedule 70',
+      'Calculate wrap rates for this FFP task order',
+      'What should we bid to win against incumbent?'
+    ]
+  },
+  {
+    id: 'compliance',
+    name: 'Compliance Guardian',
+    shortName: 'Compliance',
+    icon: '🛡️',
+    color: '#22c55e',
+    bgColor: 'rgba(34, 197, 94, 0.15)',
+    description: 'FAR/DFARS analysis, requirement shredding, compliance matrix',
+    capabilities: ['RFP Shredding', 'Compliance Matrix', 'FAR/DFARS Lookup', 'Requirement Tracking'],
+    samplePrompts: [
+      'Shred this PWS for L and M requirements',
+      'What does DFARS 252.204-7012 require?',
+      'Check compliance for CUI handling requirements'
+    ]
+  },
+  {
+    id: 'writer',
+    name: 'Proposal Writer',
+    shortName: 'Writer',
+    icon: '✍️',
+    color: '#06b6d4',
+    bgColor: 'rgba(6, 182, 212, 0.15)',
+    description: 'Technical writing, win theme integration, section drafting',
+    capabilities: ['Section Drafting', 'Win Theme Integration', 'Technical Approach', 'Past Performance'],
+    samplePrompts: [
+      'Draft a technical approach for EHR modernization',
+      'Write an executive summary with our win themes',
+      'Generate past performance narrative for DHA work'
+    ]
+  },
+  {
+    id: 'contracts',
+    name: 'Contracts Analyst',
+    shortName: 'Contracts',
+    icon: '📋',
+    color: '#8b5cf6',
+    bgColor: 'rgba(139, 92, 246, 0.15)',
+    description: 'Contract vehicle analysis, terms review, risk assessment',
+    capabilities: ['Vehicle Analysis', 'Terms Review', 'Risk Assessment', 'Modification Tracking'],
+    samplePrompts: [
+      'Analyze risks in this IDIQ ceiling',
+      'Compare GSA vs. SEWP for this requirement',
+      'Review these special contract requirements'
+    ]
+  },
+  {
+    id: 'orals',
+    name: 'Orals Coach',
+    shortName: 'Orals',
+    icon: '🎤',
+    color: '#ec4899',
+    bgColor: 'rgba(236, 72, 153, 0.15)',
+    description: 'Presentation prep, Q&A anticipation, delivery coaching',
+    capabilities: ['Presentation Design', 'Q&A Prep', 'Delivery Coaching', 'Mock Orals'],
+    samplePrompts: [
+      'Generate likely evaluator questions',
+      'Create talking points for our technical approach',
+      'How do we handle the staffing risk question?'
+    ]
+  }
+];
+
+// ============================================================
+// API INTEGRATION
+// ============================================================
+const API_BASE = 'https://missionpulse-api.onrender.com';
+
+async function chatWithAgent(agentId, message) {
+  try {
+    // Try using the global MissionPulseAPI if available
+    if (typeof MissionPulseAPI !== 'undefined' && MissionPulseAPI.agents) {
+      const response = await MissionPulseAPI.agents.chat(agentId, message);
+      return response;
+    }
+    
+    // Fallback to direct fetch
+    const response = await fetch(`${API_BASE}/api/agents-live/${agentId}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Agent chat error:', error);
+    throw error;
+  }
+}
+
+async function checkApiHealth() {
+  try {
+    if (typeof MissionPulseAPI !== 'undefined' && MissionPulseAPI.system) {
+      const health = await MissionPulseAPI.system.health();
+      return health?.status === 'healthy';
+    }
+    
+    const response = await fetch(`${API_BASE}/api/health`);
+    const data = await response.json();
+    return data?.status === 'healthy';
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================
+// COMPONENTS
+// ============================================================
+
+// Icon Component
+const Icon = ({ name, className = '', style = {} }) => {
+  const icons = {
+    send: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />,
+    chevronLeft: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />,
+    refresh: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />,
+    check: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />,
+    alert: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />,
+    lock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />,
+    sparkles: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />,
+    home: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />,
+  };
+  
+  return (
+    <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {icons[name] || icons.sparkles}
+    </svg>
+  );
+};
+
+// Typing Indicator
+const TypingIndicator = () => (
+  <div className="flex items-center gap-1 px-4 py-3">
+    <div className="w-2 h-2 rounded-full bg-cyan-400 typing-dot"></div>
+    <div className="w-2 h-2 rounded-full bg-cyan-400 typing-dot"></div>
+    <div className="w-2 h-2 rounded-full bg-cyan-400 typing-dot"></div>
+    <span className="ml-2 text-sm text-slate-400">Agent is thinking...</span>
+  </div>
+);
+
+// Confidence Badge
+const ConfidenceBadge = ({ score }) => {
+  const percentage = Math.round(score * 100);
+  const color = percentage >= 80 ? '#22c55e' : percentage >= 60 ? '#f59e0b' : '#ef4444';
+  const label = percentage >= 80 ? 'High' : percentage >= 60 ? 'Medium' : 'Low';
+  
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+        <div 
+          className="h-full confidence-bar rounded-full" 
+          style={{ width: `${percentage}%`, backgroundColor: color }}
+        />
+      </div>
+      <span className="text-xs font-medium" style={{ color }}>{percentage}% {label}</span>
+    </div>
+  );
+};
+
+// Agent Card
+const AgentCard = ({ agent, onClick, isSelected }) => (
+  <div 
+    onClick={onClick}
+    className={`agent-card glass-panel rounded-xl p-4 cursor-pointer ${isSelected ? 'ring-2' : ''}`}
+    style={{ 
+      borderColor: isSelected ? agent.color : 'transparent',
+      boxShadow: isSelected ? `0 0 20px ${agent.color}30` : 'none'
+    }}
+  >
+    <div className="flex items-start gap-3">
+      <div 
+        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+        style={{ backgroundColor: agent.bgColor }}
+      >
+        {agent.icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-white truncate">{agent.name}</h3>
+          {agent.restricted && (
+            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500/20 text-red-400 flex-shrink-0">
+              RESTRICTED
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{agent.description}</p>
+      </div>
+    </div>
+    <div className="flex flex-wrap gap-1.5 mt-3">
+      {agent.capabilities.slice(0, 3).map(cap => (
+        <span 
+          key={cap} 
+          className="px-2 py-0.5 text-[10px] rounded-full"
+          style={{ backgroundColor: `${agent.color}20`, color: agent.color }}
+        >
+          {cap}
+        </span>
+      ))}
+    </div>
+  </div>
+);
+
+// Chat Message
+const ChatMessage = ({ message, agent }) => {
+  const isUser = message.role === 'user';
+  
+  return (
+    <div className={`chat-message flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+      <div className={`max-w-[85%] ${isUser ? 'order-2' : 'order-1'}`}>
+        {!isUser && (
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">{agent.icon}</span>
+            <span className="text-xs font-medium" style={{ color: agent.color }}>{agent.shortName}</span>
+          </div>
+        )}
+        <div 
+          className={`rounded-2xl px-4 py-3 ${isUser 
+            ? 'bg-cyan-500/20 border border-cyan-500/30 text-white' 
+            : 'glass-panel text-slate-200'
+          }`}
+        >
+          <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+          
+          {message.confidence_score && (
+            <div className="mt-3 pt-3 border-t border-slate-700/50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">Confidence</span>
+                <ConfidenceBadge score={message.confidence_score} />
+              </div>
+            </div>
+          )}
+          
+          {message.citations && message.citations.length > 0 && (
+            <div className="mt-2">
+              <span className="text-xs text-slate-500">Sources:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {message.citations.map((cite, i) => (
+                  <span key={i} className="px-2 py-0.5 text-[10px] rounded bg-slate-700/50 text-slate-400">
+                    {cite.source} {cite.ref && `(${cite.ref})`}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {message.review_notes && message.review_notes.length > 0 && (
+            <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <span className="text-xs text-amber-400 font-medium">Review Notes:</span>
+              <ul className="mt-1 space-y-0.5">
+                {message.review_notes.map((note, i) => (
+                  <li key={i} className="text-xs text-amber-300/80">• {note}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <div className="text-[10px] text-slate-500 mt-1 px-2">
+          {new Date(message.timestamp).toLocaleTimeString()}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Chat Interface
+const ChatInterface = ({ agent, onBack }) => {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+  
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+  
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [agent]);
+  
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    if (!input.trim() || isLoading) return;
+    
+    const userMessage = {
+      role: 'user',
+      content: input.trim(),
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await chatWithAgent(agent.id, userMessage.content);
+      
+      const assistantMessage = {
+        role: 'assistant',
+        content: response.data?.content || response.content || 'No response received.',
+        confidence_score: response.data?.confidence_score || response.confidence_score,
+        citations: response.data?.citations || response.citations,
+        review_notes: response.data?.review_notes || response.review_notes,
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (err) {
+      setError('Failed to get response. Please try again.');
+      console.error('Chat error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleSamplePrompt = (prompt) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  };
+  
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="glass-panel rounded-xl p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={onBack}
+              className="p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
+            >
+              <Icon name="chevronLeft" className="w-5 h-5 text-slate-400" />
+            </button>
+            <div 
+              className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+              style={{ backgroundColor: agent.bgColor }}
+            >
+              {agent.icon}
+            </div>
+            <div>
+              <h2 className="font-bold text-white">{agent.name}</h2>
+              <p className="text-xs text-slate-400">{agent.description}</p>
+            </div>
+          </div>
+          {agent.restricted && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30">
+              <Icon name="lock" className="w-4 h-4 text-red-400" />
+              <span className="text-xs font-medium text-red-400">CAP/Admin Only</span>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto px-2 pb-4">
+        {messages.length === 0 ? (
+          <div className="text-center py-8">
+            <div 
+              className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl"
+              style={{ backgroundColor: agent.bgColor }}
+            >
+              {agent.icon}
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">Start a conversation</h3>
+            <p className="text-sm text-slate-400 mb-6">Ask {agent.shortName} anything about {agent.capabilities[0].toLowerCase()}</p>
+            
+            <div className="space-y-2 max-w-md mx-auto">
+              <p className="text-xs text-slate-500 mb-2">Try these prompts:</p>
+              {agent.samplePrompts.map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSamplePrompt(prompt)}
+                  className="w-full text-left px-4 py-3 rounded-xl glass-panel hover:border-cyan-500/30 transition-colors text-sm text-slate-300"
+                >
+                  "{prompt}"
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            {messages.map((msg, i) => (
+              <ChatMessage key={i} message={msg} agent={agent} />
+            ))}
+            {isLoading && <TypingIndicator />}
+            {error && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 mb-4">
+                <Icon name="alert" className="w-5 h-5 text-red-400" />
+                <span className="text-sm text-red-400">{error}</span>
+                <button 
+                  onClick={() => setError(null)}
+                  className="ml-auto text-xs text-red-400 hover:text-red-300"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
+        )}
+      </div>
+      
+      {/* Input Area */}
+      <form onSubmit={handleSubmit} className="glass-panel rounded-xl p-3">
+        <div className="flex gap-3">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder={`Ask ${agent.shortName}...`}
+            className="flex-1 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 resize-none"
+            rows={2}
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading}
+            className="px-5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ 
+              backgroundColor: input.trim() && !isLoading ? agent.color : 'transparent',
+              color: input.trim() && !isLoading ? '#000' : agent.color,
+              border: `1px solid ${agent.color}50`
+            }}
+          >
+            <Icon name="send" className="w-5 h-5" />
+          </button>
+        </div>
+        <p className="text-[10px] text-slate-500 mt-2 text-center">
+          Press Enter to send • Shift+Enter for new line
+        </p>
+      </form>
+    </div>
+  );
+};
+
+// Main App
+const AgentHub = () => {
+  const [selectedAgent, setSelectedAgent] = useState(null);
+  const [apiStatus, setApiStatus] = useState('checking');
+  
+  useEffect(() => {
+    checkApiHealth().then(healthy => {
+      setApiStatus(healthy ? 'connected' : 'disconnected');
+    });
+  }, []);
+  
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Header */}
+      <header className="glass-panel border-b border-cyan-500/10">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <a href="missionpulse-v12-task17-complete.html" className="p-2 rounded-lg hover:bg-slate-700/50 transition-colors">
+              <Icon name="home" className="w-5 h-5 text-slate-400" />
+            </a>
+            <div>
+              <h1 className="text-lg font-bold">
+                <span className="text-white">Mission</span>
+                <span style={{ color: '#00E5FA' }}>Pulse</span>
+                <span className="text-slate-400 font-normal ml-2">Agent Hub</span>
+              </h1>
+              <p className="text-xs text-slate-500">8 AI Agents • Real-time Intelligence</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+              apiStatus === 'connected' 
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+                : apiStatus === 'checking'
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                : 'bg-red-500/10 text-red-400 border border-red-500/30'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                apiStatus === 'connected' ? 'bg-emerald-400' : 
+                apiStatus === 'checking' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'
+              }`} />
+              {apiStatus === 'connected' ? 'API Connected' : 
+               apiStatus === 'checking' ? 'Connecting...' : 'API Offline'}
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* Main Content */}
+      <main className="flex-1 max-w-7xl mx-auto w-full p-4">
+        {selectedAgent ? (
+          <div className="h-[calc(100vh-140px)]">
+            <ChatInterface 
+              agent={selectedAgent} 
+              onBack={() => setSelectedAgent(null)} 
+            />
+          </div>
+        ) : (
+          <div className="animate-fadeIn">
+            {/* Hero */}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-4">
+                <Icon name="sparkles" className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm text-cyan-400">Powered by Claude AI</span>
+              </div>
+              <h2 className="text-3xl font-bold text-white mb-2">AI Agent Swarm</h2>
+              <p className="text-slate-400">Select an agent to start a conversation</p>
+            </div>
+            
+            {/* Agent Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {AGENTS.map(agent => (
+                <AgentCard
+                  key={agent.id}
+                  agent={agent}
+                  isSelected={false}
+                  onClick={() => setSelectedAgent(agent)}
+                />
+              ))}
+            </div>
+            
+            {/* Capabilities Overview */}
+            <div className="mt-8 glass-panel rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">What these agents can do</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <h4 className="font-medium text-cyan-400 mb-2">Strategy & Capture</h4>
+                  <ul className="space-y-1 text-slate-400">
+                    <li>• Win probability scoring</li>
+                    <li>• Go/No-Go analysis</li>
+                    <li>• Competitive positioning</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium text-purple-400 mb-2">Intelligence</h4>
+                  <ul className="space-y-1 text-slate-400">
+                    <li>• Competitor analysis</li>
+                    <li>• Price-to-win modeling</li>
+                    <li>• Ghost strategies</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium text-emerald-400 mb-2">Compliance</h4>
+                  <ul className="space-y-1 text-slate-400">
+                    <li>• RFP shredding</li>
+                    <li>• FAR/DFARS lookup</li>
+                    <li>• Compliance matrix</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium text-amber-400 mb-2">Execution</h4>
+                  <ul className="space-y-1 text-slate-400">
+                    <li>• Section drafting</li>
+                    <li>• LCAT pricing</li>
+                    <li>• Orals preparation</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+      
+      {/* Footer */}
+      <footer className="glass-panel border-t border-cyan-500/10 py-3">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500">© 2026 Mission Meets Tech</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-500">Mission. Technology. Transformation.</span>
+          </div>
+          <div className="px-3 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">
+            AI GENERATED - REQUIRES HUMAN REVIEW
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+// Render
+ReactDOM.createRoot(document.getElementById('root')).render(<AgentHub />);
+    </script>
+</body>
+</html>
