@@ -1,6 +1,6 @@
 /**
  * MissionPulse Supabase Client Module
- * Sprint 7: Authentication + CRUD + Real-time
+ * Sprint 8: Authentication + CRUD + Real-time + All Tables
  * 
  * Provides MissionPulse namespace with:
  * 
@@ -14,7 +14,7 @@
  * - resetPassword(email) - Send password reset email
  * - updatePassword(newPassword) - Update user password
  * 
- * CRUD OPERATIONS:
+ * OPPORTUNITIES:
  * - getOpportunities() - Fetch all opportunities
  * - getPipelineStats() - Aggregate statistics
  * - subscribeToOpportunities(callback) - Real-time updates
@@ -22,6 +22,21 @@
  * - updateOpportunity(id, data) - Update existing opportunity
  * - deleteOpportunity(id) - Delete opportunity
  * - getOpportunitiesByPhase() - Grouped by Shipley phase
+ * 
+ * COMPLIANCE (M4):
+ * - getComplianceRequirements(opportunityId?) - Fetch requirements
+ * - createComplianceRequirement(data) - Create new requirement
+ * - updateComplianceRequirement(id, data) - Update requirement
+ * 
+ * COMPETITORS (M7 Black Hat):
+ * - getCompetitors(opportunityId?) - Fetch competitor intel
+ * - createCompetitor(data) - Create competitor record
+ * - updateCompetitor(id, data) - Update competitor
+ * 
+ * PARTNERS (M11 Frenemy):
+ * - getPartners(companyId?) - Fetch partners
+ * - createPartner(data) - Create partner
+ * - updatePartner(id, data) - Update partner
  * 
  * © 2026 Mission Meets Tech
  */
@@ -703,6 +718,285 @@
   }
 
   // ============================================================
+  // COMPLIANCE REQUIREMENTS (M4)
+  // ============================================================
+
+  /**
+   * Fetch compliance requirements
+   * @param {string} opportunityId - Optional filter by opportunity
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  async function getComplianceRequirements(opportunityId = null) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      let query = supabase
+        .from('compliance_requirements')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (opportunityId) {
+        query = query.eq('opportunity_id', opportunityId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      console.log('[MissionPulse] Fetched compliance requirements:', data?.length || 0);
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error fetching compliance:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Create compliance requirement
+   * @param {Object} reqData - Requirement data
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function createComplianceRequirement(reqData) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('compliance_requirements')
+        .insert([{ ...reqData, created_at: new Date().toISOString() }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error creating compliance req:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Update compliance requirement
+   * @param {string} id - Requirement ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function updateComplianceRequirement(id, updates) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('compliance_requirements')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error updating compliance req:', error);
+      return { data: null, error };
+    }
+  }
+
+  // ============================================================
+  // COMPETITORS (M7 Black Hat)
+  // ============================================================
+
+  /**
+   * Fetch competitors
+   * @param {string} opportunityId - Optional filter by opportunity
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  async function getCompetitors(opportunityId = null) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      let query = supabase
+        .from('competitors')
+        .select('*')
+        .order('threat_level', { ascending: false });
+
+      if (opportunityId) {
+        query = query.eq('opportunity_id', opportunityId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      console.log('[MissionPulse] Fetched competitors:', data?.length || 0);
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error fetching competitors:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Create competitor record
+   * @param {Object} compData - Competitor data
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function createCompetitor(compData) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('competitors')
+        .insert([{ ...compData, created_at: new Date().toISOString() }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error creating competitor:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Update competitor
+   * @param {string} id - Competitor ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function updateCompetitor(id, updates) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('competitors')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error updating competitor:', error);
+      return { data: null, error };
+    }
+  }
+
+  // ============================================================
+  // PARTNERS (M11 Frenemy)
+  // ============================================================
+
+  /**
+   * Fetch partners
+   * @param {string} companyId - Optional filter by company
+   * @returns {Promise<{data: Array, error: Error|null}>}
+   */
+  async function getPartners(companyId = null) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      let query = supabase
+        .from('partners')
+        .select('*')
+        .order('trust_score', { ascending: false });
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      console.log('[MissionPulse] Fetched partners:', data?.length || 0);
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error fetching partners:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Create partner
+   * @param {Object} partnerData - Partner data
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function createPartner(partnerData) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('partners')
+        .insert([{ ...partnerData, created_at: new Date().toISOString() }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error creating partner:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Update partner
+   * @param {string} id - Partner ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<{data: Object, error: Error|null}>}
+   */
+  async function updatePartner(id, updates) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('partners')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Error updating partner:', error);
+      return { data: null, error };
+    }
+  }
+
+  // ============================================================
   // REAL-TIME SUBSCRIPTIONS
   // ============================================================
 
@@ -851,13 +1145,28 @@
     requireAuth,
     handlePostLoginRedirect,
 
-    // CRUD Operations
+    // Opportunities
     getOpportunities,
     getPipelineStats,
     getOpportunitiesByPhase,
     createOpportunity,
     updateOpportunity,
     deleteOpportunity,
+
+    // Compliance (M4)
+    getComplianceRequirements,
+    createComplianceRequirement,
+    updateComplianceRequirement,
+
+    // Competitors (M7 Black Hat)
+    getCompetitors,
+    createCompetitor,
+    updateCompetitor,
+
+    // Partners (M11 Frenemy)
+    getPartners,
+    createPartner,
+    updatePartner,
 
     // Real-time
     subscribeToOpportunities,
