@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse v12 | AI Proposal Command Center</title>
+    <meta name="description" content="Enterprise proposal management with 11-role RBAC, AI agent swarm, Shipley methodology">
+    <link rel="icon" type="image/png" href="MMT_icon_32px.png">
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+      
+      :root { --mmt-cyan: #00E5FA; --mmt-navy: #00050F; --mmt-slate: #1e293b; --mmt-text: #e2e8f0; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--mmt-navy); color: var(--mmt-text); min-height: 100vh; }
+      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #0a1628; }
+      ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+      .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.12); border-radius: 12px; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+      .animate-pulse { animation: pulse 2s infinite; }
+      .progress-bar { transition: width 0.8s ease-out; }
+      .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
+      .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 25px -5px rgba(0, 229, 250, 0.15); }
+      .live-indicator { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+      .threat-high { border-left: 3px solid #ef4444; }
+      .threat-medium { border-left: 3px solid #f59e0b; }
+      .threat-low { border-left: 3px solid #22c55e; }
+    </style>
+</head>
+<body class="overflow-hidden">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+// ============================================================
+// MISSIONPULSE v12 - SPRINT 4: WAR ROOM + FRENEMY
+// © 2026 Mission Meets Tech
+// ============================================================
+
+const { useState, useEffect, useMemo, useCallback, createContext, useContext } = React;
+
+// ============================================================
+// SUPABASE CLIENT
+// ============================================================
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+
+let supabaseClient = null;
+function getSupabaseClient() {
+  if (!supabaseClient && window.supabase) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return supabaseClient;
+}
+
+// Shipley phases
+const SHIPLEY_PHASES = {
+  'gate_1': { name: 'Gate 1', color: '#94a3b8' },
+  'blue_team': { name: 'Blue Team', color: '#60a5fa' },
+  'pink_team': { name: 'Pink Team', color: '#f472b6' },
+  'red_team': { name: 'Red Team', color: '#ef4444' },
+  'gold_team': { name: 'Gold Team', color: '#fbbf24' },
+  'submitted': { name: 'Submitted', color: '#22c55e' },
+  'awarded': { name: 'Awarded', color: '#8b5cf6' },
+  'lost': { name: 'Lost', color: '#64748b' }
+};
+
+// Map records
+function mapOpportunity(r) {
+  if (!r) return null;
+  return {
+    id: r.id, name: r.title || r.name || 'Unnamed', agency: r.agency || 'TBD',
+    ceiling: r.ceiling || 0, priority: r.priority || 'P-1',
+    phase: SHIPLEY_PHASES[r.shipley_phase]?.name || 'Gate 1',
+    pWin: r.win_probability || 50,
+    daysRemaining: r.due_date ? Math.ceil((new Date(r.due_date) - new Date()) / 86400000) : 90,
+    description: r.description || '', nickname: r.nickname || ''
+  };
+}
+
+function mapCompetitor(r) {
+  if (!r) return null;
+  return {
+    id: r.id, name: r.name, threat: r.threat_level || 'MEDIUM',
+    pWin: r.estimated_pwin || 50, strength: r.strength || '',
+    weakness: r.weakness || '', strategy: r.strategy || '',
+    isIncumbent: r.is_incumbent || false, color: r.color || '#64748b'
+  };
+}
+
+// Demo fallbacks
+const DEMO_OPPORTUNITIES = [
+  { id: 'DEMO-001', name: 'DHA MHS GENESIS Cloud Migration', agency: 'DHA', ceiling: 98450210, priority: 'P-0', phase: 'Pink Team', pWin: 72, daysRemaining: 37 },
+  { id: 'DEMO-002', name: 'VA Enterprise Cloud Hosting', agency: 'VA', ceiling: 45000000, priority: 'P-1', phase: 'Blue Team', pWin: 58, daysRemaining: 82 },
+  { id: 'DEMO-003', name: 'CMS Data Analytics Modernization', agency: 'CMS', ceiling: 125000000, priority: 'P-0', phase: 'Red Team', pWin: 68, daysRemaining: 127 },
+];
+
+const DEMO_COMPETITORS = [
+  { id: 'C1', name: 'Leidos Health', threat: 'HIGH', pWin: 68, strength: 'Strong VA presence', weakness: 'Limited DHA experience', isIncumbent: false, color: '#EF4444' },
+  { id: 'C2', name: 'GDIT', threat: 'HIGH', pWin: 62, strength: 'Incumbent MHS GENESIS', weakness: 'Higher cost structure', isIncumbent: true, color: '#F59E0B' },
+  { id: 'C3', name: 'Accenture Federal', threat: 'MEDIUM', pWin: 55, strength: 'Cloud expertise', weakness: 'Lower SDVOSB %', isIncumbent: false, color: '#3B82F6' },
+];
+
+// ============================================================
+// CONTEXTS & ROLES
+// ============================================================
+const RoleContext = createContext(null);
+
+const ROLES = [
+  { id: 'CEO', name: 'CEO', fullName: 'Mary Womack', icon: 'crown', color: '#fbbf24', bgColor: 'rgba(251, 191, 36, 0.2)', shipleyFunction: 'Executive Approver', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'launch_roi', 'orals', 'frenemy', 'post_award'] },
+  { id: 'COO', name: 'COO', fullName: 'David Chen', icon: 'briefcase', color: '#f97316', bgColor: 'rgba(249, 115, 22, 0.2)', shipleyFunction: 'Capture Oversight', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'hitl', 'frenemy', 'launch_roi', 'post_award', 'pricing'] },
+  { id: 'CAP', name: 'Capture', fullName: 'Michael Torres', icon: 'target', color: '#f472b6', bgColor: 'rgba(244, 114, 182, 0.2)', shipleyFunction: 'Capture Manager', access: ['dashboard', 'pipeline', 'blackhat', 'strategy', 'warroom', 'frenemy', 'swarm'] },
+  { id: 'PM', name: 'Proposal Mgr', fullName: 'Lisa Martinez', icon: 'clipboard', color: '#60a5fa', bgColor: 'rgba(96, 165, 250, 0.2)', shipleyFunction: 'Proposal Manager', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'writer', 'hitl', 'launch_roi', 'post_award', 'orals'] },
+  { id: 'SA', name: 'Solution Arch', fullName: 'Sarah Chen', icon: 'cpu', color: '#22d3ee', bgColor: 'rgba(34, 211, 238, 0.2)', shipleyFunction: 'Technical Lead', access: ['writer', 'compliance', 'contracts', 'orals', 'swarm'] },
+  { id: 'FIN', name: 'Pricing', fullName: 'Jennifer Park', icon: 'calculator', color: '#a855f7', bgColor: 'rgba(168, 85, 247, 0.2)', shipleyFunction: 'Pricing Manager', access: ['pricing', 'contracts', 'launch_roi'] },
+  { id: 'CON', name: 'Contracts', fullName: 'Robert Kim', icon: 'scale', color: '#22c55e', bgColor: 'rgba(34, 197, 94, 0.2)', shipleyFunction: 'Contracts Manager', access: ['contracts', 'compliance', 'pricing', 'post_award'] },
+  { id: 'DEL', name: 'Delivery', fullName: 'Amanda Foster', icon: 'users', color: '#06b6d4', bgColor: 'rgba(6, 182, 212, 0.2)', shipleyFunction: 'Staffing Lead', access: ['pricing', 'post_award', 'warroom'] },
+  { id: 'QA', name: 'QA Lead', fullName: 'Kevin Walsh', icon: 'check-circle', color: '#84cc16', bgColor: 'rgba(132, 204, 22, 0.2)', shipleyFunction: 'Quality Assurance', access: ['compliance', 'writer', 'hitl', 'orals'] },
+  { id: 'PAR', name: 'Partner', fullName: 'External Partner', icon: 'handshake', color: '#64748b', bgColor: 'rgba(100, 116, 139, 0.2)', shipleyFunction: 'Teaming Partner', access: ['warroom'] },
+  { id: 'ADM', name: 'Admin', fullName: 'System Admin', icon: 'settings', color: '#94a3b8', bgColor: 'rgba(148, 163, 184, 0.2)', shipleyFunction: 'Administrator', access: ['dashboard', 'pipeline'] },
+];
+
+const MODULES = [
+  { id: 'dashboard', name: 'Dashboard', icon: 'home', category: 'core' },
+  { id: 'pipeline', name: 'Pipeline Intel', icon: 'activity', category: 'strategy' },
+  { id: 'warroom', name: 'War Room', icon: 'users', category: 'strategy' },
+  { id: 'frenemy', name: 'Frenemy Intel', icon: 'target', category: 'strategy' },
+  { id: 'swarm', name: 'Agent Swarm', icon: 'cpu', category: 'ai' },
+  { id: 'blackhat', name: 'Black Hat', icon: 'eye', category: 'strategy', restricted: true },
+  { id: 'compliance', name: 'Iron Dome', icon: 'shield', category: 'execution' },
+  { id: 'writer', name: 'AI Writer', icon: 'edit', category: 'ai' },
+  { id: 'pricing', name: 'Pricing Studio', icon: 'dollar-sign', category: 'execution' },
+  { id: 'contracts', name: 'Contracts', icon: 'file-text', category: 'execution' },
+  { id: 'hitl', name: 'HITL Review', icon: 'check-square', category: 'qa' },
+  { id: 'orals', name: 'Orals Coach', icon: 'mic', category: 'qa' },
+  { id: 'launch_roi', name: 'Launch ROI', icon: 'rocket', category: 'analytics' },
+  { id: 'post_award', name: 'Post-Award', icon: 'award', category: 'execution' },
+  { id: 'agents', name: 'Agent Hub', icon: 'bot', category: 'ai' },
+];
+
+// ============================================================
+// UI COMPONENTS
+// ============================================================
+const Card = ({ children, className = '', onClick }) => (
+  <div className={`glass-panel p-4 hover-lift ${className}`} onClick={onClick}>{children}</div>
+);
+
+const Badge = ({ children, color = '#00E5FA' }) => (
+  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" 
+        style={{ backgroundColor: `${color}20`, color: color, border: `1px solid ${color}40` }}>
+    {children}
+  </span>
+);
+
+const Button = ({ children, variant = 'default', size = 'md', icon, onClick, disabled }) => {
+  const variants = {
+    default: 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600',
+    primary: 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border-cyan-500/50',
+    danger: 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/50'
+  };
+  const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm' };
+  return (
+    <button onClick={onClick} disabled={disabled}
+            className={`inline-flex items-center gap-2 rounded-lg border font-medium transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50' : ''}`}>
+      {icon && <Icon name={icon} size={14} />}
+      {children}
+    </button>
+  );
+};
+
+const Icon = ({ name, size = 18, className = '' }) => {
+  const icons = {
+    'crown': 'M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z',
+    'home': 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10',
+    'activity': 'M22 12h-4l-3 9L9 3l-3 9H2',
+    'users': 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75',
+    'cpu': 'M4 4h16v16H4z M9 1v3 M15 1v3 M9 20v3 M15 20v3 M20 9h3 M20 14h3 M1 9h3 M1 14h3',
+    'eye': 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+    'shield': 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+    'edit': 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z',
+    'dollar-sign': 'M12 1v22 M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+    'file-text': 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8',
+    'check-square': 'M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
+    'mic': 'M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v4',
+    'target': 'M12 12m-10 0a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M12 12m-6 0a6 6 0 1 0 12 0a6 6 0 1 0-12 0 M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
+    'rocket': 'M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z',
+    'award': 'M12 15l-3.5 7 1-4.5L5 15l4.5-1L12 7l2.5 7 4.5 1-4.5 2.5 1 4.5z M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12z',
+    'bot': 'M12 2a2 2 0 0 1 2 2v2h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4V4a2 2 0 0 1 2-2z M9 12h.01 M15 12h.01',
+    'plus': 'M12 5v14 M5 12h14',
+    'menu': 'M3 12h18 M3 6h18 M3 18h18',
+    'alert-triangle': 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01',
+    'briefcase': 'M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16',
+    'clipboard': 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2 M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z',
+    'calculator': 'M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M8 6h8v4H8V6z',
+    'scale': 'M12 3v18 M5 8l7-5 7 5 M5 8v8l7 5 7-5V8',
+    'handshake': 'M20 12v4h-4l-4-4-4 4H4v-4 M4 12l4-4 4 4 4-4 4 4',
+    'settings': 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
+    'check-circle': 'M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4L12 14.01l-3-3',
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" 
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d={icons[name] || icons.home} />
+    </svg>
+  );
+};
+
+const DataSourceIndicator = ({ isLive, count, table = 'data' }) => (
+  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+    <div className={isLive ? 'live-indicator animate-pulse' : 'w-2 h-2 rounded-full bg-amber-500'} />
+    {isLive ? `Live ${table} (${count})` : `Demo ${table}`}
+  </div>
+);
+
+const LoadingSpinner = ({ text = 'Loading...' }) => (
+  <div className="flex items-center justify-center h-64">
+    <div className="text-center">
+      <div className="animate-spin w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <p className="text-slate-400">{text}</p>
+    </div>
+  </div>
+);
+
+// ============================================================
+// M1: PIPELINE INTELLIGENCE
+// ============================================================
+const M1_Pipeline = () => {
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isLive, setIsLive] = useState(false);
+  const [stats, setStats] = useState({ totalCount: 0, totalValue: 0, avgPwin: 0 });
+  
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const client = getSupabaseClient();
+        if (!client) throw new Error('No client');
+        const { data, error } = await client.from('opportunities').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        const mapped = (data || []).map(mapOpportunity);
+        setOpportunities(mapped);
+        setIsLive(true);
+        setStats({
+          totalCount: data.length,
+          totalValue: data.reduce((sum, o) => sum + (o.ceiling || 0), 0),
+          avgPwin: data.length ? Math.round(data.reduce((sum, o) => sum + (o.win_probability || 50), 0) / data.length) : 0
+        });
+      } catch (err) {
+        console.error('[Pipeline] Fallback:', err);
+        setOpportunities(DEMO_OPPORTUNITIES);
+        setIsLive(false);
+        setStats({ totalCount: 3, totalValue: 268450210, avgPwin: 66 });
+      } finally { setLoading(false); }
+    }
+    fetchData();
+  }, []);
+  
+  const formatCurrency = (v) => v >= 1e9 ? `$${(v/1e9).toFixed(1)}B` : v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : `$${v?.toLocaleString() || 0}`;
+  
+  if (loading) return <LoadingSpinner text="Loading pipeline..." />;
+  
+  return (
+    <div className="p-6 space-y-6 animate-fadeIn">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-white">Pipeline Intelligence</h2>
+        <DataSourceIndicator isLive={isLive} count={stats.totalCount} table="opportunities" />
+      </div>
+      
+      <div className="grid grid-cols-4 gap-4">
+        <Card><p className="text-xs text-slate-400 mb-1">Active Pursuits</p><p className="text-2xl font-bold text-white">{stats.totalCount}</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Pipeline Value</p><p className="text-2xl font-bold text-emerald-400">{formatCurrency(stats.totalValue)}</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Avg Win Probability</p><p className="text-2xl font-bold text-cyan-400">{stats.avgPwin}%</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Status</p><p className="text-lg font-bold" style={{ color: isLive ? '#22c55e' : '#f59e0b' }}>{isLive ? 'LIVE' : 'DEMO'}</p></Card>
+      </div>
+      
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">Active Opportunities</h3>
+          <Button variant="primary" size="sm" icon="plus">Add Opportunity</Button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-800/50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {opportunities.map(opp => (
+                <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
+                  <td className="px-4 py-3"><p className="text-sm font-medium text-white">{opp.name}</p><p className="text-xs text-slate-500">{opp.id}</p></td>
+                  <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
+                  <td className="px-4 py-3 text-sm text-emerald-400 font-mono">{formatCurrency(opp.ceiling)}</td>
+                  <td className="px-4 py-3"><Badge color="#8b5cf6">{opp.phase}</Badge></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pWin}%` }} />
+                      </div>
+                      <span className="text-sm text-cyan-400">{opp.pWin}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ============================================================
+// M2: WAR ROOM - SPRINT 4
+// ============================================================
+const M2_WarRoom = () => {
+  const [competitors, setCompetitors] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isLive, setIsLive] = useState({ competitors: false, opportunities: false });
+  
+  useEffect(() => {
+    async function fetchData() {
+      const client = getSupabaseClient();
+      
+      // Fetch opportunities
+      try {
+        if (!client) throw new Error('No client');
+        const { data, error } = await client.from('opportunities').select('*').order('created_at', { ascending: false }).limit(5);
+        if (error) throw error;
+        setOpportunities((data || []).map(mapOpportunity));
+        setIsLive(prev => ({ ...prev, opportunities: true }));
+      } catch (err) {
+        setOpportunities(DEMO_OPPORTUNITIES);
+      }
+      
+      // Fetch competitors
+      try {
+        if (!client) throw new Error('No client');
+        const { data, error } = await client.from('competitors').select('*').order('estimated_pwin', { ascending: false });
+        if (error) throw error;
+        setCompetitors((data || []).map(mapCompetitor));
+        setIsLive(prev => ({ ...prev, competitors: true }));
+      } catch (err) {
+        console.log('[WarRoom] Competitors table not found, using demo data');
+        setCompetitors(DEMO_COMPETITORS);
+      }
+      
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+  
+  const threatColors = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#22c55e', CRITICAL: '#dc2626' };
+  
+  if (loading) return <LoadingSpinner text="Loading War Room..." />;
+  
+  return (
+    <div className="p-6 space-y-6 animate-fadeIn">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-white">War Room</h2>
+        <div className="flex gap-2">
+          <DataSourceIndicator isLive={isLive.opportunities} count={opportunities.length} table="opps" />
+          <DataSourceIndicator isLive={isLive.competitors} count={competitors.length} table="competitors" />
+        </div>
+      </div>
+      
+      {/* Stats Row */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Active Competitors</p>
+          <p className="text-2xl font-bold text-white">{competitors.length}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">High Threats</p>
+          <p className="text-2xl font-bold text-red-400">{competitors.filter(c => c.threat === 'HIGH' || c.threat === 'CRITICAL').length}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Incumbent Watch</p>
+          <p className="text-2xl font-bold text-amber-400">{competitors.filter(c => c.isIncumbent).length}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Avg Competitor pWin</p>
+          <p className="text-2xl font-bold text-cyan-400">{competitors.length ? Math.round(competitors.reduce((s,c) => s + c.pWin, 0) / competitors.length) : 0}%</p>
+        </Card>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-6">
+        {/* Competitor Intel */}
+        <Card>
+          <h3 className="text-lg font-semibold text-white mb-4">Competitor Intelligence</h3>
+          <div className="space-y-3">
+            {competitors.map(comp => (
+              <div key={comp.id} className={`p-3 bg-slate-800/50 rounded-lg threat-${comp.threat.toLowerCase()}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-white">{comp.name}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge color={threatColors[comp.threat]}>{comp.threat}</Badge>
+                    {comp.isIncumbent && <Badge color="#f59e0b">INCUMBENT</Badge>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-slate-400">Est. pWin:</span>
+                  <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${comp.pWin}%`, backgroundColor: comp.color }} />
+                  </div>
+                  <span className="text-xs font-mono" style={{ color: comp.color }}>{comp.pWin}%</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div><span className="text-emerald-400">Strength:</span> <span className="text-slate-300">{comp.strength}</span></div>
+                  <div><span className="text-red-400">Weakness:</span> <span className="text-slate-300">{comp.weakness}</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+        
+        {/* Active Pursuits */}
+        <Card>
+          <h3 className="text-lg font-semibold text-white mb-4">Priority Pursuits</h3>
+          <div className="space-y-3">
+            {opportunities.slice(0, 4).map(opp => (
+              <div key={opp.id} className="p-3 bg-slate-800/50 rounded-lg border-l-3" style={{ borderLeftColor: opp.priority === 'P-0' ? '#ef4444' : '#f59e0b' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-white">{opp.name}</span>
+                  <Badge color={opp.priority === 'P-0' ? '#ef4444' : '#f59e0b'}>{opp.priority}</Badge>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <Badge color="#60a5fa">{opp.agency}</Badge>
+                  <span className="text-slate-400">{opp.phase}</span>
+                  <span className="text-cyan-400 font-mono">{opp.pWin}% pWin</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+      
+      {!isLive.competitors && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <div className="flex items-center gap-3">
+            <Icon name="alert-triangle" className="text-amber-400" />
+            <div>
+              <p className="text-sm font-semibold text-amber-400">Competitors table not found</p>
+              <p className="text-xs text-slate-400">Run the SQL script in Supabase to create the competitors table with demo data.</p>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// M11: FRENEMY INTEL - SPRINT 4
+// ============================================================
+const M11_Frenemy = () => {
+  const [competitors, setCompetitors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isLive, setIsLive] = useState(false);
+  const [selectedCompetitor, setSelectedCompetitor] = useState(null);
+  
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const client = getSupabaseClient();
+        if (!client) throw new Error('No client');
+        const { data, error } = await client.from('competitors').select('*').order('estimated_pwin', { ascending: false });
+        if (error) throw error;
+        setCompetitors((data || []).map(mapCompetitor));
+        setIsLive(true);
+      } catch (err) {
+        setCompetitors(DEMO_COMPETITORS);
+        setIsLive(false);
+      } finally { setLoading(false); }
+    }
+    fetchData();
+  }, []);
+  
+  if (loading) return <LoadingSpinner text="Loading Frenemy Intel..." />;
+  
+  const threatColors = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#22c55e', CRITICAL: '#dc2626' };
+  
+  return (
+    <div className="p-6 space-y-6 animate-fadeIn">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-white">Frenemy Intelligence Protocol</h2>
+          <p className="text-sm text-slate-400">Competitive intelligence & teaming partner analysis</p>
+        </div>
+        <DataSourceIndicator isLive={isLive} count={competitors.length} table="competitors" />
+      </div>
+      
+      {/* Threat Matrix */}
+      <div className="grid grid-cols-4 gap-4">
+        {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(level => {
+          const count = competitors.filter(c => c.threat === level).length;
+          return (
+            <Card key={level} className={count > 0 ? 'border border-opacity-30' : ''} style={{ borderColor: threatColors[level] }}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-400">{level} Threat</p>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: threatColors[level] }} />
+              </div>
+              <p className="text-2xl font-bold" style={{ color: threatColors[level] }}>{count}</p>
+            </Card>
+          );
+        })}
+      </div>
+      
+      {/* Competitor Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        {competitors.map(comp => (
+          <Card key={comp.id} 
+                className={`cursor-pointer ${selectedCompetitor?.id === comp.id ? 'ring-2 ring-cyan-500' : ''}`}
+                onClick={() => setSelectedCompetitor(comp)}>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-white">{comp.name}</h4>
+              <Badge color={threatColors[comp.threat]}>{comp.threat}</Badge>
+            </div>
+            
+            <div className="mb-3">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-slate-400">Estimated Win %</span>
+                <span style={{ color: comp.color }}>{comp.pWin}%</span>
+              </div>
+              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${comp.pWin}%`, backgroundColor: comp.color }} />
+              </div>
+            </div>
+            
+            <div className="space-y-2 text-xs">
+              <div className="flex gap-2">
+                <span className="text-emerald-400 w-16">Strength</span>
+                <span className="text-slate-300 flex-1">{comp.strength}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-red-400 w-16">Weakness</span>
+                <span className="text-slate-300 flex-1">{comp.weakness}</span>
+              </div>
+            </div>
+            
+            {comp.isIncumbent && (
+              <div className="mt-3 pt-3 border-t border-slate-700">
+                <Badge color="#f59e0b">⚠️ INCUMBENT</Badge>
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+      
+      {/* Strategy Panel */}
+      {selectedCompetitor && (
+        <Card className="border border-cyan-500/30">
+          <h3 className="text-lg font-semibold text-cyan-400 mb-4">Counter-Strategy: {selectedCompetitor.name}</h3>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-sm font-semibold text-emerald-400 mb-2">Ghost Their Weakness</h4>
+              <p className="text-sm text-slate-300 bg-slate-800/50 p-3 rounded-lg">{selectedCompetitor.weakness}</p>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-amber-400 mb-2">Counter Their Strength</h4>
+              <p className="text-sm text-slate-300 bg-slate-800/50 p-3 rounded-lg">{selectedCompetitor.strength}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// DASHBOARD HOME
+// ============================================================
+const Dashboard = ({ roleContext }) => (
+  <div className="p-6 space-y-6 animate-fadeIn">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">Welcome to MissionPulse</h2>
+        <p className="text-slate-400">AI-Powered Proposal Command Center • Sprint 4</p>
+      </div>
+    </div>
+    
+    <div className="grid grid-cols-4 gap-4">
+      <Card className="text-center p-6 bg-gradient-to-br from-cyan-500/10 to-blue-500/10">
+        <p className="text-3xl font-bold text-cyan-400">12</p>
+        <p className="text-xs text-slate-400 mt-1">Active Pursuits</p>
+      </Card>
+      <Card className="text-center p-6 bg-gradient-to-br from-emerald-500/10 to-green-500/10">
+        <p className="text-3xl font-bold text-emerald-400">$847M</p>
+        <p className="text-xs text-slate-400 mt-1">Pipeline Value</p>
+      </Card>
+      <Card className="text-center p-6 bg-gradient-to-br from-amber-500/10 to-orange-500/10">
+        <p className="text-3xl font-bold text-amber-400">6</p>
+        <p className="text-xs text-slate-400 mt-1">Competitors Tracked</p>
+      </Card>
+      <Card className="text-center p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10">
+        <p className="text-3xl font-bold text-purple-400">8</p>
+        <p className="text-xs text-slate-400 mt-1">AI Agents Ready</p>
+      </Card>
+    </div>
+    
+    <Card>
+      <h3 className="text-lg font-semibold text-white mb-4">Sprint Status</h3>
+      <div className="space-y-3">
+        {[
+          { name: 'Sprint 0-2: Database + Client', status: 'DONE', color: '#22c55e' },
+          { name: 'Sprint 3: Pipeline Intel', status: 'DONE', color: '#22c55e' },
+          { name: 'Sprint 4: War Room + Frenemy', status: 'LIVE', color: '#00e5fa' },
+          { name: 'Sprint 5: Iron Dome + Pricing', status: 'NEXT', color: '#f59e0b' },
+          { name: 'Sprint 6: Final QA + Polish', status: 'PENDING', color: '#64748b' },
+        ].map(sprint => (
+          <div key={sprint.name} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+            <span className="text-sm text-white">{sprint.name}</span>
+            <Badge color={sprint.color}>{sprint.status}</Badge>
+          </div>
+        ))}
+      </div>
+    </Card>
+  </div>
+);
+
+// ============================================================
+// PLACEHOLDER MODULE
+// ============================================================
+const PlaceholderModule = ({ id, name }) => (
+  <div className="p-6 flex items-center justify-center h-64">
+    <div className="text-center">
+      <Icon name={MODULES.find(m => m.id === id)?.icon || 'home'} size={48} className="text-slate-600 mx-auto mb-4" />
+      <h3 className="text-xl font-semibold text-slate-400">{name}</h3>
+      <p className="text-sm text-slate-500 mt-2">Coming in Sprint 5-6</p>
+    </div>
+  </div>
+);
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+const Sidebar = ({ currentModule, setCurrentModule, role, collapsed, setCollapsed }) => {
+  const accessibleModules = MODULES.filter(m => !m.restricted || role.access.includes(m.id));
+  
+  return (
+    <div className={`h-full bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-56'}`}>
+      <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+              <span className="text-white text-xs font-bold">MP</span>
+            </div>
+            <div>
+              <h1 className="text-sm font-bold text-white">MissionPulse</h1>
+              <p className="text-[10px] text-cyan-400">v12.0 • Sprint 4</p>
+            </div>
+          </div>
+        )}
+        <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 hover:bg-slate-800 rounded">
+          <Icon name="menu" size={16} className="text-slate-400" />
+        </button>
+      </div>
+      
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+        {accessibleModules.map(module => (
+          <button key={module.id} onClick={() => setCurrentModule(module.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                    currentModule === module.id 
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}>
+            <Icon name={module.icon} size={18} />
+            {!collapsed && <span className="text-sm font-medium">{module.name}</span>}
+          </button>
+        ))}
+      </nav>
+      
+      {!collapsed && (
+        <div className="p-3 border-t border-slate-800">
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg" style={{ backgroundColor: role.bgColor }}>
+            <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: role.color }}>
+              <Icon name={role.icon} size={12} className="text-slate-900" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate" style={{ color: role.color }}>{role.name}</p>
+              <p className="text-[10px] text-slate-500 truncate">{role.fullName}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// MAIN APP
+// ============================================================
+function App() {
+  const [currentRole, setCurrentRole] = useState(ROLES[0]);
+  const [currentModule, setCurrentModule] = useState('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  const renderModule = () => {
+    switch (currentModule) {
+      case 'dashboard': return <Dashboard roleContext={currentRole} />;
+      case 'pipeline': return <M1_Pipeline />;
+      case 'warroom': return <M2_WarRoom />;
+      case 'frenemy': return <M11_Frenemy />;
+      default: return <PlaceholderModule id={currentModule} name={MODULES.find(m => m.id === currentModule)?.name || 'Module'} />;
+    }
+  };
+  
+  return (
+    <RoleContext.Provider value={currentRole}>
+      <div className="h-screen flex">
+        <Sidebar currentModule={currentModule} setCurrentModule={setCurrentModule} role={currentRole} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
+        
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="h-14 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between px-6">
+            <h2 className="text-lg font-semibold text-white">{MODULES.find(m => m.id === currentModule)?.name || 'Dashboard'}</h2>
+            <select value={currentRole.id} onChange={(e) => setCurrentRole(ROLES.find(r => r.id === e.target.value) || ROLES[0])}
+                    className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cyan-500">
+              {ROLES.map(role => (<option key={role.id} value={role.id}>{role.name} - {role.fullName}</option>))}
+            </select>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto bg-slate-950">{renderModule()}</div>
+        </div>
+      </div>
+      
+      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-50">
+        <span className="text-[10px] text-slate-500 tracking-wider">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 Sprint 4 • © 2026 Mission Meets Tech</span>
+      </div>
+    </RoleContext.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
