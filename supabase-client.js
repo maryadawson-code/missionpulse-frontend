@@ -1,33 +1,6 @@
 /**
- * MissionPulse Supabase Client Module v2.0
- * Complete Auth + CRUD + Real-time + RBAC
- * 
- * Provides MissionPulse namespace with:
- * 
- * AUTH:
- * - signIn(email, password) - Authenticate user
- * - signUp(email, password, metadata) - Register new user
- * - signOut() - End session
- * - getCurrentUser() - Get authenticated user with profile
- * - onAuthStateChange(callback) - Subscribe to auth events
- * - resetPassword(email) - Send password reset email
- * 
- * RBAC:
- * - hasPermission(permission) - Check user permission
- * - canAccessModule(moduleId) - Check module access
- * - getUserRole() - Get current user's role
- * 
- * CRUD:
- * - getOpportunities() - Fetch all opportunities
- * - getPipelineStats() - Aggregate statistics
- * - createOpportunity(data) - Create new opportunity
- * - updateOpportunity(id, data) - Update existing
- * - deleteOpportunity(id) - Delete opportunity
- * - getOpportunitiesByPhase() - Grouped by Shipley phase
- * 
- * REAL-TIME:
- * - subscribeToOpportunities(callback) - Real-time updates
- * - onConnectionChange(callback) - Connection status
+ * MissionPulse Supabase Client Module
+ * Sprint 16: Shared client with auth, CRUD operations, and real-time subscriptions
  * 
  * © 2026 Mission Meets Tech
  */
@@ -39,14 +12,12 @@
   // SUPABASE CONFIGURATION
   // ============================================================
   const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
 
-  // Initialize Supabase client
   let supabase = null;
   let connectionStatus = 'disconnected';
   let connectionListeners = [];
-  let currentUser = null;
-  let currentUserProfile = null;
+  let authListeners = [];
 
   function initSupabase() {
     if (typeof global.supabase !== 'undefined' && global.supabase.createClient) {
@@ -55,19 +26,15 @@
       notifyConnectionListeners();
       console.log('[MissionPulse] Supabase client initialized');
       
-      // Check for existing session
-      checkExistingSession();
+      supabase.auth.onAuthStateChange((event, session) => {
+        console.log('[MissionPulse] Auth state changed:', event);
+        authListeners.forEach(cb => cb(event, session));
+      });
+      
       return true;
     }
     console.warn('[MissionPulse] Supabase library not loaded');
     return false;
-  }
-
-  function getClient() {
-    if (!supabase) {
-      initSupabase();
-    }
-    return supabase;
   }
 
   function notifyConnectionListeners() {
@@ -75,430 +42,154 @@
   }
 
   // ============================================================
-  // AUTHENTICATION SYSTEM
+  // AUTHENTICATION FUNCTIONS
   // ============================================================
 
-  /**
-   * Check for existing session on page load
-   */
-  async function checkExistingSession() {
-    try {
-      const { data: { session } } = await getClient().auth.getSession();
-      if (session?.user) {
-        currentUser = session.user;
-        await loadUserProfile(session.user.email);
+  async function signIn(email, password) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
       }
-    } catch (error) {
-      console.warn('[MissionPulse] Session check failed:', error.message);
     }
-  }
 
-  /**
-   * Load user profile from users table
-   * @param {string} email - User email
-   */
-  async function loadUserProfile(email) {
     try {
-      const { data, error } = await getClient()
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .single();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: password
+      });
 
       if (error) {
-        console.warn('[MissionPulse] Profile load failed:', error.message);
-        return null;
+        console.error('[MissionPulse] Sign in error:', error);
+        return { data: null, error };
       }
 
-      currentUserProfile = mapUserFromDB(data);
-      return currentUserProfile;
-    } catch (error) {
-      console.error('[MissionPulse] Profile load error:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Sign in with email and password
-   * @param {string} email 
-   * @param {string} password 
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function signIn(email, password) {
-    try {
-      const { data, error } = await getClient().auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) throw error;
-
-      currentUser = data.user;
-      await loadUserProfile(email);
-
-      // Update last login
-      if (currentUserProfile?.id) {
-        await getClient()
-          .from('users')
-          .update({ last_login: new Date().toISOString() })
-          .eq('id', currentUserProfile.id);
-      }
-
-      return { 
-        data: { 
-          user: currentUser, 
-          profile: currentUserProfile,
-          session: data.session 
-        }, 
-        error: null 
-      };
-    } catch (error) {
-      console.error('[MissionPulse] Sign in error:', error);
-      return { data: null, error };
-    }
-  }
-
-  /**
-   * Sign up new user
-   * @param {string} email 
-   * @param {string} password 
-   * @param {Object} metadata - { fullName, roleId }
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function signUp(email, password, metadata = {}) {
-    try {
-      const { data, error } = await getClient().auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: metadata.fullName || '',
-            role_id: metadata.roleId || 'Partner'
-          }
-        }
-      });
-
-      if (error) throw error;
-
+      console.log('[MissionPulse] Sign in successful:', data.user?.email);
       return { data, error: null };
     } catch (error) {
-      console.error('[MissionPulse] Sign up error:', error);
+      console.error('[MissionPulse] Sign in exception:', error);
       return { data: null, error };
     }
   }
 
-  /**
-   * Sign out current user
-   * @returns {Promise<{error: Error|null}>}
-   */
   async function signOut() {
+    if (!supabase) {
+      return { error: new Error('Supabase not initialized') };
+    }
+
     try {
-      const { error } = await getClient().auth.signOut();
-      if (error) throw error;
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('[MissionPulse] Sign out error:', error);
+        return { error };
+      }
       
-      currentUser = null;
-      currentUserProfile = null;
-      
+      localStorage.removeItem('mp_user');
+      console.log('[MissionPulse] Sign out successful');
       return { error: null };
     } catch (error) {
-      console.error('[MissionPulse] Sign out error:', error);
+      console.error('[MissionPulse] Sign out exception:', error);
       return { error };
     }
   }
 
-  /**
-   * Get current authenticated user with profile
-   * @returns {Promise<{data: Object|null, error: Error|null}>}
-   */
-  async function getCurrentUser() {
+  async function getSession() {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: { session: null }, error: new Error('Supabase not initialized') };
+      }
+    }
+
     try {
-      const { data: { user } } = await getClient().auth.getUser();
-      
-      if (!user) {
-        return { data: null, error: null };
-      }
-
-      currentUser = user;
-      
-      if (!currentUserProfile || currentUserProfile.email !== user.email) {
-        await loadUserProfile(user.email);
-      }
-
-      return { 
-        data: { 
-          ...user, 
-          profile: currentUserProfile 
-        }, 
-        error: null 
-      };
+      const { data, error } = await supabase.auth.getSession();
+      return { data, error };
     } catch (error) {
-      console.error('[MissionPulse] Get current user error:', error);
-      return { data: null, error };
+      console.error('[MissionPulse] Get session exception:', error);
+      return { data: { session: null }, error };
     }
   }
 
-  /**
-   * Subscribe to auth state changes
-   * @param {Function} callback - (event, session) => void
-   * @returns {Object} Subscription object with unsubscribe method
-   */
-  function onAuthStateChange(callback) {
-    return getClient().auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        currentUser = session.user;
-        await loadUserProfile(session.user.email);
-      } else if (event === 'SIGNED_OUT') {
-        currentUser = null;
-        currentUserProfile = null;
+  async function getCurrentUser() {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: { user: null }, error: new Error('Supabase not initialized') };
       }
-      callback(event, session);
-    });
+    }
+
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      return { data, error };
+    } catch (error) {
+      console.error('[MissionPulse] Get user exception:', error);
+      return { data: { user: null }, error };
+    }
   }
 
-  /**
-   * Send password reset email
-   * @param {string} email 
-   * @returns {Promise<{data: Object, error: Error|null}>}
-   */
-  async function resetPassword(email) {
-    try {
-      const { data, error } = await getClient().auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password.html`
-      });
+  async function getUserProfile(userId) {
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
+    }
 
-      if (error) throw error;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, email, role, is_active, company_id')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('[MissionPulse] Get user profile error:', error);
+        return { data: null, error };
+      }
+
       return { data, error: null };
     } catch (error) {
-      console.error('[MissionPulse] Password reset error:', error);
+      console.error('[MissionPulse] Get user profile exception:', error);
       return { data: null, error };
     }
   }
 
-  // ============================================================
-  // ROLE-BASED ACCESS CONTROL (RBAC)
-  // ============================================================
+  function onAuthStateChange(callback) {
+    authListeners.push(callback);
+    
+    return () => {
+      const index = authListeners.indexOf(callback);
+      if (index > -1) {
+        authListeners.splice(index, 1);
+      }
+    };
+  }
 
-  /**
-   * Role definitions with permissions and module access
-   */
-  const ROLES = {
-    CEO: {
-      name: 'Chief Executive Officer',
-      level: 100,
-      modules: ['*'],
-      permissions: ['*']
-    },
-    COO: {
-      name: 'Chief Operating Officer',
-      level: 90,
-      modules: ['dashboard', 'pipeline', 'warroom', 'compliance', 'pricing', 'partners', 'reports'],
-      permissions: ['view_all', 'edit_all', 'approve_gonogo', 'manage_team']
-    },
-    Admin: {
-      name: 'System Administrator',
-      level: 95,
-      modules: ['*'],
-      permissions: ['*', 'manage_users', 'manage_system']
-    },
-    CAP: {
-      name: 'Capture Manager',
-      level: 70,
-      modules: ['dashboard', 'pipeline', 'warroom', 'blackhat', 'partners', 'orals'],
-      permissions: ['view_all', 'edit_capture', 'manage_competitors']
-    },
-    PM: {
-      name: 'Proposal Manager',
-      level: 70,
-      modules: ['dashboard', 'pipeline', 'warroom', 'compliance', 'schedule', 'documents'],
-      permissions: ['view_all', 'edit_proposal', 'manage_schedule']
-    },
-    SA: {
-      name: 'Solution Architect',
-      level: 60,
-      modules: ['dashboard', 'compliance', 'technical', 'documents'],
-      permissions: ['view_assigned', 'edit_technical']
-    },
-    FIN: {
-      name: 'Financial Analyst',
-      level: 60,
-      modules: ['dashboard', 'pricing', 'staffing', 'reports'],
-      permissions: ['view_financial', 'edit_pricing']
-    },
-    CON: {
-      name: 'Contracts Specialist',
-      level: 60,
-      modules: ['dashboard', 'compliance', 'irondome', 'contracts'],
-      permissions: ['view_compliance', 'edit_compliance']
-    },
-    DEL: {
-      name: 'Delivery Lead',
-      level: 60,
-      modules: ['dashboard', 'staffing', 'partners', 'schedule'],
-      permissions: ['view_staffing', 'edit_staffing']
-    },
-    QA: {
-      name: 'Quality Assurance',
-      level: 50,
-      modules: ['dashboard', 'compliance', 'reviews', 'documents'],
-      permissions: ['view_all', 'edit_reviews']
-    },
-    Partner: {
-      name: 'Teaming Partner',
-      level: 20,
-      modules: ['dashboard', 'assigned'],
-      permissions: ['view_assigned']
+  async function requireAuth(loginUrl = 'login.html') {
+    const { data: { session }, error } = await getSession();
+    
+    if (error || !session) {
+      console.log('[MissionPulse] Not authenticated, redirecting to login');
+      window.location.href = loginUrl;
+      return null;
     }
-  };
-
-  /**
-   * Module definitions for navigation
-   */
-  const MODULES = {
-    dashboard: { name: 'Dashboard', icon: 'home', path: '/index.html' },
-    pipeline: { name: 'Pipeline', icon: 'chart-bar', path: '/pipeline.html' },
-    warroom: { name: 'War Room', icon: 'users', path: '/warroom.html' },
-    compliance: { name: 'Compliance', icon: 'shield-check', path: '/compliance.html' },
-    irondome: { name: 'Iron Dome', icon: 'shield', path: '/irondome.html' },
-    blackhat: { name: 'Black Hat', icon: 'eye', path: '/blackhat.html' },
-    pricing: { name: 'Pricing', icon: 'currency-dollar', path: '/pricing.html' },
-    staffing: { name: 'Staffing', icon: 'user-group', path: '/staffing.html' },
-    partners: { name: 'Partners', icon: 'link', path: '/partners.html' },
-    orals: { name: 'Orals Studio', icon: 'presentation', path: '/orals.html' },
-    documents: { name: 'Documents', icon: 'document', path: '/documents.html' },
-    reports: { name: 'Reports', icon: 'chart-pie', path: '/reports.html' },
-    admin: { name: 'Admin', icon: 'cog', path: '/admin.html' }
-  };
-
-  /**
-   * Get current user's role ID
-   * @returns {string|null}
-   */
-  function getUserRole() {
-    return currentUserProfile?.roleId || null;
-  }
-
-  /**
-   * Get current user's role definition
-   * @returns {Object|null}
-   */
-  function getUserRoleDefinition() {
-    const roleId = getUserRole();
-    return roleId ? ROLES[roleId] : null;
-  }
-
-  /**
-   * Check if user has a specific permission
-   * @param {string} permission 
-   * @returns {boolean}
-   */
-  function hasPermission(permission) {
-    const role = getUserRoleDefinition();
-    if (!role) return false;
     
-    // Wildcard permissions
-    if (role.permissions.includes('*')) return true;
-    
-    return role.permissions.includes(permission);
-  }
-
-  /**
-   * Check if user can access a specific module
-   * @param {string} moduleId 
-   * @returns {boolean}
-   */
-  function canAccessModule(moduleId) {
-    const role = getUserRoleDefinition();
-    if (!role) return false;
-    
-    // Wildcard access
-    if (role.modules.includes('*')) return true;
-    
-    return role.modules.includes(moduleId);
-  }
-
-  /**
-   * Get all accessible modules for current user
-   * @returns {Array<Object>}
-   */
-  function getAccessibleModules() {
-    const role = getUserRoleDefinition();
-    if (!role) return [];
-
-    if (role.modules.includes('*')) {
-      return Object.entries(MODULES).map(([id, module]) => ({ id, ...module }));
-    }
-
-    return role.modules
-      .filter(id => MODULES[id])
-      .map(id => ({ id, ...MODULES[id] }));
-  }
-
-  /**
-   * Check if current user is authenticated
-   * @returns {boolean}
-   */
-  function isAuthenticated() {
-    return currentUser !== null;
+    return session;
   }
 
   // ============================================================
-  // FIELD MAPPING: snake_case (DB) <-> camelCase (Frontend)
+  // FIELD MAPPING
   // ============================================================
-
   const fieldMapping = {
     toFrontend: {
-      id: 'id',
-      name: 'name',
-      agency: 'agency',
-      contract_value: 'contractValue',
-      priority: 'priority',
-      shipley_phase: 'shipleyPhase',
-      win_probability: 'winProbability',
-      due_date: 'dueDate',
-      solicitation_number: 'solicitationNumber',
-      created_at: 'createdAt',
-      updated_at: 'updatedAt',
-      description: 'description',
-      contract_type: 'contractType',
-      set_aside: 'setAside',
-      naics_code: 'naicsCode',
-      primary_contact: 'primaryContact',
-      company_id: 'companyId'
+      id: 'id', name: 'name', agency: 'agency', contract_value: 'contractValue',
+      priority: 'priority', shipley_phase: 'shipleyPhase', win_probability: 'winProbability',
+      due_date: 'dueDate', solicitation_number: 'solicitationNumber', created_at: 'createdAt',
+      updated_at: 'updatedAt', description: 'description', contract_type: 'contractType',
+      set_aside: 'setAside', naics_code: 'naicsCode', primary_contact: 'primaryContact'
     },
     toDatabase: {
-      id: 'id',
-      name: 'name',
-      agency: 'agency',
-      contractValue: 'contract_value',
-      priority: 'priority',
-      shipleyPhase: 'shipley_phase',
-      winProbability: 'win_probability',
-      dueDate: 'due_date',
-      solicitationNumber: 'solicitation_number',
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
-      description: 'description',
-      contractType: 'contract_type',
-      setAside: 'set_aside',
-      naicsCode: 'naics_code',
-      primaryContact: 'primary_contact',
-      companyId: 'company_id'
-    }
-  };
-
-  const userFieldMapping = {
-    toFrontend: {
-      id: 'id',
-      company_id: 'companyId',
-      email: 'email',
-      full_name: 'fullName',
-      role_id: 'roleId',
-      avatar_url: 'avatarUrl',
-      phone: 'phone',
-      is_active: 'isActive',
-      last_login: 'lastLogin',
-      preferences: 'preferences',
-      created_at: 'createdAt'
+      id: 'id', name: 'name', agency: 'agency', contractValue: 'contract_value',
+      priority: 'priority', shipleyPhase: 'shipley_phase', winProbability: 'win_probability',
+      dueDate: 'due_date', solicitationNumber: 'solicitation_number', createdAt: 'created_at',
+      updatedAt: 'updated_at', description: 'description', contractType: 'contract_type',
+      setAside: 'set_aside', naicsCode: 'naics_code', primaryContact: 'primary_contact'
     }
   };
 
@@ -536,17 +227,6 @@
     return mapped;
   }
 
-  function mapUserFromDB(record) {
-    if (!record) return null;
-    const mapped = {};
-    Object.keys(record).forEach(key => {
-      const frontendKey = userFieldMapping.toFrontend[key] || key;
-      mapped[frontendKey] = record[key];
-    });
-    return mapped;
-  }
-
-  // Shipley phase display mapping
   const SHIPLEY_PHASES = {
     'gate_1': { name: 'Gate 1', color: '#94a3b8', order: 1 },
     'blue_team': { name: 'Blue Team', color: '#60a5fa', order: 2 },
@@ -569,21 +249,19 @@
   // ============================================================
 
   async function getOpportunities(options = {}) {
-    if (!getClient()) {
-      return { data: null, error: new Error('Supabase not initialized') };
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
     }
 
     try {
-      let query = getClient()
-        .from('opportunities')
-        .select('*');
-
+      let query = supabase.from('opportunities').select('*');
       const orderBy = options.orderBy || 'due_date';
       const ascending = options.ascending !== undefined ? options.ascending : true;
       query = query.order(orderBy, { ascending });
 
       const { data, error } = await query;
-
       if (error) throw error;
 
       const mappedData = (data || []).map(mapToFrontend);
@@ -595,12 +273,14 @@
   }
 
   async function getPipelineStats() {
-    if (!getClient()) {
-      return { data: null, error: new Error('Supabase not initialized') };
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
     }
 
     try {
-      const { data, error } = await getClient()
+      const { data, error } = await supabase
         .from('opportunities')
         .select('contract_value, win_probability, due_date, shipley_phase');
 
@@ -646,11 +326,7 @@
 
     const grouped = {};
     Object.keys(SHIPLEY_PHASES).forEach(phase => {
-      grouped[phase] = {
-        ...SHIPLEY_PHASES[phase],
-        phase: phase,
-        items: []
-      };
+      grouped[phase] = { ...SHIPLEY_PHASES[phase], phase: phase, items: [] };
     });
 
     (data || []).forEach(opp => {
@@ -664,8 +340,10 @@
   }
 
   async function createOpportunity(opportunityData) {
-    if (!getClient()) {
-      return { data: null, error: new Error('Supabase not initialized') };
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
     }
 
     try {
@@ -674,19 +352,13 @@
       dbData.created_at = new Date().toISOString();
       dbData.updated_at = new Date().toISOString();
 
-      // Add company_id from current user
-      if (currentUserProfile?.companyId) {
-        dbData.company_id = currentUserProfile.companyId;
-      }
-
-      const { data, error } = await getClient()
+      const { data, error } = await supabase
         .from('opportunities')
         .insert([dbData])
         .select()
         .single();
 
       if (error) throw error;
-
       return { data: mapToFrontend(data), error: null };
     } catch (error) {
       console.error('[MissionPulse] Error creating opportunity:', error);
@@ -695,15 +367,17 @@
   }
 
   async function updateOpportunity(id, updates) {
-    if (!getClient()) {
-      return { data: null, error: new Error('Supabase not initialized') };
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
     }
 
     try {
       const dbData = mapToDatabase(updates);
       dbData.updated_at = new Date().toISOString();
 
-      const { data, error } = await getClient()
+      const { data, error } = await supabase
         .from('opportunities')
         .update(dbData)
         .eq('id', id)
@@ -711,7 +385,6 @@
         .single();
 
       if (error) throw error;
-
       return { data: mapToFrontend(data), error: null };
     } catch (error) {
       console.error('[MissionPulse] Error updating opportunity:', error);
@@ -720,18 +393,15 @@
   }
 
   async function deleteOpportunity(id) {
-    if (!getClient()) {
-      return { data: null, error: new Error('Supabase not initialized') };
+    if (!supabase) {
+      if (!initSupabase()) {
+        return { data: null, error: new Error('Supabase not initialized') };
+      }
     }
 
     try {
-      const { error } = await getClient()
-        .from('opportunities')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('opportunities').delete().eq('id', id);
       if (error) throw error;
-
       return { data: { success: true, id }, error: null };
     } catch (error) {
       console.error('[MissionPulse] Error deleting opportunity:', error);
@@ -747,15 +417,17 @@
   let opportunityCallbacks = [];
 
   function subscribeToOpportunities(callback) {
-    if (!getClient()) {
-      console.error('[MissionPulse] Cannot subscribe - Supabase not initialized');
-      return () => {};
+    if (!supabase) {
+      if (!initSupabase()) {
+        console.error('[MissionPulse] Cannot subscribe - Supabase not initialized');
+        return () => {};
+      }
     }
 
     opportunityCallbacks.push(callback);
 
     if (!opportunitySubscription) {
-      opportunitySubscription = getClient()
+      opportunitySubscription = supabase
         .channel('opportunities-changes')
         .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'opportunities' },
@@ -809,20 +481,14 @@
   }
 
   // ============================================================
-  // UTILITY FUNCTIONS
+  // UTILITIES
   // ============================================================
 
   function formatCurrency(value) {
     if (!value) return '$0';
-    if (value >= 1000000000) {
-      return `$${(value / 1000000000).toFixed(1)}B`;
-    }
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `$${(value / 1000).toFixed(0)}K`;
-    }
+    if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
     return `$${value.toLocaleString()}`;
   }
 
@@ -836,66 +502,27 @@
       .sort((a, b) => a.order - b.order);
   }
 
+  function getClient() {
+    if (!supabase) initSupabase();
+    return supabase;
+  }
+
   // ============================================================
-  // EXPORT MissionPulse NAMESPACE
+  // EXPORT
   // ============================================================
   global.MissionPulse = {
-    // Authentication
-    signIn,
-    signUp,
-    signOut,
-    getCurrentUser,
-    onAuthStateChange,
-    resetPassword,
-    isAuthenticated,
-
-    // RBAC
-    getUserRole,
-    getUserRoleDefinition,
-    hasPermission,
-    canAccessModule,
-    getAccessibleModules,
-    ROLES,
-    MODULES,
-
-    // CRUD Operations
-    getOpportunities,
-    getPipelineStats,
-    getOpportunitiesByPhase,
-    createOpportunity,
-    updateOpportunity,
-    deleteOpportunity,
-
-    // Real-time
-    subscribeToOpportunities,
-    onConnectionChange,
-    getConnectionStatus,
-
-    // Utilities
-    formatCurrency,
-    getPhaseInfo,
-    getShipleyPhases,
-    mapToFrontend,
-    mapToDatabase,
-
-    // Constants
-    SHIPLEY_PHASES,
-
-    // Initialization
-    init: initSupabase,
-    
-    // Config (read-only)
-    config: {
-      url: SUPABASE_URL,
-      initialized: () => supabase !== null
-    }
+    signIn, signOut, getSession, getCurrentUser, getUserProfile,
+    onAuthStateChange, requireAuth,
+    getOpportunities, getPipelineStats, getOpportunitiesByPhase,
+    createOpportunity, updateOpportunity, deleteOpportunity,
+    subscribeToOpportunities, onConnectionChange, getConnectionStatus,
+    formatCurrency, getPhaseInfo, getShipleyPhases, mapToFrontend, mapToDatabase, getClient,
+    SHIPLEY_PHASES, SUPABASE_URL,
+    init: initSupabase
   };
 
-  // Auto-initialize when Supabase is available
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(initSupabase, 100);
-    });
+    document.addEventListener('DOMContentLoaded', () => setTimeout(initSupabase, 100));
   } else {
     setTimeout(initSupabase, 100);
   }
