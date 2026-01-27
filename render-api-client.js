@@ -4,9 +4,10 @@
  * 
  * Provides MissionPulseAPI namespace with:
  * - agents.list() / agents.get(id) / agents.chat(id, message)
- * - dashboard.health() / summary() / pipeline() / activities() / workload()
+ * - analytics.summary() / pipeline() / dashboard()
  * - trainingData.* - Company profile, win themes, competitors, etc.
- * - system.health() / version() / contextStatus()
+ * - context.loadDemo() / status() / opportunities()
+ * - system.health() / version()
  * 
  * © 2026 Mission Meets Tech
  */
@@ -26,7 +27,7 @@
 
   /**
    * Make an API request with error handling
-   * @param {string} endpoint - API endpoint (e.g., '/api/agents')
+   * @param {string} endpoint - API endpoint (e.g., '/api/agents-live')
    * @param {Object} options - Fetch options
    * @returns {Promise<{data: any, error: Error|null}>}
    */
@@ -105,6 +106,17 @@
   }
 
   /**
+   * PUT request helper
+   */
+  async function put(endpoint, body, options = {}) {
+    return apiRequest(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      ...options
+    });
+  }
+
+  /**
    * DELETE request helper
    */
   async function del(endpoint, options = {}) {
@@ -130,28 +142,83 @@
      */
     async version() {
       return get('/api/version');
-    },
-
-    /**
-     * Get context injection status
-     * @returns {Promise<{data: Object, error: Error|null}>}
-     */
-    async contextStatus() {
-      return get('/api/context/status');
     }
   };
 
   // ============================================================
-  // AI AGENTS ENDPOINTS
+  // CONTEXT MANAGEMENT ENDPOINTS
+  // ============================================================
+
+  const context = {
+    /**
+     * Load demo data
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async loadDemo() {
+      return post('/api/context/load-demo', {});
+    },
+
+    /**
+     * Get context status
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async status() {
+      return get('/api/context/status');
+    },
+
+    /**
+     * Get agent context
+     * @param {string} agentType - Agent type (capture, strategy, etc.)
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async getAgentContext(agentType) {
+      return get(`/api/context/agent/${agentType}`);
+    },
+
+    /**
+     * Get opportunities
+     * @returns {Promise<{data: Array, error: Error|null}>}
+     */
+    async opportunities() {
+      return get('/api/context/opportunities');
+    },
+
+    /**
+     * Get competitors
+     * @returns {Promise<{data: Array, error: Error|null}>}
+     */
+    async competitors() {
+      return get('/api/context/competitors');
+    },
+
+    /**
+     * Clear cache
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async clearCache() {
+      return post('/api/context/cache/clear', {});
+    },
+
+    /**
+     * Context health check
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async health() {
+      return get('/api/context/health');
+    }
+  };
+
+  // ============================================================
+  // AI AGENTS ENDPOINTS (LIVE)
   // ============================================================
 
   const agents = {
     /**
-     * List all available agents (filtered by RBAC)
+     * List all available agents
      * @returns {Promise<{data: Array, error: Error|null}>}
      */
     async list() {
-      return get('/api/agents');
+      return get('/api/agents-live');
     },
 
     /**
@@ -160,7 +227,7 @@
      * @returns {Promise<{data: Object, error: Error|null}>}
      */
     async get(agentId) {
-      return get(`/api/agents/${agentId}`);
+      return get(`/api/agents-live/${agentId}`);
     },
 
     /**
@@ -168,116 +235,115 @@
      * @param {string} agentId - Agent ID
      * @param {string} message - User message
      * @param {Object} options - Additional options
-     * @param {string} options.opportunityId - Context opportunity ID
-     * @param {boolean} options.includePlaybook - Include golden examples
-     * @param {string} options.userRole - User's role for RBAC
      * @returns {Promise<{data: Object, error: Error|null}>}
      */
     async chat(agentId, message, options = {}) {
       const body = {
         message,
         opportunity_id: options.opportunityId || null,
-        include_playbook: options.includePlaybook !== false,
-        user_role: options.userRole || 'standard'
+        include_context: options.includeContext !== false,
+        stream: options.stream || false
       };
       
       // Longer timeout for AI responses
-      return post(`/api/agents/${agentId}/chat`, body, { timeout: 60000 });
+      return post(`/api/agents-live/${agentId}/chat`, body, { timeout: 60000 });
     },
 
     /**
-     * Get agent IDs by restriction level
-     * @param {Array} agentList - List of agents from list()
-     * @returns {Object} { public: [], restricted: [] }
+     * Analyze content with an agent
+     * @param {string} agentId - Agent ID
+     * @param {Object} data - Data to analyze
+     * @returns {Promise<{data: Object, error: Error|null}>}
      */
-    categorize(agentList) {
-      if (!agentList) return { public: [], restricted: [] };
-      return {
-        public: agentList.filter(a => !a.restricted).map(a => a.id),
-        restricted: agentList.filter(a => a.restricted).map(a => a.id)
-      };
+    async analyze(agentId, data) {
+      return post(`/api/agents-live/${agentId}/analyze`, data, { timeout: 60000 });
+    },
+
+    /**
+     * Get agent usage stats
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async usage(agentId) {
+      return get(`/api/agents-live/${agentId}/usage`);
+    },
+
+    /**
+     * Health check for live agents
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async health() {
+      return get('/api/agents-live/health/live');
     }
   };
 
   // ============================================================
-  // DASHBOARD ENDPOINTS
+  // ANALYTICS ENDPOINTS (Dashboard)
   // ============================================================
 
-  const dashboard = {
+  const analytics = {
     /**
-     * Dashboard health check
-     * @returns {Promise<{data: Object, error: Error|null}>}
-     */
-    async health() {
-      return get('/api/dashboard/health');
-    },
-
-    /**
-     * Get dashboard summary (KPIs, stats)
+     * Get analytics summary
      * @returns {Promise<{data: Object, error: Error|null}>}
      */
     async summary() {
-      return get('/api/dashboard/summary');
+      return get('/api/analytics/summary');
     },
 
     /**
-     * Get pipeline data
+     * Get pipeline metrics
      * @returns {Promise<{data: Object, error: Error|null}>}
      */
     async pipeline() {
-      return get('/api/dashboard/pipeline');
+      return get('/api/analytics/pipeline');
     },
 
     /**
-     * Get recent activities
-     * @returns {Promise<{data: Array, error: Error|null}>}
-     */
-    async activities() {
-      return get('/api/dashboard/activities');
-    },
-
-    /**
-     * Get workload distribution
+     * Get win rate metrics
      * @returns {Promise<{data: Object, error: Error|null}>}
      */
-    async workload() {
-      return get('/api/dashboard/workload');
+    async winRate() {
+      return get('/api/analytics/win-rate');
     },
 
     /**
-     * Get all dashboard data in parallel
+     * Get agent usage metrics
      * @returns {Promise<{data: Object, error: Error|null}>}
      */
-    async getAll() {
-      try {
-        const [summaryRes, pipelineRes, activitiesRes, workloadRes] = await Promise.all([
-          this.summary(),
-          this.pipeline(),
-          this.activities(),
-          this.workload()
-        ]);
+    async agentUsage() {
+      return get('/api/analytics/agents');
+    },
 
-        // Check for any errors
-        const errors = [summaryRes, pipelineRes, activitiesRes, workloadRes]
-          .filter(r => r.error)
-          .map(r => r.error.message);
+    /**
+     * Get token usage trends
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async tokenTrends() {
+      return get('/api/analytics/tokens');
+    },
 
-        if (errors.length > 0) {
-          return { data: null, error: new Error(errors.join(', ')) };
-        }
+    /**
+     * Get priority distribution
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async priorityDistribution() {
+      return get('/api/analytics/priority');
+    },
 
-        return {
-          data: {
-            summary: summaryRes.data,
-            pipeline: pipelineRes.data,
-            activities: activitiesRes.data,
-            workload: workloadRes.data
-          },
-          error: null
-        };
-      } catch (error) {
-        return { data: null, error };
-      }
+    /**
+     * Get full dashboard data
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async dashboard() {
+      return get('/api/analytics/dashboard');
+    },
+
+    /**
+     * Analytics health check
+     * @returns {Promise<{data: Object, error: Error|null}>}
+     */
+    async health() {
+      return get('/api/analytics/health');
     }
   };
 
@@ -295,115 +361,110 @@
     },
 
     // --- Company Profile ---
-    async getCompanyProfile() {
-      return get('/api/company-profile');
+    async getCompanyProfiles() {
+      return get('/api/training-data/company-profile');
     },
 
     async createCompanyProfile(profile) {
-      return post('/api/company-profile', profile);
+      return post('/api/training-data/company-profile', profile);
     },
 
-    // --- Win Themes ---
-    async getWinThemes() {
-      return get('/api/win-themes');
+    async updateCompanyProfile(recordId, profile) {
+      return put(`/api/training-data/company-profile/${recordId}`, profile);
     },
 
-    async createWinTheme(theme) {
-      return post('/api/win-themes', theme);
-    },
-
-    async deleteWinTheme(themeId) {
-      return del(`/api/win-themes/${themeId}`);
-    },
-
-    // --- Competitors ---
-    async getCompetitors() {
-      return get('/api/competitors');
-    },
-
-    async createCompetitor(competitor) {
-      return post('/api/competitors', competitor);
-    },
-
-    async deleteCompetitor(competitorId) {
-      return del(`/api/competitors/${competitorId}`);
+    async deleteCompanyProfile(recordId) {
+      return del(`/api/training-data/company-profile/${recordId}`);
     },
 
     // --- Labor Categories ---
     async getLaborCategories() {
-      return get('/api/labor-categories');
+      return get('/api/training-data/labor-categories');
     },
 
     async createLaborCategory(category) {
-      return post('/api/labor-categories', category);
+      return post('/api/training-data/labor-categories', category);
     },
 
-    async deleteLaborCategory(categoryId) {
-      return del(`/api/labor-categories/${categoryId}`);
+    async updateLaborCategory(recordId, category) {
+      return put(`/api/training-data/labor-categories/${recordId}`, category);
+    },
+
+    async deleteLaborCategory(recordId) {
+      return del(`/api/training-data/labor-categories/${recordId}`);
     },
 
     // --- Past Performance ---
     async getPastPerformance() {
-      return get('/api/past-performance');
+      return get('/api/training-data/past-performance');
     },
 
     async createPastPerformance(pastPerf) {
-      return post('/api/past-performance', pastPerf);
+      return post('/api/training-data/past-performance', pastPerf);
     },
 
-    async deletePastPerformance(ppId) {
-      return del(`/api/past-performance/${ppId}`);
+    async updatePastPerformance(recordId, pastPerf) {
+      return put(`/api/training-data/past-performance/${recordId}`, pastPerf);
+    },
+
+    async deletePastPerformance(recordId) {
+      return del(`/api/training-data/past-performance/${recordId}`);
+    },
+
+    // --- Competitor Intel ---
+    async getCompetitorIntel() {
+      return get('/api/training-data/competitor-intel');
+    },
+
+    async createCompetitorIntel(competitor) {
+      return post('/api/training-data/competitor-intel', competitor);
+    },
+
+    async updateCompetitorIntel(recordId, competitor) {
+      return put(`/api/training-data/competitor-intel/${recordId}`, competitor);
+    },
+
+    async deleteCompetitorIntel(recordId) {
+      return del(`/api/training-data/competitor-intel/${recordId}`);
+    },
+
+    // --- Win Themes ---
+    async getWinThemes() {
+      return get('/api/training-data/win-themes');
+    },
+
+    async createWinTheme(theme) {
+      return post('/api/training-data/win-themes', theme);
+    },
+
+    async updateWinTheme(recordId, theme) {
+      return put(`/api/training-data/win-themes/${recordId}`, theme);
+    },
+
+    async deleteWinTheme(recordId) {
+      return del(`/api/training-data/win-themes/${recordId}`);
     },
 
     // --- Teaming Partners ---
     async getTeamingPartners() {
-      return get('/api/teaming-partners');
+      return get('/api/training-data/teaming-partners');
     },
 
     async createTeamingPartner(partner) {
-      return post('/api/teaming-partners', partner);
+      return post('/api/training-data/teaming-partners', partner);
     },
 
-    async deleteTeamingPartner(partnerId) {
-      return del(`/api/teaming-partners/${partnerId}`);
+    async updateTeamingPartner(recordId, partner) {
+      return put(`/api/training-data/teaming-partners/${recordId}`, partner);
     },
 
-    /**
-     * Get all training data in parallel
-     * @returns {Promise<{data: Object, error: Error|null}>}
-     */
-    async getAll() {
-      try {
-        const [
-          profileRes,
-          themesRes,
-          competitorsRes,
-          lcatsRes,
-          pastPerfRes,
-          partnersRes
-        ] = await Promise.all([
-          this.getCompanyProfile(),
-          this.getWinThemes(),
-          this.getCompetitors(),
-          this.getLaborCategories(),
-          this.getPastPerformance(),
-          this.getTeamingPartners()
-        ]);
+    async deleteTeamingPartner(recordId) {
+      return del(`/api/training-data/teaming-partners/${recordId}`);
+    },
 
-        return {
-          data: {
-            companyProfile: profileRes.data,
-            winThemes: themesRes.data,
-            competitors: competitorsRes.data,
-            laborCategories: lcatsRes.data,
-            pastPerformance: pastPerfRes.data,
-            teamingPartners: partnersRes.data
-          },
-          error: null
-        };
-      } catch (error) {
-        return { data: null, error };
-      }
+    // --- Export ---
+    async exportCategory(category) {
+      return get(`/api/training-data/export/${category}`);
     }
   };
 
@@ -469,9 +530,6 @@
     ORALS: 'orals'
   };
 
-  const RESTRICTED_AGENTS = ['strategy', 'blackhat', 'pricing'];
-  const PUBLIC_AGENTS = ['capture', 'compliance', 'writer', 'contracts', 'orals'];
-
   // ============================================================
   // EXPORT MissionPulseAPI NAMESPACE
   // ============================================================
@@ -479,8 +537,9 @@
   global.MissionPulseAPI = {
     // Namespaces
     system,
+    context,
     agents,
-    dashboard,
+    analytics,
     trainingData,
 
     // Connection utilities
@@ -490,14 +549,13 @@
 
     // Constants
     AGENT_IDS,
-    RESTRICTED_AGENTS,
-    PUBLIC_AGENTS,
     API_BASE_URL,
 
     // Direct access to request helpers (for custom endpoints)
     request: {
       get,
       post,
+      put,
       delete: del
     }
   };
