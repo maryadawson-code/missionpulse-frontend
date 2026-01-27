@@ -7,12 +7,13 @@
     <meta name="description" content="Enterprise proposal management with 11-role RBAC, AI agent swarm, Shipley methodology">
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="supabase-client.js"></script>
-    <script src="render-api-client.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Supabase Client for Live Data -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
 
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -82,6 +83,103 @@ const { useState, useEffect, useMemo, useCallback, createContext, useContext } =
 // ============================================================
 const RoleContext = createContext(null);
 const AppContext = createContext(null);
+const DataContext = createContext(null);
+
+// ============================================================
+// DATA PROVIDER - LIVE SUPABASE CONNECTION
+// ============================================================
+const DataProvider = ({ children }) => {
+  const [opportunities, setOpportunities] = useState([]);
+  const [stats, setStats] = useState({ totalCount: 0, totalValue: 0, avgPwin: 0, dueThisMonth: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Check if MissionPulse client is available
+      if (typeof MissionPulse === 'undefined') {
+        throw new Error('Supabase client not loaded. Check network connection.');
+      }
+      
+      // Initialize if needed
+      if (MissionPulse.init) MissionPulse.init();
+      
+      // Fetch opportunities and stats in parallel
+      const [oppsResult, statsResult] = await Promise.all([
+        MissionPulse.getOpportunities({ orderBy: 'contract_value', ascending: false }),
+        MissionPulse.getPipelineStats()
+      ]);
+      
+      if (oppsResult.error) throw oppsResult.error;
+      if (statsResult.error) throw statsResult.error;
+      
+      setOpportunities(oppsResult.data || []);
+      setStats(statsResult.data || { totalCount: 0, totalValue: 0, avgPwin: 0, dueThisMonth: 0 });
+      setLastUpdated(new Date());
+      
+      console.log('[MissionPulse] Loaded', oppsResult.data?.length, 'opportunities');
+    } catch (err) {
+      console.error('[MissionPulse] Data load error:', err);
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial load and real-time subscription
+  useEffect(() => {
+    // Small delay to ensure Supabase is initialized
+    const timer = setTimeout(() => {
+      loadData();
+    }, 200);
+
+    // Subscribe to real-time updates if available
+    let unsubscribe = null;
+    if (typeof MissionPulse !== 'undefined' && MissionPulse.subscribeToOpportunities) {
+      setTimeout(() => {
+        unsubscribe = MissionPulse.subscribeToOpportunities(() => {
+          loadData();
+        });
+      }, 500);
+    }
+
+    return () => {
+      clearTimeout(timer);
+      if (unsubscribe) unsubscribe();
+    };
+  }, [loadData]);
+
+  const value = {
+    opportunities,
+    stats,
+    isLoading,
+    error,
+    lastUpdated,
+    refresh: loadData,
+    formatCurrency: (val) => {
+      if (typeof MissionPulse !== 'undefined' && MissionPulse.formatCurrency) {
+        return MissionPulse.formatCurrency(val);
+      }
+      if (!val) return '$0';
+      if (val >= 1000000000) return '$' + (val / 1000000000).toFixed(1) + 'B';
+      if (val >= 1000000) return '$' + (val / 1000000).toFixed(1) + 'M';
+      return '$' + val.toLocaleString();
+    }
+  };
+
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+};
+
+// Hook for consuming data context
+const useData = () => {
+  const context = useContext(DataContext);
+  if (!context) throw new Error('useData must be used within DataProvider');
+  return context;
+};
 
 // ============================================================
 // 11 SHIPLEY METHODOLOGY ROLES - COMPLETE RBAC DEFINITION
@@ -588,82 +686,36 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
 // Each renders functional UI for its purpose
 // ============================================================
 
-// M1: Pipeline Intelligence
+// M1: Pipeline Intelligence - LIVE DATA
 const M1_Pipeline = ({ roleContext }) => {
-  // Demo data as fallback
-  const DEMO_OPPORTUNITIES = [
-    { id: 'OPP-2026-DHA-001', name: 'DHA MHS GENESIS Cloud Migration', agency: 'DHA', ceiling: 98450210, priority: 'P-0', phase: 'Pink Team', pWin: 72, daysRemaining: 37 },
-    { id: 'OPP-2026-VA-003', name: 'VA Enterprise Cloud Hosting', agency: 'VA', ceiling: 45000000, priority: 'P-1', phase: 'Blue Team', pWin: 58, daysRemaining: 82 },
-    { id: 'OPP-2026-CMS-008', name: 'CMS Data Analytics Modernization', agency: 'CMS', ceiling: 125000000, priority: 'P-0', phase: 'Red Team', pWin: 68, daysRemaining: 127 },
-    { id: 'OPP-2026-IHS-012', name: 'IHS Telehealth Expansion', agency: 'IHS', ceiling: 32000000, priority: 'P-1', phase: 'Gold Team', pWin: 81, daysRemaining: 14 },
-    { id: 'OPP-2026-CMS-015', name: 'CMS Quality Payment Program', agency: 'CMS', ceiling: 78000000, priority: 'P-0', phase: 'Gate 2', pWin: 45, daysRemaining: 156 },
-  ];
-  const DEMO_STATS = { total: 12, totalValue: 847000000, avgPwin: 64, dueThisMonth: 3 };
-
-  const [opportunities, setOpportunities] = useState(DEMO_OPPORTUNITIES);
-  const [stats, setStats] = useState(DEMO_STATS);
-  const [loading, setLoading] = useState(true);
-  const [dataSource, setDataSource] = useState('demo');
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        // Check if MissionPulse Supabase client is available
-        if (typeof MissionPulse !== 'undefined' && MissionPulse.getOpportunities) {
-          const opps = await MissionPulse.getOpportunities();
-          
-          // Verify we got an array back (not an error object)
-          if (Array.isArray(opps) && opps.length > 0) {
-            setOpportunities(opps);
-            setDataSource('supabase');
-            
-            // Calculate stats from real data
-            const totalValue = opps.reduce((sum, o) => sum + (o.ceiling || 0), 0);
-            const avgPwin = opps.reduce((sum, o) => sum + (o.pwin || o.pWin || 0), 0) / opps.length;
-            const now = new Date();
-            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            const dueThisMonth = opps.filter(o => {
-              const due = new Date(o.dueDate || o.due_date);
-              return due <= endOfMonth;
-            }).length;
-            
-            setStats({ total: opps.length, totalValue, avgPwin, dueThisMonth });
-            console.log('[M1_Pipeline] Loaded', opps.length, 'opportunities from Supabase');
-          } else {
-            console.log('[M1_Pipeline] No data from Supabase, using demo data');
-            setDataSource('demo');
-          }
-        } else {
-          console.log('[M1_Pipeline] Supabase client not available, using demo data');
-          setDataSource('demo');
-        }
-      } catch (err) {
-        console.warn('[M1_Pipeline] Error loading data, using demo:', err.message);
-        setDataSource('demo');
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    // Small delay to let Supabase initialize
-    setTimeout(loadData, 500);
-  }, []);
-
-  // Format currency helper
-  const formatCurrency = (value) => {
-    if (!value) return '$0';
-    if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-    return `$${value.toLocaleString()}`;
-  };
-
-  if (loading) {
+  const { opportunities, stats, isLoading, error, refresh, formatCurrency, lastUpdated } = useData();
+  
+  // Loading state
+  if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-slate-400 text-sm">Loading pipeline...</p>
+      <div className="p-6 animate-fadeIn">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-400">Loading pipeline data...</p>
+            <p className="text-xs text-slate-500 mt-2">Connecting to Supabase</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="p-6 animate-fadeIn">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+          <Icon name="alert" className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <p className="text-red-400 mb-2 font-medium">Failed to load pipeline data</p>
+          <p className="text-sm text-slate-400 mb-4">{error}</p>
+          <Button variant="primary" size="sm" icon="refresh" onClick={refresh}>
+            Try Again
+          </Button>
         </div>
       </div>
     );
@@ -671,87 +723,130 @@ const M1_Pipeline = ({ roleContext }) => {
   
   return (
     <div className="p-6 space-y-6 animate-fadeIn">
-      {/* Data Source Indicator */}
-      <div className="flex items-center gap-2 text-xs">
-        <span className={`w-2 h-2 rounded-full ${dataSource === 'supabase' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-        <span className={dataSource === 'supabase' ? 'text-emerald-400' : 'text-amber-400'}>
-          {dataSource === 'supabase' ? 'Live data from Supabase' : 'Demo mode (Supabase not connected)'}
-        </span>
-      </div>
-      
-      {/* Stats Row */}
+      {/* Stats Row - Live from Supabase */}
       <div className="grid grid-cols-4 gap-4">
-        <Card><p className="text-xs text-slate-400 mb-1">Active Pursuits</p><p className="text-2xl font-bold text-white">{stats.total}</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Pipeline Value</p><p className="text-2xl font-bold text-emerald-400">{formatCurrency(stats.totalValue)}</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Avg Win Probability</p><p className="text-2xl font-bold text-cyan-400">{Math.round(stats.avgPwin)}%</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Due This Month</p><p className="text-2xl font-bold text-amber-400">{stats.dueThisMonth}</p></Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Active Pursuits</p>
+          <p className="text-2xl font-bold text-white">{stats.totalCount || 0}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Pipeline Value</p>
+          <p className="text-2xl font-bold text-emerald-400">{formatCurrency(stats.totalValue)}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Avg Win Probability</p>
+          <p className="text-2xl font-bold text-cyan-400">{stats.avgPwin || 0}%</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400 mb-1">Due This Month</p>
+          <p className="text-2xl font-bold text-amber-400">{stats.dueThisMonth || 0}</p>
+        </Card>
       </div>
       
-      {/* Opportunities Table */}
+      {/* Opportunities Table - Live from Supabase */}
       <Card>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Active Opportunities</h3>
-          <Button variant="primary" size="sm" icon="plus">Add Opportunity</Button>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Active Opportunities</h3>
+            {lastUpdated && (
+              <p className="text-xs text-slate-500">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" icon="refresh" onClick={refresh}>Refresh</Button>
+            <Button variant="primary" size="sm" icon="plus">Add Opportunity</Button>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-800/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Priority</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Days Left</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {opportunities.map(opp => (
-                <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-white">{opp.title || opp.name}</p>
-                    <p className="text-xs text-slate-500">{opp.id}</p>
-                  </td>
-                  <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
-                  <td className="px-4 py-3 text-sm text-emerald-400 font-mono">{formatCurrency(opp.ceiling)}</td>
-                  <td className="px-4 py-3">
-                    <Badge color={opp.priority === 'P-0' ? '#ef4444' : '#f59e0b'}>{opp.priority || 'P-1'}</Badge>
-                  </td>
-                  <td className="px-4 py-3"><Badge color="#8b5cf6">{opp.phase}</Badge></td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pwin || opp.pWin || 0}%` }} />
-                      </div>
-                      <span className="text-sm text-cyan-400">{opp.pwin || opp.pWin || 0}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-sm font-medium ${(opp.daysRemaining || 999) < 45 ? 'text-red-400' : 'text-slate-300'}`}>
-                      {opp.daysRemaining || '—'}d
-                    </span>
-                  </td>
+        
+        {opportunities.length === 0 ? (
+          <div className="text-center py-12">
+            <Icon name="inbox" className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+            <p className="text-slate-400">No opportunities found</p>
+            <p className="text-xs text-slate-500 mt-1">Add your first opportunity to get started</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Priority</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Days Left</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {opportunities.map(opp => (
+                  <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
+                    <td className="px-4 py-3">
+                      <p className="text-sm font-medium text-white">{opp.name || 'Untitled'}</p>
+                      <p className="text-xs text-slate-500">{opp.solicitationNumber || opp.id}</p>
+                    </td>
+                    <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency || 'N/A'}</Badge></td>
+                    <td className="px-4 py-3 text-sm text-emerald-400 font-mono">{formatCurrency(opp.ceiling || opp.contractValue)}</td>
+                    <td className="px-4 py-3">
+                      <Badge color={opp.priority === 'P-0' || opp.priority === 'high' ? '#ef4444' : '#f59e0b'}>
+                        {opp.priority || 'P-2'}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3"><Badge color="#8b5cf6">{opp.phase || 'Gate 1'}</Badge></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pWin || opp.winProbability || 0}%` }} />
+                        </div>
+                        <span className="text-sm text-cyan-400">{opp.pWin || opp.winProbability || 0}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-sm font-medium ${(opp.daysRemaining || 999) < 45 ? 'text-red-400' : 'text-slate-300'}`}>
+                        {opp.daysRemaining != null ? `${opp.daysRemaining}d` : 'TBD'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
+      
+      {/* Live Data Indicator */}
+      <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+        <span>Live data from Supabase • {opportunities.length} opportunities loaded</span>
+      </div>
     </div>
   );
 };
 
-// M2: War Room
-const M2_WarRoom = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <div className="flex items-center justify-between">
-      <div>
-        <h2 className="text-xl font-bold text-white">Pursuit War Room</h2>
-        <p className="text-sm text-slate-400">DHA MHS GENESIS Cloud Migration</p>
+// M2: War Room - LIVE DATA
+const M2_WarRoom = ({ roleContext }) => {
+  const { opportunities, formatCurrency } = useData();
+  
+  // Get highest value opportunity as featured
+  const featured = useMemo(() => {
+    if (!opportunities.length) return null;
+    return [...opportunities].sort((a, b) => (b.ceiling || 0) - (a.ceiling || 0))[0];
+  }, [opportunities]);
+  
+  return (
+    <div className="p-6 space-y-6 animate-fadeIn">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-white">Pursuit War Room</h2>
+          <p className="text-sm text-slate-400">
+            {featured ? featured.name : 'No active pursuits'} 
+            {featured && ` • ${formatCurrency(featured.ceiling)}`}
+          </p>
+        </div>
+        <Badge color="#ef4444">{featured?.priority === 'high' || featured?.priority === 'P-0' ? 'P-0 MUST WIN' : 'ACTIVE PURSUIT'}</Badge>
       </div>
-      <Badge color="#ef4444">P-0 MUST WIN</Badge>
-    </div>
     
     <div className="grid grid-cols-3 gap-4">
       <Card>
@@ -775,47 +870,82 @@ const M2_WarRoom = ({ roleContext }) => (
         <ul className="space-y-2 text-sm text-slate-300">
           <li className="flex items-center gap-2"><Icon name="calendar" className="w-4 h-4 text-cyan-400" />Pink Team: Jan 28</li>
           <li className="flex items-center gap-2"><Icon name="calendar" className="w-4 h-4 text-purple-400" />Red Team: Feb 10</li>
-          <li className="flex items-center gap-2"><Icon name="calendar" className="w-4 h-4 text-red-400" />Submission: Mar 1</li>
+          <li className="flex items-center gap-2">
+            <Icon name="calendar" className="w-4 h-4 text-red-400" />
+            Submission: {featured?.dueDate ? new Date(featured.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
+          </li>
         </ul>
       </Card>
     </div>
   </div>
 );
+};
 
-// M3: Swimlane Board (Shipley Phases)
+// M3: Swimlane Board (Shipley Phases) - LIVE DATA
 const M3_SwimlanBoard = ({ roleContext }) => {
-  const phases = [
-    { name: 'Gate 1', color: '#94a3b8', items: ['OPP-2026-HHS-012'] },
-    { name: 'Blue Team', color: '#60a5fa', items: ['OPP-2026-VA-003'] },
-    { name: 'Pink Team', color: '#f472b6', items: ['OPP-2026-DHA-001'] },
-    { name: 'Red Team', color: '#ef4444', items: ['OPP-2026-CMS-008'] },
-    { name: 'Gold Team', color: '#fbbf24', items: [] },
-    { name: 'Submitted', color: '#22c55e', items: [] },
+  const { opportunities, isLoading, refresh } = useData();
+  
+  // Group opportunities by phase
+  const phaseConfig = [
+    { key: 'gate_1', name: 'Gate 1', color: '#94a3b8' },
+    { key: 'blue_team', name: 'Blue Team', color: '#60a5fa' },
+    { key: 'pink_team', name: 'Pink Team', color: '#f472b6' },
+    { key: 'red_team', name: 'Red Team', color: '#ef4444' },
+    { key: 'gold_team', name: 'Gold Team', color: '#fbbf24' },
+    { key: 'submitted', name: 'Submitted', color: '#22c55e' },
   ];
+  
+  const groupedByPhase = useMemo(() => {
+    const grouped = {};
+    phaseConfig.forEach(p => {
+      grouped[p.key] = { ...p, items: [] };
+    });
+    
+    opportunities.forEach(opp => {
+      const phaseKey = opp.shipleyPhase || 'gate_1';
+      if (grouped[phaseKey]) {
+        grouped[phaseKey].items.push(opp);
+      } else {
+        grouped['gate_1'].items.push(opp);
+      }
+    });
+    
+    return phaseConfig.map(p => grouped[p.key]);
+  }, [opportunities]);
+  
+  if (isLoading) {
+    return (
+      <div className="p-6 animate-fadeIn">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="p-6 animate-fadeIn">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white">Shipley Workflow Board</h2>
-        <Button variant="secondary" size="sm" icon="refresh">Refresh</Button>
+        <Button variant="secondary" size="sm" icon="refresh" onClick={refresh}>Refresh</Button>
       </div>
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {phases.map(phase => (
-          <div key={phase.name} className="flex-shrink-0 w-64">
+        {groupedByPhase.map(phase => (
+          <div key={phase.key} className="flex-shrink-0 w-64">
             <div className="flex items-center gap-2 mb-3 px-2">
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
               <span className="text-sm font-semibold text-white">{phase.name}</span>
               <span className="ml-auto text-xs text-slate-500">{phase.items.length}</span>
             </div>
             <div className="space-y-2 min-h-[200px] p-2 bg-slate-800/30 rounded-xl border border-slate-700/30">
-              {phase.items.map(item => (
-                <Card key={item} className="cursor-move hover:border-cyan-500/50">
-                  <p className="text-sm font-medium text-white">{item}</p>
-                  <p className="text-xs text-slate-400 mt-1">Click to view details</p>
+              {phase.items.map(opp => (
+                <Card key={opp.id} className="cursor-move hover:border-cyan-500/50">
+                  <p className="text-sm font-medium text-white">{opp.name || 'Untitled'}</p>
+                  <p className="text-xs text-slate-400 mt-1">{opp.agency} • {opp.pWin || 0}% pWin</p>
                 </Card>
               ))}
               {phase.items.length === 0 && (
-                <p className="text-xs text-slate-500 text-center py-8">Drop items here</p>
+                <p className="text-xs text-slate-500 text-center py-8">No opportunities</p>
               )}
             </div>
           </div>
@@ -1490,27 +1620,29 @@ function App() {
   };
 
   return (
-    <RoleContext.Provider value={{ currentRole, setCurrentRole: handleRoleChange }}>
-      <div className="h-screen flex bg-[#00050F] overflow-hidden">
-        <Sidebar
-          currentRole={currentRole}
-          activeModule={activeModule}
-          onModuleSelect={handleModuleSelect}
-          onRoleChange={handleRoleChange}
-        />
-        <MainContent
-          activeModule={activeModule}
-          currentRole={currentRole}
-        />
-      </div>
+    <DataProvider>
+      <RoleContext.Provider value={{ currentRole, setCurrentRole: handleRoleChange }}>
+        <div className="h-screen flex bg-[#00050F] overflow-hidden">
+          <Sidebar
+            currentRole={currentRole}
+            activeModule={activeModule}
+            onModuleSelect={handleModuleSelect}
+            onRoleChange={handleRoleChange}
+          />
+          <MainContent
+            activeModule={activeModule}
+            currentRole={currentRole}
+          />
+        </div>
 
-      {/* Global Footer */}
-      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-50">
-        <span className="text-[10px] text-slate-500 tracking-wider">
-          AI GENERATED - REQUIRES HUMAN REVIEW â€¢ MissionPulse v12.0 Ultimate â€¢ Â© 2026 Mission Meets Tech
-        </span>
-      </div>
-    </RoleContext.Provider>
+        {/* Global Footer */}
+        <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-50">
+          <span className="text-[10px] text-slate-500 tracking-wider">
+            AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 Ultimate • © 2026 Mission Meets Tech
+          </span>
+        </div>
+      </RoleContext.Provider>
+    </DataProvider>
   );
 }
 
@@ -1519,7 +1651,5 @@ function App() {
 // ============================================================
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
-    <!-- AI Chat Widget - Capture Agent -->
-    <script src="ai-chat-widget.js" data-agent="capture"></script>
 </body>
 </html>
