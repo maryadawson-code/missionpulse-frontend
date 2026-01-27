@@ -1,6 +1,7 @@
 /**
  * MissionPulse Supabase Client Module
  * Sprint 2-3: Shared client with CRUD operations and real-time subscriptions
+ * FIXED: Uses created_at instead of due_date (column doesn't exist)
  * 
  * Provides MissionPulse namespace with:
  * - getOpportunities() - Fetch all opportunities
@@ -21,7 +22,7 @@
   // SUPABASE CONFIGURATION
   // ============================================================
   const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
 
   // Initialize Supabase client
   let supabase = null;
@@ -51,8 +52,10 @@
     // DB -> Frontend
     toFrontend: {
       id: 'id',
+      title: 'name',          // Map title -> name for display
       name: 'name',
       agency: 'agency',
+      ceiling: 'ceiling',
       contract_value: 'contractValue',
       priority: 'priority',
       shipley_phase: 'shipleyPhase',
@@ -65,13 +68,16 @@
       contract_type: 'contractType',
       set_aside: 'setAside',
       naics_code: 'naicsCode',
-      primary_contact: 'primaryContact'
+      primary_contact: 'primaryContact',
+      nickname: 'nickname',
+      company_id: 'companyId'
     },
     // Frontend -> DB
     toDatabase: {
       id: 'id',
-      name: 'name',
+      name: 'title',
       agency: 'agency',
+      ceiling: 'ceiling',
       contractValue: 'contract_value',
       priority: 'priority',
       shipleyPhase: 'shipley_phase',
@@ -97,22 +103,37 @@
       mapped[frontendKey] = record[key];
     });
     
+    // Handle name fallback (title -> name)
+    if (!mapped.name && record.title) {
+      mapped.name = record.title;
+    }
+    
     // Compute derived fields
     if (mapped.dueDate) {
       const dueDate = new Date(mapped.dueDate);
       const today = new Date();
       const diffTime = dueDate - today;
       mapped.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    } else {
+      // Default days remaining if no due date
+      mapped.daysRemaining = 90;
     }
     
     // Map shipley_phase to display phase
     mapped.phase = mapShipleyPhaseToDisplay(mapped.shipleyPhase);
     
-    // Format ceiling from contract_value
-    mapped.ceiling = mapped.contractValue;
+    // Ensure ceiling is set
+    if (!mapped.ceiling && mapped.contractValue) {
+      mapped.ceiling = mapped.contractValue;
+    }
     
-    // Map win_probability to pWin
-    mapped.pWin = mapped.winProbability;
+    // Map win_probability to pWin with default
+    mapped.pWin = mapped.winProbability || 50;
+    
+    // Default priority
+    if (!mapped.priority) {
+      mapped.priority = 'P-1';
+    }
     
     return mapped;
   }
@@ -155,7 +176,7 @@
   /**
    * Fetch all opportunities
    * @param {Object} options - Query options
-   * @param {string} options.orderBy - Field to order by
+   * @param {string} options.orderBy - Field to order by (default: created_at)
    * @param {boolean} options.ascending - Sort direction
    * @returns {Promise<{data: Array, error: Error|null}>}
    */
@@ -171,7 +192,7 @@
         .from('opportunities')
         .select('*');
 
-      // Apply ordering (use created_at as safe default)
+      // FIXED: Use created_at as default (due_date column doesn't exist)
       const orderBy = options.orderBy || 'created_at';
       const ascending = options.ascending !== undefined ? options.ascending : false;
       query = query.order(orderBy, { ascending });
@@ -202,10 +223,9 @@
     }
 
     try {
-      // Only select columns that are guaranteed to exist
       const { data, error } = await supabase
         .from('opportunities')
-        .select('*');
+        .select('ceiling, win_probability, created_at, shipley_phase');
 
       if (error) throw error;
 
@@ -214,16 +234,15 @@
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
       const stats = {
-        total: data.length,
-        totalValue: data.reduce((sum, opp) => sum + (opp.contract_value || opp.ceiling || 0), 0),
+        totalCount: data.length,
+        totalValue: data.reduce((sum, opp) => sum + (opp.ceiling || 0), 0),
         avgPwin: data.length > 0 
-          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || opp.pwin || 0), 0) / data.length)
+          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || 50), 0) / data.length)
           : 0,
         dueThisMonth: data.filter(opp => {
-          const dueDate = opp.due_date || opp.response_deadline;
-          if (!dueDate) return false;
-          const due = new Date(dueDate);
-          return due >= now && due <= monthEnd;
+          if (!opp.due_date) return false;
+          const dueDate = new Date(opp.due_date);
+          return dueDate >= now && dueDate <= monthEnd;
         }).length,
         byPhase: {}
       };
@@ -235,7 +254,7 @@
           stats.byPhase[phase] = { count: 0, value: 0 };
         }
         stats.byPhase[phase].count++;
-        stats.byPhase[phase].value += opp.contract_value || 0;
+        stats.byPhase[phase].value += opp.ceiling || 0;
       });
 
       return { data: stats, error: null };
@@ -269,13 +288,12 @@
       const phase = opp.shipleyPhase || 'gate_1';
       if (grouped[phase]) {
         grouped[phase].items.push(opp);
+      } else {
+        grouped.gate_1.items.push(opp);
       }
     });
 
-    // Convert to array sorted by order
-    const phasesArray = Object.values(grouped).sort((a, b) => a.order - b.order);
-
-    return { data: phasesArray, error: null };
+    return { data: grouped, error: null };
   }
 
   /**
