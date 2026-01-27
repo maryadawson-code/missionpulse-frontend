@@ -590,7 +590,7 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
       <div className={`p-3 border-t border-slate-800 ${collapsed ? 'text-center' : ''}`}>
         <div className="flex items-center gap-2 px-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          {!collapsed && <span className="text-[10px] text-slate-400">RBAC Active â€¢ FedRAMP Moderate</span>}
+          {!collapsed && <span className="text-[10px] text-slate-400">RBAC Active • FedRAMP Moderate</span>}
         </div>
       </div>
     </aside>
@@ -1069,7 +1069,7 @@ const M9_HITL = ({ roleContext }) => (
           <div key={item.id} className="flex items-center justify-between p-3 bg-slate-800/30 rounded-lg">
             <div>
               <p className="text-sm font-medium text-white">{item.section}</p>
-              <p className="text-xs text-slate-400">{item.type} â€¢ {item.id}</p>
+              <p className="text-xs text-slate-400">{item.type} • {item.id}</p>
             </div>
             <div className="flex items-center gap-3">
               <div className={`px-2 py-1 rounded text-xs font-semibold ${
@@ -1227,35 +1227,148 @@ const M11_FrenemyProtocol = ({ roleContext }) => {
 
 
 // M12: Mission Control Dashboard
-const M12_Dashboard = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <h2 className="text-xl font-bold text-white">Mission Control</h2>
-    <div className="grid grid-cols-4 gap-4">
-      <Card><p className="text-xs text-slate-400">Active Proposals</p><p className="text-2xl font-bold text-cyan-400">5</p></Card>
-      <Card><p className="text-xs text-slate-400">Pipeline Value</p><p className="text-2xl font-bold text-emerald-400">$847M</p></Card>
-      <Card><p className="text-xs text-slate-400">Win Rate YTD</p><p className="text-2xl font-bold text-white">68%</p></Card>
-      <Card><p className="text-xs text-slate-400">Due This Week</p><p className="text-2xl font-bold text-amber-400">2</p></Card>
+const M12_Dashboard = ({ roleContext }) => {
+  const [stats, setStats] = useState(null);
+  const [recentOpps, setRecentOpps] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      if (window.MissionPulse) {
+        // Get pipeline stats
+        const { data: statsData } = await MissionPulse.getPipelineStats();
+        if (statsData) {
+          setStats(statsData);
+        }
+        
+        // Get recent opportunities for activity feed
+        const { data: oppsData } = await MissionPulse.getOpportunities({ limit: 5 });
+        if (oppsData) {
+          setRecentOpps(oppsData);
+        }
+      }
+      setLoading(false);
+    };
+    loadDashboardData();
+  }, []);
+
+  const formatCurrency = (value) => {
+    if (!value) return '$0';
+    if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value.toLocaleString()}`;
+  };
+
+  const getPhaseLabel = (phase) => {
+    const labels = {
+      'gate_1': 'Gate 1',
+      'blue_team': 'Blue Team',
+      'pink_team': 'Pink Team',
+      'red_team': 'Red Team',
+      'gold_team': 'Gold Team',
+      'submitted': 'Submitted'
+    };
+    return labels[phase] || phase;
+  };
+
+  return (
+    <div className="p-6 space-y-6 animate-fadeIn">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-white">Mission Control</h2>
+        {loading && <span className="text-xs text-cyan-400 animate-pulse">Loading live data...</span>}
+      </div>
+      
+      {/* Key Metrics */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card>
+          <p className="text-xs text-slate-400">Active Proposals</p>
+          <p className="text-2xl font-bold text-cyan-400">
+            {loading ? '...' : stats?.totalCount || 0}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400">Pipeline Value</p>
+          <p className="text-2xl font-bold text-emerald-400">
+            {loading ? '...' : formatCurrency(stats?.totalValue)}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400">Avg Win Probability</p>
+          <p className="text-2xl font-bold text-white">
+            {loading ? '...' : `${stats?.avgPwin || 0}%`}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs text-slate-400">Phases Active</p>
+          <p className="text-2xl font-bold text-amber-400">
+            {loading ? '...' : Object.keys(stats?.byPhase || {}).length}
+          </p>
+        </Card>
+      </div>
+
+      {/* Phase Breakdown */}
+      {stats?.byPhase && Object.keys(stats.byPhase).length > 0 && (
+        <Card>
+          <h3 className="text-sm font-semibold text-white mb-4">Pipeline by Phase</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {Object.entries(stats.byPhase).map(([phase, data]) => (
+              <div key={phase} className="p-3 bg-slate-800/50 rounded-lg">
+                <p className="text-xs text-slate-400">{getPhaseLabel(phase)}</p>
+                <p className="text-lg font-bold text-white">{data.count} opps</p>
+                <p className="text-xs text-emerald-400">{formatCurrency(data.value)}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-6">
+        {/* Recent Opportunities */}
+        <Card>
+          <h3 className="text-sm font-semibold text-white mb-3">Recent Opportunities</h3>
+          <div className="space-y-2 text-sm">
+            {loading ? (
+              <p className="text-slate-500">Loading...</p>
+            ) : recentOpps.length === 0 ? (
+              <p className="text-slate-500">No opportunities yet</p>
+            ) : (
+              recentOpps.slice(0, 5).map(opp => (
+                <div key={opp.id} className="flex items-center justify-between py-1">
+                  <span className="text-slate-300 truncate flex-1">{opp.nickname || opp.title}</span>
+                  <span className="text-emerald-400 text-xs ml-2">{formatCurrency(opp.ceiling)}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+        
+        {/* System Status */}
+        <Card>
+          <h3 className="text-sm font-semibold text-white mb-3">System Status</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span className="text-slate-300">Supabase Connected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span className="text-slate-300">AI Agents Online</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span className="text-slate-300">RBAC Active</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+              <span className="text-slate-300">{stats?.totalCount || 0} opportunities loaded</span>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
-    <div className="grid grid-cols-2 gap-6">
-      <Card>
-        <h3 className="text-sm font-semibold text-white mb-3">Recent Activity</h3>
-        <div className="space-y-2 text-sm">
-          <p className="text-slate-300">â€¢ Pink Team review scheduled for DHA</p>
-          <p className="text-slate-300">â€¢ VA proposal moved to Blue Team</p>
-          <p className="text-slate-300">â€¢ New compliance requirement flagged</p>
-        </div>
-      </Card>
-      <Card>
-        <h3 className="text-sm font-semibold text-white mb-3">Team Status</h3>
-        <div className="space-y-2 text-sm">
-          <p className="text-slate-300">â€¢ 11 team members online</p>
-          <p className="text-slate-300">â€¢ 3 pending reviews in HITL</p>
-          <p className="text-slate-300">â€¢ All systems operational</p>
-        </div>
-      </Card>
-    </div>
-  </div>
-);
+  );
+};
 
 // M13: Launch & ROI
 const M13_LaunchROI = ({ roleContext }) => (
@@ -1440,7 +1553,7 @@ const MainContent = ({ activeModule, currentRole }) => {
           <p className="text-slate-400 mb-4">Select a module from the sidebar to begin</p>
           <p className="text-sm text-slate-500">
             Logged in as <span className="text-cyan-400 font-semibold">{currentRole.name}</span>
-            <span className="mx-2">â€¢</span>
+            <span className="mx-2">•</span>
             {currentRole.access.length} modules available
           </p>
         </div>
@@ -1592,7 +1705,7 @@ function App() {
       {/* Global Footer */}
       <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-50">
         <span className="text-[10px] text-slate-500 tracking-wider">
-          AI GENERATED - REQUIRES HUMAN REVIEW â€¢ MissionPulse v12.0 Ultimate â€¢ Â© 2026 Mission Meets Tech
+          AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 Ultimate • Â© 2026 Mission Meets Tech
         </span>
       </div>
     </RoleContext.Provider>
