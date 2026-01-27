@@ -7,6 +7,9 @@
     <meta name="description" content="Enterprise proposal management with 11-role RBAC, AI agent swarm, Shipley methodology">
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="render-api-client.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -472,30 +475,6 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
         )}
       </div>
 
-      {/* Agent Hub - Prominent Link */}
-      <div className="p-3 border-b border-slate-800">
-        <a
-          href="missionpulse-agent-hub.html"
-          className="w-full flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 hover:border-cyan-400/50 transition-all group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-            <span className="text-xl">🤖</span>
-          </div>
-          {!collapsed && (
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-bold text-white">Agent Hub</p>
-                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-cyan-500/30 text-cyan-300">LIVE AI</span>
-              </div>
-              <p className="text-[10px] text-slate-400">Chat with 8 AI agents</p>
-            </div>
-          )}
-          {!collapsed && (
-            <Icon name="chevronRight" className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
-          )}
-        </a>
-      </div>
-
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {MODULE_CATEGORIES.map(category => {
@@ -609,22 +588,108 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
 // Each renders functional UI for its purpose
 // ============================================================
 
-// M1: Pipeline Intelligence
+// M1: Pipeline Intelligence - Connected to Supabase
 const M1_Pipeline = ({ roleContext }) => {
-  const [opportunities] = useState([
-    { id: 'OPP-2026-DHA-001', name: 'DHA MHS GENESIS Cloud Migration', agency: 'DHA', ceiling: 98450210, priority: 'P-0', phase: 'Pink Team', pWin: 72, daysRemaining: 37 },
-    { id: 'OPP-2026-VA-003', name: 'VA Enterprise Cloud Hosting', agency: 'VA', ceiling: 45000000, priority: 'P-1', phase: 'Blue Team', pWin: 58, daysRemaining: 82 },
-    { id: 'OPP-2026-CMS-008', name: 'CMS Data Analytics Modernization', agency: 'CMS', ceiling: 125000000, priority: 'P-0', phase: 'Red Team', pWin: 68, daysRemaining: 127 },
-  ]);
-  
+  const [opportunities, setOpportunities] = useState([]);
+  const [stats, setStats] = useState({ total: 0, totalValue: 0, avgPwin: 0, dueThisMonth: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch data from Supabase on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        // Check if MissionPulse API is available
+        if (typeof MissionPulse !== 'undefined') {
+          const [opps, pipelineStats] = await Promise.all([
+            MissionPulse.getOpportunities(),
+            MissionPulse.getPipelineStats()
+          ]);
+          setOpportunities(opps || []);
+          setStats(pipelineStats || { total: 0, totalValue: 0, avgPwin: 0, dueThisMonth: 0 });
+        } else {
+          // Fallback to demo data if Supabase not loaded
+          setOpportunities([
+            { id: 'OPP-2026-DHA-001', title: 'DHA MHS GENESIS Cloud Migration', agency: 'DHA', ceiling: 98450210, priority: 'P-0', phase: 'pink_team', pwin: 72, dueDate: new Date(Date.now() + 37*24*60*60*1000) },
+            { id: 'OPP-2026-VA-003', title: 'VA Enterprise Cloud Hosting', agency: 'VA', ceiling: 45000000, priority: 'P-1', phase: 'blue_team', pwin: 58, dueDate: new Date(Date.now() + 82*24*60*60*1000) },
+            { id: 'OPP-2026-CMS-008', title: 'CMS Data Analytics Modernization', agency: 'CMS', ceiling: 125000000, priority: 'P-0', phase: 'red_team', pwin: 68, dueDate: new Date(Date.now() + 127*24*60*60*1000) },
+          ]);
+          setStats({ total: 12, totalValue: 847000000, avgPwin: 64, dueThisMonth: 3 });
+        }
+      } catch (err) {
+        console.error('Failed to load pipeline data:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+    
+    // Subscribe to real-time updates if available
+    let unsubscribe;
+    if (typeof MissionPulse !== 'undefined' && MissionPulse.subscribeToOpportunities) {
+      unsubscribe = MissionPulse.subscribeToOpportunities((payload) => {
+        loadData(); // Refresh on changes
+      });
+    }
+    return () => unsubscribe?.();
+  }, []);
+
+  // Calculate days remaining from due date
+  const getDaysRemaining = (dueDate) => {
+    if (!dueDate) return 999;
+    const due = new Date(dueDate);
+    const now = new Date();
+    return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+  };
+
+  // Get phase display name
+  const getPhaseDisplay = (phase) => {
+    const phaseMap = {
+      'gate_1': 'Gate 1', 'gate_2': 'Gate 2', 'gate_3': 'Gate 3',
+      'pink_team': 'Pink Team', 'red_team': 'Red Team', 'blue_team': 'Blue Team',
+      'gold_team': 'Gold Team', 'submitted': 'Submitted', 'awarded': 'Awarded'
+    };
+    return phaseMap[phase] || phase;
+  };
+
+  // Format currency
+  const formatCurrency = (value) => {
+    if (!value) return '$0';
+    if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value.toLocaleString()}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-400">Loading pipeline data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 animate-fadeIn">
+      {/* Connection Status */}
+      {typeof MissionPulse !== 'undefined' && (
+        <div className="flex items-center gap-2 text-xs text-emerald-400">
+          <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+          Live data from Supabase
+        </div>
+      )}
+      
       {/* Stats Row */}
       <div className="grid grid-cols-4 gap-4">
-        <Card><p className="text-xs text-slate-400 mb-1">Active Pursuits</p><p className="text-2xl font-bold text-white">12</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Pipeline Value</p><p className="text-2xl font-bold text-emerald-400">$847M</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Avg Win Probability</p><p className="text-2xl font-bold text-cyan-400">64%</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Due This Month</p><p className="text-2xl font-bold text-amber-400">3</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Active Pursuits</p><p className="text-2xl font-bold text-white">{stats.total || opportunities.length}</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Pipeline Value</p><p className="text-2xl font-bold text-emerald-400">{formatCurrency(stats.totalValue)}</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Avg Win Probability</p><p className="text-2xl font-bold text-cyan-400">{Math.round(stats.avgPwin || 0)}%</p></Card>
+        <Card><p className="text-xs text-slate-400 mb-1">Due This Month</p><p className="text-2xl font-bold text-amber-400">{stats.dueThisMonth || 0}</p></Card>
       </div>
       
       {/* Opportunities Table */}
@@ -633,50 +698,61 @@ const M1_Pipeline = ({ roleContext }) => {
           <h3 className="text-lg font-semibold text-white">Active Opportunities</h3>
           <Button variant="primary" size="sm" icon="plus">Add Opportunity</Button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-800/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Priority</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Days Left</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {opportunities.map(opp => (
-                <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-white">{opp.name}</p>
-                    <p className="text-xs text-slate-500">{opp.id}</p>
-                  </td>
-                  <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
-                  <td className="px-4 py-3 text-sm text-emerald-400 font-mono">${(opp.ceiling / 1000000).toFixed(1)}M</td>
-                  <td className="px-4 py-3">
-                    <Badge color={opp.priority === 'P-0' ? '#ef4444' : '#f59e0b'}>{opp.priority}</Badge>
-                  </td>
-                  <td className="px-4 py-3"><Badge color="#8b5cf6">{opp.phase}</Badge></td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pWin}%` }} />
-                      </div>
-                      <span className="text-sm text-cyan-400">{opp.pWin}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-sm font-medium ${opp.daysRemaining < 45 ? 'text-red-400' : 'text-slate-300'}`}>
-                      {opp.daysRemaining}d
-                    </span>
-                  </td>
+        {opportunities.length === 0 ? (
+          <div className="text-center py-12 text-slate-400">
+            <Icon name="filter" className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No opportunities found</p>
+            <p className="text-sm mt-2">Add your first opportunity to get started</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Priority</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Days Left</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {opportunities.map(opp => {
+                  const daysRemaining = getDaysRemaining(opp.dueDate);
+                  return (
+                    <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-white">{opp.title || opp.name}</p>
+                        <p className="text-xs text-slate-500">{opp.id}</p>
+                      </td>
+                      <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
+                      <td className="px-4 py-3 text-sm text-emerald-400 font-mono">{formatCurrency(opp.ceiling)}</td>
+                      <td className="px-4 py-3">
+                        <Badge color={opp.priority === 'P-0' ? '#ef4444' : '#f59e0b'}>{opp.priority || 'P-1'}</Badge>
+                      </td>
+                      <td className="px-4 py-3"><Badge color="#8b5cf6">{getPhaseDisplay(opp.phase)}</Badge></td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pwin || 0}%` }} />
+                          </div>
+                          <span className="text-sm text-cyan-400">{opp.pwin || 0}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-sm font-medium ${daysRemaining < 45 ? 'text-red-400' : 'text-slate-300'}`}>
+                          {daysRemaining}d
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -1447,7 +1523,7 @@ function App() {
       {/* Global Footer */}
       <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-50">
         <span className="text-[10px] text-slate-500 tracking-wider">
-          AI GENERATED - REQUIRES HUMAN REVIEW â€¢ MissionPulse v12.0 Ultimate â€¢ Â© 2026 Mission Meets Tech
+          AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 Ultimate • © 2026 Mission Meets Tech
         </span>
       </div>
     </RoleContext.Provider>
@@ -1459,5 +1535,7 @@ function App() {
 // ============================================================
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
+    <!-- AI Chat Widget - Capture Agent for Dashboard -->
+    <script src="ai-chat-widget.js" data-agent="capture"></script>
 </body>
 </html>
