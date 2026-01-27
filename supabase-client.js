@@ -171,9 +171,9 @@
         .from('opportunities')
         .select('*');
 
-      // Apply ordering
-      const orderBy = options.orderBy || 'due_date';
-      const ascending = options.ascending !== undefined ? options.ascending : true;
+      // Apply ordering (use created_at as safe default)
+      const orderBy = options.orderBy || 'created_at';
+      const ascending = options.ascending !== undefined ? options.ascending : false;
       query = query.order(orderBy, { ascending });
 
       const { data, error } = await query;
@@ -202,9 +202,10 @@
     }
 
     try {
+      // Only select columns that are guaranteed to exist
       const { data, error } = await supabase
         .from('opportunities')
-        .select('contract_value, win_probability, due_date, shipley_phase');
+        .select('*');
 
       if (error) throw error;
 
@@ -213,15 +214,16 @@
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
       const stats = {
-        totalCount: data.length,
-        totalValue: data.reduce((sum, opp) => sum + (opp.contract_value || 0), 0),
+        total: data.length,
+        totalValue: data.reduce((sum, opp) => sum + (opp.contract_value || opp.ceiling || 0), 0),
         avgPwin: data.length > 0 
-          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || 0), 0) / data.length)
+          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || opp.pwin || 0), 0) / data.length)
           : 0,
         dueThisMonth: data.filter(opp => {
-          if (!opp.due_date) return false;
-          const dueDate = new Date(opp.due_date);
-          return dueDate >= now && dueDate <= monthEnd;
+          const dueDate = opp.due_date || opp.response_deadline;
+          if (!dueDate) return false;
+          const due = new Date(dueDate);
+          return due >= now && due <= monthEnd;
         }).length,
         byPhase: {}
       };
@@ -248,7 +250,7 @@
    * @returns {Promise<{data: Object, error: Error|null}>}
    */
   async function getOpportunitiesByPhase() {
-    const { data, error } = await getOpportunities({ orderBy: 'due_date', ascending: true });
+    const { data, error } = await getOpportunities({ orderBy: 'created_at', ascending: false });
     
     if (error) return { data: null, error };
 
