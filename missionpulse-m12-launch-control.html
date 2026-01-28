@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse M12 - Launch Control</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" type="image/png" href="MMT_icon_transparent.png">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Space Grotesk', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes checkBounce { 0% { transform: scale(0); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); } 50% { box-shadow: 0 0 40px rgba(0, 229, 250, 0.6); } }
+    @keyframes criticalPulse { 0%, 100% { color: #EF4444; } 50% { color: #F87171; text-shadow: 0 0 20px rgba(239, 68, 68, 0.8); } }
+    @keyframes rocketLaunch { 0% { transform: translateY(0); } 100% { transform: translateY(-150vh) rotate(5deg); } }
+    @keyframes confetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+    @keyframes readyGlow { 0%, 100% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); } 50% { box-shadow: 0 0 60px rgba(16, 185, 129, 0.8); } }
+    @keyframes barFill { from { width: 0%; } }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes separatorBlink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }
+    
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-slide-in { animation: slideIn 0.5s ease-out forwards; }
+    .animate-check { animation: checkBounce 0.4s ease-out forwards; }
+    .animate-glow { animation: glow 2s ease-in-out infinite; }
+    .animate-ready-glow { animation: readyGlow 1.5s ease-in-out infinite; }
+    .animate-critical { animation: criticalPulse 1s ease-in-out infinite; }
+    .animate-bar-fill { animation: barFill 1s ease-out forwards; }
+    .animate-fade-up { animation: fadeInUp 0.6s ease-out forwards; }
+    .animate-blink { animation: separatorBlink 1s ease-in-out infinite; }
+    
+    .confetti-piece { position: fixed; animation: confetti 3s ease-out forwards; pointer-events: none; z-index: 1000; }
+    .rocket-launch { animation: rocketLaunch 2s ease-in forwards; }
+    
+    .glass-card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.7) 100%);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 229, 250, 0.2);
+    }
+    
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0, 229, 250, 0.3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // Icons Library
+    const Icons = {
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>,
+      rocket: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      document: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      folder: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
+      user: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+      upload: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      undo: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>,
+      send: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+      pen: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+      print: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // Checklist Categories
+    const CHECKLIST = {
+      compliance: [
+        { id: 'c1', label: 'All RFP requirements traced', status: 'complete' },
+        { id: 'c2', label: 'Compliance matrix 100% green', status: 'complete' },
+        { id: 'c3', label: 'Section L/M alignment verified', status: 'complete' },
+        { id: 'c4', label: 'FAR/DFARS clauses addressed', status: 'complete' },
+        { id: 'c5', label: 'CUI marking applied', status: 'complete' },
+      ],
+      formatting: [
+        { id: 'f1', label: 'Page limits verified', status: 'complete' },
+        { id: 'f2', label: 'Font/margin requirements met', status: 'complete' },
+        { id: 'f3', label: 'Headers/footers consistent', status: 'complete' },
+        { id: 'f4', label: 'Cross-references validated', status: 'complete' },
+        { id: 'f5', label: 'TOC/LOF generated', status: 'complete' },
+      ],
+      signatures: [
+        { id: 's1', label: 'SF33 signed', status: 'complete' },
+        { id: 's2', label: 'Representations & Certs', status: 'complete' },
+        { id: 's3', label: 'Subcontractor consent letters', status: 'complete' },
+        { id: 's4', label: 'Teaming Agreement signed', status: 'pending' },
+        { id: 's5', label: 'Cover letter finalized', status: 'complete' },
+      ],
+      uploads: [
+        { id: 'u1', label: 'Technical Volume (Vol I)', status: 'complete' },
+        { id: 'u2', label: 'Management Volume (Vol II)', status: 'complete' },
+        { id: 'u3', label: 'Past Performance (Vol III)', status: 'complete' },
+        { id: 'u4', label: 'Cost/Price Volume (Vol IV)', status: 'complete' },
+        { id: 'u5', label: 'Attachments (Vol V)', status: 'complete' },
+      ],
+      final: [
+        { id: 'r1', label: 'Executive review complete', status: 'complete' },
+        { id: 'r2', label: 'Red Team fixes incorporated', status: 'complete' },
+        { id: 'r3', label: 'Gold Team approval', status: 'complete' },
+        { id: 'r4', label: 'Final PDF generated', status: 'complete' },
+        { id: 'r5', label: 'Backup copy created', status: 'complete' },
+      ],
+    };
+
+    // Volume Status Data
+    const VOLUMES = [
+      { id: 'vol1', name: 'Technical Volume', pages: 85, limit: 100, size: 12.4, status: 'ready' },
+      { id: 'vol2', name: 'Management Volume', pages: 42, limit: 50, size: 8.2, status: 'ready' },
+      { id: 'vol3', name: 'Past Performance', pages: 28, limit: 30, size: 5.6, status: 'ready' },
+      { id: 'vol4', name: 'Cost/Price Volume', pages: 156, limit: 200, size: 18.9, status: 'ready' },
+      { id: 'vol5', name: 'Attachments', pages: 45, limit: null, size: 24.1, status: 'ready' },
+    ];
+
+    // Team Sign-off Roster
+    const SIGNOFF_ROSTER = [
+      { role: 'CEO', name: 'Mary Womack', status: 'approved', time: '2 hours ago' },
+      { role: 'COO', name: 'Robert Chen', status: 'approved', time: '3 hours ago' },
+      { role: 'CAP', name: 'Jennifer Park', status: 'approved', time: '1 hour ago' },
+      { role: 'PM', name: 'Marcus Williams', status: 'pending', time: null },
+      { role: 'SA', name: 'Sarah Chen', status: 'approved', time: '4 hours ago' },
+      { role: 'FIN', name: 'David Kim', status: 'approved', time: '2 hours ago' },
+      { role: 'CON', name: 'Michelle Torres', status: 'approved', time: '3 hours ago' },
+      { role: 'QA', name: 'James Wilson', status: 'approved', time: '1 hour ago' },
+    ];
+
+    // Confetti Generator
+    const createConfetti = (count = 150) => {
+      const colors = ['#00E5FA', '#FFD700', '#10b981', '#8B5CF6', '#EC4899', '#F59E0B', '#00BDAE'];
+      const shapes = ['●', '■', '▲', '★', '◆', '♦', '✦'];
+      return Array.from({ length: count }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        shape: shapes[Math.floor(Math.random() * shapes.length)],
+        delay: Math.random() * 2,
+        duration: 2 + Math.random() * 2,
+        size: 10 + Math.random() * 20,
+      }));
+    };
+
+    // Countdown Timer Component
+    const CountdownTimer = ({ deadline }) => {
+      const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      const [isCritical, setIsCritical] = useState(false);
+
+      useEffect(() => {
+        const calculateTime = () => {
+          const now = new Date();
+          const diff = deadline - now;
+          
+          if (diff <= 0) {
+            setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+            return;
+          }
+          
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+          
+          setTimeLeft({ days, hours, minutes, seconds });
+          setIsCritical(diff < 24 * 60 * 60 * 1000); // Less than 24 hours
+        };
+
+        calculateTime();
+        const interval = setInterval(calculateTime, 1000);
+        return () => clearInterval(interval);
+      }, [deadline]);
+
+      const TimeSegment = ({ value, label }) => (
+        <div className="flex flex-col items-center">
+          <div className={`font-mono text-4xl font-bold min-w-[3rem] text-center ${isCritical ? 'animate-critical' : 'text-white'}`}>
+            {String(value).padStart(2, '0')}
+          </div>
+          <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">{label}</div>
+        </div>
+      );
+
+      return (
+        <div className="flex items-center gap-2">
+          <TimeSegment value={timeLeft.days} label="Days" />
+          <span className="text-2xl text-slate-600 animate-blink">:</span>
+          <TimeSegment value={timeLeft.hours} label="Hours" />
+          <span className="text-2xl text-slate-600 animate-blink">:</span>
+          <TimeSegment value={timeLeft.minutes} label="Min" />
+          <span className="text-2xl text-slate-600 animate-blink">:</span>
+          <TimeSegment value={timeLeft.seconds} label="Sec" />
+        </div>
+      );
+    };
+
+    // Volume Status Card
+    const VolumeCard = ({ volume }) => {
+      const pagePercent = volume.limit ? (volume.pages / volume.limit) * 100 : 0;
+      const isNearLimit = pagePercent > 85;
+
+      return (
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${volume.status === 'ready' ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                <Icon name="folder" className={`w-4 h-4 ${volume.status === 'ready' ? 'text-emerald-400' : 'text-amber-400'}`} />
+              </div>
+              <span className="font-medium text-white">{volume.name}</span>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded-full ${volume.status === 'ready' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+              {volume.status === 'ready' ? '✓ Ready' : '⏳ Pending'}
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <div className="text-slate-500 mb-1">Pages</div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-white">{volume.pages}</span>
+                {volume.limit && (
+                  <>
+                    <span className="text-slate-600">/</span>
+                    <span className="font-mono text-slate-400">{volume.limit}</span>
+                  </>
+                )}
+              </div>
+              {volume.limit && (
+                <div className="h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${isNearLimit ? 'bg-amber-500' : 'bg-cyan-500'}`}
+                    style={{ width: `${Math.min(pagePercent, 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-slate-500 mb-1">File Size</div>
+              <div className="font-mono text-white">{volume.size} MB</div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Checklist Section
+    const ChecklistSection = ({ title, items, icon, color }) => {
+      const completedCount = items.filter(i => i.status === 'complete').length;
+      const allComplete = completedCount === items.length;
+
+      return (
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color}`}>
+                <Icon name={icon} className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">{title}</h3>
+                <p className="text-xs text-slate-500">{completedCount}/{items.length} complete</p>
+              </div>
+            </div>
+            {allComplete && (
+              <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400">✓ Complete</span>
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            {items.map((item, idx) => (
+              <div 
+                key={item.id}
+                className={`flex items-center gap-3 p-2 rounded-lg transition-all ${
+                  item.status === 'complete' 
+                    ? 'bg-emerald-500/5 border border-emerald-500/20' 
+                    : 'bg-amber-500/5 border border-amber-500/20'
+                }`}
+                style={{ animation: `slideIn 0.3s ease-out ${idx * 0.05}s both` }}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                  item.status === 'complete' 
+                    ? 'bg-emerald-500' 
+                    : 'border-2 border-amber-500'
+                }`}>
+                  {item.status === 'complete' && <Icon name="check" className="w-3 h-3 text-white" />}
+                </div>
+                <span className={`text-sm flex-1 ${item.status === 'complete' ? 'text-slate-300' : 'text-amber-300'}`}>
+                  {item.label}
+                </span>
+                {item.status !== 'complete' && (
+                  <span className="text-xs text-amber-400 font-medium">PENDING</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    // Main Component
+    const LaunchControl = () => {
+      const [stage, setStage] = useState('precheck');
+      const [confetti, setConfetti] = useState([]);
+      const [showRollback, setShowRollback] = useState(false);
+      
+      // Deadline: 3 days from now
+      const deadline = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      
+      // Calculate overall readiness
+      const allChecks = [...CHECKLIST.compliance, ...CHECKLIST.formatting, ...CHECKLIST.signatures, ...CHECKLIST.uploads, ...CHECKLIST.final];
+      const completedChecks = allChecks.filter(c => c.status === 'complete').length;
+      const totalChecks = allChecks.length;
+      const checklistPercent = Math.round((completedChecks / totalChecks) * 100);
+      
+      const approvedSignoffs = SIGNOFF_ROSTER.filter(s => s.status === 'approved').length;
+      const totalSignoffs = SIGNOFF_ROSTER.length;
+      
+      const totalFileSize = VOLUMES.reduce((sum, v) => sum + v.size, 0);
+      const maxPortalSize = 100; // MB
+      
+      const isReadyForLaunch = checklistPercent === 100 && approvedSignoffs === totalSignoffs;
+
+      const handleLaunch = () => {
+        setStage('launching');
+        setTimeout(() => {
+          setStage('complete');
+          setConfetti(createConfetti(200));
+        }, 2000);
+      };
+
+      useEffect(() => {
+        if (confetti.length > 0) {
+          const timer = setTimeout(() => setConfetti([]), 5000);
+          return () => clearTimeout(timer);
+        }
+      }, [confetti]);
+
+      return (
+        <div className="min-h-screen bg-[#00050F] text-white p-6">
+          {/* Confetti */}
+          {confetti.map(piece => (
+            <div key={piece.id} className="confetti-piece" style={{
+              left: `${piece.left}%`, top: '-20px', color: piece.color,
+              fontSize: `${piece.size}px`, animationDelay: `${piece.delay}s`, animationDuration: `${piece.duration}s`,
+            }}>{piece.shape}</div>
+          ))}
+
+          {/* Header */}
+          <div className="max-w-7xl mx-auto mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                  <Icon name="rocket" className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold">M12: Launch Control</h1>
+                  <p className="text-slate-400 text-sm">DHA Healthcare Data Platform • FA8052-26-R-0001</p>
+                </div>
+              </div>
+              
+              {/* Status Badge */}
+              <div className={`px-4 py-2 rounded-xl ${
+                isReadyForLaunch 
+                  ? 'bg-emerald-500/20 border border-emerald-500/50 animate-ready-glow' 
+                  : 'bg-amber-500/20 border border-amber-500/50'
+              }`}>
+                <div className={`text-sm font-bold ${isReadyForLaunch ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {isReadyForLaunch ? '✓ GO FOR LAUNCH' : '⏳ HOLD - Items Pending'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-7xl mx-auto">
+            {stage === 'precheck' && (
+              <>
+                {/* Countdown & Summary Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                  {/* Countdown Timer */}
+                  <div className="glass-card rounded-2xl p-6 lg:col-span-2">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                        <Icon name="clock" className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold">Time to Deadline</h2>
+                        <p className="text-xs text-slate-500">Submission portal closes Feb 15, 2026 @ 2:00 PM EST</p>
+                      </div>
+                    </div>
+                    <CountdownTimer deadline={deadline} />
+                  </div>
+
+                  {/* Portal Limits */}
+                  <div className="glass-card rounded-2xl p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <Icon name="upload" className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold">Portal Limits</h2>
+                        <p className="text-xs text-slate-500">SAM.gov upload capacity</p>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold font-mono text-white mb-1">
+                        {totalFileSize.toFixed(1)} <span className="text-lg text-slate-400">/ {maxPortalSize} MB</span>
+                      </div>
+                      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-cyan-500 to-purple-500"
+                          style={{ width: `${(totalFileSize / maxPortalSize) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-emerald-400 mt-2">✓ Within limits</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Volume Status */}
+                <div className="mb-6">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Icon name="database" className="w-5 h-5 text-cyan-400" />
+                    Volume Status Dashboard
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {VOLUMES.map(vol => <VolumeCard key={vol.id} volume={vol} />)}
+                  </div>
+                </div>
+
+                {/* Checklist Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  <ChecklistSection 
+                    title="Compliance" 
+                    items={CHECKLIST.compliance} 
+                    icon="shield" 
+                    color="bg-cyan-500/30"
+                  />
+                  <ChecklistSection 
+                    title="Formatting" 
+                    items={CHECKLIST.formatting} 
+                    icon="print" 
+                    color="bg-purple-500/30"
+                  />
+                  <ChecklistSection 
+                    title="Signatures" 
+                    items={CHECKLIST.signatures} 
+                    icon="pen" 
+                    color="bg-amber-500/30"
+                  />
+                  <ChecklistSection 
+                    title="Upload Status" 
+                    items={CHECKLIST.uploads} 
+                    icon="upload" 
+                    color="bg-emerald-500/30"
+                  />
+                  <ChecklistSection 
+                    title="Final Review" 
+                    items={CHECKLIST.final} 
+                    icon="document" 
+                    color="bg-rose-500/30"
+                  />
+                  
+                  {/* Sign-off Roster */}
+                  <div className="glass-card rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/30 flex items-center justify-center">
+                          <Icon name="user" className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-white">Team Sign-offs</h3>
+                          <p className="text-xs text-slate-500">{approvedSignoffs}/{totalSignoffs} approved</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-thin">
+                      {SIGNOFF_ROSTER.map((member, idx) => (
+                        <div 
+                          key={member.role}
+                          className={`flex items-center justify-between p-2 rounded-lg ${
+                            member.status === 'approved' 
+                              ? 'bg-emerald-500/5 border border-emerald-500/20' 
+                              : 'bg-amber-500/5 border border-amber-500/20'
+                          }`}
+                          style={{ animation: `slideIn 0.3s ease-out ${idx * 0.05}s both` }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              member.status === 'approved' ? 'bg-emerald-500 text-white' : 'bg-amber-500/30 text-amber-400'
+                            }`}>
+                              {member.role.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="text-sm text-white">{member.name}</div>
+                              <div className="text-xs text-slate-500">{member.role}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {member.status === 'approved' ? (
+                              <>
+                                <div className="text-xs text-emerald-400">✓ Approved</div>
+                                <div className="text-xs text-slate-600">{member.time}</div>
+                              </>
+                            ) : (
+                              <div className="text-xs text-amber-400">Pending</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between">
+                  <button 
+                    onClick={() => setShowRollback(!showRollback)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-all"
+                  >
+                    <Icon name="undo" className="w-4 h-4" />
+                    Rollback Plan
+                  </button>
+                  
+                  <button 
+                    onClick={handleLaunch}
+                    disabled={!isReadyForLaunch}
+                    className={`flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-lg transition-all ${
+                      isReadyForLaunch
+                        ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-900 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 animate-glow'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    <Icon name="rocket" className="w-6 h-6" />
+                    {isReadyForLaunch ? 'GO FOR LAUNCH' : 'HOLD - Items Pending'}
+                  </button>
+                </div>
+
+                {/* Rollback Plan */}
+                {showRollback && (
+                  <div className="mt-6 glass-card rounded-2xl p-6 border-2 border-amber-500/30 animate-fade-up">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                        <Icon name="alert" className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-amber-400">Emergency Rollback Plan</h3>
+                        <p className="text-xs text-slate-500">In case of submission issues</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="p-3 bg-slate-800/50 rounded-lg">
+                        <div className="text-amber-400 font-medium mb-1">Step 1: Contact CO</div>
+                        <div className="text-slate-400">contracting.officer@dha.mil • (703) 555-0123</div>
+                      </div>
+                      <div className="p-3 bg-slate-800/50 rounded-lg">
+                        <div className="text-amber-400 font-medium mb-1">Step 2: Backup Location</div>
+                        <div className="text-slate-400">SharePoint: /Proposals/DHA-2026/Backup/</div>
+                      </div>
+                      <div className="p-3 bg-slate-800/50 rounded-lg">
+                        <div className="text-amber-400 font-medium mb-1">Step 3: Alt Submission</div>
+                        <div className="text-slate-400">Email submission to contracts@dha.mil if portal fails</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Launching State */}
+            {stage === 'launching' && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <div className="rocket-launch mb-8">
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-2xl shadow-amber-500/50">
+                    <Icon name="rocket" className="w-16 h-16 text-white" />
+                  </div>
+                </div>
+                <h2 className="text-3xl font-bold text-amber-400 animate-pulse">SUBMITTING PROPOSAL...</h2>
+                <p className="text-slate-400 mt-2">Uploading to SAM.gov portal</p>
+              </div>
+            )}
+
+            {/* Complete State */}
+            {stage === 'complete' && (
+              <div className="glass-card rounded-2xl p-12 text-center animate-ready-glow">
+                <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/50 animate-check">
+                  <Icon name="check" className="w-12 h-12 text-white" />
+                </div>
+                <h2 className="text-4xl font-bold text-emerald-400 mb-2">SUBMISSION CONFIRMED</h2>
+                <p className="text-slate-400 mb-6">FA8052-26-R-0001 • DHA Healthcare Data Platform</p>
+                
+                <div className="inline-block glass-card rounded-xl p-6 mb-6">
+                  <div className="text-sm text-slate-500 mb-1">Confirmation Number</div>
+                  <div className="text-2xl font-mono font-bold text-cyan-400">SAM-2026-DHA-0847291</div>
+                  <div className="text-xs text-slate-500 mt-2">Submitted: Feb 12, 2026 @ 10:47:23 AM EST</div>
+                </div>
+                
+                <div className="flex items-center justify-center gap-4">
+                  <button className="px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white hover:bg-slate-700 transition-all flex items-center gap-2">
+                    <Icon name="print" className="w-4 h-4" />
+                    Print Confirmation
+                  </button>
+                  <button className="px-6 py-3 rounded-xl bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/30 transition-all flex items-center gap-2">
+                    <Icon name="document" className="w-4 h-4" />
+                    View Submission Log
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* AI Disclaimer Footer */}
+          <div className="max-w-7xl mx-auto mt-8 text-center">
+            <p className="text-xs text-slate-600">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v2.0 © 2026 Mission Meets Tech</p>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<LaunchControl />, document.getElementById('root'));
+  </script>
+  <script src="render-api-client.js"></script>
+  <script src="ai-chat-widget.js"></script>
+</body>
+</html>
