@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposal Outline Builder | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); backdrop-filter: blur(10px); }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA, #00b8d4); color: #00050F; font-weight: 600; }
+        .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+        
+        /* Volume colors */
+        .volume-i { border-left: 3px solid #9ca3af; }
+        .volume-ii { border-left: 3px solid #60a5fa; }
+        .volume-iii { border-left: 3px solid #c084fc; }
+        .volume-iv { border-left: 3px solid #4ade80; }
+        .volume-v { border-left: 3px solid #fb923c; }
+        
+        /* Status */
+        .status-not-started { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+        .status-outline { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+        .status-draft { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .status-review { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+        .status-final { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .status-approved { background: rgba(34, 197, 94, 0.3); color: #22c55e; }
+        
+        /* Outline status */
+        .outline-draft { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+        .outline-in-review { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .outline-approved { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .outline-locked { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        
+        /* Section tree */
+        .section-item { transition: all 0.2s; }
+        .section-item:hover { background: rgba(0, 229, 250, 0.05); }
+        .section-level-0 { padding-left: 0; }
+        .section-level-1 { padding-left: 1.5rem; }
+        .section-level-2 { padding-left: 3rem; }
+        .section-level-3 { padding-left: 4.5rem; }
+        
+        /* Page bar */
+        .page-bar { background: rgba(107, 114, 128, 0.2); height: 8px; border-radius: 4px; overflow: hidden; }
+        .page-fill { height: 100%; transition: width 0.3s; }
+        .page-fill.under { background: linear-gradient(90deg, #22c55e, #4ade80); }
+        .page-fill.warning { background: linear-gradient(90deg, #eab308, #facc15); }
+        .page-fill.over { background: linear-gradient(90deg, #ef4444, #f87171); }
+        
+        .tag { background: rgba(0, 229, 250, 0.15); color: #00E5FA; font-size: 0.6rem; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Header -->
+    <header class="border-b border-cyan-500/20 bg-black/40 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="index.html" class="text-cyan-400 hover:text-cyan-300"><i class="fas fa-arrow-left"></i></a>
+                <div>
+                    <h1 class="text-xl font-bold text-cyan-400"><i class="fas fa-sitemap mr-2"></i>Proposal Outline Builder</h1>
+                    <p class="text-xs text-gray-400">Structure Sections, Assign Writers & Track Pages</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="connectionStatus" class="text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
+                    <i class="fas fa-circle text-[8px] mr-1"></i> Connecting...
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Opportunity & Outline Selector -->
+        <div class="flex flex-wrap items-center gap-4 mb-6">
+            <select id="opportunitySelect" onchange="loadOutlines()" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm min-w-[250px]">
+                <option value="">Select Opportunity...</option>
+            </select>
+            <select id="outlineSelect" onchange="loadSections()" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm min-w-[200px]">
+                <option value="">Select Outline...</option>
+            </select>
+            <button onclick="openOutlineModal()" class="btn-primary px-4 py-2 rounded text-sm">
+                <i class="fas fa-plus mr-2"></i>New Outline
+            </button>
+            <button onclick="useTemplate()" class="px-4 py-2 border border-cyan-500/50 text-cyan-400 rounded text-sm hover:bg-cyan-500/10">
+                <i class="fas fa-magic mr-2"></i>Use Template
+            </button>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8" id="statsRow">
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-cyan-400" id="totalSections">0</div>
+                <div class="text-xs text-gray-400">Total Sections</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-blue-400" id="pageLimit">0</div>
+                <div class="text-xs text-gray-400">Page Limit</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-green-400" id="pageEstimate">0</div>
+                <div class="text-xs text-gray-400">Estimated Pages</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-yellow-400" id="pagesRemaining">0</div>
+                <div class="text-xs text-gray-400">Pages Remaining</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-purple-400" id="completedSections">0</div>
+                <div class="text-xs text-gray-400">Completed</div>
+            </div>
+        </div>
+
+        <!-- Page Budget Bar -->
+        <div class="glass-card rounded-lg p-4 mb-6" id="pageBudgetContainer" style="display: none;">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400">Page Budget</span>
+                <span class="text-sm" id="pagePercentText">0%</span>
+            </div>
+            <div class="page-bar">
+                <div class="page-fill under" id="pageFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Outline Content -->
+        <div id="outlineContainer" class="space-y-2">
+            <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                <i class="fas fa-sitemap text-4xl mb-4 opacity-50"></i>
+                <p>Select an opportunity and outline to view sections</p>
+            </div>
+        </div>
+
+        <!-- Add Section Button -->
+        <div id="addSectionBtnContainer" class="hidden mt-4">
+            <button onclick="openSectionModal()" class="w-full py-3 border-2 border-dashed border-cyan-500/30 rounded-lg text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all">
+                <i class="fas fa-plus mr-2"></i>Add Section
+            </button>
+        </div>
+    </main>
+
+    <!-- Outline Modal -->
+    <div id="outlineModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-xl max-w-lg w-full p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-folder-plus mr-2"></i><span id="outlineModalTitle">New Outline</span></h3>
+                <button onclick="closeOutlineModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="outlineForm" onsubmit="saveOutline(event)" class="space-y-4">
+                <input type="hidden" id="outlineId">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Outline Name <span class="text-red-400">*</span></label>
+                    <input type="text" id="outlineName" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Technical Volume Outline v1">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Volume</label>
+                        <select id="outlineVolume" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="Volume I - Admin">Volume I - Admin</option>
+                            <option value="Volume II - Technical" selected>Volume II - Technical</option>
+                            <option value="Volume III - Past Performance">Volume III - Past Performance</option>
+                            <option value="Volume IV - Pricing">Volume IV - Pricing</option>
+                            <option value="Volume V - Other">Volume V - Other</option>
+                            <option value="Full Proposal">Full Proposal</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Page Limit</label>
+                        <input type="number" id="outlinePageLimit" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., 50">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Notes</label>
+                    <textarea id="outlineNotes" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="Any notes about this outline..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeOutlineModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Save Outline</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Section Modal -->
+    <div id="sectionModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="glass-card rounded-xl max-w-2xl w-full p-6 my-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-file-alt mr-2"></i><span id="sectionModalTitle">Add Section</span></h3>
+                <button onclick="closeSectionModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="sectionForm" onsubmit="saveSection(event)" class="space-y-4">
+                <input type="hidden" id="sectionId">
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Section # <span class="text-red-400">*</span></label>
+                        <input type="text" id="sectionNumber" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., 3.1.2">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-sm text-gray-400 mb-1">Section Title <span class="text-red-400">*</span></label>
+                        <input type="text" id="sectionTitle" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Technical Approach">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Parent Section</label>
+                    <select id="sectionParent" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                        <option value="">None (Top Level)</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">RFP Reference</label>
+                        <input type="text" id="sectionRfpRef" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., L.5.2.1">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Compliance Ref</label>
+                        <input type="text" id="sectionComplianceRef" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., M.2.1.a">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Page Allocation</label>
+                        <input type="number" id="sectionPageAlloc" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., 5">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Page Estimate</label>
+                        <input type="number" id="sectionPageEst" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., 4">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Due Date</label>
+                        <input type="date" id="sectionDueDate" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Assigned To</label>
+                        <select id="sectionAssigned" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="">Unassigned</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Status</label>
+                        <select id="sectionStatus" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="Not Started">Not Started</option>
+                            <option value="Outline">Outline</option>
+                            <option value="Draft">Draft</option>
+                            <option value="Review">Review</option>
+                            <option value="Final">Final</option>
+                            <option value="Approved">Approved</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Content Summary</label>
+                    <textarea id="sectionSummary" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="Brief description of section content..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Key Themes (comma separated)</label>
+                    <input type="text" id="sectionThemes" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Innovation, Cost Savings, Experience">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Planned Graphics (comma separated)</label>
+                    <input type="text" id="sectionGraphics" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Org Chart, Process Flow, Timeline">
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="sectionRequired" checked class="rounded">
+                    <label for="sectionRequired" class="text-sm text-gray-400">Required Section</label>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeSectionModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Save Section</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Template Modal -->
+    <div id="templateModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-xl max-w-lg w-full p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-magic mr-2"></i>Apply Template</h3>
+                <button onclick="closeTemplateModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="space-y-3">
+                <button onclick="applyTemplate('technical')" class="w-full p-4 glass-card rounded-lg text-left hover:border-cyan-400/50">
+                    <div class="font-medium text-cyan-400">Standard Technical Volume</div>
+                    <div class="text-xs text-gray-400">Executive Summary, Technical Approach, Management, Staffing, Transition</div>
+                </button>
+                <button onclick="applyTemplate('past_performance')" class="w-full p-4 glass-card rounded-lg text-left hover:border-cyan-400/50">
+                    <div class="font-medium text-purple-400">Past Performance Volume</div>
+                    <div class="text-xs text-gray-400">3 Contract References with Relevance and Performance sections</div>
+                </button>
+                <button onclick="applyTemplate('pricing')" class="w-full p-4 glass-card rounded-lg text-left hover:border-cyan-400/50">
+                    <div class="font-medium text-green-400">Pricing Volume</div>
+                    <div class="text-xs text-gray-400">Price Summary, Labor Rates, ODCs, BOE, Assumptions</div>
+                </button>
+                <button onclick="applyTemplate('full')" class="w-full p-4 glass-card rounded-lg text-left hover:border-cyan-400/50">
+                    <div class="font-medium text-yellow-400">Full Proposal (All Volumes)</div>
+                    <div class="text-xs text-gray-400">Complete structure for multi-volume proposal</div>
+                </button>
+            </div>
+            <button onclick="closeTemplateModal()" class="w-full mt-4 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-cyan-500/10 mt-12 py-6 text-center text-xs text-gray-500">
+        <p>AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+        <p class="mt-1">MissionPulse v2.0 | Mission Meets Tech | Shield & Pulse UX v8.0</p>
+    </footer>
+
+    <script>
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTc0NjMsImV4cCI6MjA1Mjk5MzQ2M30.GXfKRTONeK0kCHk9WJzJzeG3sEaH15uPlFwczw4MXCg';
+        
+        let supabase;
+        let opportunities = [], profiles = [], outlines = [], sections = [];
+        let currentOutline = null;
+
+        // Demo Data
+        const demoOpportunities = [
+            { id: 'o1', title: 'VA EHR Modernization', stage: 'Proposal' },
+            { id: 'o2', title: 'DHA Cybersecurity Support', stage: 'Capture' }
+        ];
+        const demoProfiles = [
+            { id: 'u1', full_name: 'Mary Womack', email: 'mary@mmt.com', role: 'CEO' },
+            { id: 'u2', full_name: 'Sarah Miller', email: 'sarah@mmt.com', role: 'Capture Manager' },
+            { id: 'u3', full_name: 'Mike Torres', email: 'mike@mmt.com', role: 'Solution Architect' },
+            { id: 'u4', full_name: 'Lisa Park', email: 'lisa@mmt.com', role: 'Proposal Manager' }
+        ];
+        const demoOutlines = [
+            { id: 'ol1', opportunity_id: 'o1', outline_name: 'Technical Volume v1', volume: 'Volume II - Technical', status: 'Draft', total_page_limit: 50, current_page_estimate: 42 }
+        ];
+        const demoSections = [
+            { id: 's1', outline_id: 'ol1', parent_id: null, section_number: '1', section_title: 'Executive Summary', rfp_reference: 'L.5.1', page_allocation: 3, page_estimate: 3, status: 'Final', assigned_to: 'u1', sort_order: 1, key_themes: ['Innovation', 'Experience'], is_required: true },
+            { id: 's2', outline_id: 'ol1', parent_id: null, section_number: '2', section_title: 'Technical Approach', rfp_reference: 'L.5.2', page_allocation: 25, page_estimate: 22, status: 'Draft', assigned_to: 'u3', sort_order: 2, is_required: true },
+            { id: 's3', outline_id: 'ol1', parent_id: 's2', section_number: '2.1', section_title: 'Understanding of Requirements', rfp_reference: 'L.5.2.1', page_allocation: 5, page_estimate: 5, status: 'Review', assigned_to: 'u3', sort_order: 1, is_required: true },
+            { id: 's4', outline_id: 'ol1', parent_id: 's2', section_number: '2.2', section_title: 'Technical Solution', rfp_reference: 'L.5.2.2', page_allocation: 12, page_estimate: 10, status: 'Draft', assigned_to: 'u3', sort_order: 2, graphics_planned: ['Architecture Diagram', 'Data Flow'], is_required: true },
+            { id: 's5', outline_id: 'ol1', parent_id: 's2', section_number: '2.3', section_title: 'Innovation & Best Practices', rfp_reference: 'L.5.2.3', page_allocation: 8, page_estimate: 7, status: 'Outline', assigned_to: 'u3', sort_order: 3, is_required: true },
+            { id: 's6', outline_id: 'ol1', parent_id: null, section_number: '3', section_title: 'Management Approach', rfp_reference: 'L.5.3', page_allocation: 15, page_estimate: 12, status: 'Draft', assigned_to: 'u2', sort_order: 3, is_required: true },
+            { id: 's7', outline_id: 'ol1', parent_id: 's6', section_number: '3.1', section_title: 'Program Management', rfp_reference: 'L.5.3.1', page_allocation: 5, page_estimate: 4, status: 'Draft', assigned_to: 'u2', sort_order: 1, is_required: true },
+            { id: 's8', outline_id: 'ol1', parent_id: 's6', section_number: '3.2', section_title: 'Staffing Plan', rfp_reference: 'L.5.3.2', page_allocation: 6, page_estimate: 5, status: 'Not Started', assigned_to: 'u4', sort_order: 2, graphics_planned: ['Org Chart'], is_required: true },
+            { id: 's9', outline_id: 'ol1', parent_id: 's6', section_number: '3.3', section_title: 'Quality Assurance', rfp_reference: 'L.5.3.3', page_allocation: 4, page_estimate: 3, status: 'Not Started', assigned_to: 'u2', sort_order: 3, is_required: true },
+            { id: 's10', outline_id: 'ol1', parent_id: null, section_number: '4', section_title: 'Transition Plan', rfp_reference: 'L.5.4', page_allocation: 7, page_estimate: 5, status: 'Outline', assigned_to: 'u3', sort_order: 4, graphics_planned: ['Transition Timeline'], is_required: true }
+        ];
+
+        async function init() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                const [opRes, profRes] = await Promise.all([
+                    supabase.from('opportunities').select('id, title, stage').order('title'),
+                    supabase.from('profiles').select('id, full_name, email, role').order('full_name')
+                ]);
+                opportunities = opRes.data?.length ? opRes.data : demoOpportunities;
+                profiles = profRes.data?.length ? profRes.data : demoProfiles;
+                updateStatus('connected', 'Live');
+            } catch (e) {
+                console.log('Demo mode:', e.message);
+                opportunities = demoOpportunities;
+                profiles = demoProfiles;
+                outlines = demoOutlines;
+                sections = demoSections;
+                updateStatus('demo', 'Demo Mode');
+            }
+            populateSelects();
+        }
+
+        function updateStatus(type, text) {
+            const el = document.getElementById('connectionStatus');
+            el.className = type === 'connected' 
+                ? 'text-xs px-3 py-1 rounded-full bg-green-500/20 text-green-400'
+                : 'text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400';
+            el.innerHTML = `<i class="fas fa-circle text-[8px] mr-1"></i> ${text}`;
+        }
+
+        function populateSelects() {
+            const opSelect = document.getElementById('opportunitySelect');
+            const assignSelect = document.getElementById('sectionAssigned');
+            opportunities.forEach(o => opSelect.innerHTML += `<option value="${o.id}">${o.title}</option>`);
+            profiles.forEach(p => assignSelect.innerHTML += `<option value="${p.id}">${p.full_name || p.email}</option>`);
+        }
+
+        async function loadOutlines() {
+            const oppId = document.getElementById('opportunitySelect').value;
+            const outlineSelect = document.getElementById('outlineSelect');
+            outlineSelect.innerHTML = '<option value="">Select Outline...</option>';
+            
+            if (!oppId) { resetView(); return; }
+
+            try {
+                const { data } = await supabase.from('proposal_outlines').select('*').eq('opportunity_id', oppId).order('created_at');
+                outlines = data?.length ? data : demoOutlines.filter(o => o.opportunity_id === oppId);
+            } catch (e) {
+                outlines = demoOutlines.filter(o => o.opportunity_id === oppId);
+            }
+
+            outlines.forEach(o => outlineSelect.innerHTML += `<option value="${o.id}">${o.outline_name} (${o.volume})</option>`);
+        }
+
+        async function loadSections() {
+            const outlineId = document.getElementById('outlineSelect').value;
+            if (!outlineId) { resetView(); return; }
+
+            currentOutline = outlines.find(o => o.id === outlineId);
+            
+            try {
+                const { data } = await supabase.from('outline_sections').select('*').eq('outline_id', outlineId).order('sort_order');
+                sections = data?.length ? data : demoSections.filter(s => s.outline_id === outlineId);
+            } catch (e) {
+                sections = demoSections.filter(s => s.outline_id === outlineId);
+            }
+
+            updateStats();
+            renderSections();
+            populateParentSelect();
+            document.getElementById('addSectionBtnContainer').classList.remove('hidden');
+            document.getElementById('pageBudgetContainer').style.display = 'block';
+        }
+
+        function resetView() {
+            document.getElementById('outlineContainer').innerHTML = `
+                <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                    <i class="fas fa-sitemap text-4xl mb-4 opacity-50"></i>
+                    <p>Select an opportunity and outline to view sections</p>
+                </div>`;
+            document.getElementById('addSectionBtnContainer').classList.add('hidden');
+            document.getElementById('pageBudgetContainer').style.display = 'none';
+            resetStats();
+            currentOutline = null;
+        }
+
+        function resetStats() {
+            ['totalSections', 'pageLimit', 'pageEstimate', 'pagesRemaining', 'completedSections'].forEach(id => {
+                document.getElementById(id).textContent = '0';
+            });
+        }
+
+        function updateStats() {
+            const pageLimit = currentOutline?.total_page_limit || 0;
+            const pageEstimate = sections.reduce((sum, s) => sum + (s.page_estimate || 0), 0);
+            const pagesRemaining = Math.max(0, pageLimit - pageEstimate);
+            const completedSections = sections.filter(s => s.status === 'Final' || s.status === 'Approved').length;
+            const pagePercent = pageLimit ? Math.round((pageEstimate / pageLimit) * 100) : 0;
+
+            document.getElementById('totalSections').textContent = sections.length;
+            document.getElementById('pageLimit').textContent = pageLimit;
+            document.getElementById('pageEstimate').textContent = pageEstimate;
+            document.getElementById('pagesRemaining').textContent = pagesRemaining;
+            document.getElementById('completedSections').textContent = completedSections;
+
+            const pageFill = document.getElementById('pageFill');
+            const pagePercentText = document.getElementById('pagePercentText');
+            pageFill.style.width = Math.min(pagePercent, 100) + '%';
+            pageFill.className = 'page-fill ' + (pagePercent > 100 ? 'over' : pagePercent > 90 ? 'warning' : 'under');
+            pagePercentText.textContent = pagePercent + '%';
+            pagePercentText.className = 'text-sm ' + (pagePercent > 100 ? 'text-red-400' : pagePercent > 90 ? 'text-yellow-400' : 'text-green-400');
+        }
+
+        function populateParentSelect() {
+            const select = document.getElementById('sectionParent');
+            select.innerHTML = '<option value="">None (Top Level)</option>';
+            sections.filter(s => !s.parent_id).sort((a, b) => a.sort_order - b.sort_order).forEach(s => {
+                select.innerHTML += `<option value="${s.id}">${s.section_number} - ${s.section_title}</option>`;
+            });
+        }
+
+        function buildTree(items, parentId = null, level = 0) {
+            return items.filter(i => i.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order)
+                .map(item => ({ ...item, level, children: buildTree(items, item.id, level + 1) }));
+        }
+
+        function renderSections() {
+            const container = document.getElementById('outlineContainer');
+            const tree = buildTree(sections);
+            
+            if (!tree.length) {
+                container.innerHTML = `
+                    <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                        <i class="fas fa-plus-circle text-4xl mb-4 opacity-50"></i>
+                        <p>No sections yet. Add one or use a template.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = renderTreeItems(tree);
+        }
+
+        function renderTreeItems(items) {
+            return items.map(s => {
+                const statusClass = `status-${s.status.toLowerCase().replace(/\s+/g, '-')}`;
+                const assignee = profiles.find(p => p.id === s.assigned_to);
+                const levelClass = `section-level-${Math.min(s.level, 3)}`;
+                const pageColor = (s.page_estimate || 0) > (s.page_allocation || 999) ? 'text-red-400' : (s.page_estimate || 0) === (s.page_allocation || 0) ? 'text-yellow-400' : 'text-green-400';
+
+                return `
+                    <div class="section-item glass-card rounded-lg p-3 ${levelClass}" data-id="${s.id}">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-cyan-400 font-mono font-bold">${s.section_number}</span>
+                                    <span class="font-medium">${s.section_title}</span>
+                                    ${!s.is_required ? '<span class="tag bg-gray-500/20 text-gray-400">Optional</span>' : ''}
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3 text-xs">
+                                    <span class="${statusClass} px-2 py-0.5 rounded">${s.status}</span>
+                                    ${s.rfp_reference ? `<span class="text-gray-500"><i class="fas fa-file-alt mr-1"></i>${s.rfp_reference}</span>` : ''}
+                                    ${s.page_allocation ? `<span class="${pageColor}"><i class="fas fa-file mr-1"></i>${s.page_estimate || 0}/${s.page_allocation} pg</span>` : ''}
+                                    ${assignee ? `<span class="text-gray-400"><i class="fas fa-user mr-1"></i>${assignee.full_name}</span>` : ''}
+                                    ${s.due_date ? `<span class="text-gray-500"><i class="fas fa-calendar mr-1"></i>${s.due_date}</span>` : ''}
+                                </div>
+                                ${s.key_themes?.length ? `<div class="flex gap-1 mt-2">${s.key_themes.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+                                ${s.graphics_planned?.length ? `<div class="text-xs text-purple-400 mt-1"><i class="fas fa-image mr-1"></i>${s.graphics_planned.join(', ')}</div>` : ''}
+                            </div>
+                            <div class="flex items-center gap-2 ml-4">
+                                <button onclick="editSection('${s.id}')" class="text-cyan-400 hover:text-cyan-300 p-1" title="Edit"><i class="fas fa-edit"></i></button>
+                                <button onclick="deleteSection('${s.id}')" class="text-red-400 hover:text-red-300 p-1" title="Delete"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    ${s.children?.length ? renderTreeItems(s.children) : ''}
+                `;
+            }).join('');
+        }
+
+        // Outline CRUD
+        function openOutlineModal() {
+            if (!document.getElementById('opportunitySelect').value) { alert('Select an opportunity first'); return; }
+            document.getElementById('outlineForm').reset();
+            document.getElementById('outlineId').value = '';
+            document.getElementById('outlineModalTitle').textContent = 'New Outline';
+            document.getElementById('outlineModal').classList.remove('hidden');
+        }
+        function closeOutlineModal() { document.getElementById('outlineModal').classList.add('hidden'); }
+
+        async function saveOutline(e) {
+            e.preventDefault();
+            const id = document.getElementById('outlineId').value;
+            const data = {
+                opportunity_id: document.getElementById('opportunitySelect').value,
+                outline_name: document.getElementById('outlineName').value,
+                volume: document.getElementById('outlineVolume').value,
+                total_page_limit: parseInt(document.getElementById('outlinePageLimit').value) || null,
+                notes: document.getElementById('outlineNotes').value || null,
+                status: 'Draft',
+                updated_at: new Date().toISOString()
+            };
+            try {
+                if (id) {
+                    await supabase.from('proposal_outlines').update(data).eq('id', id);
+                } else {
+                    const { data: newO } = await supabase.from('proposal_outlines').insert([data]).select().single();
+                    if (newO) outlines.push(newO);
+                    else outlines.push({ id: 'ol' + Date.now(), ...data });
+                }
+            } catch (e) {
+                if (!id) outlines.push({ id: 'ol' + Date.now(), ...data });
+            }
+            closeOutlineModal();
+            loadOutlines();
+        }
+
+        // Section CRUD
+        function openSectionModal() {
+            document.getElementById('sectionForm').reset();
+            document.getElementById('sectionId').value = '';
+            document.getElementById('sectionRequired').checked = true;
+            document.getElementById('sectionModalTitle').textContent = 'Add Section';
+            document.getElementById('sectionModal').classList.remove('hidden');
+        }
+        function closeSectionModal() { document.getElementById('sectionModal').classList.add('hidden'); }
+
+        function editSection(id) {
+            const s = sections.find(x => x.id === id);
+            if (!s) return;
+            document.getElementById('sectionId').value = s.id;
+            document.getElementById('sectionNumber').value = s.section_number;
+            document.getElementById('sectionTitle').value = s.section_title;
+            document.getElementById('sectionParent').value = s.parent_id || '';
+            document.getElementById('sectionRfpRef').value = s.rfp_reference || '';
+            document.getElementById('sectionComplianceRef').value = s.compliance_ref || '';
+            document.getElementById('sectionPageAlloc').value = s.page_allocation || '';
+            document.getElementById('sectionPageEst').value = s.page_estimate || '';
+            document.getElementById('sectionDueDate').value = s.due_date || '';
+            document.getElementById('sectionAssigned').value = s.assigned_to || '';
+            document.getElementById('sectionStatus').value = s.status;
+            document.getElementById('sectionSummary').value = s.content_summary || '';
+            document.getElementById('sectionThemes').value = (s.key_themes || []).join(', ');
+            document.getElementById('sectionGraphics').value = (s.graphics_planned || []).join(', ');
+            document.getElementById('sectionRequired').checked = s.is_required !== false;
+            document.getElementById('sectionModalTitle').textContent = 'Edit Section';
+            document.getElementById('sectionModal').classList.remove('hidden');
+        }
+
+        async function saveSection(e) {
+            e.preventDefault();
+            const id = document.getElementById('sectionId').value;
+            const data = {
+                outline_id: document.getElementById('outlineSelect').value,
+                parent_id: document.getElementById('sectionParent').value || null,
+                section_number: document.getElementById('sectionNumber').value,
+                section_title: document.getElementById('sectionTitle').value,
+                rfp_reference: document.getElementById('sectionRfpRef').value || null,
+                compliance_ref: document.getElementById('sectionComplianceRef').value || null,
+                page_allocation: parseInt(document.getElementById('sectionPageAlloc').value) || null,
+                page_estimate: parseInt(document.getElementById('sectionPageEst').value) || 0,
+                due_date: document.getElementById('sectionDueDate').value || null,
+                assigned_to: document.getElementById('sectionAssigned').value || null,
+                status: document.getElementById('sectionStatus').value,
+                content_summary: document.getElementById('sectionSummary').value || null,
+                key_themes: document.getElementById('sectionThemes').value.split(',').map(s => s.trim()).filter(Boolean),
+                graphics_planned: document.getElementById('sectionGraphics').value.split(',').map(s => s.trim()).filter(Boolean),
+                is_required: document.getElementById('sectionRequired').checked,
+                sort_order: id ? sections.find(s => s.id === id)?.sort_order : sections.length + 1,
+                updated_at: new Date().toISOString()
+            };
+            try {
+                if (id) {
+                    await supabase.from('outline_sections').update(data).eq('id', id);
+                    const idx = sections.findIndex(s => s.id === id);
+                    if (idx >= 0) sections[idx] = { ...sections[idx], ...data };
+                } else {
+                    const { data: newS } = await supabase.from('outline_sections').insert([data]).select().single();
+                    if (newS) sections.push(newS);
+                    else sections.push({ id: 's' + Date.now(), ...data });
+                }
+            } catch (e) {
+                if (!id) sections.push({ id: 's' + Date.now(), ...data });
+            }
+            closeSectionModal();
+            updateStats();
+            renderSections();
+            populateParentSelect();
+        }
+
+        async function deleteSection(id) {
+            if (!confirm('Delete this section and all subsections?')) return;
+            const toDelete = [id, ...sections.filter(s => s.parent_id === id).map(s => s.id)];
+            try { await supabase.from('outline_sections').delete().in('id', toDelete); } catch (e) {}
+            sections = sections.filter(s => !toDelete.includes(s.id));
+            updateStats();
+            renderSections();
+            populateParentSelect();
+        }
+
+        // Templates
+        function useTemplate() {
+            if (!document.getElementById('outlineSelect').value) { alert('Select or create an outline first'); return; }
+            document.getElementById('templateModal').classList.remove('hidden');
+        }
+        function closeTemplateModal() { document.getElementById('templateModal').classList.add('hidden'); }
+
+        async function applyTemplate(type) {
+            const templates = {
+                technical: [
+                    { section_number: '1', section_title: 'Executive Summary', page_allocation: 3 },
+                    { section_number: '2', section_title: 'Technical Approach', page_allocation: 20 },
+                    { section_number: '2.1', section_title: 'Understanding of Requirements', parent_num: '2', page_allocation: 5 },
+                    { section_number: '2.2', section_title: 'Technical Solution', parent_num: '2', page_allocation: 10, graphics_planned: ['Architecture Diagram'] },
+                    { section_number: '2.3', section_title: 'Innovation', parent_num: '2', page_allocation: 5 },
+                    { section_number: '3', section_title: 'Management Approach', page_allocation: 15 },
+                    { section_number: '3.1', section_title: 'Program Management', parent_num: '3', page_allocation: 5 },
+                    { section_number: '3.2', section_title: 'Staffing Plan', parent_num: '3', page_allocation: 6, graphics_planned: ['Org Chart'] },
+                    { section_number: '3.3', section_title: 'Quality Assurance', parent_num: '3', page_allocation: 4 },
+                    { section_number: '4', section_title: 'Transition Plan', page_allocation: 7, graphics_planned: ['Timeline'] }
+                ],
+                past_performance: [
+                    { section_number: '1', section_title: 'Past Performance Overview', page_allocation: 1 },
+                    { section_number: '2', section_title: 'Contract Reference 1', page_allocation: 5 },
+                    { section_number: '2.1', section_title: 'Relevance', parent_num: '2', page_allocation: 2 },
+                    { section_number: '2.2', section_title: 'Performance', parent_num: '2', page_allocation: 3 },
+                    { section_number: '3', section_title: 'Contract Reference 2', page_allocation: 5 },
+                    { section_number: '4', section_title: 'Contract Reference 3', page_allocation: 5 }
+                ],
+                pricing: [
+                    { section_number: '1', section_title: 'Price Summary', page_allocation: 2 },
+                    { section_number: '2', section_title: 'Labor Rates', page_allocation: 3 },
+                    { section_number: '3', section_title: 'Other Direct Costs', page_allocation: 2 },
+                    { section_number: '4', section_title: 'Basis of Estimate', page_allocation: 10 },
+                    { section_number: '5', section_title: 'Assumptions & Exclusions', page_allocation: 2 }
+                ],
+                full: [
+                    { section_number: 'I', section_title: 'Administrative Volume', page_allocation: 5 },
+                    { section_number: 'II', section_title: 'Technical Volume', page_allocation: 50 },
+                    { section_number: 'III', section_title: 'Past Performance Volume', page_allocation: 20 },
+                    { section_number: 'IV', section_title: 'Pricing Volume', page_allocation: 20 }
+                ]
+            };
+
+            const template = templates[type];
+            if (!template) return;
+
+            const outlineId = document.getElementById('outlineSelect').value;
+            const parentMap = {};
+
+            for (let i = 0; i < template.length; i++) {
+                const t = template[i];
+                const sectionData = {
+                    outline_id: outlineId,
+                    section_number: t.section_number,
+                    section_title: t.section_title,
+                    page_allocation: t.page_allocation,
+                    is_required: true,
+                    graphics_planned: t.graphics_planned || [],
+                    status: 'Not Started',
+                    sort_order: i + 1,
+                    parent_id: t.parent_num ? parentMap[t.parent_num] : null
+                };
+                try {
+                    const { data: newS } = await supabase.from('outline_sections').insert([sectionData]).select().single();
+                    if (newS) { sections.push(newS); parentMap[t.section_number] = newS.id; }
+                    else { const lid = 's' + Date.now() + i; sections.push({ id: lid, ...sectionData }); parentMap[t.section_number] = lid; }
+                } catch (e) {
+                    const lid = 's' + Date.now() + i; sections.push({ id: lid, ...sectionData }); parentMap[t.section_number] = lid;
+                }
+            }
+
+            closeTemplateModal();
+            updateStats();
+            renderSections();
+            populateParentSelect();
+        }
+
+        init();
+    </script>
+</body>
+</html>
