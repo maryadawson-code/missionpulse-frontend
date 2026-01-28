@@ -16,9 +16,7 @@
       justify-content: center;
       color: white;
     }
-    .loader-container {
-      text-align: center;
-    }
+    .loader-container { text-align: center; }
     .logo {
       width: 64px;
       height: 64px;
@@ -30,11 +28,7 @@
       justify-content: center;
       animation: pulse 2s ease-in-out infinite;
     }
-    .logo svg {
-      width: 36px;
-      height: 36px;
-      color: white;
-    }
+    .logo svg { width: 36px; height: 36px; color: white; }
     .brand {
       font-size: 24px;
       font-weight: 700;
@@ -44,11 +38,7 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    .tagline {
-      color: #64748b;
-      font-size: 14px;
-      margin-bottom: 32px;
-    }
+    .tagline { color: #64748b; font-size: 14px; margin-bottom: 32px; }
     .spinner {
       width: 40px;
       height: 40px;
@@ -58,18 +48,25 @@
       animation: spin 1s linear infinite;
       margin: 0 auto;
     }
-    .status {
-      margin-top: 16px;
-      color: #64748b;
-      font-size: 12px;
+    .status { margin-top: 16px; color: #64748b; font-size: 12px; }
+    .error { color: #ef4444; }
+    .debug { 
+      margin-top: 24px; 
+      padding: 16px; 
+      background: #1e293b; 
+      border-radius: 8px; 
+      text-align: left;
+      font-size: 11px;
+      font-family: monospace;
+      max-width: 400px;
+      display: none;
     }
+    .debug.show { display: block; }
     @keyframes pulse {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.05); opacity: 0.9; }
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -81,78 +78,101 @@
     </div>
     <h1 class="brand">MissionPulse</h1>
     <p class="tagline">Mission. Technology. Transformation.</p>
-    <div class="spinner"></div>
-    <p class="status" id="status">Checking authentication...</p>
+    <div class="spinner" id="spinner"></div>
+    <p class="status" id="status">Initializing...</p>
+    <div class="debug" id="debug"></div>
   </div>
 
-  <!-- Supabase Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <script>
-    // Supabase Configuration
     const SUPABASE_URL = 'https://qlbvbfaprymzdqywcsiq.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsYnZiZmFwcnltemRxeXdjc2lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NjQ4NjcsImV4cCI6MjA1MzM0MDg2N30.QEnpsflnMM9i9xvYPHJlJO7wGPazPTvTWSFIohHcA';
-
-    // Pages
     const LOGIN_PAGE = 'login.html';
     const DASHBOARD_PAGE = 'missionpulse-mvp-v2-final.html';
 
-    // Initialize Supabase
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const statusEl = document.getElementById('status');
+    const debugEl = document.getElementById('debug');
+    let debugLog = [];
 
-    // Update status message
-    function updateStatus(message) {
-      document.getElementById('status').textContent = message;
+    function log(msg) {
+      console.log('[MissionPulse]', msg);
+      debugLog.push(new Date().toISOString().substr(11, 8) + ' ' + msg);
+      debugEl.innerHTML = debugLog.join('<br>');
     }
 
-    // Check authentication and redirect
-    async function checkAuthAndRedirect() {
+    function updateStatus(msg, isError = false) {
+      statusEl.textContent = msg;
+      if (isError) statusEl.classList.add('error');
+      log(msg);
+    }
+
+    function showDebug() {
+      debugEl.classList.add('show');
+    }
+
+    function redirect(url) {
+      log('Redirecting to: ' + url);
+      setTimeout(() => { window.location.href = url; }, 300);
+    }
+
+    async function checkAuth() {
       try {
-        updateStatus('Checking authentication...');
+        updateStatus('Loading Supabase...');
         
-        // Get current session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        if (typeof window.supabase === 'undefined') {
+          throw new Error('Supabase library not loaded');
+        }
+        log('Supabase library loaded');
+
+        updateStatus('Connecting to database...');
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        log('Supabase client created');
+
+        updateStatus('Checking session...');
+        const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Auth check error:', error);
-          updateStatus('Redirecting to login...');
-          setTimeout(() => window.location.href = LOGIN_PAGE, 500);
-          return;
+          log('Session error: ' + error.message);
+          throw error;
         }
 
-        if (session && session.user) {
-          // User is logged in - redirect to dashboard
+        log('Session check complete');
+        
+        if (data.session && data.session.user) {
+          const email = data.session.user.email;
+          log('User authenticated: ' + email);
           updateStatus('Welcome back! Loading dashboard...');
-          console.log('User authenticated:', session.user.email);
-          
-          // Store session info for dashboard
-          localStorage.setItem('mp_user_email', session.user.email);
-          localStorage.setItem('mp_session_id', session.access_token);
-          
-          setTimeout(() => window.location.href = DASHBOARD_PAGE, 500);
+          localStorage.setItem('mp_user_email', email);
+          redirect(DASHBOARD_PAGE);
         } else {
-          // No session - check for demo mode
+          log('No active session');
           const demoMode = localStorage.getItem('mp_demo_mode');
-          const demoUser = localStorage.getItem('mp_demo_user');
           
-          if (demoMode === 'true' && demoUser) {
-            updateStatus('Demo mode active. Loading dashboard...');
-            setTimeout(() => window.location.href = DASHBOARD_PAGE, 500);
+          if (demoMode === 'true') {
+            log('Demo mode active');
+            updateStatus('Demo mode. Loading dashboard...');
+            redirect(DASHBOARD_PAGE);
           } else {
-            // No auth - redirect to login
+            log('Redirecting to login');
             updateStatus('Please sign in...');
-            setTimeout(() => window.location.href = LOGIN_PAGE, 500);
+            redirect(LOGIN_PAGE);
           }
         }
       } catch (err) {
-        console.error('Unexpected error:', err);
-        updateStatus('Redirecting to login...');
-        setTimeout(() => window.location.href = LOGIN_PAGE, 1000);
+        console.error('Auth error:', err);
+        updateStatus('Error: ' + err.message, true);
+        showDebug();
+        log('Fallback redirect in 3s...');
+        setTimeout(() => redirect(LOGIN_PAGE), 3000);
       }
     }
 
-    // Run on page load
-    document.addEventListener('DOMContentLoaded', checkAuthAndRedirect);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', checkAuth);
+    } else {
+      checkAuth();
+    }
   </script>
 </body>
 </html>
