@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Orals Prep Studio</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes countdown { from { stroke-dashoffset: 0; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // ============================================================================
+    // CONFIG
+    // ============================================================================
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMzcsImV4cCI6MjA1MzM5OTAzN30.sGmvSPxaAjOjFkFkqU3MRajBSFjHlxgNQSeS07l0bH0';
+    const API_URL = 'https://missionpulse-api.onrender.com';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================================================
+    // ICONS
+    // ============================================================================
+    const Icons = {
+      mic: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>,
+      play: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>,
+      pause: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>,
+      stop: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>,
+      skip: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      star: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
+      starOutline: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      arrowLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      lightbulb: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================================
+    // UI COMPONENTS
+    // ============================================================================
+    const Card = ({ children, className = '', glow = false }) => (
+      <div className={`bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl ${glow ? 'shadow-lg shadow-cyan-500/20 border-cyan-500/30' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, className = '', disabled = false, ...props }) => {
+      const variants = { 
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400', 
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600', 
+        success: 'bg-emerald-500 text-white hover:bg-emerald-400', 
+        danger: 'bg-red-500 text-white hover:bg-red-400',
+        warning: 'bg-amber-500 text-white hover:bg-amber-400',
+        ghost: 'bg-transparent text-slate-400 hover:text-white hover:bg-slate-700/50',
+        gold: 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 hover:from-amber-300 hover:to-yellow-400'
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base', xl: 'px-8 py-4 text-lg' };
+      return (
+        <button className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`} disabled={disabled} {...props}>
+          {icon && <Icon name={icon} className="w-4 h-4" />}{children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm' }) => {
+      const variants = { 
+        default: 'bg-slate-700 text-slate-300', 
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30', 
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', 
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30', 
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        purple: 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return <span className={`inline-flex items-center rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>{children}</span>;
+    };
+
+    // ============================================================================
+    // TIMER COMPONENT
+    // ============================================================================
+    const CountdownTimer = ({ seconds, isRunning, onComplete }) => {
+      const [timeLeft, setTimeLeft] = useState(seconds);
+      const intervalRef = useRef(null);
+
+      useEffect(() => { setTimeLeft(seconds); }, [seconds]);
+
+      useEffect(() => {
+        if (isRunning && timeLeft > 0) {
+          intervalRef.current = setInterval(() => {
+            setTimeLeft(prev => {
+              if (prev <= 1) { clearInterval(intervalRef.current); onComplete?.(); return 0; }
+              return prev - 1;
+            });
+          }, 1000);
+        }
+        return () => clearInterval(intervalRef.current);
+      }, [isRunning, timeLeft, onComplete]);
+
+      const mins = Math.floor(timeLeft / 60);
+      const secs = timeLeft % 60;
+      const pct = (timeLeft / seconds) * 100;
+      const color = pct > 50 ? '#10B981' : pct > 25 ? '#F59E0B' : '#EF4444';
+
+      return (
+        <div className="relative w-32 h-32">
+          <svg className="w-full h-full transform -rotate-90">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#334155" strokeWidth="8" />
+            <circle 
+              cx="64" cy="64" r="56" fill="none" stroke={color} strokeWidth="8"
+              strokeDasharray={352} strokeDashoffset={352 - (352 * pct / 100)}
+              strokeLinecap="round" className="transition-all duration-1000"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-3xl font-bold font-mono" style={{ color }}>
+              {mins}:{secs.toString().padStart(2, '0')}
+            </span>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================================
+    // DEMO DATA
+    // ============================================================================
+    const DEMO_QUESTIONS = [
+      { id: 1, question_text: 'Describe your technical approach to implementing Zero Trust architecture within the existing infrastructure.', category: 'technical', difficulty: 'hard', suggested_answer: 'Our Zero Trust implementation follows NIST 800-207 guidelines...', time_limit_seconds: 180 },
+      { id: 2, question_text: 'How will you ensure continuity of operations during the transition period?', category: 'management', difficulty: 'medium', suggested_answer: 'We implement a parallel operations model with 90-day overlap...', time_limit_seconds: 120 },
+      { id: 3, question_text: 'What makes your team uniquely qualified for this work?', category: 'past_performance', difficulty: 'medium', suggested_answer: 'Our team delivered 3 similar contracts averaging $42M each...', time_limit_seconds: 120 },
+      { id: 4, question_text: 'The incumbent has been on this contract for 8 years. Why should we switch to you?', category: 'curveball', difficulty: 'killer', suggested_answer: 'Eight years of legacy decisions compound technical debt...', time_limit_seconds: 150 },
+      { id: 5, question_text: 'Walk us through your pricing methodology.', category: 'pricing', difficulty: 'hard', suggested_answer: 'Our pricing uses bottom-up engineering estimates...', time_limit_seconds: 150 },
+    ];
+
+    // ============================================================================
+    // MAIN COMPONENT
+    // ============================================================================
+    const OralsStudio = () => {
+      const [questions, setQuestions] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [dbConnected, setDbConnected] = useState(false);
+      const [mode, setMode] = useState('lobby'); // lobby, practice, review
+      const [currentIndex, setCurrentIndex] = useState(0);
+      const [isTimerRunning, setIsTimerRunning] = useState(false);
+      const [showAnswer, setShowAnswer] = useState(false);
+      const [scores, setScores] = useState({});
+      const [notes, setNotes] = useState({});
+      const [aiCoaching, setAiCoaching] = useState('');
+      const [loadingCoach, setLoadingCoach] = useState(false);
+      const [filterCategory, setFilterCategory] = useState('all');
+
+      useEffect(() => { loadQuestions(); }, []);
+
+      const loadQuestions = async () => {
+        setLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('orals_questions')
+            .select('*')
+            .order('created_at');
+          if (error) throw error;
+          setQuestions(data?.length ? data : DEMO_QUESTIONS);
+          setDbConnected(!error && data?.length > 0);
+        } catch (err) {
+          setQuestions(DEMO_QUESTIONS);
+          setDbConnected(false);
+        }
+        setLoading(false);
+      };
+
+      const filteredQuestions = useMemo(() => {
+        if (filterCategory === 'all') return questions;
+        return questions.filter(q => q.category === filterCategory);
+      }, [questions, filterCategory]);
+
+      const currentQuestion = filteredQuestions[currentIndex];
+
+      const getCategoryBadge = (cat) => {
+        const cats = {
+          technical: { variant: 'primary', label: '🔧 Technical' },
+          management: { variant: 'success', label: '📊 Management' },
+          past_performance: { variant: 'warning', label: '📜 Past Performance' },
+          pricing: { variant: 'purple', label: '💰 Pricing' },
+          curveball: { variant: 'danger', label: '⚡ Curveball' },
+          general: { variant: 'default', label: '📝 General' }
+        };
+        return cats[cat] || cats.general;
+      };
+
+      const getDifficultyBadge = (diff) => {
+        const diffs = {
+          easy: { variant: 'success', label: 'Easy' },
+          medium: { variant: 'warning', label: 'Medium' },
+          hard: { variant: 'danger', label: 'Hard' },
+          killer: { variant: 'danger', label: '💀 Killer' }
+        };
+        return diffs[diff] || diffs.medium;
+      };
+
+      const startPractice = () => {
+        setMode('practice');
+        setCurrentIndex(0);
+        setIsTimerRunning(false);
+        setShowAnswer(false);
+        setScores({});
+        setNotes({});
+        setAiCoaching('');
+      };
+
+      const nextQuestion = () => {
+        if (currentIndex < filteredQuestions.length - 1) {
+          setCurrentIndex(prev => prev + 1);
+          setIsTimerRunning(false);
+          setShowAnswer(false);
+          setAiCoaching('');
+        } else {
+          setMode('review');
+        }
+      };
+
+      const scoreQuestion = (score) => {
+        setScores(prev => ({ ...prev, [currentQuestion.id]: score }));
+      };
+
+      const getAICoaching = async () => {
+        if (!currentQuestion) return;
+        setLoadingCoach(true);
+        try {
+          const response = await fetch(`${API_URL}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [
+                { role: 'system', content: 'You are an orals presentation coach for federal proposals. Give concise, actionable advice.' },
+                { role: 'user', content: `Coach me on answering this orals question: "${currentQuestion.question_text}"\n\nSuggested answer framework: ${currentQuestion.suggested_answer}\n\nGive 3 specific tips for delivering a compelling response.` }
+              ],
+              stream: false
+            })
+          });
+          const data = await response.json();
+          setAiCoaching(data.content || data.message || 'Coaching unavailable');
+        } catch (err) {
+          setAiCoaching('Focus on: 1) Lead with your discriminator 2) Use specific metrics 3) Connect to evaluator priorities');
+        }
+        setLoadingCoach(false);
+      };
+
+      const avgScore = Object.values(scores).length > 0 
+        ? (Object.values(scores).reduce((a, b) => a + b, 0) / Object.values(scores).length).toFixed(1)
+        : 0;
+
+      // ========================================================================
+      // RENDER
+      // ========================================================================
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white p-6">
+          <div className="max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <a href="index.html" className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50">
+                  <Icon name="arrowLeft" className="w-5 h-5 text-slate-400" />
+                </a>
+                <div>
+                  <h1 className="text-2xl font-bold flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                      <Icon name="mic" className="w-5 h-5 text-white" />
+                    </div>
+                    Orals Prep Studio
+                  </h1>
+                  <p className="text-sm text-slate-400">Practice presentations with AI coaching</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge variant={dbConnected ? 'success' : 'warning'}>{dbConnected ? 'Live' : 'Demo'}</Badge>
+                {mode !== 'lobby' && (
+                  <Button variant="ghost" size="sm" onClick={() => setMode('lobby')}>Exit Practice</Button>
+                )}
+              </div>
+            </div>
+
+            {/* LOBBY MODE */}
+            {mode === 'lobby' && (
+              <div className="animate-fade-in">
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <Card className="p-4 text-center">
+                    <div className="text-3xl font-bold text-cyan-400">{questions.length}</div>
+                    <div className="text-xs text-slate-400">Questions</div>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <div className="text-3xl font-bold text-amber-400">{questions.filter(q => q.difficulty === 'killer').length}</div>
+                    <div className="text-xs text-slate-400">Killer Questions</div>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <div className="text-3xl font-bold text-emerald-400">{Math.round(questions.reduce((a, q) => a + q.time_limit_seconds, 0) / 60)}</div>
+                    <div className="text-xs text-slate-400">Total Minutes</div>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <div className="text-3xl font-bold text-purple-400">5</div>
+                    <div className="text-xs text-slate-400">Categories</div>
+                  </Card>
+                </div>
+
+                {/* Category Filter */}
+                <Card className="p-4 mb-6">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-sm text-slate-400">Filter:</span>
+                    {['all', 'technical', 'management', 'past_performance', 'pricing', 'curveball'].map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setFilterCategory(cat)}
+                        className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
+                          filterCategory === cat 
+                            ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' 
+                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        }`}
+                      >
+                        {cat === 'all' ? 'All' : getCategoryBadge(cat).label}
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+
+                {/* Question Bank */}
+                <Card className="p-4 mb-6">
+                  <h3 className="font-semibold mb-4">Question Bank ({filteredQuestions.length})</h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {filteredQuestions.map((q, idx) => {
+                      const catBadge = getCategoryBadge(q.category);
+                      const diffBadge = getDifficultyBadge(q.difficulty);
+                      return (
+                        <div key={q.id} className="p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <p className="text-sm">{q.question_text}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge variant={catBadge.variant} size="xs">{catBadge.label}</Badge>
+                                <Badge variant={diffBadge.variant} size="xs">{diffBadge.label}</Badge>
+                                <span className="text-xs text-slate-500">{q.time_limit_seconds}s</span>
+                              </div>
+                            </div>
+                            <span className="text-slate-600 font-mono text-sm">#{idx + 1}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+
+                {/* Start Button */}
+                <div className="text-center">
+                  <Button variant="gold" size="xl" icon="play" onClick={startPractice} className="shadow-lg shadow-amber-500/25">
+                    Start Practice Session
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* PRACTICE MODE */}
+            {mode === 'practice' && currentQuestion && (
+              <div className="animate-fade-in">
+                {/* Progress */}
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-slate-400">Question {currentIndex + 1} of {filteredQuestions.length}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={getCategoryBadge(currentQuestion.category).variant}>
+                      {getCategoryBadge(currentQuestion.category).label}
+                    </Badge>
+                    <Badge variant={getDifficultyBadge(currentQuestion.difficulty).variant}>
+                      {getDifficultyBadge(currentQuestion.difficulty).label}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="h-2 bg-slate-800 rounded-full mb-6">
+                  <div 
+                    className="h-full bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full transition-all"
+                    style={{ width: `${((currentIndex + 1) / filteredQuestions.length) * 100}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Question Card */}
+                  <div className="lg:col-span-2">
+                    <Card className="p-6" glow>
+                      <h2 className="text-xl font-semibold mb-6">{currentQuestion.question_text}</h2>
+                      
+                      {/* Timer & Controls */}
+                      <div className="flex items-center justify-center gap-8 mb-6">
+                        <CountdownTimer 
+                          seconds={currentQuestion.time_limit_seconds} 
+                          isRunning={isTimerRunning}
+                          onComplete={() => setIsTimerRunning(false)}
+                        />
+                        <div className="flex flex-col gap-3">
+                          <Button 
+                            variant={isTimerRunning ? 'warning' : 'success'} 
+                            size="lg" 
+                            icon={isTimerRunning ? 'pause' : 'play'}
+                            onClick={() => setIsTimerRunning(!isTimerRunning)}
+                          >
+                            {isTimerRunning ? 'Pause' : 'Start Timer'}
+                          </Button>
+                          <Button variant="secondary" size="md" icon="lightbulb" onClick={() => setShowAnswer(!showAnswer)}>
+                            {showAnswer ? 'Hide Answer' : 'Show Answer'}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Suggested Answer */}
+                      {showAnswer && (
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 animate-fade-in">
+                          <h4 className="text-sm font-semibold text-emerald-400 mb-2">Suggested Answer Framework</h4>
+                          <p className="text-sm text-slate-300">{currentQuestion.suggested_answer}</p>
+                        </div>
+                      )}
+                    </Card>
+
+                    {/* Score & Next */}
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-400">Rate your response:</span>
+                        {[1, 2, 3, 4, 5].map(s => (
+                          <button
+                            key={s}
+                            onClick={() => scoreQuestion(s)}
+                            className="p-1 hover:scale-110 transition-transform"
+                          >
+                            <Icon 
+                              name={scores[currentQuestion.id] >= s ? 'star' : 'starOutline'} 
+                              className={`w-6 h-6 ${scores[currentQuestion.id] >= s ? 'text-amber-400' : 'text-slate-600'}`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      <Button variant="primary" size="lg" icon="skip" onClick={nextQuestion}>
+                        {currentIndex < filteredQuestions.length - 1 ? 'Next Question' : 'Finish'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* AI Coach Panel */}
+                  <div>
+                    <Card className="p-4">
+                      <h3 className="font-semibold flex items-center gap-2 mb-4">
+                        <Icon name="zap" className="w-4 h-4 text-amber-400" />
+                        AI Coach
+                      </h3>
+                      <Button 
+                        variant="gold" 
+                        size="sm" 
+                        className="w-full mb-4" 
+                        onClick={getAICoaching}
+                        disabled={loadingCoach}
+                      >
+                        {loadingCoach ? 'Thinking...' : 'Get Coaching Tips'}
+                      </Button>
+                      {aiCoaching && (
+                        <div className="bg-slate-900/50 rounded-lg p-3 text-sm text-slate-300 animate-fade-in">
+                          {aiCoaching}
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      <div className="mt-4">
+                        <label className="text-xs text-slate-400 block mb-2">Your Notes</label>
+                        <textarea
+                          value={notes[currentQuestion.id] || ''}
+                          onChange={(e) => setNotes(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
+                          placeholder="Jot down key points..."
+                          className="w-full h-24 bg-slate-900/50 border border-slate-700 rounded-lg p-3 text-sm resize-none focus:border-cyan-500 focus:outline-none"
+                        />
+                      </div>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* REVIEW MODE */}
+            {mode === 'review' && (
+              <div className="animate-fade-in">
+                <Card className="p-8 text-center mb-6" glow>
+                  <h2 className="text-3xl font-bold mb-2">Session Complete! 🎉</h2>
+                  <p className="text-slate-400 mb-6">You practiced {filteredQuestions.length} questions</p>
+                  <div className="flex items-center justify-center gap-8">
+                    <div>
+                      <div className="text-5xl font-bold text-amber-400">{avgScore}</div>
+                      <div className="text-sm text-slate-400">Avg Score</div>
+                    </div>
+                    <div>
+                      <div className="text-5xl font-bold text-cyan-400">{Object.keys(scores).length}</div>
+                      <div className="text-sm text-slate-400">Rated</div>
+                    </div>
+                  </div>
+                </Card>
+
+                <div className="flex justify-center gap-4">
+                  <Button variant="primary" size="lg" icon="refresh" onClick={startPractice}>
+                    Practice Again
+                  </Button>
+                  <Button variant="secondary" size="lg" onClick={() => setMode('lobby')}>
+                    Back to Lobby
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="mt-8 text-center text-xs text-slate-600">
+              AI GENERATED CONTENT - REQUIRES HUMAN REVIEW | MissionPulse v12 | Orals Studio Sprint 21
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<OralsStudio />, document.getElementById('root'));
+  </script>
+</body>
+</html>

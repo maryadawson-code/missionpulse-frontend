@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Risk Register</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // ============================================================================
+    // CONFIG
+    // ============================================================================
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMzcsImV4cCI6MjA1MzM5OTAzN30.sGmvSPxaAjOjFkFkqU3MRajBSFjHlxgNQSeS07l0bH0';
+    const API_URL = 'https://missionpulse-api.onrender.com';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================================================
+    // ICONS
+    // ============================================================================
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      arrowLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      chevronUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================================
+    // UI COMPONENTS
+    // ============================================================================
+    const Card = ({ children, className = '', glow = false }) => (
+      <div className={`bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl ${glow ? 'shadow-lg shadow-cyan-500/20 border-cyan-500/30' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, className = '', disabled = false, ...props }) => {
+      const variants = { 
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400', 
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600', 
+        success: 'bg-emerald-500 text-white hover:bg-emerald-400', 
+        danger: 'bg-red-500 text-white hover:bg-red-400',
+        warning: 'bg-amber-500 text-white hover:bg-amber-400',
+        ghost: 'bg-transparent text-slate-400 hover:text-white hover:bg-slate-700/50',
+        gold: 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 hover:from-amber-300 hover:to-yellow-400'
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`} disabled={disabled} {...props}>
+          {icon && <Icon name={icon} className="w-4 h-4" />}{children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm' }) => {
+      const variants = { 
+        default: 'bg-slate-700 text-slate-300', 
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30', 
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', 
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30', 
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        purple: 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return <span className={`inline-flex items-center rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>{children}</span>;
+    };
+
+    // ============================================================================
+    // DEMO DATA
+    // ============================================================================
+    const DEMO_RISKS = [
+      { id: 1, risk_title: 'Key personnel availability', description: 'Dr. Chen may be committed to VA contract extension through Q2', category: 'staffing', probability: 'medium', impact: 'critical', risk_score: 8, status: 'mitigating', mitigations: [{ action: 'Identify backup CMIO', status: 'in_progress' }, { action: 'Negotiate early release', status: 'planned' }] },
+      { id: 2, risk_title: 'Teaming partner financial stability', description: 'Subcontractor showing signs of cash flow issues', category: 'teaming', probability: 'low', impact: 'critical', risk_score: 4, status: 'watching', mitigations: [] },
+      { id: 3, risk_title: 'Schedule compression for orals', description: 'Only 3 weeks between submission and orals', category: 'schedule', probability: 'high', impact: 'high', risk_score: 9, status: 'open', mitigations: [{ action: 'Begin orals prep at Pink Team', status: 'in_progress' }] },
+      { id: 4, risk_title: 'CMMC certification timeline', description: 'Level 2 may not complete before contract start', category: 'compliance', probability: 'medium', impact: 'high', risk_score: 6, status: 'mitigating', mitigations: [{ action: 'Engage C3PAO for expedited assessment', status: 'in_progress' }] },
+      { id: 5, risk_title: 'Incumbent protest likelihood', description: 'Strong incumbent likely to protest any loss', category: 'external', probability: 'high', impact: 'medium', risk_score: 6, status: 'accepted', mitigations: [] },
+      { id: 6, risk_title: 'Labor rate competitiveness', description: 'GSA rates 8% higher than competitor direct rates', category: 'cost', probability: 'medium', impact: 'medium', risk_score: 4, status: 'mitigating', mitigations: [{ action: 'Model alternative labor mix', status: 'completed' }] },
+      { id: 7, risk_title: 'Technical solution scalability', description: 'Architecture untested above 10,000 users', category: 'technical', probability: 'low', impact: 'high', risk_score: 3, status: 'open', mitigations: [] },
+      { id: 8, risk_title: 'Past performance recency', description: 'Most relevant contract ended 3 years ago', category: 'performance', probability: 'medium', impact: 'medium', risk_score: 4, status: 'watching', mitigations: [] },
+    ];
+
+    // ============================================================================
+    // MAIN COMPONENT
+    // ============================================================================
+    const RiskRegister = () => {
+      const [risks, setRisks] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [dbConnected, setDbConnected] = useState(false);
+      const [filterCategory, setFilterCategory] = useState('all');
+      const [filterStatus, setFilterStatus] = useState('all');
+      const [expandedId, setExpandedId] = useState(null);
+      const [showAddRisk, setShowAddRisk] = useState(false);
+      const [showMatrix, setShowMatrix] = useState(false);
+      const [generating, setGenerating] = useState(false);
+      const [newRisk, setNewRisk] = useState({
+        risk_title: '', description: '', category: 'technical', 
+        probability: 'medium', impact: 'medium', status: 'open'
+      });
+
+      useEffect(() => { loadRisks(); }, []);
+
+      const loadRisks = async () => {
+        setLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('risks')
+            .select('*, risk_mitigations(*)')
+            .order('risk_score', { ascending: false });
+          if (error) throw error;
+          const formatted = data?.map(r => ({
+            ...r,
+            mitigations: r.risk_mitigations || []
+          })) || [];
+          setRisks(formatted.length ? formatted : DEMO_RISKS);
+          setDbConnected(!error && data?.length > 0);
+        } catch (err) {
+          setRisks(DEMO_RISKS);
+          setDbConnected(false);
+        }
+        setLoading(false);
+      };
+
+      const getCategoryBadge = (cat) => {
+        const cats = {
+          technical: { variant: 'primary', label: '🔧 Technical' },
+          schedule: { variant: 'warning', label: '📅 Schedule' },
+          cost: { variant: 'success', label: '💰 Cost' },
+          performance: { variant: 'purple', label: '📊 Performance' },
+          staffing: { variant: 'warning', label: '👥 Staffing' },
+          teaming: { variant: 'primary', label: '🤝 Teaming' },
+          compliance: { variant: 'danger', label: '✅ Compliance' },
+          external: { variant: 'default', label: '🌐 External' }
+        };
+        return cats[cat] || cats.technical;
+      };
+
+      const getStatusBadge = (status) => {
+        const statuses = {
+          open: { variant: 'danger', label: '🔴 Open' },
+          mitigating: { variant: 'warning', label: '🟡 Mitigating' },
+          watching: { variant: 'primary', label: '👁️ Watching' },
+          closed: { variant: 'success', label: '✅ Closed' },
+          accepted: { variant: 'default', label: '✓ Accepted' }
+        };
+        return statuses[status] || statuses.open;
+      };
+
+      const getLevelBadge = (level) => {
+        const levels = {
+          low: { variant: 'success', label: 'Low' },
+          medium: { variant: 'warning', label: 'Medium' },
+          high: { variant: 'danger', label: 'High' },
+          critical: { variant: 'danger', label: '🔴 Critical' }
+        };
+        return levels[level] || levels.medium;
+      };
+
+      const getRiskScoreColor = (score) => {
+        if (score >= 9) return 'bg-red-500 text-white';
+        if (score >= 6) return 'bg-amber-500 text-white';
+        if (score >= 3) return 'bg-yellow-500 text-slate-900';
+        return 'bg-emerald-500 text-white';
+      };
+
+      const calcRiskScore = (prob, impact) => {
+        const probMap = { low: 1, medium: 2, high: 3, critical: 4 };
+        const impactMap = { low: 1, medium: 2, high: 3, critical: 4 };
+        return (probMap[prob] || 2) * (impactMap[impact] || 2);
+      };
+
+      const filteredRisks = useMemo(() => {
+        return risks.filter(risk => {
+          if (filterCategory !== 'all' && risk.category !== filterCategory) return false;
+          if (filterStatus !== 'all' && risk.status !== filterStatus) return false;
+          return true;
+        });
+      }, [risks, filterCategory, filterStatus]);
+
+      const stats = useMemo(() => ({
+        total: risks.length,
+        critical: risks.filter(r => r.risk_score >= 9).length,
+        high: risks.filter(r => r.risk_score >= 6 && r.risk_score < 9).length,
+        open: risks.filter(r => r.status === 'open').length,
+        mitigating: risks.filter(r => r.status === 'mitigating').length
+      }), [risks]);
+
+      const addRisk = async () => {
+        if (!newRisk.risk_title) return;
+        const risk = {
+          ...newRisk,
+          id: Date.now(),
+          risk_score: calcRiskScore(newRisk.probability, newRisk.impact),
+          mitigations: []
+        };
+        setRisks(prev => [risk, ...prev].sort((a, b) => b.risk_score - a.risk_score));
+        if (dbConnected) {
+          await supabase.from('risks').insert(newRisk);
+        }
+        setNewRisk({ risk_title: '', description: '', category: 'technical', probability: 'medium', impact: 'medium', status: 'open' });
+        setShowAddRisk(false);
+      };
+
+      const updateRiskStatus = async (id, status) => {
+        setRisks(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+        if (dbConnected) {
+          await supabase.from('risks').update({ status }).eq('id', id);
+        }
+      };
+
+      const generateMitigations = async () => {
+        setGenerating(true);
+        try {
+          const topRisks = risks.filter(r => r.risk_score >= 6).slice(0, 3);
+          const response = await fetch(`${API_URL}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [
+                { role: 'system', content: 'You are a federal proposal risk management expert.' },
+                { role: 'user', content: `Suggest mitigation strategies for these proposal risks:\n\n${topRisks.map(r => `- ${r.risk_title}: ${r.description}`).join('\n')}` }
+              ],
+              stream: false
+            })
+          });
+          const data = await response.json();
+          alert('AI Mitigation Suggestions:\n\n' + (data.content || data.message));
+        } catch (err) {
+          alert('AI Mitigation Suggestions:\n\n1. Key Personnel: Secure LOI from backup candidate, begin onboarding paperwork early\n\n2. Schedule: Implement parallel workstreams, pre-position orals materials\n\n3. Compliance: Engage expedited assessment, document interim controls');
+        }
+        setGenerating(false);
+      };
+
+      // Risk Matrix Component
+      const RiskMatrix = () => {
+        const matrix = [
+          ['critical', 4, 8, 12, 16],
+          ['high', 3, 6, 9, 12],
+          ['medium', 2, 4, 6, 8],
+          ['low', 1, 2, 3, 4]
+        ];
+        const impactLabels = ['Low', 'Medium', 'High', 'Critical'];
+
+        const getRisksAtScore = (prob, impactIdx) => {
+          const probMap = { low: 1, medium: 2, high: 3, critical: 4 };
+          const targetScore = probMap[prob] * (impactIdx + 1);
+          return risks.filter(r => r.risk_score === targetScore);
+        };
+
+        return (
+          <Card className="p-4 mb-6">
+            <h3 className="font-semibold mb-4">Probability/Impact Matrix</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="p-2 text-left text-slate-400">Probability</th>
+                    {impactLabels.map(l => <th key={l} className="p-2 text-center text-slate-400">{l}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {matrix.map(([prob, ...scores], rowIdx) => (
+                    <tr key={prob}>
+                      <td className="p-2 font-medium capitalize">{prob}</td>
+                      {scores.map((score, colIdx) => {
+                        const risksHere = getRisksAtScore(prob, colIdx);
+                        return (
+                          <td key={colIdx} className="p-1">
+                            <div className={`rounded-lg p-2 min-h-16 ${
+                              score >= 9 ? 'bg-red-500/20' : 
+                              score >= 6 ? 'bg-amber-500/20' : 
+                              score >= 3 ? 'bg-yellow-500/20' : 'bg-emerald-500/20'
+                            }`}>
+                              <div className="text-xs text-slate-400 mb-1">Score: {score}</div>
+                              {risksHere.slice(0, 2).map(r => (
+                                <div key={r.id} className="text-xs truncate" title={r.risk_title}>
+                                  • {r.risk_title.substring(0, 20)}...
+                                </div>
+                              ))}
+                              {risksHere.length > 2 && (
+                                <div className="text-xs text-slate-500">+{risksHere.length - 2} more</div>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td></td>
+                    {impactLabels.map(l => <td key={l} className="p-2 text-center text-xs text-slate-500">Impact: {l}</td>)}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </Card>
+        );
+      };
+
+      // ========================================================================
+      // RENDER
+      // ========================================================================
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white p-6">
+          <div className="max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <a href="index.html" className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50">
+                  <Icon name="arrowLeft" className="w-5 h-5 text-slate-400" />
+                </a>
+                <div>
+                  <h1 className="text-2xl font-bold flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+                      <Icon name="alert" className="w-5 h-5 text-white" />
+                    </div>
+                    Risk Register
+                  </h1>
+                  <p className="text-sm text-slate-400">Track and mitigate proposal risks</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge variant={dbConnected ? 'success' : 'warning'}>{dbConnected ? 'Live' : 'Demo'}</Badge>
+                <Button variant="ghost" size="sm" icon="refresh" onClick={loadRisks}>Refresh</Button>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-5 gap-4 mb-6">
+              <Card className="p-4 text-center">
+                <div className="text-3xl font-bold text-cyan-400">{stats.total}</div>
+                <div className="text-xs text-slate-400">Total Risks</div>
+              </Card>
+              <Card className="p-4 text-center border-red-500/30">
+                <div className="text-3xl font-bold text-red-400">{stats.critical}</div>
+                <div className="text-xs text-slate-400">Critical (9+)</div>
+              </Card>
+              <Card className="p-4 text-center">
+                <div className="text-3xl font-bold text-amber-400">{stats.high}</div>
+                <div className="text-xs text-slate-400">High (6-8)</div>
+              </Card>
+              <Card className="p-4 text-center">
+                <div className="text-3xl font-bold text-red-400">{stats.open}</div>
+                <div className="text-xs text-slate-400">Open</div>
+              </Card>
+              <Card className="p-4 text-center">
+                <div className="text-3xl font-bold text-amber-400">{stats.mitigating}</div>
+                <div className="text-xs text-slate-400">Mitigating</div>
+              </Card>
+            </div>
+
+            {/* Controls */}
+            <Card className="p-4 mb-6">
+              <div className="flex flex-wrap items-center gap-4">
+                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">All Categories</option>
+                  <option value="technical">🔧 Technical</option>
+                  <option value="schedule">📅 Schedule</option>
+                  <option value="cost">💰 Cost</option>
+                  <option value="staffing">👥 Staffing</option>
+                  <option value="teaming">🤝 Teaming</option>
+                  <option value="compliance">✅ Compliance</option>
+                  <option value="external">🌐 External</option>
+                </select>
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">All Status</option>
+                  <option value="open">🔴 Open</option>
+                  <option value="mitigating">🟡 Mitigating</option>
+                  <option value="watching">👁️ Watching</option>
+                  <option value="accepted">✓ Accepted</option>
+                  <option value="closed">✅ Closed</option>
+                </select>
+                <div className="flex-1" />
+                <Button variant={showMatrix ? 'primary' : 'secondary'} size="sm" icon="target" onClick={() => setShowMatrix(!showMatrix)}>
+                  {showMatrix ? 'Hide Matrix' : 'Show Matrix'}
+                </Button>
+                <Button variant="gold" size="sm" icon="zap" onClick={generateMitigations} disabled={generating}>
+                  {generating ? 'Analyzing...' : 'AI Mitigations'}
+                </Button>
+                <Button variant="primary" size="sm" icon="plus" onClick={() => setShowAddRisk(true)}>
+                  Add Risk
+                </Button>
+              </div>
+            </Card>
+
+            {/* Risk Matrix */}
+            {showMatrix && <RiskMatrix />}
+
+            {/* Add Risk Form */}
+            {showAddRisk && (
+              <Card className="p-4 mb-6 border-cyan-500/30 animate-fade-in">
+                <h3 className="font-semibold mb-4">Add New Risk</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <input
+                    value={newRisk.risk_title}
+                    onChange={(e) => setNewRisk(prev => ({ ...prev, risk_title: e.target.value }))}
+                    placeholder="Risk title..."
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <select value={newRisk.category} onChange={(e) => setNewRisk(prev => ({ ...prev, category: e.target.value }))} className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                    <option value="technical">Technical</option>
+                    <option value="schedule">Schedule</option>
+                    <option value="cost">Cost</option>
+                    <option value="staffing">Staffing</option>
+                    <option value="teaming">Teaming</option>
+                    <option value="compliance">Compliance</option>
+                    <option value="external">External</option>
+                  </select>
+                </div>
+                <textarea
+                  value={newRisk.description}
+                  onChange={(e) => setNewRisk(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Risk description..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm mb-4 h-20 resize-none"
+                />
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Probability</label>
+                    <select value={newRisk.probability} onChange={(e) => setNewRisk(prev => ({ ...prev, probability: e.target.value }))} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Impact</label>
+                    <select value={newRisk.impact} onChange={(e) => setNewRisk(prev => ({ ...prev, impact: e.target.value }))} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Risk Score</label>
+                    <div className={`rounded-lg px-3 py-2 text-center font-bold ${getRiskScoreColor(calcRiskScore(newRisk.probability, newRisk.impact))}`}>
+                      {calcRiskScore(newRisk.probability, newRisk.impact)}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="success" size="sm" icon="check" onClick={addRisk}>Save Risk</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddRisk(false)}>Cancel</Button>
+                </div>
+              </Card>
+            )}
+
+            {/* Risks List */}
+            <div className="space-y-3">
+              {loading ? (
+                <Card className="p-8 text-center">
+                  <div className="animate-spin w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full mx-auto" />
+                </Card>
+              ) : filteredRisks.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <Icon name="shield" className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400">No risks match your filters</p>
+                </Card>
+              ) : filteredRisks.map(risk => {
+                const catBadge = getCategoryBadge(risk.category);
+                const statusBadge = getStatusBadge(risk.status);
+                const isExpanded = expandedId === risk.id;
+
+                return (
+                  <Card key={risk.id} className={`overflow-hidden transition-all ${risk.risk_score >= 9 ? 'border-red-500/30' : ''}`}>
+                    <div className="p-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : risk.id)}>
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${getRiskScoreColor(risk.risk_score)}`}>
+                          {risk.risk_score}
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-medium mb-1">{risk.risk_title}</h3>
+                          <p className="text-sm text-slate-400 mb-2">{risk.description}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={catBadge.variant} size="xs">{catBadge.label}</Badge>
+                            <Badge variant={statusBadge.variant} size="xs">{statusBadge.label}</Badge>
+                            <span className="text-xs text-slate-500">P: {risk.probability} | I: {risk.impact}</span>
+                            {risk.mitigations?.length > 0 && (
+                              <span className="text-xs text-cyan-400">{risk.mitigations.length} mitigation(s)</span>
+                            )}
+                          </div>
+                        </div>
+                        <Icon name={isExpanded ? 'chevronUp' : 'chevronDown'} className="w-5 h-5 text-slate-400" />
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-slate-700/50 pt-4 animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="text-xs text-slate-400 mb-2">Update Status</h4>
+                            <div className="flex gap-2 flex-wrap">
+                              {['open', 'mitigating', 'watching', 'accepted', 'closed'].map(s => (
+                                <button
+                                  key={s}
+                                  onClick={() => updateRiskStatus(risk.id, s)}
+                                  className={`px-2 py-1 rounded text-xs capitalize transition-all ${
+                                    risk.status === s ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                  }`}
+                                >
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="text-xs text-slate-400 mb-2">Mitigations</h4>
+                            {risk.mitigations?.length > 0 ? (
+                              <div className="space-y-1">
+                                {risk.mitigations.map((m, idx) => (
+                                  <div key={idx} className="flex items-center gap-2 text-sm">
+                                    <span className={`w-2 h-2 rounded-full ${
+                                      m.status === 'completed' ? 'bg-emerald-500' : 
+                                      m.status === 'in_progress' ? 'bg-amber-500' : 'bg-slate-500'
+                                    }`} />
+                                    <span className={m.status === 'completed' ? 'line-through text-slate-500' : ''}>
+                                      {m.action}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-slate-500">No mitigations defined</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-8 text-center text-xs text-slate-600">
+              AI GENERATED CONTENT - REQUIRES HUMAN REVIEW | MissionPulse v12 | Risk Register Sprint 24
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<RiskRegister />, document.getElementById('root'));
+  </script>
+</body>
+</html>

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Assignments | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); backdrop-filter: blur(10px); }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA, #00b8d4); color: #00050F; font-weight: 600; }
+        .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+        .workload-bar { background: rgba(0, 229, 250, 0.1); border-radius: 4px; overflow: hidden; }
+        .workload-fill { background: linear-gradient(90deg, #00E5FA, #00b8d4); height: 100%; transition: width 0.3s; }
+        .workload-fill.over { background: linear-gradient(90deg, #ff4444, #ff6666); }
+        .role-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; }
+        .status-assigned { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .status-active { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .status-completed { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+        .tab-active { border-bottom: 2px solid #00E5FA; color: #00E5FA; }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Header -->
+    <header class="border-b border-cyan-500/20 bg-black/40 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="index.html" class="text-cyan-400 hover:text-cyan-300"><i class="fas fa-arrow-left"></i></a>
+                <div>
+                    <h1 class="text-xl font-bold text-cyan-400"><i class="fas fa-users-cog mr-2"></i>Team Assignments</h1>
+                    <p class="text-xs text-gray-400">Workload Manager & Resource Allocation</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="connectionStatus" class="text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
+                    <i class="fas fa-circle text-[8px] mr-1"></i> Connecting...
+                </span>
+                <span id="userRole" class="text-xs text-gray-400"></span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Tabs -->
+        <div class="flex gap-6 mb-8 border-b border-gray-700">
+            <button onclick="showTab('assignments')" id="tab-assignments" class="pb-3 px-2 text-sm tab-active">
+                <i class="fas fa-clipboard-list mr-2"></i>Assignments
+            </button>
+            <button onclick="showTab('workload')" id="tab-workload" class="pb-3 px-2 text-sm text-gray-400 hover:text-white">
+                <i class="fas fa-chart-bar mr-2"></i>Workload Overview
+            </button>
+            <button onclick="showTab('capacity')" id="tab-capacity" class="pb-3 px-2 text-sm text-gray-400 hover:text-white">
+                <i class="fas fa-user-clock mr-2"></i>Capacity Settings
+            </button>
+        </div>
+
+        <!-- Tab: Assignments -->
+        <div id="panel-assignments">
+            <!-- Controls -->
+            <div class="flex flex-wrap gap-4 mb-6">
+                <select id="filterOpportunity" onchange="loadAssignments()" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm">
+                    <option value="">All Opportunities</option>
+                </select>
+                <select id="filterRole" onchange="loadAssignments()" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm">
+                    <option value="">All Roles</option>
+                    <option value="CEO">CEO</option>
+                    <option value="COO">COO</option>
+                    <option value="Capture Manager">Capture Manager</option>
+                    <option value="Proposal Manager">Proposal Manager</option>
+                    <option value="Solution Architect">Solution Architect</option>
+                    <option value="Pricing Analyst">Pricing Analyst</option>
+                    <option value="Contracts">Contracts</option>
+                    <option value="Staffing Lead">Staffing Lead</option>
+                    <option value="QA Lead">QA Lead</option>
+                    <option value="Partner Lead">Partner Lead</option>
+                    <option value="Admin">Admin</option>
+                </select>
+                <select id="filterStatus" onchange="loadAssignments()" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm">
+                    <option value="">All Statuses</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                </select>
+                <div class="flex-1"></div>
+                <button onclick="openAssignModal()" class="btn-primary px-4 py-2 rounded text-sm">
+                    <i class="fas fa-plus mr-2"></i>New Assignment
+                </button>
+            </div>
+
+            <!-- Assignments Table -->
+            <div class="glass-card rounded-lg overflow-hidden">
+                <table class="w-full">
+                    <thead class="bg-cyan-500/10 text-cyan-400 text-xs uppercase">
+                        <tr>
+                            <th class="px-4 py-3 text-left">Team Member</th>
+                            <th class="px-4 py-3 text-left">Opportunity</th>
+                            <th class="px-4 py-3 text-left">Role</th>
+                            <th class="px-4 py-3 text-center">Hours</th>
+                            <th class="px-4 py-3 text-left">Dates</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assignmentsTable" class="divide-y divide-gray-700/50">
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">Loading assignments...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab: Workload Overview -->
+        <div id="panel-workload" class="hidden">
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6" id="workloadCards">
+                <div class="glass-card rounded-lg p-6 text-center text-gray-500">Loading workload data...</div>
+            </div>
+        </div>
+
+        <!-- Tab: Capacity Settings -->
+        <div id="panel-capacity" class="hidden">
+            <div class="glass-card rounded-lg overflow-hidden">
+                <table class="w-full">
+                    <thead class="bg-cyan-500/10 text-cyan-400 text-xs uppercase">
+                        <tr>
+                            <th class="px-4 py-3 text-left">Team Member</th>
+                            <th class="px-4 py-3 text-center">Weekly Hours</th>
+                            <th class="px-4 py-3 text-center">Currently Allocated</th>
+                            <th class="px-4 py-3 text-left">Skills</th>
+                            <th class="px-4 py-3 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="capacityTable" class="divide-y divide-gray-700/50">
+                        <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading capacity data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Assignment Modal -->
+    <div id="assignModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-xl max-w-lg w-full p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-user-plus mr-2"></i>New Assignment</h3>
+                <button onclick="closeAssignModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="assignForm" onsubmit="saveAssignment(event)" class="space-y-4">
+                <input type="hidden" id="assignId">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Team Member</label>
+                    <select id="assignUser" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                        <option value="">Select team member...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Opportunity</label>
+                    <select id="assignOpportunity" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                        <option value="">Select opportunity...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Role</label>
+                    <select id="assignRole" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                        <option value="">Select role...</option>
+                        <option value="CEO">CEO</option>
+                        <option value="COO">COO</option>
+                        <option value="Capture Manager">Capture Manager</option>
+                        <option value="Proposal Manager">Proposal Manager</option>
+                        <option value="Solution Architect">Solution Architect</option>
+                        <option value="Pricing Analyst">Pricing Analyst</option>
+                        <option value="Contracts">Contracts</option>
+                        <option value="Staffing Lead">Staffing Lead</option>
+                        <option value="QA Lead">QA Lead</option>
+                        <option value="Partner Lead">Partner Lead</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Hours</label>
+                        <input type="number" id="assignHours" min="1" max="500" value="40" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Start Date</label>
+                        <input type="date" id="assignStart" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">End Date</label>
+                        <input type="date" id="assignEnd" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Notes</label>
+                    <textarea id="assignNotes" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="Optional notes..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeAssignModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Save Assignment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Capacity Modal -->
+    <div id="capacityModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-xl max-w-md w-full p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-user-clock mr-2"></i>Edit Capacity</h3>
+                <button onclick="closeCapacityModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="capacityForm" onsubmit="saveCapacity(event)" class="space-y-4">
+                <input type="hidden" id="capacityUserId">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Weekly Hours Available</label>
+                    <input type="number" id="capacityHours" min="0" max="80" value="40" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Skills (comma separated)</label>
+                    <input type="text" id="capacitySkills" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Technical Writing, CMMC, Healthcare IT">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Certifications</label>
+                    <input type="text" id="capacityCerts" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., PMP, CISSP, AWS">
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeCapacityModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Save Capacity</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-cyan-500/10 mt-12 py-6 text-center text-xs text-gray-500">
+        <p>AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+        <p class="mt-1">MissionPulse v2.0 | Mission Meets Tech | Shield & Pulse UX v8.0</p>
+    </footer>
+
+    <script>
+        // Supabase Init
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTc0NjMsImV4cCI6MjA1Mjk5MzQ2M30.GXfKRTONeK0kCHk9WJzJzeG3sEaH15uPlFwczw4MXCg';
+        let supabase, currentUser = null;
+        let opportunities = [], profiles = [], assignments = [], capacities = [];
+
+        // Demo Data
+        const demoProfiles = [
+            { id: 'u1', full_name: 'Mary Womack', email: 'mary@missionmeetstech.com', role: 'CEO' },
+            { id: 'u2', full_name: 'John Chen', email: 'john@missionmeetstech.com', role: 'COO' },
+            { id: 'u3', full_name: 'Sarah Miller', email: 'sarah@missionmeetstech.com', role: 'Capture Manager' },
+            { id: 'u4', full_name: 'Mike Torres', email: 'mike@missionmeetstech.com', role: 'Solution Architect' },
+            { id: 'u5', full_name: 'Lisa Park', email: 'lisa@missionmeetstech.com', role: 'Proposal Manager' }
+        ];
+        const demoOpportunities = [
+            { id: 'o1', title: 'VA EHR Modernization', stage: 'Proposal', value: 125000000 },
+            { id: 'o2', title: 'DHA Cybersecurity Support', stage: 'Capture', value: 45000000 },
+            { id: 'o3', title: 'CMS Data Analytics Platform', stage: 'Pursuit', value: 78000000 }
+        ];
+        const demoAssignments = [
+            { id: 'a1', opportunity_id: 'o1', user_id: 'u1', role: 'CEO', hours_allocated: 20, status: 'active', start_date: '2025-01-15', end_date: '2025-03-15' },
+            { id: 'a2', opportunity_id: 'o1', user_id: 'u3', role: 'Capture Manager', hours_allocated: 80, status: 'active', start_date: '2025-01-10', end_date: '2025-03-15' },
+            { id: 'a3', opportunity_id: 'o1', user_id: 'u4', role: 'Solution Architect', hours_allocated: 120, status: 'assigned', start_date: '2025-02-01', end_date: '2025-03-15' },
+            { id: 'a4', opportunity_id: 'o2', user_id: 'u2', role: 'COO', hours_allocated: 15, status: 'active', start_date: '2025-01-20', end_date: '2025-04-01' },
+            { id: 'a5', opportunity_id: 'o2', user_id: 'u5', role: 'Proposal Manager', hours_allocated: 60, status: 'assigned', start_date: '2025-02-01', end_date: '2025-04-01' }
+        ];
+        const demoCapacities = [
+            { id: 'c1', user_id: 'u1', weekly_hours_available: 20, current_week_allocated: 15, skills: ['Strategy', 'Business Development'], certifications: ['PMP'] },
+            { id: 'c2', user_id: 'u2', weekly_hours_available: 30, current_week_allocated: 22, skills: ['Operations', 'Capture'], certifications: ['CMMC-AB'] },
+            { id: 'c3', user_id: 'u3', weekly_hours_available: 40, current_week_allocated: 38, skills: ['Capture Management', 'GovCon'], certifications: ['APMP'] },
+            { id: 'c4', user_id: 'u4', weekly_hours_available: 40, current_week_allocated: 45, skills: ['Healthcare IT', 'Cloud', 'Security'], certifications: ['AWS SAA', 'CISSP'] },
+            { id: 'c5', user_id: 'u5', weekly_hours_available: 40, current_week_allocated: 30, skills: ['Proposal Writing', 'Technical Editing'], certifications: ['APMP'] }
+        ];
+
+        async function init() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    currentUser = session.user;
+                    const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+                    if (profile) {
+                        document.getElementById('userRole').textContent = `${profile.full_name || profile.email} (${profile.role || 'User'})`;
+                    }
+                }
+                await loadSupabaseData();
+                updateStatus('connected', 'Live');
+            } catch (e) {
+                console.log('Using demo data:', e.message);
+                useDemoData();
+                updateStatus('demo', 'Demo Mode');
+            }
+            populateFilters();
+            loadAssignments();
+            loadWorkload();
+            loadCapacity();
+        }
+
+        async function loadSupabaseData() {
+            const [opRes, profRes, assignRes, capRes] = await Promise.all([
+                supabase.from('opportunities').select('id, title, stage, value').order('title'),
+                supabase.from('profiles').select('id, full_name, email, role').order('full_name'),
+                supabase.from('team_assignments').select('*').order('created_at', { ascending: false }),
+                supabase.from('workload_capacity').select('*')
+            ]);
+            opportunities = opRes.data?.length ? opRes.data : demoOpportunities;
+            profiles = profRes.data?.length ? profRes.data : demoProfiles;
+            assignments = assignRes.data?.length ? assignRes.data : demoAssignments;
+            capacities = capRes.data?.length ? capRes.data : demoCapacities;
+        }
+
+        function useDemoData() {
+            opportunities = demoOpportunities;
+            profiles = demoProfiles;
+            assignments = demoAssignments;
+            capacities = demoCapacities;
+        }
+
+        function updateStatus(type, text) {
+            const el = document.getElementById('connectionStatus');
+            if (type === 'connected') {
+                el.className = 'text-xs px-3 py-1 rounded-full bg-green-500/20 text-green-400';
+            } else if (type === 'demo') {
+                el.className = 'text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400';
+            }
+            el.innerHTML = `<i class="fas fa-circle text-[8px] mr-1"></i> ${text}`;
+        }
+
+        function populateFilters() {
+            const opFilter = document.getElementById('filterOpportunity');
+            const opSelect = document.getElementById('assignOpportunity');
+            const userSelect = document.getElementById('assignUser');
+            
+            opportunities.forEach(o => {
+                opFilter.innerHTML += `<option value="${o.id}">${o.title}</option>`;
+                opSelect.innerHTML += `<option value="${o.id}">${o.title}</option>`;
+            });
+            profiles.forEach(p => {
+                userSelect.innerHTML += `<option value="${p.id}">${p.full_name || p.email}</option>`;
+            });
+        }
+
+        function showTab(tab) {
+            ['assignments', 'workload', 'capacity'].forEach(t => {
+                document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+                document.getElementById(`tab-${t}`).classList.toggle('tab-active', t === tab);
+                document.getElementById(`tab-${t}`).classList.toggle('text-gray-400', t !== tab);
+            });
+        }
+
+        function loadAssignments() {
+            const opFilter = document.getElementById('filterOpportunity').value;
+            const roleFilter = document.getElementById('filterRole').value;
+            const statusFilter = document.getElementById('filterStatus').value;
+
+            let filtered = assignments.filter(a => {
+                if (opFilter && a.opportunity_id !== opFilter) return false;
+                if (roleFilter && a.role !== roleFilter) return false;
+                if (statusFilter && a.status !== statusFilter) return false;
+                return true;
+            });
+
+            const tbody = document.getElementById('assignmentsTable');
+            if (!filtered.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No assignments found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(a => {
+                const user = profiles.find(p => p.id === a.user_id) || { full_name: 'Unknown', email: '' };
+                const opp = opportunities.find(o => o.id === a.opportunity_id) || { title: 'Unknown' };
+                const statusClass = `status-${a.status}`;
+                return `
+                    <tr class="hover:bg-cyan-500/5">
+                        <td class="px-4 py-3">
+                            <div class="font-medium">${user.full_name || user.email}</div>
+                            <div class="text-xs text-gray-500">${user.email}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm">${opp.title}</td>
+                        <td class="px-4 py-3"><span class="role-badge bg-cyan-500/20 text-cyan-400">${a.role}</span></td>
+                        <td class="px-4 py-3 text-center text-sm">${a.hours_allocated}h</td>
+                        <td class="px-4 py-3 text-xs text-gray-400">${a.start_date || '-'} → ${a.end_date || '-'}</td>
+                        <td class="px-4 py-3 text-center"><span class="role-badge ${statusClass}">${a.status}</span></td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="editAssignment('${a.id}')" class="text-cyan-400 hover:text-cyan-300 mr-2"><i class="fas fa-edit"></i></button>
+                            <button onclick="updateAssignmentStatus('${a.id}')" class="text-green-400 hover:text-green-300 mr-2" title="Toggle Status"><i class="fas fa-check-circle"></i></button>
+                            <button onclick="deleteAssignment('${a.id}')" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadWorkload() {
+            const container = document.getElementById('workloadCards');
+            
+            const workloadData = profiles.map(p => {
+                const userAssignments = assignments.filter(a => a.user_id === p.id && a.status !== 'completed');
+                const totalHours = userAssignments.reduce((sum, a) => sum + (a.hours_allocated || 0), 0);
+                const capacity = capacities.find(c => c.user_id === p.id) || { weekly_hours_available: 40 };
+                const weeklyCapacity = capacity.weekly_hours_available || 40;
+                const utilization = Math.round((totalHours / (weeklyCapacity * 4)) * 100); // Monthly view
+                return { ...p, totalHours, weeklyCapacity, utilization, assignmentCount: userAssignments.length };
+            });
+
+            container.innerHTML = workloadData.map(w => {
+                const overloaded = w.utilization > 100;
+                return `
+                    <div class="glass-card rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="font-medium">${w.full_name || w.email}</h4>
+                                <p class="text-xs text-gray-400">${w.role || 'Team Member'}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold ${overloaded ? 'text-red-400' : 'text-cyan-400'}">${w.utilization}%</div>
+                                <div class="text-xs text-gray-500">utilization</div>
+                            </div>
+                        </div>
+                        <div class="workload-bar h-3 mb-3">
+                            <div class="workload-fill ${overloaded ? 'over' : ''}" style="width: ${Math.min(w.utilization, 100)}%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span>${w.totalHours}h allocated</span>
+                            <span>${w.assignmentCount} active assignments</span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">${w.weeklyCapacity}h/week capacity</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function loadCapacity() {
+            const tbody = document.getElementById('capacityTable');
+            
+            const capData = profiles.map(p => {
+                const cap = capacities.find(c => c.user_id === p.id) || { weekly_hours_available: 40, current_week_allocated: 0, skills: [], certifications: [] };
+                return { ...p, ...cap };
+            });
+
+            tbody.innerHTML = capData.map(c => `
+                <tr class="hover:bg-cyan-500/5">
+                    <td class="px-4 py-3">
+                        <div class="font-medium">${c.full_name || c.email}</div>
+                        <div class="text-xs text-gray-500">${c.role || 'Team Member'}</div>
+                    </td>
+                    <td class="px-4 py-3 text-center">${c.weekly_hours_available || 40}h</td>
+                    <td class="px-4 py-3 text-center">${c.current_week_allocated || 0}h</td>
+                    <td class="px-4 py-3 text-xs text-gray-400">${(c.skills || []).join(', ') || '-'}</td>
+                    <td class="px-4 py-3 text-center">
+                        <button onclick="editCapacity('${c.id}')" class="text-cyan-400 hover:text-cyan-300"><i class="fas fa-edit"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Modal Functions
+        function openAssignModal() {
+            document.getElementById('assignForm').reset();
+            document.getElementById('assignId').value = '';
+            document.getElementById('assignModal').classList.remove('hidden');
+        }
+
+        function closeAssignModal() {
+            document.getElementById('assignModal').classList.add('hidden');
+        }
+
+        function editAssignment(id) {
+            const a = assignments.find(x => x.id === id);
+            if (!a) return;
+            document.getElementById('assignId').value = a.id;
+            document.getElementById('assignUser').value = a.user_id;
+            document.getElementById('assignOpportunity').value = a.opportunity_id;
+            document.getElementById('assignRole').value = a.role;
+            document.getElementById('assignHours').value = a.hours_allocated;
+            document.getElementById('assignStart').value = a.start_date || '';
+            document.getElementById('assignEnd').value = a.end_date || '';
+            document.getElementById('assignNotes').value = a.notes || '';
+            document.getElementById('assignModal').classList.remove('hidden');
+        }
+
+        async function saveAssignment(e) {
+            e.preventDefault();
+            const id = document.getElementById('assignId').value;
+            const data = {
+                user_id: document.getElementById('assignUser').value,
+                opportunity_id: document.getElementById('assignOpportunity').value,
+                role: document.getElementById('assignRole').value,
+                hours_allocated: parseInt(document.getElementById('assignHours').value) || 40,
+                start_date: document.getElementById('assignStart').value || null,
+                end_date: document.getElementById('assignEnd').value || null,
+                notes: document.getElementById('assignNotes').value,
+                status: 'assigned',
+                updated_at: new Date().toISOString()
+            };
+
+            try {
+                if (id) {
+                    await supabase.from('team_assignments').update(data).eq('id', id);
+                    const idx = assignments.findIndex(a => a.id === id);
+                    if (idx >= 0) assignments[idx] = { ...assignments[idx], ...data };
+                } else {
+                    const { data: newAssign } = await supabase.from('team_assignments').insert([data]).select().single();
+                    if (newAssign) assignments.unshift(newAssign);
+                    else assignments.unshift({ id: 'a' + Date.now(), ...data });
+                }
+            } catch (e) {
+                assignments.unshift({ id: 'a' + Date.now(), ...data });
+            }
+
+            closeAssignModal();
+            loadAssignments();
+            loadWorkload();
+        }
+
+        async function updateAssignmentStatus(id) {
+            const a = assignments.find(x => x.id === id);
+            if (!a) return;
+            const nextStatus = { assigned: 'active', active: 'completed', completed: 'assigned' }[a.status] || 'assigned';
+            try {
+                await supabase.from('team_assignments').update({ status: nextStatus }).eq('id', id);
+            } catch (e) {}
+            a.status = nextStatus;
+            loadAssignments();
+            loadWorkload();
+        }
+
+        async function deleteAssignment(id) {
+            if (!confirm('Remove this assignment?')) return;
+            try {
+                await supabase.from('team_assignments').delete().eq('id', id);
+            } catch (e) {}
+            assignments = assignments.filter(a => a.id !== id);
+            loadAssignments();
+            loadWorkload();
+        }
+
+        function editCapacity(userId) {
+            const c = capacities.find(x => x.user_id === userId) || {};
+            document.getElementById('capacityUserId').value = userId;
+            document.getElementById('capacityHours').value = c.weekly_hours_available || 40;
+            document.getElementById('capacitySkills').value = (c.skills || []).join(', ');
+            document.getElementById('capacityCerts').value = (c.certifications || []).join(', ');
+            document.getElementById('capacityModal').classList.remove('hidden');
+        }
+
+        function closeCapacityModal() {
+            document.getElementById('capacityModal').classList.add('hidden');
+        }
+
+        async function saveCapacity(e) {
+            e.preventDefault();
+            const userId = document.getElementById('capacityUserId').value;
+            const data = {
+                user_id: userId,
+                weekly_hours_available: parseInt(document.getElementById('capacityHours').value) || 40,
+                skills: document.getElementById('capacitySkills').value.split(',').map(s => s.trim()).filter(Boolean),
+                certifications: document.getElementById('capacityCerts').value.split(',').map(s => s.trim()).filter(Boolean),
+                updated_at: new Date().toISOString()
+            };
+
+            try {
+                const existing = capacities.find(c => c.user_id === userId);
+                if (existing) {
+                    await supabase.from('workload_capacity').update(data).eq('user_id', userId);
+                    Object.assign(existing, data);
+                } else {
+                    const { data: newCap } = await supabase.from('workload_capacity').insert([data]).select().single();
+                    if (newCap) capacities.push(newCap);
+                    else capacities.push({ id: 'c' + Date.now(), ...data });
+                }
+            } catch (e) {
+                const existing = capacities.find(c => c.user_id === userId);
+                if (existing) Object.assign(existing, data);
+                else capacities.push({ id: 'c' + Date.now(), ...data });
+            }
+
+            closeCapacityModal();
+            loadCapacity();
+            loadWorkload();
+        }
+
+        // Init
+        init();
+    </script>
+</body>
+</html>

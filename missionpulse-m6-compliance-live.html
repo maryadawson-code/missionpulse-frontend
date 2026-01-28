@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iron Dome Compliance | MissionPulse</title>
+  <link rel="icon" type="image/png" href="MMT_icon_32px.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    body { background: linear-gradient(135deg, #00050F 0%, #0a1628 50%, #00050F 100%); min-height: 100vh; }
+    .glow-border { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #00b8d4 100%); }
+    .shield-icon { filter: drop-shadow(0 0 8px rgba(0, 229, 250, 0.5)); }
+    .category-cybersecurity { border-left: 3px solid #ef4444; }
+    .category-clearance { border-left: 3px solid #8b5cf6; }
+    .category-certifications { border-left: 3px solid #3b82f6; }
+    .category-financial { border-left: 3px solid #22c55e; }
+    .category-past_performance { border-left: 3px solid #f59e0b; }
+    .status-compliant { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    .status-in_progress { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .status-gap_identified { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .status-not_started { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+    .status-waived { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+    .progress-ring { transform: rotate(-90deg); }
+  </style>
+</head>
+<body class="text-white">
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="flex items-center gap-3">
+          <img src="MMT_icon_64px.png" alt="MissionPulse" class="w-10 h-10">
+          <div>
+            <h1 class="text-xl font-bold text-white">MissionPulse</h1>
+            <p class="text-xs text-cyan-400">M6: Iron Dome Compliance</p>
+          </div>
+        </a>
+      </div>
+      <div class="flex items-center gap-4">
+        <select id="opportunitySelect" class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white text-sm">
+          <option value="">Select Opportunity...</option>
+        </select>
+        <a href="index.html" class="text-slate-400 hover:text-white text-sm">← Back to Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <!-- Shield Status -->
+    <div class="flex items-center justify-center mb-8">
+      <div class="relative">
+        <svg class="w-32 h-32 shield-icon" viewBox="0 0 100 100">
+          <!-- Background ring -->
+          <circle cx="50" cy="50" r="45" fill="none" stroke="#334155" stroke-width="8"/>
+          <!-- Progress ring -->
+          <circle id="progressRing" class="progress-ring" cx="50" cy="50" r="45" fill="none" 
+            stroke="#00E5FA" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="283" stroke-dashoffset="283"/>
+          <!-- Shield icon -->
+          <path d="M50 20 L70 30 L70 50 C70 65 60 75 50 80 C40 75 30 65 30 50 L30 30 Z" 
+            fill="none" stroke="#00E5FA" stroke-width="2"/>
+          <path d="M42 50 L48 56 L58 44" fill="none" stroke="#00E5FA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="text-center mt-2">
+            <span id="shieldScore" class="text-3xl font-bold text-cyan-400">--%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-5 gap-4 mb-8">
+      <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+        <div class="text-2xl font-bold text-white" id="statTotal">0</div>
+        <div class="text-xs text-slate-400">Requirements</div>
+      </div>
+      <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+        <div class="text-2xl font-bold text-green-400" id="statCompliant">0</div>
+        <div class="text-xs text-slate-400">Compliant</div>
+      </div>
+      <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+        <div class="text-2xl font-bold text-blue-400" id="statProgress">0</div>
+        <div class="text-xs text-slate-400">In Progress</div>
+      </div>
+      <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+        <div class="text-2xl font-bold text-red-400" id="statGaps">0</div>
+        <div class="text-xs text-slate-400">Gaps</div>
+      </div>
+      <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+        <div class="text-2xl font-bold text-slate-400" id="statNotStarted">0</div>
+        <div class="text-xs text-slate-400">Not Started</div>
+      </div>
+    </div>
+
+    <!-- No Opp Selected -->
+    <div id="noOppSelected" class="text-center py-16">
+      <svg class="w-20 h-20 mx-auto text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+      </svg>
+      <h3 class="text-xl font-semibold text-white mb-2">Iron Dome Compliance Tracker</h3>
+      <p class="text-slate-400 mb-4">Select an opportunity to track compliance requirements</p>
+    </div>
+
+    <!-- Compliance Categories -->
+    <div id="complianceContainer" class="hidden space-y-6">
+      <!-- Cybersecurity -->
+      <div class="bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="bg-red-500/10 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🔒</span>
+            <h3 class="font-semibold text-white">Cybersecurity</h3>
+          </div>
+          <span id="cyberCount" class="text-sm text-slate-400">0/0</span>
+        </div>
+        <div id="cyberItems" class="divide-y divide-slate-700/50"></div>
+      </div>
+
+      <!-- Clearances -->
+      <div class="bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="bg-purple-500/10 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🔐</span>
+            <h3 class="font-semibold text-white">Security Clearances</h3>
+          </div>
+          <span id="clearanceCount" class="text-sm text-slate-400">0/0</span>
+        </div>
+        <div id="clearanceItems" class="divide-y divide-slate-700/50"></div>
+      </div>
+
+      <!-- Certifications -->
+      <div class="bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="bg-blue-500/10 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">📋</span>
+            <h3 class="font-semibold text-white">Certifications & Registrations</h3>
+          </div>
+          <span id="certCount" class="text-sm text-slate-400">0/0</span>
+        </div>
+        <div id="certItems" class="divide-y divide-slate-700/50"></div>
+      </div>
+
+      <!-- Financial -->
+      <div class="bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="bg-green-500/10 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">💰</span>
+            <h3 class="font-semibold text-white">Financial Requirements</h3>
+          </div>
+          <span id="finCount" class="text-sm text-slate-400">0/0</span>
+        </div>
+        <div id="finItems" class="divide-y divide-slate-700/50"></div>
+      </div>
+
+      <!-- Past Performance -->
+      <div class="bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="bg-amber-500/10 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">⭐</span>
+            <h3 class="font-semibold text-white">Past Performance</h3>
+          </div>
+          <span id="ppCount" class="text-sm text-slate-400">0/0</span>
+        </div>
+        <div id="ppItems" class="divide-y divide-slate-700/50"></div>
+      </div>
+
+      <!-- Add Requirement Button -->
+      <div class="text-center">
+        <button onclick="openAddModal()" class="btn-primary px-6 py-3 rounded-lg text-slate-900 font-semibold">
+          + Add Compliance Requirement
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add Requirement Modal -->
+  <div id="addModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-slate-900/90" onclick="closeAddModal()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg">
+      <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
+        <h3 class="text-lg font-bold text-white mb-4">Add Compliance Requirement</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Requirement</label>
+            <select id="modalReqSelect" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white">
+              <option value="">Select requirement...</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Initial Status</label>
+            <select id="modalStatus" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white">
+              <option value="not_started">Not Started</option>
+              <option value="in_progress">In Progress</option>
+              <option value="compliant">Compliant</option>
+              <option value="gap_identified">Gap Identified</option>
+            </select>
+          </div>
+          <div class="flex justify-end gap-3">
+            <button onclick="closeAddModal()" class="px-4 py-2 rounded bg-slate-700 text-white text-sm">Cancel</button>
+            <button onclick="addRequirement()" class="btn-primary px-4 py-2 rounded text-slate-900 font-semibold text-sm">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Update Status Modal -->
+  <div id="updateModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-slate-900/90" onclick="closeUpdateModal()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg">
+      <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
+        <h3 id="updateTitle" class="text-lg font-bold text-white mb-4">Update Requirement</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Status</label>
+            <select id="updateStatus" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white">
+              <option value="not_started">Not Started</option>
+              <option value="in_progress">In Progress</option>
+              <option value="compliant">Compliant</option>
+              <option value="gap_identified">Gap Identified</option>
+              <option value="waived">Waived</option>
+            </select>
+          </div>
+          <div id="gapSection" class="hidden">
+            <label class="block text-sm text-slate-400 mb-1">Gap Description</label>
+            <textarea id="gapDescription" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm"></textarea>
+          </div>
+          <div id="remediationSection" class="hidden">
+            <label class="block text-sm text-slate-400 mb-1">Remediation Plan</label>
+            <textarea id="remediationPlan" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Target Date</label>
+            <input type="date" id="targetDate" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white">
+          </div>
+          <div class="flex justify-end gap-3">
+            <button onclick="closeUpdateModal()" class="px-4 py-2 rounded bg-slate-700 text-white text-sm">Cancel</button>
+            <button onclick="saveUpdate()" class="btn-primary px-4 py-2 rounded text-slate-900 font-semibold text-sm">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 mt-12 py-6">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+      <p class="text-xs text-slate-500">© 2026 Mission Meets Tech | MissionPulse v2.0</p>
+      <p class="text-xs text-yellow-500 mt-1">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+    </div>
+  </footer>
+
+  <script>
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+    
+    let supabase;
+    let allRequirements = [];
+    let opportunities = [];
+    let selectedOppId = null;
+    let oppCompliance = [];
+    let currentUpdateId = null;
+
+    async function init() {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      await Promise.all([loadRequirements(), loadOpportunities()]);
+      setupEventListeners();
+    }
+
+    async function loadRequirements() {
+      const { data, error } = await supabase
+        .from('compliance_requirements')
+        .select('*')
+        .order('category, requirement_code');
+      
+      if (!error) {
+        allRequirements = data || [];
+        populateReqSelect();
+      }
+    }
+
+    async function loadOpportunities() {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('id, name, agency')
+        .order('name');
+      
+      if (!error) {
+        opportunities = data || [];
+        const select = document.getElementById('opportunitySelect');
+        select.innerHTML = '<option value="">Select Opportunity...</option>' +
+          opportunities.map(o => `<option value="${o.id}">${o.name} (${o.agency})</option>`).join('');
+      }
+    }
+
+    async function loadOppCompliance(oppId) {
+      const { data, error } = await supabase
+        .from('opportunity_compliance')
+        .select('*, requirement:compliance_requirements(*)')
+        .eq('opportunity_id', oppId);
+      
+      if (!error) {
+        oppCompliance = data || [];
+        renderCompliance();
+        updateStats();
+      }
+    }
+
+    function renderCompliance() {
+      const categories = {
+        cybersecurity: { el: 'cyberItems', count: 'cyberCount' },
+        clearance: { el: 'clearanceItems', count: 'clearanceCount' },
+        certifications: { el: 'certItems', count: 'certCount' },
+        financial: { el: 'finItems', count: 'finCount' },
+        past_performance: { el: 'ppItems', count: 'ppCount' }
+      };
+
+      Object.entries(categories).forEach(([cat, config]) => {
+        const items = oppCompliance.filter(oc => oc.requirement?.category === cat);
+        const compliant = items.filter(i => i.status === 'compliant' || i.status === 'waived').length;
+        
+        document.getElementById(config.count).textContent = `${compliant}/${items.length}`;
+        
+        const container = document.getElementById(config.el);
+        if (items.length === 0) {
+          container.innerHTML = '<p class="text-slate-500 text-sm p-4">No requirements tracked</p>';
+        } else {
+          container.innerHTML = items.map(renderComplianceItem).join('');
+        }
+      });
+    }
+
+    function renderComplianceItem(oc) {
+      const req = oc.requirement;
+      return `
+        <div class="p-4 hover:bg-slate-800/30 cursor-pointer transition-colors" onclick="openUpdateModal('${oc.id}')">
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-medium text-white text-sm">${req.requirement_code}</span>
+                ${req.is_mandatory ? '<span class="text-xs text-red-400">Required</span>' : ''}
+              </div>
+              <p class="text-sm text-slate-400">${req.requirement_name}</p>
+              ${oc.gap_description ? `<p class="text-xs text-red-400 mt-1">Gap: ${oc.gap_description}</p>` : ''}
+              ${oc.target_date ? `<p class="text-xs text-slate-500 mt-1">Target: ${new Date(oc.target_date).toLocaleDateString()}</p>` : ''}
+            </div>
+            <span class="status-${oc.status} px-3 py-1 rounded text-xs font-medium whitespace-nowrap">
+              ${formatStatus(oc.status)}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    function formatStatus(status) {
+      const map = {
+        not_started: 'Not Started',
+        in_progress: 'In Progress',
+        compliant: 'Compliant',
+        gap_identified: 'Gap',
+        waived: 'Waived'
+      };
+      return map[status] || status;
+    }
+
+    function updateStats() {
+      const total = oppCompliance.length;
+      const compliant = oppCompliance.filter(oc => oc.status === 'compliant' || oc.status === 'waived').length;
+      const progress = oppCompliance.filter(oc => oc.status === 'in_progress').length;
+      const gaps = oppCompliance.filter(oc => oc.status === 'gap_identified').length;
+      const notStarted = oppCompliance.filter(oc => oc.status === 'not_started').length;
+
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statCompliant').textContent = compliant;
+      document.getElementById('statProgress').textContent = progress;
+      document.getElementById('statGaps').textContent = gaps;
+      document.getElementById('statNotStarted').textContent = notStarted;
+
+      const score = total > 0 ? Math.round((compliant / total) * 100) : 0;
+      document.getElementById('shieldScore').textContent = `${score}%`;
+      
+      // Animate progress ring
+      const ring = document.getElementById('progressRing');
+      const circumference = 283;
+      const offset = circumference - (score / 100) * circumference;
+      ring.style.strokeDashoffset = offset;
+      
+      // Color based on score
+      if (score >= 80) {
+        ring.style.stroke = '#22c55e';
+      } else if (score >= 50) {
+        ring.style.stroke = '#fbbf24';
+      } else {
+        ring.style.stroke = '#ef4444';
+      }
+    }
+
+    function populateReqSelect() {
+      const select = document.getElementById('modalReqSelect');
+      select.innerHTML = '<option value="">Select requirement...</option>' +
+        allRequirements.map(r => `<option value="${r.id}">${r.requirement_code} - ${r.requirement_name}</option>`).join('');
+    }
+
+    function openAddModal() {
+      if (!selectedOppId) {
+        alert('Please select an opportunity first');
+        return;
+      }
+      document.getElementById('addModal').classList.remove('hidden');
+    }
+
+    function closeAddModal() {
+      document.getElementById('addModal').classList.add('hidden');
+    }
+
+    async function addRequirement() {
+      const reqId = document.getElementById('modalReqSelect').value;
+      const status = document.getElementById('modalStatus').value;
+
+      if (!reqId) {
+        alert('Please select a requirement');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('opportunity_compliance')
+        .insert({
+          opportunity_id: selectedOppId,
+          requirement_id: reqId,
+          status
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          alert('This requirement is already tracked for this opportunity');
+        } else {
+          alert('Error: ' + error.message);
+        }
+        return;
+      }
+
+      closeAddModal();
+      await loadOppCompliance(selectedOppId);
+    }
+
+    function openUpdateModal(id) {
+      currentUpdateId = id;
+      const item = oppCompliance.find(oc => oc.id === id);
+      if (!item) return;
+
+      document.getElementById('updateTitle').textContent = item.requirement.requirement_code;
+      document.getElementById('updateStatus').value = item.status;
+      document.getElementById('gapDescription').value = item.gap_description || '';
+      document.getElementById('remediationPlan').value = item.remediation_plan || '';
+      document.getElementById('targetDate').value = item.target_date || '';
+
+      toggleGapFields(item.status);
+      document.getElementById('updateModal').classList.remove('hidden');
+    }
+
+    function closeUpdateModal() {
+      document.getElementById('updateModal').classList.add('hidden');
+      currentUpdateId = null;
+    }
+
+    function toggleGapFields(status) {
+      const gapSection = document.getElementById('gapSection');
+      const remSection = document.getElementById('remediationSection');
+      if (status === 'gap_identified') {
+        gapSection.classList.remove('hidden');
+        remSection.classList.remove('hidden');
+      } else {
+        gapSection.classList.add('hidden');
+        remSection.classList.add('hidden');
+      }
+    }
+
+    async function saveUpdate() {
+      if (!currentUpdateId) return;
+
+      const status = document.getElementById('updateStatus').value;
+      const updates = {
+        status,
+        gap_description: document.getElementById('gapDescription').value || null,
+        remediation_plan: document.getElementById('remediationPlan').value || null,
+        target_date: document.getElementById('targetDate').value || null
+      };
+
+      if (status === 'compliant') {
+        updates.completed_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('opportunity_compliance')
+        .update(updates)
+        .eq('id', currentUpdateId);
+
+      if (error) {
+        alert('Error: ' + error.message);
+        return;
+      }
+
+      closeUpdateModal();
+      await loadOppCompliance(selectedOppId);
+    }
+
+    function setupEventListeners() {
+      document.getElementById('opportunitySelect').addEventListener('change', async (e) => {
+        selectedOppId = e.target.value;
+        if (selectedOppId) {
+          document.getElementById('noOppSelected').classList.add('hidden');
+          document.getElementById('complianceContainer').classList.remove('hidden');
+          await loadOppCompliance(selectedOppId);
+        } else {
+          document.getElementById('noOppSelected').classList.remove('hidden');
+          document.getElementById('complianceContainer').classList.add('hidden');
+          oppCompliance = [];
+          updateStats();
+        }
+      });
+
+      document.getElementById('updateStatus').addEventListener('change', (e) => {
+        toggleGapFields(e.target.value);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

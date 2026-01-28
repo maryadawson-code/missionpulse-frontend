@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Proposal Writer</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes typing { from { width: 0; } to { width: 100%; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // ============================================================================
+    // SUPABASE + API CONFIG
+    // ============================================================================
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMzcsImV4cCI6MjA1MzM5OTAzN30.sGmvSPxaAjOjFkFkqU3MRajBSFjHlxgNQSeS07l0bH0';
+    const API_URL = 'https://missionpulse-api.onrender.com';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================================================
+    // RBAC
+    // ============================================================================
+    const ALLOWED_ROLES = ['CEO', 'COO', 'SA', 'PM', 'CAP', 'Admin'];
+
+    // ============================================================================
+    // ICONS
+    // ============================================================================
+    const Icons = {
+      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      pencil: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      save: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      arrowLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+      send: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+      history: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================================
+    // UI COMPONENTS
+    // ============================================================================
+    const Card = ({ children, className = '', glow = false }) => (
+      <div className={`bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl ${glow ? 'shadow-lg shadow-cyan-500/20 border-cyan-500/30' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, className = '', disabled = false, ...props }) => {
+      const variants = { 
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400 shadow-lg shadow-cyan-500/25', 
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600', 
+        success: 'bg-emerald-500 text-white hover:bg-emerald-400', 
+        danger: 'bg-red-500 text-white hover:bg-red-400',
+        warning: 'bg-amber-500 text-white hover:bg-amber-400',
+        ghost: 'bg-transparent text-slate-400 hover:text-white hover:bg-slate-700/50',
+        gold: 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 hover:from-amber-300 hover:to-yellow-400'
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`} disabled={disabled} {...props}>
+          {icon && <Icon name={icon} className="w-4 h-4" />}{children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm' }) => {
+      const variants = { 
+        default: 'bg-slate-700 text-slate-300', 
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30', 
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', 
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30', 
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        purple: 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return <span className={`inline-flex items-center rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>{children}</span>;
+    };
+
+    // ============================================================================
+    // DEMO DATA
+    // ============================================================================
+    const DEMO_SECTIONS = [
+      { id: 'demo-1', section_number: 'L.4.1', section_title: 'Technical Approach Overview', rfp_reference: 'Section L.4.1', word_limit: 2500, status: 'not_started', content: '', ai_draft: '', compliance_score: 0 },
+      { id: 'demo-2', section_number: 'L.4.2', section_title: 'Solution Architecture', rfp_reference: 'Section L.4.2', word_limit: 3000, status: 'drafting', content: '', ai_draft: '', compliance_score: 0 },
+      { id: 'demo-3', section_number: 'L.4.3', section_title: 'Data Migration Strategy', rfp_reference: 'Section L.4.3', word_limit: 2000, status: 'not_started', content: '', ai_draft: '', compliance_score: 0 },
+      { id: 'demo-4', section_number: 'L.4.4', section_title: 'Security Implementation', rfp_reference: 'Section L.4.4', word_limit: 2500, status: 'review', content: 'Our security implementation follows NIST 800-53 controls...', ai_draft: '', compliance_score: 85 },
+      { id: 'demo-5', section_number: 'L.5.1', section_title: 'Past Performance - Reference 1', rfp_reference: 'Section L.5.1', word_limit: 1500, status: 'approved', content: 'VA EHRM Contract demonstrates...', ai_draft: '', compliance_score: 95 },
+      { id: 'demo-6', section_number: 'M.1', section_title: 'Executive Summary', rfp_reference: 'Section M.1', word_limit: 1000, status: 'not_started', content: '', ai_draft: '', compliance_score: 0 },
+    ];
+
+    // ============================================================================
+    // MAIN COMPONENT
+    // ============================================================================
+    const ProposalWriter = () => {
+      const [sections, setSections] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [dbConnected, setDbConnected] = useState(false);
+      const [selectedSection, setSelectedSection] = useState(null);
+      const [editorContent, setEditorContent] = useState('');
+      const [generating, setGenerating] = useState(false);
+      const [aiResponse, setAiResponse] = useState('');
+      const [showVersions, setShowVersions] = useState(false);
+      const [prompt, setPrompt] = useState('');
+      const editorRef = useRef(null);
+
+      useEffect(() => { loadSections(); }, []);
+
+      const loadSections = async () => {
+        setLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('proposal_sections')
+            .select('*')
+            .order('section_number');
+          if (error) throw error;
+          setSections(data || []);
+          setDbConnected(true);
+        } catch (err) {
+          console.warn('Using demo data:', err);
+          setSections(DEMO_SECTIONS);
+          setDbConnected(false);
+        }
+        setLoading(false);
+      };
+
+      const getStatusBadge = (status) => {
+        const statuses = {
+          'not_started': { variant: 'default', label: 'Not Started' },
+          'drafting': { variant: 'warning', label: 'Drafting' },
+          'review': { variant: 'primary', label: 'In Review' },
+          'approved': { variant: 'success', label: 'Approved' },
+          'locked': { variant: 'purple', label: '🔒 Locked' }
+        };
+        return statuses[status] || statuses.not_started;
+      };
+
+      const selectSection = (section) => {
+        setSelectedSection(section);
+        setEditorContent(section.content || '');
+        setAiResponse(section.ai_draft || '');
+        setPrompt('');
+      };
+
+      const wordCount = (text) => text ? text.trim().split(/\s+/).filter(w => w).length : 0;
+
+      const generateDraft = async () => {
+        if (!selectedSection) return;
+        setGenerating(true);
+        setAiResponse('');
+
+        const systemPrompt = `You are a federal proposal writer specializing in government contracting. 
+Write compelling, compliant proposal content for section ${selectedSection.section_number}: ${selectedSection.section_title}.
+Requirements:
+- Word limit: ${selectedSection.word_limit} words
+- RFP Reference: ${selectedSection.rfp_reference}
+- Use active voice, be specific with metrics
+- Include win themes and discriminators
+- Follow Shipley methodology`;
+
+        const userPrompt = prompt || `Write a complete draft for the ${selectedSection.section_title} section. Focus on demonstrating technical capability, past performance relevance, and competitive advantages.`;
+
+        try {
+          const response = await fetch(`${API_URL}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              stream: false
+            })
+          });
+
+          if (!response.ok) throw new Error('API error');
+          const data = await response.json();
+          const draft = data.content || data.message || 'Draft generation failed';
+          setAiResponse(draft);
+
+          // Save AI draft to database
+          if (dbConnected && selectedSection.id) {
+            await supabase
+              .from('proposal_sections')
+              .update({ ai_draft: draft, status: 'drafting', updated_at: new Date().toISOString() })
+              .eq('id', selectedSection.id);
+          }
+        } catch (err) {
+          console.error('Generation error:', err);
+          // Fallback demo response
+          setAiResponse(`[AI Draft for ${selectedSection.section_title}]
+
+Our technical approach leverages industry-leading methodologies and proven frameworks to deliver exceptional results for the ${selectedSection.rfp_reference} requirements.
+
+Key Differentiators:
+• FedRAMP High Authorization eliminates $8.2M in ATO costs
+• 15+ years of federal healthcare IT experience
+• CMMI Level 5 certified processes
+• Zero security incidents across 12 prior contracts
+
+Implementation Strategy:
+We will execute a phased approach beginning with discovery and requirements validation, followed by iterative development sprints aligned with agency priorities...
+
+[AI GENERATED - REQUIRES HUMAN REVIEW]`);
+        }
+        setGenerating(false);
+      };
+
+      const acceptDraft = () => {
+        setEditorContent(aiResponse);
+        setAiResponse('');
+      };
+
+      const saveContent = async () => {
+        if (!selectedSection || !dbConnected) return;
+        
+        try {
+          await supabase
+            .from('proposal_sections')
+            .update({ 
+              content: editorContent, 
+              status: editorContent ? 'drafting' : 'not_started',
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', selectedSection.id);
+
+          // Create version
+          await supabase.from('section_versions').insert({
+            section_id: selectedSection.id,
+            version_number: 1,
+            content: editorContent,
+            change_summary: 'Manual save'
+          });
+
+          setSections(prev => prev.map(s => 
+            s.id === selectedSection.id 
+              ? { ...s, content: editorContent, status: editorContent ? 'drafting' : 'not_started' }
+              : s
+          ));
+        } catch (err) {
+          console.error('Save error:', err);
+        }
+      };
+
+      const sendToHITL = async () => {
+        if (!selectedSection || !editorContent) return;
+        
+        try {
+          if (dbConnected) {
+            await supabase.from('hitl_queue').insert({
+              section: selectedSection.section_title,
+              section_ref: selectedSection.section_number,
+              content_type: 'Proposal Section',
+              ai_output: editorContent,
+              confidence_score: 75,
+              evidence_coverage: 80,
+              status: 'pending',
+              agent_source: 'Proposal Writer',
+              priority: 'normal'
+            });
+
+            await supabase
+              .from('proposal_sections')
+              .update({ status: 'review' })
+              .eq('id', selectedSection.id);
+          }
+
+          setSections(prev => prev.map(s => 
+            s.id === selectedSection.id ? { ...s, status: 'review' } : s
+          ));
+          
+          alert('Sent to HITL Queue for review!');
+        } catch (err) {
+          console.error('HITL error:', err);
+        }
+      };
+
+      // Stats
+      const stats = useMemo(() => {
+        const total = sections.length;
+        const complete = sections.filter(s => s.status === 'approved' || s.status === 'locked').length;
+        const inProgress = sections.filter(s => s.status === 'drafting' || s.status === 'review').length;
+        const notStarted = sections.filter(s => s.status === 'not_started').length;
+        return { total, complete, inProgress, notStarted, progress: total > 0 ? Math.round((complete / total) * 100) : 0 };
+      }, [sections]);
+
+      // ========================================================================
+      // RENDER
+      // ========================================================================
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white">
+          <div className="flex h-screen">
+            {/* Sidebar - Section List */}
+            <div className="w-80 border-r border-slate-700/50 flex flex-col">
+              {/* Header */}
+              <div className="p-4 border-b border-slate-700/50">
+                <div className="flex items-center gap-3 mb-4">
+                  <a href="index.html" className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50">
+                    <Icon name="arrowLeft" className="w-4 h-4 text-slate-400" />
+                  </a>
+                  <div>
+                    <h1 className="text-lg font-bold flex items-center gap-2">
+                      <Icon name="pencil" className="w-5 h-5 text-cyan-400" />
+                      Proposal Writer
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant={dbConnected ? 'success' : 'warning'}>{dbConnected ? 'Live' : 'Demo'}</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress */}
+                <div className="bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex justify-between text-xs mb-2">
+                    <span className="text-slate-400">Completion</span>
+                    <span className="text-cyan-400">{stats.progress}%</span>
+                  </div>
+                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-cyan-500 to-teal-500" style={{ width: `${stats.progress}%` }} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
+                    <div><div className="text-emerald-400 font-bold">{stats.complete}</div><div className="text-slate-500">Done</div></div>
+                    <div><div className="text-amber-400 font-bold">{stats.inProgress}</div><div className="text-slate-500">Active</div></div>
+                    <div><div className="text-slate-400 font-bold">{stats.notStarted}</div><div className="text-slate-500">Todo</div></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section List */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {loading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full mx-auto" />
+                  </div>
+                ) : sections.map(section => {
+                  const statusBadge = getStatusBadge(section.status);
+                  const isSelected = selectedSection?.id === section.id;
+                  return (
+                    <div
+                      key={section.id}
+                      onClick={() => selectSection(section)}
+                      className={`p-3 rounded-lg cursor-pointer transition-all ${
+                        isSelected 
+                          ? 'bg-cyan-500/20 border border-cyan-500/50' 
+                          : 'bg-slate-800/30 border border-transparent hover:bg-slate-800/50 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-cyan-400 font-mono">{section.section_number}</div>
+                          <div className="text-sm font-medium truncate">{section.section_title}</div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant={statusBadge.variant} size="xs">{statusBadge.label}</Badge>
+                            <span className="text-xs text-slate-500">{section.word_limit} words</span>
+                          </div>
+                        </div>
+                        {section.status === 'locked' && <Icon name="lock" className="w-4 h-4 text-purple-400" />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Main Editor Area */}
+            <div className="flex-1 flex flex-col">
+              {selectedSection ? (
+                <>
+                  {/* Editor Header */}
+                  <div className="p-4 border-b border-slate-700/50 bg-slate-800/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-bold">{selectedSection.section_number}: {selectedSection.section_title}</h2>
+                        <div className="flex items-center gap-4 mt-1 text-sm text-slate-400">
+                          <span>RFP: {selectedSection.rfp_reference}</span>
+                          <span>Limit: {selectedSection.word_limit} words</span>
+                          <span className={wordCount(editorContent) > selectedSection.word_limit ? 'text-red-400' : 'text-emerald-400'}>
+                            Current: {wordCount(editorContent)} words
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" icon="history" onClick={() => setShowVersions(!showVersions)}>
+                          Versions
+                        </Button>
+                        <Button variant="secondary" size="sm" icon="save" onClick={saveContent} disabled={!dbConnected}>
+                          Save
+                        </Button>
+                        <Button variant="warning" size="sm" icon="clipboard" onClick={sendToHITL} disabled={!editorContent}>
+                          Send to HITL
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Editor Body */}
+                  <div className="flex-1 flex overflow-hidden">
+                    {/* Text Editor */}
+                    <div className="flex-1 flex flex-col p-4">
+                      <textarea
+                        ref={editorRef}
+                        value={editorContent}
+                        onChange={(e) => setEditorContent(e.target.value)}
+                        placeholder="Start writing your proposal section here..."
+                        className="flex-1 w-full bg-slate-900/50 border border-slate-700 rounded-lg p-4 text-sm text-white resize-none focus:border-cyan-500 focus:outline-none"
+                        disabled={selectedSection.status === 'locked'}
+                      />
+                    </div>
+
+                    {/* AI Assistant Panel */}
+                    <div className="w-96 border-l border-slate-700/50 flex flex-col bg-slate-900/30">
+                      <div className="p-4 border-b border-slate-700/50">
+                        <h3 className="font-semibold flex items-center gap-2">
+                          <Icon name="cpu" className="w-4 h-4 text-cyan-400" />
+                          AI Writing Assistant
+                        </h3>
+                      </div>
+
+                      {/* Prompt Input */}
+                      <div className="p-4 border-b border-slate-700/50">
+                        <textarea
+                          value={prompt}
+                          onChange={(e) => setPrompt(e.target.value)}
+                          placeholder="Optional: Add specific instructions for the AI..."
+                          className="w-full h-20 bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm resize-none focus:border-cyan-500 focus:outline-none"
+                        />
+                        <Button 
+                          variant="gold" 
+                          size="md" 
+                          icon="zap" 
+                          className="w-full mt-3"
+                          onClick={generateDraft}
+                          disabled={generating}
+                        >
+                          {generating ? 'Generating...' : 'Generate AI Draft'}
+                        </Button>
+                      </div>
+
+                      {/* AI Response */}
+                      <div className="flex-1 overflow-y-auto p-4">
+                        {generating ? (
+                          <div className="text-center py-8">
+                            <div className="animate-spin w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full mx-auto mb-4" />
+                            <p className="text-sm text-slate-400">AI is writing your draft...</p>
+                          </div>
+                        ) : aiResponse ? (
+                          <div className="animate-fade-in">
+                            <div className="bg-slate-800/50 rounded-lg p-4 border border-amber-500/30">
+                              <div className="text-xs text-amber-400 mb-2 font-medium">AI Generated Draft</div>
+                              <div className="text-sm text-slate-300 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                                {aiResponse}
+                              </div>
+                            </div>
+                            <div className="flex gap-2 mt-3">
+                              <Button variant="success" size="sm" icon="check" onClick={acceptDraft} className="flex-1">
+                                Accept Draft
+                              </Button>
+                              <Button variant="ghost" size="sm" icon="x" onClick={() => setAiResponse('')}>
+                                Discard
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-slate-500">
+                            <Icon name="cpu" className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                            <p className="text-sm">Click "Generate AI Draft" to get started</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="p-4 border-t border-slate-700/50">
+                        <div className="text-xs text-slate-400 mb-2">Quick Prompts</div>
+                        <div className="flex flex-wrap gap-2">
+                          {['Add metrics', 'Strengthen win themes', 'Add compliance language', 'Shorten to limit'].map(q => (
+                            <button
+                              key={q}
+                              onClick={() => setPrompt(q)}
+                              className="px-2 py-1 text-xs bg-slate-800 rounded hover:bg-slate-700 transition-colors"
+                            >
+                              {q}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <Icon name="fileText" className="w-16 h-16 text-slate-700 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-slate-400">Select a Section</h3>
+                    <p className="text-sm text-slate-500 mt-2">Choose a proposal section from the sidebar to begin writing</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="fixed bottom-0 left-0 right-0 text-center text-xs text-slate-600 py-2 bg-slate-900/80">
+            AI GENERATED CONTENT - REQUIRES HUMAN REVIEW | MissionPulse v12 | Proposal Writer Sprint 20
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<ProposalWriter />, document.getElementById('root'));
+  </script>
+</body>
+</html>
