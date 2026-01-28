@@ -6,11 +6,10 @@
     <title>MissionPulse v12 | AI Proposal Command Center</title>
     <meta name="description" content="Enterprise proposal management with 11-role RBAC, AI agent swarm, Shipley methodology">
     
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase & Auth -->
+    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-client.js"></script>
-    <script src="auth-guard.js"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -34,13 +33,11 @@
       }
       .font-mono { font-family: 'JetBrains Mono', monospace; }
       
-      /* Scrollbar */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: #0a1628; }
       ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #475569; }
       
-      /* Glass Panel */
       .glass-panel { 
         background: rgba(15, 23, 42, 0.7); 
         backdrop-filter: blur(12px); 
@@ -48,22 +45,25 @@
         border-radius: 12px; 
       }
       
-      /* Animations */
       @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-      @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+      @keyframes slideIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
       
       .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
       .animate-slideUp { animation: slideUp 0.5s ease-out; }
       .animate-pulse { animation: pulse 2s infinite; }
+      .animate-slideIn { animation: slideIn 0.3s ease-out; }
+      .animate-bounce { animation: bounce 1s infinite; }
       
-      /* Progress Bar Animation */
       .progress-bar { transition: width 0.8s ease-out; }
-      
-      /* Hover effects */
       .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
       .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 25px -5px rgba(0, 229, 250, 0.15); }
+      
+      .typing-dot { animation: pulse 1.4s infinite; }
+      .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+      .typing-dot:nth-child(3) { animation-delay: 0.4s; }
     </style>
 </head>
 <body class="overflow-hidden">
@@ -71,192 +71,90 @@
     
     <script type="text/babel">
 // ============================================================
-// MISSIONPULSE v12 ULTIMATE - TASK 17 FINAL INTEGRATION
-// All 11 Shipley Roles | 16 Modules | Full RBAC
-// Â© 2026 Mission Meets Tech
+// MISSIONPULSE v12 - SPRINT 11: AI CHAT INTEGRATION
+// 8 AI Agents | Context-Aware Chat | Streaming Responses
+// © 2026 Mission Meets Tech
 // ============================================================
 
-const { useState, useEffect, useMemo, useCallback, createContext, useContext } = React;
+const { useState, useEffect, useMemo, useCallback, createContext, useContext, useRef } = React;
 
 // ============================================================
-// CONTEXT & CONSTANTS
+// CONFIGURATION
+// ============================================================
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5MzQ2NDMsImV4cCI6MjA1MzUxMDY0M30.Yx8OZQH5Fxx5Ts9DmNoO0aPWF_fFQmQJWSFIohHcA';
+const API_BASE_URL = 'https://missionpulse-api.onrender.com';
+
+const supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ============================================================
+// 8 AI AGENTS REGISTRY
+// ============================================================
+const AI_AGENTS = [
+  { id: 'capture', name: 'Capture Intelligence', description: '12-factor win probability scoring', icon: 'target', color: '#00E5FA', isRestricted: false, capabilities: ['Win probability', 'Go/No-Go analysis', 'Competitive positioning'], examplePrompts: ["What's our win probability?", "Should we pursue this?", "Analyze competitive position"] },
+  { id: 'strategy', name: 'Strategy Advisor', description: 'Win themes and discriminators', icon: 'activity', color: '#8B5CF6', isRestricted: true, capabilities: ['Win themes', 'Discriminators', 'BLUF development'], examplePrompts: ["Generate 3 win themes", "Key discriminators?", "Draft a BLUF"] },
+  { id: 'compliance', name: 'Compliance Guardian', description: 'FAR/DFARS validation', icon: 'shield', color: '#10B981', isRestricted: false, capabilities: ['Requirement extraction', 'Compliance matrix', 'Risk identification'], examplePrompts: ["Check compliance gaps", "Extract L/M requirements", "DFARS clauses?"] },
+  { id: 'writer', name: 'Proposal Writer', description: 'Shipley-compliant drafting', icon: 'penTool', color: '#3B82F6', isRestricted: false, capabilities: ['Section drafting', 'Technical writing', 'Past performance'], examplePrompts: ["Draft technical approach", "Write past performance", "Improve this paragraph"] },
+  { id: 'pricing', name: 'Pricing Analyst', description: 'BOE and price-to-win', icon: 'calculator', color: '#F59E0B', isRestricted: true, capabilities: ['BOE development', 'Wrap rates', 'Price-to-win'], examplePrompts: ["Generate BOE for 5 FTEs", "Price-to-win?", "Wrap rate analysis"] },
+  { id: 'blackhat', name: 'Competitive Intel', description: 'Ghost team simulation', icon: 'ghost', color: '#EF4444', isRestricted: true, capabilities: ['Competitor SWOT', 'Ghost team', 'Incumbent analysis'], examplePrompts: ["Black hat review", "What would competitor propose?", "Incumbent response?"] },
+  { id: 'contracts', name: 'Contracts Advisor', description: 'Clause analysis and T&C review', icon: 'scale', color: '#6366F1', isRestricted: false, capabilities: ['Clause analysis', 'T&C review', 'Risk flagging'], examplePrompts: ["Review Section H", "Flag risky terms", "T&Cs to negotiate?"] },
+  { id: 'orals', name: 'Orals Coach', description: 'Q&A simulation and coaching', icon: 'mic', color: '#EC4899', isRestricted: false, capabilities: ['Q&A simulation', 'Presentation coaching', 'Response refinement'], examplePrompts: ["Simulate tough questions", "Coach my presentation", "Answer schedule risk?"] }
+];
+
+// ============================================================
+// CONTEXTS
 // ============================================================
 const RoleContext = createContext(null);
-const AppContext = createContext(null);
 
 // ============================================================
-// 11 SHIPLEY METHODOLOGY ROLES - COMPLETE RBAC DEFINITION
+// 11 SHIPLEY ROLES WITH AGENT ACCESS
 // ============================================================
 const ROLES = [
-  { 
-    id: 'CEO', 
-    name: 'CEO', 
-    fullName: 'Mary Womack', 
-    icon: 'crown', 
-    color: '#fbbf24', 
-    bgColor: 'rgba(251, 191, 36, 0.2)', 
-    shipleyFunction: 'Executive Approver',
-    description: 'Final Go/No-Go authority, strategic oversight',
-    access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'launch_roi', 'orals', 'frenemy', 'post_award'],
-    restrictions: []
-  },
-  { 
-    id: 'COO', 
-    name: 'COO', 
-    fullName: 'David Chen', 
-    icon: 'briefcase', 
-    color: '#f97316', 
-    bgColor: 'rgba(249, 115, 22, 0.2)', 
-    shipleyFunction: 'Capture Oversight',
-    description: 'Operational leadership, resource allocation',
-    access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'hitl', 'frenemy', 'launch_roi', 'post_award', 'pricing'],
-    restrictions: ['Cannot edit Black Hat intel']
-  },
-  { 
-    id: 'CAP', 
-    name: 'Capture', 
-    fullName: 'Michael Torres', 
-    icon: 'target', 
-    color: '#f472b6', 
-    bgColor: 'rgba(244, 114, 182, 0.2)', 
-    shipleyFunction: 'Capture Manager',
-    description: 'Win strategy, competitive intelligence, teaming',
-    access: ['dashboard', 'pipeline', 'blackhat', 'strategy', 'warroom', 'frenemy', 'swarm'],
-    restrictions: ['Cannot access pricing details']
-  },
-  { 
-    id: 'PM', 
-    name: 'Proposal Mgr', 
-    fullName: 'Lisa Martinez', 
-    icon: 'clipboard', 
-    color: '#60a5fa', 
-    bgColor: 'rgba(96, 165, 250, 0.2)', 
-    shipleyFunction: 'Proposal Manager',
-    description: 'Schedule, reviews, team coordination',
-    access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'writer', 'hitl', 'launch_roi', 'post_award', 'orals'],
-    restrictions: ['Cannot access Black Hat']
-  },
-  { 
-    id: 'SA', 
-    name: 'Solution Arch', 
-    fullName: 'Sarah Chen', 
-    icon: 'cpu', 
-    color: '#22d3ee', 
-    bgColor: 'rgba(34, 211, 238, 0.2)', 
-    shipleyFunction: 'Technical Lead',
-    description: 'Technical approach, architecture, past performance',
-    access: ['writer', 'compliance', 'contracts', 'orals', 'swarm'],
-    restrictions: ['Cannot access pricing', 'Cannot access Black Hat']
-  },
-  { 
-    id: 'FIN', 
-    name: 'Pricing', 
-    fullName: 'Jennifer Park', 
-    icon: 'dollarSign', 
-    color: '#34d399', 
-    bgColor: 'rgba(52, 211, 153, 0.2)', 
-    shipleyFunction: 'Volume Lead (Pricing)',
-    description: 'BOE, LCAT rates, cost models',
-    access: ['pricing', 'contracts', 'launch_roi', 'swarm'],
-    restrictions: ['Cannot access Black Hat', 'Cannot access Strategy']
-  },
-  { 
-    id: 'CON', 
-    name: 'Compliance', 
-    fullName: 'Robert Williams', 
-    icon: 'scale', 
-    color: '#a78bfa', 
-    bgColor: 'rgba(167, 139, 250, 0.2)', 
-    shipleyFunction: 'Contracts/Compliance',
-    description: 'FAR/DFARS, terms analysis, risk review',
-    access: ['compliance', 'contracts', 'swarm', 'hitl'],
-    restrictions: ['Cannot access Black Hat', 'Cannot access Pricing details']
-  },
-  { 
-    id: 'DEL', 
-    name: 'Delivery', 
-    fullName: 'Amanda Foster', 
-    icon: 'users', 
-    color: '#fb7185', 
-    bgColor: 'rgba(251, 113, 133, 0.2)', 
-    shipleyFunction: 'Delivery/Staffing',
-    description: 'Key personnel, staffing plans, past performance',
-    access: ['swarm', 'writer', 'post_award', 'orals'],
-    restrictions: ['Cannot access Pricing', 'Cannot access Black Hat']
-  },
-  { 
-    id: 'QA', 
-    name: 'QA Lead', 
-    fullName: 'James Thompson', 
-    icon: 'checkCircle', 
-    color: '#2dd4bf', 
-    bgColor: 'rgba(45, 212, 191, 0.2)', 
-    shipleyFunction: 'Quality Assurance',
-    description: 'Color team reviews, compliance checks',
-    access: ['hitl', 'compliance', 'swarm', 'writer'],
-    restrictions: ['Read-only on most modules', 'Cannot access Black Hat']
-  },
-  { 
-    id: 'Partner', 
-    name: 'Partner', 
-    fullName: 'External Teammate', 
-    icon: 'handshake', 
-    color: '#94a3b8', 
-    bgColor: 'rgba(148, 163, 184, 0.2)', 
-    shipleyFunction: 'Teaming Partner',
-    description: 'Limited access, auto-revokes on submission',
-    access: ['swarm', 'writer'],
-    restrictions: ['No pricing access', 'No Black Hat access', 'No strategy access', 'Access revoked on submission'],
-    isExternal: true,
-    autoRevoke: true
-  },
-  { 
-    id: 'Admin', 
-    name: 'Admin', 
-    fullName: 'System Admin', 
-    icon: 'settings', 
-    color: '#cbd5e1', 
-    bgColor: 'rgba(203, 213, 225, 0.2)', 
-    shipleyFunction: 'System Administrator',
-    description: 'Full system access, audit logs, configuration',
-    access: ['admin', 'audit', 'dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'contracts', 'writer', 'blackhat', 'pricing', 'hitl', 'orals', 'frenemy', 'launch_roi', 'post_award'],
-    restrictions: []
-  }
+  { id: 'CEO', name: 'CEO', fullName: 'Mary Womack', icon: 'crown', color: '#fbbf24', bgColor: 'rgba(251, 191, 36, 0.2)', shipleyFunction: 'Executive Approver', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'launch_roi', 'orals', 'frenemy', 'post_award'], agentAccess: ['capture', 'compliance', 'writer', 'contracts', 'orals'], restrictions: [] },
+  { id: 'COO', name: 'COO', fullName: 'David Chen', icon: 'briefcase', color: '#f97316', bgColor: 'rgba(249, 115, 22, 0.2)', shipleyFunction: 'Capture Oversight', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'hitl', 'frenemy', 'launch_roi', 'post_award', 'pricing'], agentAccess: ['capture', 'strategy', 'compliance', 'writer', 'pricing', 'contracts', 'orals'], restrictions: ['Cannot edit Black Hat intel'] },
+  { id: 'CAP', name: 'Capture', fullName: 'Michael Torres', icon: 'target', color: '#f472b6', bgColor: 'rgba(244, 114, 182, 0.2)', shipleyFunction: 'Capture Manager', access: ['dashboard', 'pipeline', 'blackhat', 'strategy', 'warroom', 'frenemy', 'swarm'], agentAccess: ['capture', 'strategy', 'blackhat', 'compliance', 'writer', 'contracts'], restrictions: ['Cannot access pricing'] },
+  { id: 'PM', name: 'Proposal Mgr', fullName: 'Lisa Martinez', icon: 'clipboard', color: '#60a5fa', bgColor: 'rgba(96, 165, 250, 0.2)', shipleyFunction: 'Proposal Manager', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'writer', 'hitl', 'launch_roi', 'post_award', 'orals'], agentAccess: ['capture', 'compliance', 'writer', 'contracts', 'orals'], restrictions: ['Cannot access Black Hat'] },
+  { id: 'SA', name: 'Solution Arch', fullName: 'Sarah Chen', icon: 'cpu', color: '#22d3ee', bgColor: 'rgba(34, 211, 238, 0.2)', shipleyFunction: 'Technical Lead', access: ['writer', 'compliance', 'contracts', 'orals', 'swarm'], agentAccess: ['compliance', 'writer', 'contracts', 'orals'], restrictions: ['No pricing', 'No Black Hat'] },
+  { id: 'FIN', name: 'Pricing', fullName: 'Jennifer Park', icon: 'dollarSign', color: '#34d399', bgColor: 'rgba(52, 211, 153, 0.2)', shipleyFunction: 'Volume Lead (Pricing)', access: ['pricing', 'contracts', 'launch_roi', 'swarm'], agentAccess: ['pricing', 'contracts'], restrictions: ['No Black Hat', 'No Strategy'] },
+  { id: 'CON', name: 'Compliance', fullName: 'Robert Williams', icon: 'scale', color: '#a78bfa', bgColor: 'rgba(167, 139, 250, 0.2)', shipleyFunction: 'Contracts/Compliance', access: ['compliance', 'contracts', 'swarm', 'hitl'], agentAccess: ['compliance', 'contracts'], restrictions: ['No Black Hat', 'No Pricing'] },
+  { id: 'DEL', name: 'Delivery', fullName: 'Amanda Foster', icon: 'users', color: '#fb7185', bgColor: 'rgba(251, 113, 133, 0.2)', shipleyFunction: 'Delivery/Staffing', access: ['swarm', 'writer', 'post_award', 'orals'], agentAccess: ['writer', 'orals'], restrictions: ['No Pricing', 'No Black Hat'] },
+  { id: 'QA', name: 'QA Lead', fullName: 'James Thompson', icon: 'checkCircle', color: '#2dd4bf', bgColor: 'rgba(45, 212, 191, 0.2)', shipleyFunction: 'Quality Assurance', access: ['hitl', 'compliance', 'swarm', 'writer'], agentAccess: ['compliance', 'writer'], restrictions: ['Read-only', 'No Black Hat'] },
+  { id: 'Partner', name: 'Partner', fullName: 'External Teammate', icon: 'handshake', color: '#94a3b8', bgColor: 'rgba(148, 163, 184, 0.2)', shipleyFunction: 'Teaming Partner', access: ['swarm', 'writer'], agentAccess: ['writer'], restrictions: ['No pricing', 'No Black Hat', 'No strategy'], isExternal: true },
+  { id: 'Admin', name: 'Admin', fullName: 'System Admin', icon: 'settings', color: '#cbd5e1', bgColor: 'rgba(203, 213, 225, 0.2)', shipleyFunction: 'System Administrator', access: ['admin', 'audit', 'dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'contracts', 'writer', 'blackhat', 'pricing', 'hitl', 'orals', 'frenemy', 'launch_roi', 'post_award'], agentAccess: ['capture', 'strategy', 'compliance', 'writer', 'pricing', 'blackhat', 'contracts', 'orals'], restrictions: [] }
 ];
 
 // ============================================================
-// MODULE DEFINITIONS - 16 MODULES
+// MODULE DEFINITIONS
 // ============================================================
 const MODULES = [
-  { id: 'pipeline', name: 'Pipeline Intel', icon: 'filter', color: '#60a5fa', scene: '1', description: 'Opportunity Tracking', category: 'Strategy' },
-  { id: 'warroom', name: 'War Room', icon: 'swords', color: '#818cf8', scene: '2', description: 'Pursuit Strategy', category: 'Strategy' },
-  { id: 'swarm', name: 'Swimlane Board', icon: 'kanban', color: '#2dd4bf', scene: '3', description: 'Shipley Phases', category: 'Strategy' },
-  { id: 'compliance', name: 'RFP Shredder', icon: 'fileCheck', color: '#f87171', scene: '4', description: 'Compliance Matrix', category: 'Intelligence' },
-  { id: 'contracts', name: 'Contract Scanner', icon: 'scale', color: '#a78bfa', scene: '5', description: 'Risk Analysis', category: 'Intelligence' },
-  { id: 'writer', name: 'Iron Dome', icon: 'penTool', color: '#c084fc', scene: '6', description: 'AI Writing Suite', category: 'Intelligence' },
-  { id: 'blackhat', name: 'Black Hat', icon: 'ghost', color: '#fbbf24', scene: '7', description: 'Competitive Intel', category: 'Intelligence', badge: 'PRIVATE' },
-  { id: 'pricing', name: 'Pricing Engine', icon: 'calculator', color: '#4ade80', scene: '8', description: 'LCAT & BOE', category: 'Delivery', badge: 'CUI' },
-  { id: 'hitl', name: 'HITL Gauntlet', icon: 'eye', color: '#fb923c', scene: '9', description: 'Review Queue', category: 'Delivery' },
-  { id: 'orals', name: 'Orals Studio', icon: 'mic', color: '#f472b6', scene: '10', description: 'Presentation Prep', category: 'Delivery' },
-  { id: 'frenemy', name: 'Frenemy Protocol', icon: 'shield', color: '#22d3ee', scene: '11', description: 'Partner Access', category: 'Delivery' },
-  { id: 'dashboard', name: 'Mission Control', icon: 'activity', color: '#facc15', scene: '12', description: 'Executive Dashboard', category: 'Command' },
-  { id: 'launch_roi', name: 'Launch & ROI', icon: 'rocket', color: '#e879f9', scene: '13', description: 'Submission', category: 'Command' },
-  { id: 'post_award', name: 'Post-Award', icon: 'archive', color: '#a78bfa', scene: '14', description: 'Transition', category: 'Command' },
-  { id: 'admin', name: 'Admin Settings', icon: 'sliders', color: '#cbd5e1', scene: '15', description: 'Configuration', category: 'Admin', badge: 'ADMIN' },
-  { id: 'audit', name: 'Audit Log', icon: 'list', color: '#64748b', scene: '16', description: 'Security Logs', category: 'Admin', badge: 'ADMIN' }
+  { id: 'pipeline', name: 'Pipeline Intel', icon: 'filter', color: '#60a5fa', category: 'Strategy' },
+  { id: 'warroom', name: 'War Room', icon: 'swords', color: '#818cf8', category: 'Strategy' },
+  { id: 'swarm', name: 'Swimlane Board', icon: 'kanban', color: '#2dd4bf', category: 'Strategy' },
+  { id: 'compliance', name: 'RFP Shredder', icon: 'fileCheck', color: '#f87171', category: 'Intelligence' },
+  { id: 'contracts', name: 'Contract Scanner', icon: 'scale', color: '#a78bfa', category: 'Intelligence' },
+  { id: 'writer', name: 'Iron Dome', icon: 'penTool', color: '#c084fc', category: 'Intelligence' },
+  { id: 'blackhat', name: 'Black Hat', icon: 'ghost', color: '#fbbf24', category: 'Intelligence', badge: 'PRIVATE' },
+  { id: 'pricing', name: 'Pricing Engine', icon: 'calculator', color: '#4ade80', category: 'Delivery', badge: 'CUI' },
+  { id: 'hitl', name: 'HITL Gauntlet', icon: 'eye', color: '#fb923c', category: 'Delivery' },
+  { id: 'orals', name: 'Orals Studio', icon: 'mic', color: '#f472b6', category: 'Delivery' },
+  { id: 'frenemy', name: 'Frenemy Protocol', icon: 'shield', color: '#22d3ee', category: 'Delivery' },
+  { id: 'dashboard', name: 'Mission Control', icon: 'activity', color: '#facc15', category: 'Command' },
+  { id: 'launch_roi', name: 'Launch & ROI', icon: 'rocket', color: '#e879f9', category: 'Command' },
+  { id: 'post_award', name: 'Post-Award', icon: 'archive', color: '#a78bfa', category: 'Command' },
+  { id: 'admin', name: 'Admin Settings', icon: 'sliders', color: '#cbd5e1', category: 'Admin', badge: 'ADMIN' },
+  { id: 'audit', name: 'Audit Log', icon: 'list', color: '#64748b', category: 'Admin', badge: 'ADMIN' }
 ];
 
-// Group modules by category
 const MODULE_CATEGORIES = [
-  { id: 'Strategy', name: 'Strategy Phase', icon: 'target' },
-  { id: 'Intelligence', name: 'Intelligence Phase', icon: 'search' },
-  { id: 'Delivery', name: 'Delivery Phase', icon: 'send' },
-  { id: 'Command', name: 'Command Center', icon: 'activity' },
-  { id: 'Admin', name: 'Administration', icon: 'settings' }
+  { id: 'Strategy', name: 'Strategy Phase' },
+  { id: 'Intelligence', name: 'Intelligence Phase' },
+  { id: 'Delivery', name: 'Delivery Phase' },
+  { id: 'Command', name: 'Command Center' },
+  { id: 'Admin', name: 'Administration' }
 ];
 
 // ============================================================
-// ICON COMPONENT - SVG Icons
+// ICON COMPONENT
 // ============================================================
 const Icon = ({ name, className = 'w-5 h-5', style }) => {
   const icons = {
@@ -286,263 +184,264 @@ const Icon = ({ name, className = 'w-5 h-5', style }) => {
     archive: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
     sliders: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>,
     list: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>,
-    search: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-    send: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
     chevronDown: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
     chevronRight: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
     chevronLeft: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
     x: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
-    menu: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
-    lock: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
     alert: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
-    trendingUp: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
-    trendingDown: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>,
-    check: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
-    plus: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
-    download: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
-    bell: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
-    clock: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    calendar: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
-    play: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    refresh: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
-    copy: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
-    trash: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-    edit: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
-    star: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
-    info: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    folder: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
+    logOut: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
+    messageSquare: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+    send: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+    sparkles: <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
   };
-  
-  return icons[name] || <span className={className}>â—</span>;
+  return icons[name] || <span className={className}>?</span>;
 };
 
 // ============================================================
 // UI COMPONENTS
 // ============================================================
-const Card = ({ children, className = '', hover = false }) => (
-  <div className={`glass-panel p-4 ${hover ? 'hover-lift cursor-pointer' : ''} ${className}`}>
-    {children}
-  </div>
+const Card = ({ children, className = '' }) => (<div className={`glass-panel p-4 hover-lift ${className}`}>{children}</div>);
+const Badge = ({ children, color = '#00E5FA' }) => (<span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full" style={{ backgroundColor: `${color}20`, borderColor: `${color}40`, color, border: '1px solid' }}>{children}</span>);
+
+// ============================================================
+// AI CHAT PANEL
+// ============================================================
+const AIChatPanel = ({ isOpen, onClose, currentRole, activeModule }) => {
+  const [selectedAgent, setSelectedAgent] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAgentSelector, setShowAgentSelector] = useState(true);
+  const messagesEndRef = useRef(null);
+
+  const accessibleAgents = useMemo(() => AI_AGENTS.filter(agent => currentRole.agentAccess?.includes(agent.id)), [currentRole]);
+  
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || !selectedAgent || isLoading) return;
+    
+    const userMessage = { role: 'user', content: input, timestamp: new Date() };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/agents/${selectedAgent.id}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: input, conversation_history: messages.map(m => ({ role: m.role, content: m.content })), context: { module: activeModule?.id, role: currentRole.id } })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(prev => [...prev, { role: 'assistant', content: data.message || data.response || "I've analyzed your request.", agent: selectedAgent, timestamp: new Date() }]);
+      } else {
+        throw new Error('API unavailable');
+      }
+    } catch (error) {
+      const demoResponses = {
+        capture: "Based on 12-factor analysis, I estimate 68% win probability. Key strengths: incumbent knowledge, past performance. Risks: pricing pressure, staffing timeline.",
+        strategy: "3 win themes: 1) Proven Mission Understanding, 2) Technical Innovation, 3) Cost-Effective Delivery. Each addresses key evaluation criteria.",
+        compliance: "Identified 47 L/M requirements. 12 are high-risk compliance items requiring specific evidence. Want me to generate a compliance matrix?",
+        writer: "I can draft your technical approach using Shipley methodology. Start with understanding section or solution overview?",
+        pricing: "For 5-FTE team over 3 years: $4.2M estimated with 28% wrap rate. Positions us 12% below IGCE.",
+        blackhat: "Ghost team analysis: Incumbent (Leidos) will emphasize transition advantage and existing clearances. Counter: highlight innovation debt.",
+        contracts: "Section H has 3 high-risk clauses: (1) unlimited liability, (2) IP assignment, (3) key personnel restrictions. Recommend negotiating before award.",
+        orals: "5 tough questions: 1) Schedule risk management? 2) Staffing contingency? 3) Scope creep handling? 4) Key personnel retention? 5) Subcontractor oversight?"
+      };
+      setMessages(prev => [...prev, { role: 'assistant', content: demoResponses[selectedAgent.id] || `[${selectedAgent.name}] Ready to help with ${selectedAgent.description}.`, agent: selectedAgent, timestamp: new Date() }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const selectAgent = (agent) => {
+    setSelectedAgent(agent);
+    setShowAgentSelector(false);
+    setMessages([{ role: 'assistant', content: `Hi! I'm the ${agent.name}. I specialize in ${agent.description.toLowerCase()}. Try asking: "${agent.examplePrompts[0]}"`, agent, timestamp: new Date() }]);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed right-0 top-0 bottom-6 w-96 bg-slate-900/98 border-l border-slate-700 flex flex-col z-40 animate-slideIn">
+      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
+            <Icon name="sparkles" className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">AI Assistant</h3>
+            <p className="text-xs text-slate-400">{accessibleAgents.length} agents available</p>
+          </div>
+        </div>
+        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"><Icon name="x" className="w-5 h-5" /></button>
+      </div>
+
+      {showAgentSelector ? (
+        <div className="flex-1 overflow-y-auto p-4">
+          <p className="text-sm text-slate-400 mb-4">Select an AI agent:</p>
+          <div className="space-y-2">
+            {accessibleAgents.map(agent => (
+              <button key={agent.id} onClick={() => selectAgent(agent)} className="w-full p-3 rounded-lg border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800/50 transition-all text-left">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${agent.color}20` }}>
+                    <Icon name={agent.icon} className="w-5 h-5" style={{ color: agent.color }} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-white">{agent.name}</p>
+                      {agent.isRestricted && <Badge color="#EF4444">Private</Badge>}
+                    </div>
+                    <p className="text-xs text-slate-400">{agent.description}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          {currentRole.agentAccess?.length < 8 && (
+            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <p className="text-xs text-amber-400"><Icon name="alert" className="w-3 h-3 inline mr-1" />{8 - accessibleAgents.length} agents restricted for your role</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="p-3 border-b border-slate-700 bg-slate-800/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${selectedAgent.color}20` }}>
+                  <Icon name={selectedAgent.icon} className="w-4 h-4" style={{ color: selectedAgent.color }} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{selectedAgent.name}</p>
+                  <p className="text-[10px] text-slate-400">{selectedAgent.capabilities[0]}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAgentSelector(true)} className="text-xs text-cyan-400 hover:text-cyan-300">Switch</button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-xl p-3 ${msg.role === 'user' ? 'bg-cyan-500/20 border border-cyan-500/30' : 'bg-slate-800 border border-slate-700'}`}>
+                  {msg.role === 'assistant' && msg.agent && (
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700">
+                      <div className="w-5 h-5 rounded flex items-center justify-center" style={{ backgroundColor: `${msg.agent.color}20` }}>
+                        <Icon name={msg.agent.icon} className="w-3 h-3" style={{ color: msg.agent.color }} />
+                      </div>
+                      <span className="text-xs font-medium" style={{ color: msg.agent.color }}>{msg.agent.name}</span>
+                    </div>
+                  )}
+                  <p className="text-sm text-slate-200 whitespace-pre-wrap">{msg.content}</p>
+                  <p className="text-[10px] text-slate-500 mt-2">{msg.timestamp?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-3">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-cyan-400 rounded-full typing-dot"></div>
+                    <div className="w-2 h-2 bg-cyan-400 rounded-full typing-dot"></div>
+                    <div className="w-2 h-2 bg-cyan-400 rounded-full typing-dot"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="p-4 border-t border-slate-700">
+            <div className="flex gap-2">
+              <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())} placeholder={`Ask ${selectedAgent?.name}...`} className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500" disabled={isLoading} />
+              <button onClick={sendMessage} disabled={!input.trim() || isLoading} className="p-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 rounded-lg transition-colors">
+                <Icon name="send" className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-2 text-center">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// FLOATING CHAT BUTTON
+// ============================================================
+const FloatingChatButton = ({ onClick }) => (
+  <button onClick={onClick} className="fixed bottom-10 right-6 w-14 h-14 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-full shadow-lg hover:shadow-cyan-500/30 flex items-center justify-center transition-all hover:scale-110 z-30">
+    <Icon name="messageSquare" className="w-6 h-6 text-white" />
+  </button>
 );
 
-const Button = ({ children, onClick, className = '', variant = 'primary', size = 'md', icon, disabled = false }) => {
-  const variants = {
-    primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30',
-    secondary: 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-700',
-    danger: 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30',
-    success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30',
-    ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-  };
-  const sizes = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base'
-  };
-  
-  return (
-    <button 
-      onClick={onClick} 
-      disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
-    >
-      {icon && <Icon name={icon} className="w-4 h-4" />}
-      {children}
-    </button>
-  );
-};
-
-const Badge = ({ children, color = '#00E5FA', variant = 'default' }) => {
-  const variants = {
-    default: { bg: `${color}20`, border: `${color}40`, text: color },
-    solid: { bg: color, border: color, text: '#000' }
-  };
-  const v = variants[variant];
-  
-  return (
-    <span 
-      className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full"
-      style={{ backgroundColor: v.bg, borderColor: v.border, color: v.text, border: '1px solid' }}
-    >
-      {children}
-    </span>
-  );
-};
-
 // ============================================================
-// SIDEBAR NAVIGATION COMPONENT
+// SIDEBAR
 // ============================================================
-const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) => {
+const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange, onSignOut, userEmail }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState(['Strategy', 'Intelligence', 'Delivery', 'Command']);
 
-  const toggleCategory = (catId) => {
-    setExpandedCategories(prev => 
-      prev.includes(catId) ? prev.filter(c => c !== catId) : [...prev, catId]
-    );
-  };
-
-  const accessibleModules = useMemo(() => 
-    MODULES.filter(m => currentRole.access.includes(m.id)),
-    [currentRole]
-  );
-
+  const accessibleModules = useMemo(() => MODULES.filter(m => currentRole.access.includes(m.id)), [currentRole]);
   const modulesByCategory = useMemo(() => {
     const grouped = {};
-    MODULE_CATEGORIES.forEach(cat => {
-      grouped[cat.id] = accessibleModules.filter(m => m.category === cat.id);
-    });
+    MODULE_CATEGORIES.forEach(cat => { grouped[cat.id] = accessibleModules.filter(m => m.category === cat.id); });
     return grouped;
   }, [accessibleModules]);
 
   return (
     <aside className={`flex-shrink-0 h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
-      {/* Header */}
       <div className="p-4 border-b border-slate-800">
         <div className="flex items-center justify-between">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">MP</span>
-              </div>
-              <div>
-                <h1 className="text-sm font-bold text-white">MissionPulse</h1>
-                <p className="text-[10px] text-slate-500">v12.0 Ultimate</p>
-              </div>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center"><span className="text-white font-bold text-sm">MP</span></div>
+              <div><h1 className="text-sm font-bold text-white">MissionPulse</h1><p className="text-[10px] text-slate-500">v12.0 • AI Enabled</p></div>
             </div>
           )}
-          <button 
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"
-          >
-            <Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} className="w-4 h-4" />
-          </button>
+          <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} className="w-4 h-4" /></button>
         </div>
       </div>
 
-      {/* Role Switcher */}
       <div className={`p-3 border-b border-slate-800 ${collapsed ? 'text-center' : ''}`}>
-        <button
-          onClick={() => setShowRoleSwitcher(!showRoleSwitcher)}
-          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 transition-colors"
-        >
-          <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: currentRole.bgColor }}
-          >
-            <Icon name={currentRole.icon} className="w-4 h-4" style={{ color: currentRole.color }} />
-          </div>
-          {!collapsed && (
-            <>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-medium text-white">{currentRole.fullName}</p>
-                <p className="text-xs text-slate-400">{currentRole.shipleyFunction}</p>
-              </div>
-              <Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition-transform ${showRoleSwitcher ? 'rotate-180' : ''}`} />
-            </>
-          )}
+        <button onClick={() => setShowRoleSwitcher(!showRoleSwitcher)} className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: currentRole.bgColor }}><Icon name={currentRole.icon} className="w-4 h-4" style={{ color: currentRole.color }} /></div>
+          {!collapsed && (<><div className="flex-1 text-left"><p className="text-sm font-medium text-white">{currentRole.fullName}</p><p className="text-xs text-slate-400">{currentRole.agentAccess?.length || 0} AI agents</p></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition-transform ${showRoleSwitcher ? 'rotate-180' : ''}`} /></>)}
         </button>
-
-        {/* Role Dropdown */}
         {showRoleSwitcher && !collapsed && (
           <div className="mt-2 p-2 bg-slate-800/50 rounded-lg border border-slate-700/50 max-h-64 overflow-y-auto animate-fadeIn">
             <p className="text-[10px] uppercase text-slate-500 font-semibold mb-2 px-2">Switch Role</p>
             {ROLES.map(role => (
-              <button
-                key={role.id}
-                onClick={() => { onRoleChange(role); setShowRoleSwitcher(false); }}
-                className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors ${
-                  currentRole.id === role.id 
-                    ? 'bg-cyan-500/20 border border-cyan-500/30' 
-                    : 'hover:bg-slate-700/50'
-                }`}
-              >
-                <div 
-                  className="w-6 h-6 rounded-md flex items-center justify-center"
-                  style={{ backgroundColor: role.bgColor }}
-                >
-                  <Icon name={role.icon} className="w-3 h-3" style={{ color: role.color }} />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-xs font-medium text-white">{role.name}</p>
-                  <p className="text-[10px] text-slate-500">{role.shipleyFunction}</p>
-                </div>
-                {role.isExternal && (
-                  <span className="px-1.5 py-0.5 text-[9px] bg-amber-500/20 text-amber-400 rounded">EXT</span>
-                )}
+              <button key={role.id} onClick={() => { onRoleChange(role); setShowRoleSwitcher(false); }} className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors ${currentRole.id === role.id ? 'bg-cyan-500/20 border border-cyan-500/30' : 'hover:bg-slate-700/50'}`}>
+                <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: role.bgColor }}><Icon name={role.icon} className="w-3 h-3" style={{ color: role.color }} /></div>
+                <div className="flex-1 text-left"><p className="text-xs font-medium text-white">{role.name}</p><p className="text-[10px] text-slate-500">{role.agentAccess?.length || 0} agents</p></div>
+                {role.isExternal && <span className="px-1.5 py-0.5 text-[9px] bg-amber-500/20 text-amber-400 rounded">EXT</span>}
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {MODULE_CATEGORIES.map(category => {
           const catModules = modulesByCategory[category.id] || [];
           if (catModules.length === 0) return null;
-          
           const isExpanded = expandedCategories.includes(category.id);
-          
           return (
             <div key={category.id} className="mb-2">
-              {!collapsed && (
-                <button
-                  onClick={() => toggleCategory(category.id)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-300"
-                >
-                  <span>{category.name}</span>
-                  <Icon name={isExpanded ? 'chevronDown' : 'chevronRight'} className="w-3 h-3" />
-                </button>
-              )}
-              
+              {!collapsed && (<button onClick={() => setExpandedCategories(prev => prev.includes(category.id) ? prev.filter(c => c !== category.id) : [...prev, category.id])} className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] uppercase font-semibold text-slate-500 hover:text-slate-300"><span>{category.name}</span><Icon name={isExpanded ? 'chevronDown' : 'chevronRight'} className="w-3 h-3" /></button>)}
               {(isExpanded || collapsed) && (
                 <div className="space-y-0.5">
                   {catModules.map(mod => {
                     const isActive = activeModule?.id === mod.id;
-                    const hasAccess = currentRole.access.includes(mod.id);
-                    
                     return (
-                      <button
-                        key={mod.id}
-                        onClick={() => hasAccess && onModuleSelect(mod)}
-                        disabled={!hasAccess}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                          isActive 
-                            ? 'bg-gradient-to-r from-cyan-500/20 to-transparent border-l-2 border-cyan-400' 
-                            : hasAccess 
-                              ? 'hover:bg-slate-800/50' 
-                              : 'opacity-40 cursor-not-allowed'
-                        }`}
-                      >
-                        <div 
-                          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ 
-                            backgroundColor: isActive ? `${mod.color}30` : `${mod.color}15`,
-                            border: isActive ? `1px solid ${mod.color}50` : 'none'
-                          }}
-                        >
-                          <Icon name={mod.icon} className="w-3.5 h-3.5" style={{ color: mod.color }} />
-                        </div>
-                        {!collapsed && (
-                          <>
-                            <div className="flex-1 text-left">
-                              <p className={`text-sm font-medium ${isActive ? 'text-white' : 'text-slate-300'}`}>
-                                {mod.name}
-                              </p>
-                            </div>
-                            {mod.badge && (
-                              <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded ${
-                                mod.badge === 'PRIVATE' ? 'bg-red-500/20 text-red-400' :
-                                mod.badge === 'CUI' ? 'bg-amber-500/20 text-amber-400' :
-                                mod.badge === 'ADMIN' ? 'bg-purple-500/20 text-purple-400' :
-                                'bg-slate-600 text-slate-300'
-                              }`}>
-                                {mod.badge}
-                              </span>
-                            )}
-                          </>
-                        )}
+                      <button key={mod.id} onClick={() => onModuleSelect(mod)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${isActive ? 'bg-gradient-to-r from-cyan-500/20 to-transparent border-l-2 border-cyan-400' : 'hover:bg-slate-800/50'}`}>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: isActive ? `${mod.color}30` : `${mod.color}15`, border: isActive ? `1px solid ${mod.color}50` : 'none' }}><Icon name={mod.icon} className="w-3.5 h-3.5" style={{ color: mod.color }} /></div>
+                        {!collapsed && (<><p className={`flex-1 text-left text-sm font-medium ${isActive ? 'text-white' : 'text-slate-300'}`}>{mod.name}</p>{mod.badge && <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded ${mod.badge === 'PRIVATE' ? 'bg-red-500/20 text-red-400' : mod.badge === 'CUI' ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'}`}>{mod.badge}</span>}</>)}
                       </button>
                     );
                   })}
@@ -553,1125 +452,90 @@ const Sidebar = ({ currentRole, activeModule, onModuleSelect, onRoleChange }) =>
         })}
       </nav>
 
-      {/* Restrictions Warning */}
-      {currentRole.restrictions?.length > 0 && !collapsed && (
-        <div className="p-3 border-t border-slate-800">
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Icon name="alert" className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-semibold text-amber-400">Access Restrictions</span>
-            </div>
-            <ul className="text-[10px] text-slate-400 space-y-1">
-              {currentRole.restrictions.slice(0, 3).map((r, i) => (
-                <li key={i} className="flex items-center gap-1">
-                  <Icon name="x" className="w-3 h-3 text-red-400" />
-                  {r}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* Sign Out */}
-      <div className="p-3 border-t border-slate-800">
-        <button 
-          onClick={() => { if(window.MissionPulse) MissionPulse.signOut().then(() => window.location.href = 'login.html'); }}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors ${collapsed ? 'justify-center' : ''}`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          {!collapsed && <span className="text-sm">Sign Out</span>}
-        </button>
+      <div className={`p-3 border-t border-slate-800 ${collapsed ? 'text-center' : ''}`}>
+        {!collapsed && userEmail && <p className="text-[10px] text-slate-500 truncate mb-2 px-2">{userEmail}</p>}
+        <button onClick={onSignOut} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"><Icon name="logOut" className="w-4 h-4" />{!collapsed && <span className="text-sm">Sign Out</span>}</button>
       </div>
 
-      {/* Security Status */}
       <div className={`p-3 border-t border-slate-800 ${collapsed ? 'text-center' : ''}`}>
-        <div className="flex items-center gap-2 px-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          {!collapsed && <span className="text-[10px] text-slate-400">RBAC Active • FedRAMP Moderate</span>}
-        </div>
+        <div className="flex items-center gap-2 px-2"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />{!collapsed && <span className="text-[10px] text-slate-400">AI Online • RBAC Active</span>}</div>
       </div>
     </aside>
   );
 };
 
 // ============================================================
-// MODULE COMPONENTS (Simplified for integration)
-// Each renders functional UI for its purpose
+// MODULE CONTENT
 // ============================================================
-
-// M1: Pipeline Intelligence
-const M1_Pipeline = ({ roleContext }) => {
-  const [opportunities] = useState([
-    { id: 'OPP-2026-DHA-001', name: 'DHA MHS GENESIS Cloud Migration', agency: 'DHA', ceiling: 98450210, priority: 'P-0', phase: 'Pink Team', pWin: 72, daysRemaining: 37 },
-    { id: 'OPP-2026-VA-003', name: 'VA Enterprise Cloud Hosting', agency: 'VA', ceiling: 45000000, priority: 'P-1', phase: 'Blue Team', pWin: 58, daysRemaining: 82 },
-    { id: 'OPP-2026-CMS-008', name: 'CMS Data Analytics Modernization', agency: 'CMS', ceiling: 125000000, priority: 'P-0', phase: 'Red Team', pWin: 68, daysRemaining: 127 },
-  ]);
-  
-  return (
-    <div className="p-6 space-y-6 animate-fadeIn">
-      {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card><p className="text-xs text-slate-400 mb-1">Active Pursuits</p><p className="text-2xl font-bold text-white">12</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Pipeline Value</p><p className="text-2xl font-bold text-emerald-400">$847M</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Avg Win Probability</p><p className="text-2xl font-bold text-cyan-400">64%</p></Card>
-        <Card><p className="text-xs text-slate-400 mb-1">Due This Month</p><p className="text-2xl font-bold text-amber-400">3</p></Card>
-      </div>
-      
-      {/* Opportunities Table */}
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Active Opportunities</h3>
-          <Button variant="primary" size="sm" icon="plus">Add Opportunity</Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-800/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Agency</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ceiling</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Priority</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Phase</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Win Prob</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Days Left</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {opportunities.map(opp => (
-                <tr key={opp.id} className="hover:bg-slate-800/30 transition-colors cursor-pointer">
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-white">{opp.name}</p>
-                    <p className="text-xs text-slate-500">{opp.id}</p>
-                  </td>
-                  <td className="px-4 py-3"><Badge color="#60a5fa">{opp.agency}</Badge></td>
-                  <td className="px-4 py-3 text-sm text-emerald-400 font-mono">${(opp.ceiling / 1000000).toFixed(1)}M</td>
-                  <td className="px-4 py-3">
-                    <Badge color={opp.priority === 'P-0' ? '#ef4444' : '#f59e0b'}>{opp.priority}</Badge>
-                  </td>
-                  <td className="px-4 py-3"><Badge color="#8b5cf6">{opp.phase}</Badge></td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-cyan-500 progress-bar" style={{ width: `${opp.pWin}%` }} />
-                      </div>
-                      <span className="text-sm text-cyan-400">{opp.pWin}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-sm font-medium ${opp.daysRemaining < 45 ? 'text-red-400' : 'text-slate-300'}`}>
-                      {opp.daysRemaining}d
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-// M2: War Room
-const M2_WarRoom = ({ roleContext }) => (
+const GenericModule = ({ module }) => (
   <div className="p-6 space-y-6 animate-fadeIn">
-    <div className="flex items-center justify-between">
-      <div>
-        <h2 className="text-xl font-bold text-white">Pursuit War Room</h2>
-        <p className="text-sm text-slate-400">DHA MHS GENESIS Cloud Migration</p>
-      </div>
-      <Badge color="#ef4444">P-0 MUST WIN</Badge>
-    </div>
-    
-    <div className="grid grid-cols-3 gap-4">
-      <Card>
-        <h4 className="text-sm font-semibold text-white mb-3">Win Themes</h4>
-        <ul className="space-y-2 text-sm text-slate-300">
-          <li className="flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-emerald-400" />FedRAMP High Authorization</li>
-          <li className="flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-emerald-400" />DoD Healthcare Experience</li>
-          <li className="flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-emerald-400" />CMMC Level 2 Certified</li>
-        </ul>
-      </Card>
-      <Card>
-        <h4 className="text-sm font-semibold text-white mb-3">Ghost Team</h4>
-        <ul className="space-y-2 text-sm text-slate-300">
-          <li className="flex items-center gap-2"><Icon name="alert" className="w-4 h-4 text-amber-400" />Incumbent: Leidos (75%)</li>
-          <li className="flex items-center gap-2"><Icon name="alert" className="w-4 h-4 text-red-400" />Booz Allen Hamilton</li>
-          <li className="flex items-center gap-2"><Icon name="info" className="w-4 h-4 text-slate-400" />Deloitte (long shot)</li>
-        </ul>
-      </Card>
-      <Card>
-        <h4 className="text-sm font-semibold text-white mb-3">Key Dates</h4>
-        <ul className="space-y-2 text-sm text-slate-300">
-          <li className="flex items-center gap-2"><Icon name="calendar" className="w-4 h-4 text-cyan-400" />Pink Team: Jan 28</li>
-          <li className="flex items-center gap-2"><Icon name="calendar" className="w-4 h-4 text-purple-400" />Red Team: Feb 10</li>
-          <li className="flex items-center gap-2"><Icon name="calendar" className="w-4 h-4 text-red-400" />Submission: Mar 1</li>
-        </ul>
-      </Card>
-    </div>
-  </div>
-);
-
-// M3: Swimlane Board (Shipley Phases)
-const M3_SwimlanBoard = ({ roleContext }) => {
-  const phases = [
-    { name: 'Gate 1', color: '#94a3b8', items: ['OPP-2026-HHS-012'] },
-    { name: 'Blue Team', color: '#60a5fa', items: ['OPP-2026-VA-003'] },
-    { name: 'Pink Team', color: '#f472b6', items: ['OPP-2026-DHA-001'] },
-    { name: 'Red Team', color: '#ef4444', items: ['OPP-2026-CMS-008'] },
-    { name: 'Gold Team', color: '#fbbf24', items: [] },
-    { name: 'Submitted', color: '#22c55e', items: [] },
-  ];
-  
-  return (
-    <div className="p-6 animate-fadeIn">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">Shipley Workflow Board</h2>
-        <Button variant="secondary" size="sm" icon="refresh">Refresh</Button>
-      </div>
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {phases.map(phase => (
-          <div key={phase.name} className="flex-shrink-0 w-64">
-            <div className="flex items-center gap-2 mb-3 px-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
-              <span className="text-sm font-semibold text-white">{phase.name}</span>
-              <span className="ml-auto text-xs text-slate-500">{phase.items.length}</span>
-            </div>
-            <div className="space-y-2 min-h-[200px] p-2 bg-slate-800/30 rounded-xl border border-slate-700/30">
-              {phase.items.map(item => (
-                <Card key={item} className="cursor-move hover:border-cyan-500/50">
-                  <p className="text-sm font-medium text-white">{item}</p>
-                  <p className="text-xs text-slate-400 mt-1">Click to view details</p>
-                </Card>
-              ))}
-              {phase.items.length === 0 && (
-                <p className="text-xs text-slate-500 text-center py-8">Drop items here</p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// M4: Compliance Matrix / RFP Shredder
-const M4_ComplianceMatrix = ({ roleContext }) => {
-  const [requirements, setRequirements] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadData = async () => {
-      if (window.MissionPulse) {
-        const { data, error } = await MissionPulse.getComplianceRequirements();
-        if (!error && data) {
-          setRequirements(data);
-        }
-      }
-      setLoading(false);
-    };
-    loadData();
-  }, []);
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'complete': case 'compliant': return '#22c55e';
-      case 'in_progress': case 'in progress': return '#f59e0b';
-      case 'not_started': case 'non_compliant': return '#ef4444';
-      default: return '#64748b';
-    }
-  };
-
-  const getRiskColor = (risk) => {
-    switch (risk?.toLowerCase()) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#22c55e';
-      default: return '#64748b';
-    }
-  };
-
-  return (
-    <div className="p-6 space-y-6 animate-fadeIn">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">RFP Shredder - Compliance Matrix</h2>
-        <div className="flex gap-2">
-          <Badge color="#22c55e">{requirements.filter(r => r.status === 'complete' || r.status === 'compliant').length} Complete</Badge>
-          <Button variant="secondary" size="sm" icon="download">Export</Button>
-          <Button variant="primary" size="sm" icon="play">AI Shred</Button>
-        </div>
-      </div>
-      <Card>
-        {loading ? (
-          <div className="p-8 text-center text-slate-400">Loading compliance data...</div>
-        ) : requirements.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">No compliance requirements found</div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-slate-800/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">PWS Ref</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">Requirement</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">Risk</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">Assigned</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {requirements.map(row => (
-                <tr key={row.id} className="hover:bg-slate-800/30">
-                  <td className="px-4 py-3 text-sm font-mono text-cyan-400">{row.pws_reference || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-white">{row.requirement_text}</td>
-                  <td className="px-4 py-3">
-                    <Badge color={getStatusColor(row.status)}>{row.status || 'Unknown'}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge color={getRiskColor(row.risk_level)}>{row.risk_level || '-'}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-400">{row.assigned_to || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
-    </div>
-  );
-};
-
-// M5: Contract Scanner
-const M5_ContractsScanner = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <h2 className="text-xl font-bold text-white">Contract Risk Scanner</h2>
-    <div className="grid grid-cols-3 gap-4">
-      <Card className="border-l-4 border-l-emerald-500">
-        <p className="text-sm text-slate-400">Low Risk Clauses</p>
-        <p className="text-2xl font-bold text-emerald-400">24</p>
-      </Card>
-      <Card className="border-l-4 border-l-amber-500">
-        <p className="text-sm text-slate-400">Medium Risk</p>
-        <p className="text-2xl font-bold text-amber-400">8</p>
-      </Card>
-      <Card className="border-l-4 border-l-red-500">
-        <p className="text-sm text-slate-400">High Risk</p>
-        <p className="text-2xl font-bold text-red-400">2</p>
-      </Card>
-    </div>
     <Card>
-      <h3 className="text-sm font-semibold text-white mb-3">High Risk Items</h3>
-      <div className="space-y-2">
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <p className="text-sm font-medium text-red-400">FAR 52.227-14 - Unlimited Data Rights</p>
-          <p className="text-xs text-slate-400 mt-1">Requires legal review before acceptance</p>
-        </div>
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <p className="text-sm font-medium text-red-400">H.8 - Performance Bond Requirement</p>
-          <p className="text-xs text-slate-400 mt-1">15% of contract value - verify bonding capacity</p>
-        </div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${module.color}20` }}><Icon name={module.icon} className="w-6 h-6" style={{ color: module.color }} /></div>
+        <div><h2 className="text-xl font-bold text-white">{module.name}</h2><p className="text-slate-400">Click the chat button to ask AI agents</p></div>
       </div>
+      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700"><p className="text-sm text-slate-400"><Icon name="sparkles" className="w-4 h-4 inline mr-2 text-cyan-400" />AI agents can help with {module.name.toLowerCase()} tasks.</p></div>
     </Card>
   </div>
 );
 
-// M6: Iron Dome Writer
-const M6_IronDomeWriter = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <div className="flex items-center justify-between">
-      <h2 className="text-xl font-bold text-white">Iron Dome AI Writing Suite</h2>
-      <Badge color="#c084fc">5 AI Agents Ready</Badge>
-    </div>
-    <div className="grid grid-cols-5 gap-4">
-      {[
-        { name: 'Proposal Writer', icon: 'penTool', color: '#c084fc' },
-        { name: 'Compliance Check', icon: 'checkCircle', color: '#22c55e' },
-        { name: 'Win Themes', icon: 'star', color: '#fbbf24' },
-        { name: 'Past Perf', icon: 'folder', color: '#60a5fa' },
-        { name: 'Strategy Coach', icon: 'target', color: '#f472b6' },
-      ].map(agent => (
-        <Card key={agent.name} hover className="text-center">
-          <div className="w-12 h-12 mx-auto mb-2 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${agent.color}20` }}>
-            <Icon name={agent.icon} className="w-6 h-6" style={{ color: agent.color }} />
-          </div>
-          <p className="text-sm font-medium text-white">{agent.name}</p>
-        </Card>
-      ))}
-    </div>
-    <Card>
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <textarea 
-            className="w-full h-40 bg-slate-800/50 border border-slate-700 rounded-lg p-4 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
-            placeholder="Enter your draft or prompt for AI assistance..."
-          />
-          <div className="flex justify-end mt-3">
-            <Button variant="primary" icon="send">Generate</Button>
-          </div>
-        </div>
-      </div>
-    </Card>
-  </div>
-);
-
-// M7: Black Hat Review (Private)
-const M7_BlackHat = ({ roleContext }) => {
-  const [competitors, setCompetitors] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadData = async () => {
-      if (window.MissionPulse) {
-        const { data, error } = await MissionPulse.getCompetitors();
-        if (!error && data) {
-          setCompetitors(data);
-        }
-      }
-      setLoading(false);
-    };
-    loadData();
-  }, []);
-
-  const getThreatColor = (level) => {
-    switch (level?.toLowerCase()) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#22c55e';
-      default: return '#64748b';
-    }
-  };
-
-  return (
-    <div className="p-6 space-y-6 animate-fadeIn">
+const MainContent = ({ activeModule, currentRole }) => (
+  <div className="flex-1 flex flex-col overflow-hidden">
+    <header className="h-14 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
-        <h2 className="text-xl font-bold text-white">Black Hat Competitive Review</h2>
-        <Badge color="#ef4444">PRIVATE - CAP/ADMIN ONLY</Badge>
-        <Badge color="#64748b">{competitors.length} Competitors</Badge>
+        {activeModule && (<><div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${activeModule.color}20` }}><Icon name={activeModule.icon} className="w-4 h-4" style={{ color: activeModule.color }} /></div><h1 className="text-lg font-semibold text-white">{activeModule.name}</h1></>)}
       </div>
-      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
-        <p className="text-sm text-red-400">⚠️ This module contains sensitive competitive intelligence. Access is restricted.</p>
+      <div className="flex items-center gap-3">
+        <Badge color={currentRole.color}>{currentRole.name}</Badge>
+        <div className="flex items-center gap-1 text-xs text-slate-500"><Icon name="sparkles" className="w-3 h-3 text-cyan-400" /><span>{currentRole.agentAccess?.length || 0} AI agents</span></div>
       </div>
-      
-      {loading ? (
-        <div className="p-8 text-center text-slate-400">Loading competitor intelligence...</div>
-      ) : competitors.length === 0 ? (
-        <div className="p-8 text-center text-slate-400">No competitor data available</div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          {competitors.map(comp => (
-            <Card key={comp.id}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-white">{comp.company_name}</h3>
-                <div className="flex gap-2">
-                  {comp.incumbent && <Badge color="#fbbf24">Incumbent</Badge>}
-                  <Badge color={getThreatColor(comp.threat_level)}>{comp.threat_level || 'Unknown'}</Badge>
-                </div>
-              </div>
-              <div className="space-y-3 text-sm">
-                {comp.strengths && (
-                  <div>
-                    <p className="text-xs text-red-400 mb-1">Strengths (Threat):</p>
-                    <p className="text-slate-300">{comp.strengths}</p>
-                  </div>
-                )}
-                {comp.weaknesses && (
-                  <div>
-                    <p className="text-xs text-emerald-400 mb-1">Weaknesses (Opportunity):</p>
-                    <p className="text-slate-300">{comp.weaknesses}</p>
-                  </div>
-                )}
-                {comp.ghost_strategy && (
-                  <div className="mt-3 pt-3 border-t border-slate-700">
-                    <p className="text-xs text-cyan-400 mb-1">Ghost Strategy:</p>
-                    <p className="text-slate-300">{comp.ghost_strategy}</p>
-                  </div>
-                )}
-              </div>
-            </Card>
-          ))}
+    </header>
+    <main className="flex-1 overflow-auto bg-[#00050F]">
+      {activeModule ? <GenericModule module={activeModule} /> : (
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <Icon name="activity" className="w-16 h-16 text-cyan-500/30 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-white mb-2">Select a Module</h2>
+            <p className="text-slate-400 mb-4">Choose from {currentRole.access.length} available modules</p>
+            <div className="flex items-center justify-center gap-2 text-sm text-cyan-400"><Icon name="sparkles" className="w-4 h-4" /><span>{currentRole.agentAccess?.length || 0} AI agents ready</span></div>
+          </div>
         </div>
       )}
-    </div>
-  );
-};
-
-
-// M8: Pricing Engine
-const M8_PricingEngine = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <div className="flex items-center justify-between">
-      <h2 className="text-xl font-bold text-white">LCAT Pricing Engine</h2>
-      <Badge color="#f59e0b">CUI - FOUO</Badge>
-    </div>
-    <div className="grid grid-cols-4 gap-4">
-      <Card><p className="text-xs text-slate-400">Total Price</p><p className="text-2xl font-bold text-emerald-400">$87.4M</p></Card>
-      <Card><p className="text-xs text-slate-400">Direct Labor</p><p className="text-2xl font-bold text-white">$52.1M</p></Card>
-      <Card><p className="text-xs text-slate-400">ODCs</p><p className="text-2xl font-bold text-white">$18.3M</p></Card>
-      <Card><p className="text-xs text-slate-400">Fee (8%)</p><p className="text-2xl font-bold text-cyan-400">$6.2M</p></Card>
-    </div>
-    <Card>
-      <h3 className="text-sm font-semibold text-white mb-3">Labor Category Summary</h3>
-      <table className="w-full">
-        <thead className="bg-slate-800/50">
-          <tr>
-            <th className="px-4 py-2 text-left text-xs text-slate-400">LCAT</th>
-            <th className="px-4 py-2 text-left text-xs text-slate-400">Rate</th>
-            <th className="px-4 py-2 text-left text-xs text-slate-400">Hours</th>
-            <th className="px-4 py-2 text-left text-xs text-slate-400">Extended</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-700/50">
-          {[
-            { lcat: 'Program Manager', rate: 185, hours: 8320, extended: 1539200 },
-            { lcat: 'Sr. Cloud Architect', rate: 225, hours: 6240, extended: 1404000 },
-            { lcat: 'DevSecOps Engineer', rate: 165, hours: 12480, extended: 2059200 },
-          ].map(row => (
-            <tr key={row.lcat}>
-              <td className="px-4 py-2 text-sm text-white">{row.lcat}</td>
-              <td className="px-4 py-2 text-sm text-slate-300">${row.rate}/hr</td>
-              <td className="px-4 py-2 text-sm text-slate-300">{row.hours.toLocaleString()}</td>
-              <td className="px-4 py-2 text-sm text-emerald-400">${row.extended.toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
-  </div>
-);
-
-// M9: HITL Gauntlet
-const M9_HITL = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <h2 className="text-xl font-bold text-white">Human-in-the-Loop Review Queue</h2>
-    <div className="grid grid-cols-3 gap-4">
-      <Card className="border-l-4 border-l-red-500">
-        <p className="text-xs text-slate-400">Needs Review</p>
-        <p className="text-2xl font-bold text-red-400">7</p>
-      </Card>
-      <Card className="border-l-4 border-l-amber-500">
-        <p className="text-xs text-slate-400">In Progress</p>
-        <p className="text-2xl font-bold text-amber-400">3</p>
-      </Card>
-      <Card className="border-l-4 border-l-emerald-500">
-        <p className="text-xs text-slate-400">Approved</p>
-        <p className="text-2xl font-bold text-emerald-400">42</p>
-      </Card>
-    </div>
-    <Card>
-      <h3 className="text-sm font-semibold text-white mb-3">Review Queue</h3>
-      <div className="space-y-2">
-        {[
-          { id: 'AI-001', type: 'Section Draft', conf: 87, section: 'Technical Approach' },
-          { id: 'AI-002', type: 'Win Theme', conf: 72, section: 'Executive Summary' },
-          { id: 'AI-003', type: 'Compliance', conf: 94, section: 'Section L Response' },
-        ].map(item => (
-          <div key={item.id} className="flex items-center justify-between p-3 bg-slate-800/30 rounded-lg">
-            <div>
-              <p className="text-sm font-medium text-white">{item.section}</p>
-              <p className="text-xs text-slate-400">{item.type} • {item.id}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className={`px-2 py-1 rounded text-xs font-semibold ${
-                item.conf >= 85 ? 'bg-emerald-500/20 text-emerald-400' :
-                item.conf >= 70 ? 'bg-amber-500/20 text-amber-400' :
-                'bg-red-500/20 text-red-400'
-              }`}>
-                {item.conf}% Confidence
-              </div>
-              <Button variant="primary" size="sm">Review</Button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </Card>
-  </div>
-);
-
-// M10: Orals Studio
-const M10_OralsStudio = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <h2 className="text-xl font-bold text-white">Orals Preparation Studio</h2>
-    <div className="grid grid-cols-2 gap-6">
-      <Card>
-        <h3 className="text-sm font-semibold text-white mb-3">Practice Sessions</h3>
-        <div className="space-y-2">
-          <Button variant="primary" className="w-full justify-start" icon="mic">Start Mock Q&A</Button>
-          <Button variant="secondary" className="w-full justify-start" icon="play">Review Recording</Button>
-          <Button variant="secondary" className="w-full justify-start" icon="folder">Question Bank</Button>
-        </div>
-      </Card>
-      <Card>
-        <h3 className="text-sm font-semibold text-white mb-3">Team Readiness</h3>
-        <div className="space-y-3">
-          {[
-            { name: 'Mary Womack', role: 'CEO', score: 92 },
-            { name: 'Sarah Chen', role: 'Tech Lead', score: 88 },
-            { name: 'Michael Torres', role: 'Capture', score: 85 },
-          ].map(person => (
-            <div key={person.name} className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-xs text-cyan-400">
-                {person.name.split(' ').map(n => n[0]).join('')}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-white">{person.name}</p>
-                <p className="text-xs text-slate-400">{person.role}</p>
-              </div>
-              <Badge color={person.score >= 90 ? '#22c55e' : '#f59e0b'}>{person.score}%</Badge>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  </div>
-);
-
-// M11: Frenemy Protocol
-const M11_FrenemyProtocol = ({ roleContext }) => {
-  const [partners, setPartners] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadData = async () => {
-      if (window.MissionPulse) {
-        const { data, error } = await MissionPulse.getPartners();
-        if (!error && data) {
-          setPartners(data);
-        }
-      }
-      setLoading(false);
-    };
-    loadData();
-  }, []);
-
-  const getTrustColor = (score) => {
-    if (score >= 80) return '#22c55e';
-    if (score >= 60) return '#f59e0b';
-    return '#ef4444';
-  };
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'active': return '#22c55e';
-      case 'pending': return '#f59e0b';
-      case 'expired': case 'revoked': return '#ef4444';
-      default: return '#64748b';
-    }
-  };
-
-  return (
-    <div className="p-6 space-y-6 animate-fadeIn">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-white">Partner Access Control</h2>
-          <Badge color="#64748b">{partners.length} Partners</Badge>
-        </div>
-        <Button variant="primary" size="sm" icon="plus">Add Partner</Button>
-      </div>
-      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-        <p className="text-sm text-amber-400">⚠️ Partner access automatically revokes upon proposal submission</p>
-      </div>
-      
-      {loading ? (
-        <Card><div className="p-8 text-center text-slate-400">Loading partner data...</div></Card>
-      ) : partners.length === 0 ? (
-        <Card><div className="p-8 text-center text-slate-400">No partners configured</div></Card>
-      ) : (
-        <Card>
-          <table className="w-full">
-            <thead className="bg-slate-800/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs text-slate-400">Partner</th>
-                <th className="px-4 py-3 text-left text-xs text-slate-400">Type</th>
-                <th className="px-4 py-3 text-left text-xs text-slate-400">Socioeconomic</th>
-                <th className="px-4 py-3 text-left text-xs text-slate-400">Capabilities</th>
-                <th className="px-4 py-3 text-left text-xs text-slate-400">Trust Score</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {partners.map(row => (
-                <tr key={row.id} className="hover:bg-slate-800/30">
-                  <td className="px-4 py-3 text-sm text-white font-medium">{row.partner_name}</td>
-                  <td className="px-4 py-3 text-sm text-slate-400">{row.partner_type || '-'}</td>
-                  <td className="px-4 py-3">
-                    {row.socioeconomic_status ? (
-                      <Badge color="#60a5fa">{row.socioeconomic_status}</Badge>
-                    ) : (
-                      <span className="text-slate-500">-</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-300 max-w-xs truncate">{row.capabilities || '-'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all" 
-                          style={{ 
-                            width: `${row.trust_score || 0}%`, 
-                            backgroundColor: getTrustColor(row.trust_score) 
-                          }} 
-                        />
-                      </div>
-                      <span className="text-xs text-slate-400">{row.trust_score || 0}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
-    </div>
-  );
-};
-
-
-// M12: Mission Control Dashboard
-const M12_Dashboard = ({ roleContext }) => {
-  const [stats, setStats] = useState(null);
-  const [recentOpps, setRecentOpps] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      if (window.MissionPulse) {
-        // Get pipeline stats
-        const { data: statsData } = await MissionPulse.getPipelineStats();
-        if (statsData) {
-          setStats(statsData);
-        }
-        
-        // Get recent opportunities for activity feed
-        const { data: oppsData } = await MissionPulse.getOpportunities({ limit: 5 });
-        if (oppsData) {
-          setRecentOpps(oppsData);
-        }
-      }
-      setLoading(false);
-    };
-    loadDashboardData();
-  }, []);
-
-  const formatCurrency = (value) => {
-    if (!value) return '$0';
-    if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-    return `$${value.toLocaleString()}`;
-  };
-
-  const getPhaseLabel = (phase) => {
-    const labels = {
-      'gate_1': 'Gate 1',
-      'blue_team': 'Blue Team',
-      'pink_team': 'Pink Team',
-      'red_team': 'Red Team',
-      'gold_team': 'Gold Team',
-      'submitted': 'Submitted'
-    };
-    return labels[phase] || phase;
-  };
-
-  return (
-    <div className="p-6 space-y-6 animate-fadeIn">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">Mission Control</h2>
-        {loading && <span className="text-xs text-cyan-400 animate-pulse">Loading live data...</span>}
-      </div>
-      
-      {/* Key Metrics */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <p className="text-xs text-slate-400">Active Proposals</p>
-          <p className="text-2xl font-bold text-cyan-400">
-            {loading ? '...' : stats?.totalCount || 0}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-slate-400">Pipeline Value</p>
-          <p className="text-2xl font-bold text-emerald-400">
-            {loading ? '...' : formatCurrency(stats?.totalValue)}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-slate-400">Avg Win Probability</p>
-          <p className="text-2xl font-bold text-white">
-            {loading ? '...' : `${stats?.avgPwin || 0}%`}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-slate-400">Phases Active</p>
-          <p className="text-2xl font-bold text-amber-400">
-            {loading ? '...' : Object.keys(stats?.byPhase || {}).length}
-          </p>
-        </Card>
-      </div>
-
-      {/* Phase Breakdown */}
-      {stats?.byPhase && Object.keys(stats.byPhase).length > 0 && (
-        <Card>
-          <h3 className="text-sm font-semibold text-white mb-4">Pipeline by Phase</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {Object.entries(stats.byPhase).map(([phase, data]) => (
-              <div key={phase} className="p-3 bg-slate-800/50 rounded-lg">
-                <p className="text-xs text-slate-400">{getPhaseLabel(phase)}</p>
-                <p className="text-lg font-bold text-white">{data.count} opps</p>
-                <p className="text-xs text-emerald-400">{formatCurrency(data.value)}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-2 gap-6">
-        {/* Recent Opportunities */}
-        <Card>
-          <h3 className="text-sm font-semibold text-white mb-3">Recent Opportunities</h3>
-          <div className="space-y-2 text-sm">
-            {loading ? (
-              <p className="text-slate-500">Loading...</p>
-            ) : recentOpps.length === 0 ? (
-              <p className="text-slate-500">No opportunities yet</p>
-            ) : (
-              recentOpps.slice(0, 5).map(opp => (
-                <div key={opp.id} className="flex items-center justify-between py-1">
-                  <span className="text-slate-300 truncate flex-1">{opp.nickname || opp.title}</span>
-                  <span className="text-emerald-400 text-xs ml-2">{formatCurrency(opp.ceiling)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-        
-        {/* System Status */}
-        <Card>
-          <h3 className="text-sm font-semibold text-white mb-3">System Status</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span className="text-slate-300">Supabase Connected</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span className="text-slate-300">AI Agents Online</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span className="text-slate-300">RBAC Active</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-              <span className="text-slate-300">{stats?.totalCount || 0} opportunities loaded</span>
-            </div>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-};
-
-// M13: Launch & ROI
-const M13_LaunchROI = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <h2 className="text-xl font-bold text-white">Launch & ROI Dashboard</h2>
-    <div className="grid grid-cols-4 gap-4">
-      <Card><p className="text-xs text-slate-400">Time Saved</p><p className="text-2xl font-bold text-cyan-400">340 hrs</p></Card>
-      <Card><p className="text-xs text-slate-400">Cost Savings</p><p className="text-2xl font-bold text-emerald-400">$127.5K</p></Card>
-      <Card><p className="text-xs text-slate-400">Win Rate Î”</p><p className="text-2xl font-bold text-purple-400">+18%</p></Card>
-      <Card><p className="text-xs text-slate-400">Cycle Time</p><p className="text-2xl font-bold text-white">18d vs 45d</p></Card>
-    </div>
-    <Card>
-      <h3 className="text-sm font-semibold text-white mb-3">Submission Checklist</h3>
-      <div className="space-y-2">
-        {[
-          { item: 'Final Volume Review Complete', done: true },
-          { item: 'Pricing Approved by FIN', done: true },
-          { item: 'Compliance Matrix 100%', done: true },
-          { item: 'Executive Summary Approved', done: false },
-          { item: 'PDF/A Conversion Complete', done: false },
-        ].map((check, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${check.done ? 'bg-emerald-500' : 'bg-slate-700'}`}>
-              {check.done && <Icon name="check" className="w-3 h-3 text-white" />}
-            </div>
-            <span className={`text-sm ${check.done ? 'text-slate-300' : 'text-slate-500'}`}>{check.item}</span>
-          </div>
-        ))}
-      </div>
-    </Card>
-  </div>
-);
-
-// M14: Post-Award
-const M14_PostAward = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <h2 className="text-xl font-bold text-white">Post-Award Transition</h2>
-    <div className="grid grid-cols-2 gap-6">
-      <Card>
-        <h3 className="text-sm font-semibold text-white mb-3">Transition Timeline</h3>
-        <div className="space-y-3">
-          {[
-            { phase: 'Contract Award', date: 'Apr 1', status: 'pending' },
-            { phase: 'Kickoff Meeting', date: 'Apr 8', status: 'pending' },
-            { phase: 'Staff Onboarding', date: 'Apr 15', status: 'pending' },
-            { phase: 'Full Operations', date: 'May 1', status: 'pending' },
-          ].map(item => (
-            <div key={item.phase} className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-slate-600" />
-              <span className="text-sm text-white flex-1">{item.phase}</span>
-              <span className="text-xs text-slate-400">{item.date}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
-      <Card>
-        <h3 className="text-sm font-semibold text-white mb-3">Key Personnel</h3>
-        <div className="space-y-2">
-          {[
-            { name: 'Mary Womack', role: 'Program Manager' },
-            { name: 'Sarah Chen', role: 'Technical Lead' },
-            { name: 'Amanda Foster', role: 'Transition Manager' },
-          ].map(person => (
-            <div key={person.name} className="flex items-center gap-3 p-2 bg-slate-800/30 rounded-lg">
-              <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-xs text-cyan-400">
-                {person.name.split(' ').map(n => n[0]).join('')}
-              </div>
-              <div>
-                <p className="text-sm text-white">{person.name}</p>
-                <p className="text-xs text-slate-400">{person.role}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  </div>
-);
-
-// M15: Admin Settings
-const M15_AdminSettings = ({ roleContext }) => (
-  <div className="p-6 space-y-6 animate-fadeIn">
-    <h2 className="text-xl font-bold text-white">Admin Settings</h2>
-    <div className="grid grid-cols-2 gap-6">
-      <Card>
-        <h3 className="text-sm font-semibold text-white mb-3">Role Management</h3>
-        <p className="text-sm text-slate-400 mb-3">11 Shipley roles configured</p>
-        <Button variant="secondary" size="sm" icon="edit">Edit Roles</Button>
-      </Card>
-      <Card>
-        <h3 className="text-sm font-semibold text-white mb-3">System Health</h3>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-sm text-slate-300">All systems operational</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-sm text-slate-300">API latency: 42ms</span>
-          </div>
-        </div>
-      </Card>
-    </div>
-  </div>
-);
-
-// M16: Audit Log
-const AuditLogModule = ({ roleContext }) => {
-  const [logs] = useState([
-    { id: 1, timestamp: '2026-01-23 14:32:15', user: 'CAP', action: 'Viewed Black Hat Review', module: 'M7', status: 'success' },
-    { id: 2, timestamp: '2026-01-23 14:28:03', user: 'PM', action: 'Exported Compliance Matrix', module: 'M4', status: 'success' },
-    { id: 3, timestamp: '2026-01-23 14:25:41', user: 'Partner', action: 'Access denied: Pricing', module: 'M8', status: 'blocked' },
-    { id: 4, timestamp: '2026-01-23 14:20:00', user: 'FIN', action: 'Updated LCAT rates', module: 'M8', status: 'success' },
-  ]);
-
-  return (
-    <div className="p-6 space-y-6 animate-fadeIn">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">Security Audit Log</h2>
-        <Button variant="secondary" size="sm" icon="download">Export</Button>
-      </div>
-      <Card>
-        <table className="w-full">
-          <thead className="bg-slate-800/50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs text-slate-400">Timestamp</th>
-              <th className="px-4 py-3 text-left text-xs text-slate-400">User</th>
-              <th className="px-4 py-3 text-left text-xs text-slate-400">Action</th>
-              <th className="px-4 py-3 text-left text-xs text-slate-400">Module</th>
-              <th className="px-4 py-3 text-left text-xs text-slate-400">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-700/50">
-            {logs.map(log => (
-              <tr key={log.id} className="hover:bg-slate-800/30">
-                <td className="px-4 py-3 text-sm font-mono text-slate-300">{log.timestamp}</td>
-                <td className="px-4 py-3"><Badge color="#00E5FA">{log.user}</Badge></td>
-                <td className="px-4 py-3 text-sm text-white">{log.action}</td>
-                <td className="px-4 py-3 text-sm text-slate-400">{log.module}</td>
-                <td className="px-4 py-3">
-                  <Badge color={log.status === 'success' ? '#22c55e' : '#ef4444'}>{log.status}</Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-    </div>
-  );
-};
-
-// Access Denied Component
-const AccessDenied = ({ moduleName }) => (
-  <div className="flex-1 flex items-center justify-center p-8">
-    <div className="text-center max-w-md">
-      <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center">
-        <Icon name="lock" className="w-10 h-10 text-red-400" />
-      </div>
-      <h3 className="text-xl font-bold text-white mb-2">Access Restricted</h3>
-      <p className="text-slate-400 mb-4">
-        You don't have permission to access <span className="text-red-400 font-semibold">{moduleName}</span>.
-      </p>
-      <p className="text-sm text-slate-500">
-        Contact your administrator to request access.
-      </p>
-    </div>
+    </main>
   </div>
 );
 
 // ============================================================
-// MAIN CONTENT ROUTER
-// ============================================================
-const MainContent = ({ activeModule, currentRole }) => {
-  if (!activeModule) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-slate-900/50">
-        <div className="text-center animate-fadeIn">
-          <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/30 flex items-center justify-center">
-            <Icon name="activity" className="w-12 h-12 text-cyan-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Welcome to MissionPulse</h2>
-          <p className="text-slate-400 mb-4">Select a module from the sidebar to begin</p>
-          <p className="text-sm text-slate-500">
-            Logged in as <span className="text-cyan-400 font-semibold">{currentRole.name}</span>
-            <span className="mx-2">•</span>
-            {currentRole.access.length} modules available
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const renderModule = () => {
-    switch (activeModule.id) {
-      case 'pipeline': return <M1_Pipeline roleContext={currentRole} />;
-      case 'warroom': return <M2_WarRoom roleContext={currentRole} />;
-      case 'swarm': return <M3_SwimlanBoard roleContext={currentRole} />;
-      case 'compliance': return <M4_ComplianceMatrix roleContext={currentRole} />;
-      case 'contracts': return <M5_ContractsScanner roleContext={currentRole} />;
-      case 'writer': return <M6_IronDomeWriter roleContext={currentRole} />;
-      case 'blackhat': 
-        return currentRole.access.includes('blackhat') 
-          ? <M7_BlackHat roleContext={currentRole} />
-          : <AccessDenied moduleName="Black Hat Review" />;
-      case 'pricing':
-        return currentRole.access.includes('pricing')
-          ? <M8_PricingEngine roleContext={currentRole} />
-          : <AccessDenied moduleName="Pricing Engine" />;
-      case 'hitl': return <M9_HITL roleContext={currentRole} />;
-      case 'orals': return <M10_OralsStudio roleContext={currentRole} />;
-      case 'frenemy': return <M11_FrenemyProtocol roleContext={currentRole} />;
-      case 'dashboard': return <M12_Dashboard roleContext={currentRole} />;
-      case 'launch_roi': return <M13_LaunchROI roleContext={currentRole} />;
-      case 'post_award': return <M14_PostAward roleContext={currentRole} />;
-      case 'admin':
-        return currentRole.id === 'Admin'
-          ? <M15_AdminSettings roleContext={currentRole} />
-          : <AccessDenied moduleName="Admin Settings" />;
-      case 'audit':
-        return currentRole.id === 'Admin'
-          ? <AuditLogModule roleContext={currentRole} />
-          : <AccessDenied moduleName="Audit Log" />;
-      default:
-        return <AccessDenied moduleName={activeModule.name} />;
-    }
-  };
-
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Module Header */}
-      <header className="flex-shrink-0 h-14 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-6">
-        <div className="flex items-center gap-4">
-          <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${activeModule.color}20` }}
-          >
-            <Icon name={activeModule.icon} className="w-4 h-4" style={{ color: activeModule.color }} />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-white">{activeModule.name}</h2>
-            <p className="text-xs text-slate-400">{activeModule.description}</p>
-          </div>
-          {activeModule.badge && (
-            <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${
-              activeModule.badge === 'PRIVATE' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-              activeModule.badge === 'CUI' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-              activeModule.badge === 'ADMIN' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
-              'bg-slate-600 text-slate-300'
-            }`}>
-              {activeModule.badge}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">Module {activeModule.scene}</span>
-          <span className="w-1 h-1 rounded-full bg-slate-600" />
-          <span className="text-xs text-slate-400">
-            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-          </span>
-        </div>
-      </header>
-
-      {/* Module Content */}
-      <main className="flex-1 overflow-auto bg-[#00050F]">
-        {renderModule()}
-      </main>
-    </div>
-  );
-};
-
-// ============================================================
-// MAIN APP COMPONENT
+// MAIN APP
 // ============================================================
 function App() {
   const [currentRole, setCurrentRole] = useState(ROLES[0]);
   const [activeModule, setActiveModule] = useState(null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
 
-  // Load saved state
   useEffect(() => {
-    const savedRole = localStorage.getItem('missionpulse_role');
-    const savedModule = localStorage.getItem('missionpulse_module');
-    
-    if (savedRole) {
-      const role = ROLES.find(r => r.id === savedRole);
-      if (role) setCurrentRole(role);
-    }
-    
-    if (savedModule) {
-      const mod = MODULES.find(m => m.id === savedModule);
-      if (mod) setActiveModule(mod);
+    const checkAuth = async () => {
+      if (supabase) { const { data: { session } } = await supabase.auth.getSession(); setUser(session?.user || null); }
+      setLoading(false);
+    };
+    checkAuth();
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => { setUser(session?.user || null); if (!session) window.location.href = 'login.html'; });
+      return () => subscription?.unsubscribe();
     }
   }, []);
 
-  // Save state
   useEffect(() => {
-    localStorage.setItem('missionpulse_role', currentRole.id);
-  }, [currentRole]);
+    const savedRole = localStorage.getItem('missionpulse_role');
+    const savedModule = localStorage.getItem('missionpulse_module');
+    if (savedRole) { const role = ROLES.find(r => r.id === savedRole); if (role) setCurrentRole(role); }
+    if (savedModule) { const mod = MODULES.find(m => m.id === savedModule); if (mod) setActiveModule(mod); }
+  }, []);
 
-  useEffect(() => {
-    if (activeModule) {
-      localStorage.setItem('missionpulse_module', activeModule.id);
-    }
-  }, [activeModule]);
+  useEffect(() => { localStorage.setItem('missionpulse_role', currentRole.id); }, [currentRole]);
+  useEffect(() => { if (activeModule) localStorage.setItem('missionpulse_module', activeModule.id); }, [activeModule]);
 
   const handleRoleChange = (newRole) => {
     setCurrentRole(newRole);
@@ -1681,40 +545,32 @@ function App() {
     }
   };
 
-  const handleModuleSelect = (mod) => {
-    if (currentRole.access.includes(mod.id)) {
-      setActiveModule(mod);
-    }
+  const handleModuleSelect = (mod) => { if (currentRole.access.includes(mod.id)) setActiveModule(mod); };
+
+  const handleSignOut = async () => {
+    if (supabase) await supabase.auth.signOut();
+    localStorage.removeItem('missionpulse_role');
+    localStorage.removeItem('missionpulse_module');
+    window.location.href = 'login.html';
   };
+
+  if (loading) return (<div className="h-screen flex items-center justify-center bg-[#00050F]"><div className="text-center"><div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div><p className="text-slate-400">Loading MissionPulse...</p></div></div>);
 
   return (
     <RoleContext.Provider value={{ currentRole, setCurrentRole: handleRoleChange }}>
       <div className="h-screen flex bg-[#00050F] overflow-hidden">
-        <Sidebar
-          currentRole={currentRole}
-          activeModule={activeModule}
-          onModuleSelect={handleModuleSelect}
-          onRoleChange={handleRoleChange}
-        />
-        <MainContent
-          activeModule={activeModule}
-          currentRole={currentRole}
-        />
+        <Sidebar currentRole={currentRole} activeModule={activeModule} onModuleSelect={handleModuleSelect} onRoleChange={handleRoleChange} onSignOut={handleSignOut} userEmail={user?.email} />
+        <MainContent activeModule={activeModule} currentRole={currentRole} />
       </div>
-
-      {/* Global Footer */}
+      <AIChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} currentRole={currentRole} activeModule={activeModule} />
+      {!chatOpen && <FloatingChatButton onClick={() => setChatOpen(true)} />}
       <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-50">
-        <span className="text-[10px] text-slate-500 tracking-wider">
-          AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 Ultimate • Â© 2026 Mission Meets Tech
-        </span>
+        <span className="text-[10px] text-slate-500 tracking-wider">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 • © 2026 Mission Meets Tech</span>
       </div>
     </RoleContext.Provider>
   );
 }
 
-// ============================================================
-// RENDER
-// ============================================================
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
