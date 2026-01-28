@@ -1,25 +1,64 @@
 /**
- * MissionPulse Supabase Client v2.0
- * Full CRUD for all tables + Render API AI integration
+ * MissionPulse Supabase Client Module
+ * Sprint 14: Auth Unification + CRUD operations + Real-time subscriptions
+ * 
+ * AUTH METHODS:
+ * - signIn(email, password) - Authenticate user
+ * - signOut() - Sign out current user
+ * - getSession() - Get current session
+ * - getCurrentUser() - Get user with profile/role
+ * - onAuthStateChange(callback) - Listen for auth changes
+ * - requireAuth() - Redirect to login if not authenticated
+ * 
+ * CRUD METHODS:
+ * - getOpportunities() - Fetch all opportunities
+ * - getPipelineStats() - Aggregate statistics
+ * - subscribeToOpportunities(callback) - Real-time updates
+ * - createOpportunity(data) - Create new opportunity
+ * - updateOpportunity(id, data) - Update existing opportunity
+ * - deleteOpportunity(id) - Delete opportunity
+ * 
  * © 2026 Mission Meets Tech
  */
+
 (function(global) {
   'use strict';
 
+  // ============================================================
+  // SUPABASE CONFIGURATION
+  // ============================================================
   const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
-  const RENDER_API_URL = 'https://missionpulse-api.onrender.com';
+  
+  // Demo mode flag - set to false for production
+  const DEMO_MODE = false;
 
+  // Initialize Supabase client
   let supabase = null;
   let connectionStatus = 'disconnected';
   let connectionListeners = [];
+  let currentUser = null;
+  let currentProfile = null;
 
   function initSupabase() {
     if (typeof global.supabase !== 'undefined' && global.supabase.createClient) {
       supabase = global.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       connectionStatus = 'connected';
       notifyConnectionListeners();
-      console.log('[MissionPulse] Supabase initialized');
+      console.log('[MissionPulse] Supabase client initialized');
+      
+      // Set up auth state listener
+      supabase.auth.onAuthStateChange((event, session) => {
+        console.log('[MissionPulse] Auth state changed:', event);
+        if (session?.user) {
+          currentUser = session.user;
+          fetchUserProfile(session.user.id);
+        } else {
+          currentUser = null;
+          currentProfile = null;
+        }
+      });
+      
       return true;
     }
     console.warn('[MissionPulse] Supabase library not loaded');
@@ -30,549 +69,650 @@
     connectionListeners.forEach(cb => cb(connectionStatus));
   }
 
-  const SHIPLEY_PHASES = {
-    'qualify': { name: 'Qualify', color: '#64748b', order: 0 },
-    'capture': { name: 'Capture', color: '#8b5cf6', order: 1 },
-    'blue_team': { name: 'Blue Team', color: '#3b82f6', order: 2 },
-    'pink_team': { name: 'Pink Team', color: '#ec4899', order: 3 },
-    'red_team': { name: 'Red Team', color: '#ef4444', order: 4 },
-    'gold_team': { name: 'Gold Team', color: '#f59e0b', order: 5 },
-    'white_glove': { name: 'White Glove', color: '#10b981', order: 6 },
-    'submitted': { name: 'Submit', color: '#22d3ee', order: 7 }
+  // ============================================================
+  // AUTHENTICATION METHODS
+  // ============================================================
+
+  /**
+   * Sign in with email and password
+   * @param {string} email 
+   * @param {string} password 
+   * @returns {Promise<{data, error}>}
+   */
+  async function signIn(email, password) {
+    if (!supabase) {
+      return { data: null, error: { message: 'Supabase not initialized' } };
+    }
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) throw error;
+      
+      currentUser = data.user;
+      await fetchUserProfile(data.user.id);
+      
+      // Store session indicator
+      localStorage.setItem('missionpulse_authenticated', 'true');
+      
+      console.log('[MissionPulse] Sign in successful:', data.user.email);
+      return { data: { user: currentUser, profile: currentProfile }, error: null };
+      
+    } catch (error) {
+      console.error('[MissionPulse] Sign in error:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Sign out current user
+   * @returns {Promise<{error}>}
+   */
+  async function signOut() {
+    if (!supabase) {
+      return { error: { message: 'Supabase not initialized' } };
+    }
+    
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      currentUser = null;
+      currentProfile = null;
+      localStorage.removeItem('missionpulse_authenticated');
+      localStorage.removeItem('missionpulse_user');
+      
+      console.log('[MissionPulse] Sign out successful');
+      return { error: null };
+      
+    } catch (error) {
+      console.error('[MissionPulse] Sign out error:', error);
+      return { error };
+    }
+  }
+
+  /**
+   * Get current session
+   * @returns {Promise<{data, error}>}
+   */
+  async function getSession() {
+    if (!supabase) {
+      return { data: { session: null }, error: null };
+    }
+    
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Get session error:', error);
+      return { data: { session: null }, error };
+    }
+  }
+
+  /**
+   * Get current user with profile
+   * @returns {Promise<{user, profile, error}>}
+   */
+  async function getCurrentUser() {
+    if (!supabase) {
+      return { user: null, profile: null, error: { message: 'Supabase not initialized' } };
+    }
+    
+    // Return cached if available
+    if (currentUser && currentProfile) {
+      return { user: currentUser, profile: currentProfile, error: null };
+    }
+    
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) throw error;
+      if (!user) return { user: null, profile: null, error: null };
+      
+      currentUser = user;
+      await fetchUserProfile(user.id);
+      
+      return { user: currentUser, profile: currentProfile, error: null };
+      
+    } catch (error) {
+      console.error('[MissionPulse] Get current user error:', error);
+      return { user: null, profile: null, error };
+    }
+  }
+
+  /**
+   * Fetch user profile from profiles table
+   * @param {string} userId 
+   */
+  async function fetchUserProfile(userId) {
+    if (!supabase || !userId) return null;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.warn('[MissionPulse] Profile fetch error:', error);
+        // Create default profile object
+        currentProfile = {
+          id: userId,
+          email: currentUser?.email,
+          role: 'Partner',
+          full_name: currentUser?.email?.split('@')[0]
+        };
+      } else {
+        currentProfile = data;
+      }
+      
+      // Cache in localStorage for quick access
+      localStorage.setItem('missionpulse_user', JSON.stringify({
+        id: userId,
+        email: currentUser?.email,
+        role: currentProfile?.role || 'Partner',
+        fullName: currentProfile?.full_name
+      }));
+      
+      console.log('[MissionPulse] Profile loaded:', currentProfile?.role);
+      return currentProfile;
+      
+    } catch (error) {
+      console.error('[MissionPulse] Profile fetch error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Listen for auth state changes
+   * @param {Function} callback - Called with (event, session)
+   * @returns {Object} Subscription object with unsubscribe method
+   */
+  function onAuthStateChange(callback) {
+    if (!supabase) {
+      console.warn('[MissionPulse] Supabase not initialized');
+      return { data: { subscription: { unsubscribe: () => {} } } };
+    }
+    
+    return supabase.auth.onAuthStateChange(callback);
+  }
+
+  /**
+   * Check if user is authenticated, redirect to login if not
+   * @param {string} redirectUrl - URL to redirect to if not authenticated
+   * @returns {Promise<boolean>}
+   */
+  async function requireAuth(redirectUrl = 'login.html') {
+    // Demo mode bypass
+    if (DEMO_MODE) {
+      console.log('[MissionPulse] Demo mode - auth bypassed');
+      currentProfile = {
+        id: 'demo-user',
+        email: 'demo@missionpulse.io',
+        role: 'CEO',
+        full_name: 'Demo User'
+      };
+      return true;
+    }
+    
+    const { data } = await getSession();
+    
+    if (!data?.session) {
+      console.log('[MissionPulse] No session, redirecting to login');
+      window.location.href = redirectUrl;
+      return false;
+    }
+    
+    // Ensure profile is loaded
+    if (!currentProfile) {
+      await fetchUserProfile(data.session.user.id);
+    }
+    
+    return true;
+  }
+
+  /**
+   * Check if current user has required role
+   * @param {string|string[]} requiredRoles - Role(s) required
+   * @returns {boolean}
+   */
+  function hasRole(requiredRoles) {
+    if (!currentProfile?.role) return false;
+    
+    const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
+    return roles.includes(currentProfile.role);
+  }
+
+  /**
+   * Get current user's role
+   * @returns {string|null}
+   */
+  function getUserRole() {
+    return currentProfile?.role || null;
+  }
+
+  /**
+   * Check if user can access a module based on role
+   * @param {string} moduleName 
+   * @returns {boolean}
+   */
+  function canAccessModule(moduleName) {
+    const role = currentProfile?.role;
+    if (!role) return false;
+    
+    // CEO and Admin have full access
+    if (['CEO', 'COO', 'Admin'].includes(role)) return true;
+    
+    // Module access matrix
+    const moduleAccess = {
+      'pipeline': ['CAP', 'PM', 'SA', 'FIN', 'CON', 'DEL', 'QA'],
+      'warroom': ['CAP', 'PM', 'SA', 'QA'],
+      'strategy': ['CAP', 'SA'],
+      'blackhat': ['CAP', 'SA'],
+      'contracts': ['CON', 'PM'],
+      'compliance': ['CON', 'SA', 'PM'],
+      'pricing': ['FIN', 'PM'],
+      'hitl': ['QA', 'CAP'],
+      'orals': ['CAP', 'SA', 'PM'],
+      'partners': ['DEL', 'PM'],
+      'admin': [] // CEO/COO/Admin only
+    };
+    
+    const allowedRoles = moduleAccess[moduleName];
+    if (!allowedRoles) return true; // Unknown module = allow
+    
+    return allowedRoles.includes(role);
+  }
+
+  // ============================================================
+  // FIELD MAPPING: snake_case (DB) <-> camelCase (Frontend)
+  // ============================================================
+  const fieldMapping = {
+    toFrontend: {
+      id: 'id',
+      name: 'name',
+      agency: 'agency',
+      contract_value: 'contractValue',
+      priority: 'priority',
+      shipley_phase: 'shipleyPhase',
+      win_probability: 'winProbability',
+      due_date: 'dueDate',
+      solicitation_number: 'solicitationNumber',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+      description: 'description',
+      contract_type: 'contractType',
+      set_aside: 'setAside',
+      naics_code: 'naicsCode',
+      primary_contact: 'primaryContact'
+    },
+    toDatabase: {
+      id: 'id',
+      name: 'name',
+      agency: 'agency',
+      contractValue: 'contract_value',
+      priority: 'priority',
+      shipleyPhase: 'shipley_phase',
+      winProbability: 'win_probability',
+      dueDate: 'due_date',
+      solicitationNumber: 'solicitation_number',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+      description: 'description',
+      contractType: 'contract_type',
+      setAside: 'set_aside',
+      naicsCode: 'naics_code',
+      primaryContact: 'primary_contact'
+    }
   };
 
-  function mapPhase(phase) {
-    if (!phase) return 'Qualify';
-    const key = phase.toLowerCase().replace(/ /g, '_');
-    return SHIPLEY_PHASES[key]?.name || phase;
+  function mapToFrontend(record) {
+    if (!record) return null;
+    const mapped = {};
+    Object.keys(record).forEach(key => {
+      const frontendKey = fieldMapping.toFrontend[key] || key;
+      mapped[frontendKey] = record[key];
+    });
+    
+    if (mapped.dueDate) {
+      const dueDate = new Date(mapped.dueDate);
+      const today = new Date();
+      const diffTime = dueDate - today;
+      mapped.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+    
+    mapped.phase = mapShipleyPhaseToDisplay(mapped.shipleyPhase);
+    mapped.ceiling = mapped.contractValue;
+    mapped.pWin = mapped.winProbability;
+    
+    return mapped;
   }
 
-  // OPPORTUNITIES CRUD
-  async function getOpportunities(options = {}) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      let query = supabase.from('opportunities').select('*');
-      query = query.order(options.orderBy || 'created_at', { ascending: options.ascending ?? false });
-      const { data, error } = await query;
-      if (error) throw error;
-      return {
-        data: (data || []).map(r => ({
-          id: r.id, name: r.name, nickname: r.name?.split(' ').slice(0, 3).join(' ') || 'Unnamed',
-          title: r.description || r.name, agency: r.agency, ceiling: r.contract_value,
-          contractValue: r.contract_value, phase: mapPhase(r.shipley_phase), shipleyPhase: r.shipley_phase,
-          pWin: r.win_probability || 50, winProbability: r.win_probability,
-          days: r.due_date ? Math.max(0, Math.ceil((new Date(r.due_date) - new Date()) / 86400000)) : 999,
-          dueDate: r.due_date, priority: r.priority || 'P-1', naics: r.naics_code, setAside: r.set_aside,
-          solicitationNumber: r.solicitation_number, description: r.description, createdAt: r.created_at
-        })), error: null
-      };
-    } catch (error) { return { data: null, error }; }
+  function mapToDatabase(data) {
+    if (!data) return null;
+    const mapped = {};
+    Object.keys(data).forEach(key => {
+      const dbKey = fieldMapping.toDatabase[key];
+      if (dbKey) {
+        mapped[dbKey] = data[key];
+      }
+    });
+    return mapped;
   }
 
-  async function getOpportunityById(id) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { data, error } = await supabase.from('opportunities').select('*').eq('id', id).single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
+  // Shipley phases
+  const SHIPLEY_PHASES = {
+    'gate_1': { name: 'Gate 1', color: '#94a3b8', order: 1 },
+    'blue_team': { name: 'Blue Team', color: '#60a5fa', order: 2 },
+    'pink_team': { name: 'Pink Team', color: '#f472b6', order: 3 },
+    'red_team': { name: 'Red Team', color: '#ef4444', order: 4 },
+    'gold_team': { name: 'Gold Team', color: '#fbbf24', order: 5 },
+    'submitted': { name: 'Submitted', color: '#22c55e', order: 6 },
+    'awarded': { name: 'Awarded', color: '#8b5cf6', order: 7 },
+    'lost': { name: 'Lost', color: '#64748b', order: 8 }
+  };
+
+  function mapShipleyPhaseToDisplay(phase) {
+    if (!phase) return 'Gate 1';
+    const phaseInfo = SHIPLEY_PHASES[phase];
+    return phaseInfo ? phaseInfo.name : phase;
   }
 
-  async function createOpportunity(opp) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {
-        name: opp.name, agency: opp.agency, contract_value: opp.contractValue || opp.ceiling,
-        priority: opp.priority, shipley_phase: opp.shipleyPhase || 'qualify',
-        win_probability: opp.winProbability || opp.pWin || 50, due_date: opp.dueDate,
-        solicitation_number: opp.solicitationNumber, description: opp.description || opp.title,
-        set_aside: opp.setAside, naics_code: opp.naics,
-        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-      };
-      const { data, error } = await supabase.from('opportunities').insert([dbData]).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
+  // ============================================================
+  // CRUD OPERATIONS
+  // ============================================================
 
-  async function updateOpportunity(id, updates) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = { updated_at: new Date().toISOString() };
-      if (updates.name) dbData.name = updates.name;
-      if (updates.agency) dbData.agency = updates.agency;
-      if (updates.contractValue || updates.ceiling) dbData.contract_value = updates.contractValue || updates.ceiling;
-      if (updates.shipleyPhase) dbData.shipley_phase = updates.shipleyPhase;
-      if (updates.winProbability || updates.pWin) dbData.win_probability = updates.winProbability || updates.pWin;
-      if (updates.dueDate) dbData.due_date = updates.dueDate;
-      if (updates.priority) dbData.priority = updates.priority;
-      const { data, error } = await supabase.from('opportunities').update(dbData).eq('id', id).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
+  async function getOpportunities() {
+    if (!supabase) {
+      console.warn('[MissionPulse] Supabase not initialized, using demo data');
+      return { data: getDemoData(), error: null };
+    }
 
-  async function deleteOpportunity(id) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
     try {
-      const { error } = await supabase.from('opportunities').delete().eq('id', id);
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('*')
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
-      return { data: { id }, error: null };
-    } catch (error) { return { data: null, error }; }
+
+      const mapped = (data || []).map(mapToFrontend);
+      return { data: mapped, error: null };
+      
+    } catch (error) {
+      console.error('[MissionPulse] Get opportunities error:', error);
+      if (DEMO_MODE) {
+        return { data: getDemoData(), error: null };
+      }
+      return { data: [], error };
+    }
   }
 
   async function getPipelineStats() {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { data, error } = await supabase.from('opportunities').select('contract_value, win_probability, due_date, shipley_phase');
-      if (error) throw error;
-      const now = new Date();
-      const weekFromNow = new Date(now.getTime() + 7 * 86400000);
-      return {
-        data: {
-          totalCount: data.length,
-          totalValue: data.reduce((s, o) => s + (o.contract_value || 0), 0),
-          avgPwin: data.length ? Math.round(data.reduce((s, o) => s + (o.win_probability || 0), 0) / data.length) : 0,
-          dueThisWeek: data.filter(o => o.due_date && new Date(o.due_date) <= weekFromNow && new Date(o.due_date) >= now).length
-        }, error: null
-      };
-    } catch (error) { return { data: null, error }; }
-  }
+    const { data: opportunities, error } = await getOpportunities();
+    
+    if (error) {
+      return { data: null, error };
+    }
 
-  // COMPETITORS CRUD
-  async function getCompetitors(opportunityId = null) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      let query = supabase.from('competitors').select('*');
-      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
-      const { data, error } = await query.order('threat_level', { ascending: false });
-      if (error) throw error;
-      return {
-        data: (data || []).map(r => ({
-          id: r.id, name: r.company_name, threat: r.threat_level, strengths: r.strengths || [],
-          weaknesses: r.weaknesses || [], ghostStrategy: r.ghost_strategy,
-          opportunityId: r.opportunity_id, createdAt: r.created_at
-        })), error: null
-      };
-    } catch (error) { return { data: null, error }; }
-  }
+    const stats = {
+      totalOpportunities: opportunities.length,
+      totalPipelineValue: opportunities.reduce((sum, opp) => sum + (opp.contractValue || 0), 0),
+      avgWinProbability: opportunities.length > 0 
+        ? Math.round(opportunities.reduce((sum, opp) => sum + (opp.winProbability || 0), 0) / opportunities.length)
+        : 0,
+      byPhase: {},
+      byPriority: { critical: 0, high: 0, medium: 0, low: 0 }
+    };
 
-  async function createCompetitor(comp) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {
-        company_name: comp.name, threat_level: comp.threat || 'medium',
-        strengths: comp.strengths || [], weaknesses: comp.weaknesses || [],
-        ghost_strategy: comp.ghostStrategy, opportunity_id: comp.opportunityId,
-        created_at: new Date().toISOString()
-      };
-      const { data, error } = await supabase.from('competitors').insert([dbData]).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function updateCompetitor(id, updates) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {};
-      if (updates.name) dbData.company_name = updates.name;
-      if (updates.threat) dbData.threat_level = updates.threat;
-      if (updates.strengths) dbData.strengths = updates.strengths;
-      if (updates.weaknesses) dbData.weaknesses = updates.weaknesses;
-      if (updates.ghostStrategy) dbData.ghost_strategy = updates.ghostStrategy;
-      const { data, error } = await supabase.from('competitors').update(dbData).eq('id', id).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function deleteCompetitor(id) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { error } = await supabase.from('competitors').delete().eq('id', id);
-      if (error) throw error;
-      return { data: { id }, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  // PARTNERS CRUD
-  async function getPartners() {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { data, error } = await supabase.from('partners').select('*').order('trust_score', { ascending: false });
-      if (error) throw error;
-      return {
-        data: (data || []).map(r => ({
-          id: r.id, name: r.partner_name, status: r.status || 'Active',
-          capabilities: r.capabilities || [], trustScore: r.trust_score || 80,
-          socio: r.socioeconomic_status, email: r.contact_email,
-          assigned: r.assigned_opportunities || [], createdAt: r.created_at
-        })), error: null
-      };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function createPartner(partner) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {
-        partner_name: partner.name, status: partner.status || 'Pending',
-        capabilities: partner.capabilities || [], trust_score: partner.trustScore || 75,
-        socioeconomic_status: partner.socio, contact_email: partner.email,
-        assigned_opportunities: partner.assigned || [], created_at: new Date().toISOString()
-      };
-      const { data, error } = await supabase.from('partners').insert([dbData]).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function updatePartner(id, updates) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {};
-      if (updates.name) dbData.partner_name = updates.name;
-      if (updates.status) dbData.status = updates.status;
-      if (updates.capabilities) dbData.capabilities = updates.capabilities;
-      if (updates.trustScore !== undefined) dbData.trust_score = updates.trustScore;
-      if (updates.socio) dbData.socioeconomic_status = updates.socio;
-      if (updates.assigned) dbData.assigned_opportunities = updates.assigned;
-      const { data, error } = await supabase.from('partners').update(dbData).eq('id', id).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function deletePartner(id) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { error } = await supabase.from('partners').delete().eq('id', id);
-      if (error) throw error;
-      return { data: { id }, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  // COMPLIANCE REQUIREMENTS CRUD
-  async function getComplianceRequirements(opportunityId = null) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      let query = supabase.from('compliance_requirements').select('*');
-      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
-      const { data, error } = await query.order('reference', { ascending: true });
-      if (error) throw error;
-      return {
-        data: (data || []).map(r => ({
-          id: r.id, ref: r.reference, title: r.title, section: r.section,
-          status: r.status || 'draft', owner: r.owner, confidence: r.confidence || 0,
-          opportunityId: r.opportunity_id
-        })), error: null
-      };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function createComplianceRequirement(req) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {
-        reference: req.ref, title: req.title, section: req.section,
-        status: req.status || 'draft', owner: req.owner, confidence: req.confidence || 0,
-        opportunity_id: req.opportunityId, created_at: new Date().toISOString()
-      };
-      const { data, error } = await supabase.from('compliance_requirements').insert([dbData]).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function updateComplianceRequirement(id, updates) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {};
-      if (updates.status) dbData.status = updates.status;
-      if (updates.owner) dbData.owner = updates.owner;
-      if (updates.confidence !== undefined) dbData.confidence = updates.confidence;
-      const { data, error } = await supabase.from('compliance_requirements').update(dbData).eq('id', id).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function deleteComplianceRequirement(id) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { error } = await supabase.from('compliance_requirements').delete().eq('id', id);
-      if (error) throw error;
-      return { data: { id }, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  // CONTRACTS CRUD
-  async function getContracts() {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { data, error } = await supabase.from('contracts').select('*').order('expiry_date', { ascending: true });
-      if (error) throw error;
-      return {
-        data: (data || []).map(r => ({
-          id: r.id, vehicle: r.vehicle_name, type: r.contract_type,
-          risk: r.risk_level || 'low', clauses: r.clause_count || 0,
-          findings: r.findings || 0, expiry: r.expiry_date
-        })), error: null
-      };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function createContract(contract) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {
-        vehicle_name: contract.vehicle, contract_type: contract.type,
-        risk_level: contract.risk || 'low', clause_count: contract.clauses || 0,
-        findings: contract.findings || 0, expiry_date: contract.expiry,
-        created_at: new Date().toISOString()
-      };
-      const { data, error } = await supabase.from('contracts').insert([dbData]).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  // SUBMISSIONS CRUD
-  async function getSubmissions() {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { data, error } = await supabase.from('submissions').select('*').order('submitted_date', { ascending: false });
-      if (error) throw error;
-      return {
-        data: (data || []).map(r => ({
-          id: r.id, name: r.name, status: r.status, value: r.value,
-          submitted: r.submitted_date, result: r.result_date,
-          roi: r.roi_percent, opportunityId: r.opportunity_id
-        })), error: null
-      };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function createSubmission(sub) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {
-        name: sub.name, status: sub.status || 'Pending', value: sub.value,
-        submitted_date: sub.submitted || new Date().toISOString().split('T')[0],
-        result_date: sub.result, roi_percent: sub.roi,
-        opportunity_id: sub.opportunityId, created_at: new Date().toISOString()
-      };
-      const { data, error } = await supabase.from('submissions').insert([dbData]).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function updateSubmission(id, updates) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {};
-      if (updates.status) dbData.status = updates.status;
-      if (updates.result) dbData.result_date = updates.result;
-      if (updates.roi !== undefined) dbData.roi_percent = updates.roi;
-      const { data, error } = await supabase.from('submissions').update(dbData).eq('id', id).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  // PLAYBOOK LESSONS CRUD
-  async function getPlaybookLessons(category = null) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      let query = supabase.from('playbook_lessons').select('*');
-      if (category) query = query.eq('category', category);
-      const { data, error } = await query.order('quality_score', { ascending: false });
-      if (error) throw error;
-      return {
-        data: (data || []).map(r => ({
-          id: r.id, title: r.title, category: r.category,
-          score: r.quality_score || 85, uses: r.use_count || 0, content: r.content
-        })), error: null
-      };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function createPlaybookLesson(lesson) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const dbData = {
-        title: lesson.title, category: lesson.category,
-        quality_score: lesson.score || 85, use_count: 0,
-        content: lesson.content, created_at: new Date().toISOString()
-      };
-      const { data, error } = await supabase.from('playbook_lessons').insert([dbData]).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function deletePlaybookLesson(id) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { error } = await supabase.from('playbook_lessons').delete().eq('id', id);
-      if (error) throw error;
-      return { data: { id }, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function incrementLessonUse(id) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const { data: current } = await supabase.from('playbook_lessons').select('use_count').eq('id', id).single();
-      const { data, error } = await supabase.from('playbook_lessons').update({ use_count: (current?.use_count || 0) + 1 }).eq('id', id).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  // ACTIVITY LOG
-  async function getActivityLog(filters = {}) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      let query = supabase.from('activity_log').select('*');
-      if (filters.action) query = query.eq('action', filters.action);
-      const { data, error } = await query.order('timestamp', { ascending: false }).limit(100);
-      if (error) throw error;
-      return {
-        data: (data || []).map(r => ({
-          id: r.id, action: r.action, user: r.user_name, role: r.user_role,
-          ip: r.ip_address, ts: r.timestamp, details: r.details
-        })), error: null
-      };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function logActivity(action, details = {}) {
-    if (!supabase && !initSupabase()) return { data: null, error: new Error('Not initialized') };
-    try {
-      const user = JSON.parse(localStorage.getItem('MP_USER') || '{}');
-      const dbData = {
-        action, user_name: user.name || user.email || 'Unknown',
-        user_role: user.role || 'User', ip_address: '0.0.0.0',
-        timestamp: new Date().toISOString(), details: JSON.stringify(details)
-      };
-      const { data, error } = await supabase.from('activity_log').insert([dbData]).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  // AI INTEGRATION
-  async function sendToAI(agent, message, context = {}) {
-    try {
-      const response = await fetch(`${RENDER_API_URL}/api/chat`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent, message,
-          context: { ...context, user: JSON.parse(localStorage.getItem('MP_USER') || '{}'), timestamp: new Date().toISOString() }
-        })
-      });
-      if (!response.ok) throw new Error(`AI API error: ${response.status}`);
-      const data = await response.json();
-      return { data: data.response || data.content || data, error: null };
-    } catch (error) { return { data: null, error }; }
-  }
-
-  async function streamAIResponse(agent, message, context, onChunk) {
-    try {
-      const response = await fetch(`${RENDER_API_URL}/api/chat/stream`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent, message, context })
-      });
-      if (!response.ok) throw new Error(`AI API error: ${response.status}`);
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        fullResponse += chunk;
-        if (onChunk) onChunk(chunk, fullResponse);
+    opportunities.forEach(opp => {
+      const phase = opp.shipleyPhase || 'gate_1';
+      if (!stats.byPhase[phase]) {
+        stats.byPhase[phase] = { count: 0, value: 0 };
       }
-      return { data: fullResponse, error: null };
-    } catch (error) { return { data: null, error }; }
+      stats.byPhase[phase].count++;
+      stats.byPhase[phase].value += opp.contractValue || 0;
+
+      const priority = (opp.priority || 'medium').toLowerCase();
+      if (stats.byPriority[priority] !== undefined) {
+        stats.byPriority[priority]++;
+      }
+    });
+
+    return { data: stats, error: null };
   }
 
-  async function generateContent(sectionType, prompt, oppContext = {}) {
-    return sendToAI('writer', prompt, { sectionType, opportunity: oppContext, requestType: 'content_generation' });
+  async function getOpportunitiesByPhase() {
+    const { data: opportunities, error } = await getOpportunities();
+    
+    if (error) {
+      return { data: null, error };
+    }
+
+    const byPhase = {};
+    Object.keys(SHIPLEY_PHASES).forEach(phase => {
+      byPhase[phase] = [];
+    });
+
+    opportunities.forEach(opp => {
+      const phase = opp.shipleyPhase || 'gate_1';
+      if (byPhase[phase]) {
+        byPhase[phase].push(opp);
+      } else {
+        byPhase['gate_1'].push(opp);
+      }
+    });
+
+    return { data: byPhase, error: null };
   }
 
-  async function analyzeCompetitor(competitor, oppContext = {}) {
-    return sendToAI('blackhat', `Analyze competitor: ${competitor.name}`, { competitor, opportunity: oppContext });
+  async function createOpportunity(data) {
+    if (!supabase) {
+      return { data: null, error: { message: 'Supabase not initialized' } };
+    }
+
+    try {
+      const dbData = mapToDatabase(data);
+      const { data: created, error } = await supabase
+        .from('opportunities')
+        .insert([dbData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { data: mapToFrontend(created), error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Create opportunity error:', error);
+      return { data: null, error };
+    }
   }
 
-  async function checkCompliance(requirements, docText) {
-    return sendToAI('compliance', 'Check compliance against requirements', { requirements, documentText: docText });
+  async function updateOpportunity(id, data) {
+    if (!supabase) {
+      return { data: null, error: { message: 'Supabase not initialized' } };
+    }
+
+    try {
+      const dbData = mapToDatabase(data);
+      const { data: updated, error } = await supabase
+        .from('opportunities')
+        .update(dbData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { data: mapToFrontend(updated), error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Update opportunity error:', error);
+      return { data: null, error };
+    }
   }
 
-  async function generateOralsSlide(slideTitle, oppContext = {}) {
-    return sendToAI('orals', `Generate orals slide: ${slideTitle}`, { slideTitle, opportunity: oppContext });
+  async function deleteOpportunity(id) {
+    if (!supabase) {
+      return { error: { message: 'Supabase not initialized' } };
+    }
+
+    try {
+      const { error } = await supabase
+        .from('opportunities')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      return { error: null };
+    } catch (error) {
+      console.error('[MissionPulse] Delete opportunity error:', error);
+      return { error };
+    }
   }
 
-  async function analyzePricing(lcats, targetMargin = 15) {
-    return sendToAI('pricing', 'Analyze pricing competitiveness', { lcats, targetMargin });
-  }
-
+  // ============================================================
   // REAL-TIME SUBSCRIPTIONS
-  function subscribeToTable(table, callback) {
-    if (!supabase && !initSupabase()) return () => {};
-    const channel = supabase.channel(`${table}-changes`)
-      .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
-        callback({ eventType: payload.eventType, new: payload.new, old: payload.old });
-      }).subscribe();
-    return () => channel.unsubscribe();
+  // ============================================================
+
+  function subscribeToOpportunities(callback) {
+    if (!supabase) {
+      console.warn('[MissionPulse] Supabase not initialized');
+      return { unsubscribe: () => {} };
+    }
+
+    const channel = supabase
+      .channel('opportunities_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'opportunities' },
+        (payload) => {
+          console.log('[MissionPulse] Real-time update:', payload.eventType);
+          const mapped = payload.new ? mapToFrontend(payload.new) : null;
+          callback({
+            eventType: payload.eventType,
+            old: payload.old,
+            new: mapped
+          });
+        }
+      )
+      .subscribe();
+
+    return {
+      unsubscribe: () => {
+        supabase.removeChannel(channel);
+      }
+    };
   }
 
-  function subscribeToOpportunities(callback) { return subscribeToTable('opportunities', callback); }
-  function subscribeToCompetitors(callback) { return subscribeToTable('competitors', callback); }
-  function subscribeToPartners(callback) { return subscribeToTable('partners', callback); }
-
-  // UTILITIES
   function onConnectionChange(callback) {
     connectionListeners.push(callback);
     callback(connectionStatus);
-    return () => { const i = connectionListeners.indexOf(callback); if (i > -1) connectionListeners.splice(i, 1); };
-  }
-  function getConnectionStatus() { return connectionStatus; }
-  function formatCurrency(v) {
-    if (!v) return '$0';
-    if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-    if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-    if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
-    return `$${v.toLocaleString()}`;
-  }
-  function getPhaseInfo(key) { return SHIPLEY_PHASES[key] || SHIPLEY_PHASES.qualify; }
-  function getShipleyPhases() {
-    return Object.entries(SHIPLEY_PHASES).map(([k, v]) => ({ key: k, ...v })).sort((a, b) => a.order - b.order);
+    return () => {
+      connectionListeners = connectionListeners.filter(cb => cb !== callback);
+    };
   }
 
-  // EXPORT
+  function getConnectionStatus() {
+    return connectionStatus;
+  }
+
+  // ============================================================
+  // UTILITIES
+  // ============================================================
+
+  function formatCurrency(value) {
+    if (!value) return '$0';
+    if (value >= 1000000000) {
+      return '$' + (value / 1000000000).toFixed(1) + 'B';
+    }
+    if (value >= 1000000) {
+      return '$' + (value / 1000000).toFixed(1) + 'M';
+    }
+    if (value >= 1000) {
+      return '$' + (value / 1000).toFixed(0) + 'K';
+    }
+    return '$' + value.toLocaleString();
+  }
+
+  function getPhaseInfo(phase) {
+    return SHIPLEY_PHASES[phase] || SHIPLEY_PHASES['gate_1'];
+  }
+
+  function getShipleyPhases() {
+    return Object.entries(SHIPLEY_PHASES)
+      .map(([key, value]) => ({ key, ...value }))
+      .sort((a, b) => a.order - b.order);
+  }
+
+  // Demo data fallback
+  function getDemoData() {
+    return [
+      { id: '1', name: 'DHA EHR Modernization', agency: 'DHA', contractValue: 125000000, priority: 'Critical', shipleyPhase: 'red_team', winProbability: 72, dueDate: '2026-02-15' },
+      { id: '2', name: 'VA Claims Processing AI', agency: 'VA', contractValue: 85000000, priority: 'High', shipleyPhase: 'pink_team', winProbability: 65, dueDate: '2026-03-01' },
+      { id: '3', name: 'CMS Data Analytics Platform', agency: 'CMS', contractValue: 45000000, priority: 'Medium', shipleyPhase: 'blue_team', winProbability: 58, dueDate: '2026-04-10' }
+    ].map(mapToFrontend);
+  }
+
+  // ============================================================
+  // EXPORT MissionPulse NAMESPACE
+  // ============================================================
   global.MissionPulse = {
-    init: initSupabase,
-    getOpportunities, getOpportunityById, createOpportunity, updateOpportunity, deleteOpportunity, getPipelineStats,
-    getCompetitors, createCompetitor, updateCompetitor, deleteCompetitor,
-    getPartners, createPartner, updatePartner, deletePartner,
-    getComplianceRequirements, createComplianceRequirement, updateComplianceRequirement, deleteComplianceRequirement,
-    getContracts, createContract,
-    getSubmissions, createSubmission, updateSubmission,
-    getPlaybookLessons, createPlaybookLesson, deletePlaybookLesson, incrementLessonUse,
-    getActivityLog, logActivity,
-    sendToAI, streamAIResponse, generateContent, analyzeCompetitor, checkCompliance, generateOralsSlide, analyzePricing,
-    subscribeToOpportunities, subscribeToCompetitors, subscribeToPartners, subscribeToTable,
-    onConnectionChange, getConnectionStatus, formatCurrency, getPhaseInfo, getShipleyPhases,
-    SHIPLEY_PHASES, SUPABASE_URL, RENDER_API_URL
+    // Authentication
+    signIn,
+    signOut,
+    getSession,
+    getCurrentUser,
+    onAuthStateChange,
+    requireAuth,
+    hasRole,
+    getUserRole,
+    canAccessModule,
+    
+    // CRUD Operations
+    getOpportunities,
+    getPipelineStats,
+    getOpportunitiesByPhase,
+    createOpportunity,
+    updateOpportunity,
+    deleteOpportunity,
+
+    // Real-time
+    subscribeToOpportunities,
+    onConnectionChange,
+    getConnectionStatus,
+
+    // Utilities
+    formatCurrency,
+    getPhaseInfo,
+    getShipleyPhases,
+    mapToFrontend,
+    mapToDatabase,
+
+    // Constants
+    SHIPLEY_PHASES,
+    DEMO_MODE,
+
+    // Direct Supabase access (for advanced usage)
+    get supabase() { return supabase; },
+    get currentUser() { return currentUser; },
+    get currentProfile() { return currentProfile; },
+
+    // Initialization
+    init: initSupabase
   };
 
+  // Auto-initialize
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(initSupabase, 100));
-  } else { setTimeout(initSupabase, 100); }
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(initSupabase, 100);
+    });
+  } else {
+    setTimeout(initSupabase, 100);
+  }
 
 })(typeof window !== 'undefined' ? window : global);

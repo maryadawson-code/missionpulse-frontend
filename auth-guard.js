@@ -1,177 +1,196 @@
 /**
  * MissionPulse Auth Guard
- * Sprint 7: Automatic authentication protection
+ * Sprint 14: Include this script in protected pages to enforce authentication
  * 
- * This script auto-protects any page it's included on.
- * Just add: <script src="auth-guard.js"></script>
- * 
- * Features:
- * - Checks session on page load
- * - Redirects to login if not authenticated
- * - Provides global AuthState for React components
- * - Shows loading state while checking auth
+ * Usage: Add before </body> in any protected page:
+ * <script src="auth-guard.js"></script>
  * 
  * © 2026 Mission Meets Tech
  */
 
-(function(global) {
+(function() {
   'use strict';
 
   // Configuration
-  const CONFIG = {
-    loginUrl: 'login.html',
-    checkTimeout: 5000,
-    redirectKey: 'mp_redirect_after_login'
-  };
+  const LOGIN_URL = 'login.html';
+  const CHECK_INTERVAL = 100; // ms to wait for MissionPulse to load
+  const MAX_ATTEMPTS = 50; // 5 seconds max wait
 
-  // Auth state
-  let authState = {
-    user: null,
-    session: null,
-    loading: true,
-    checked: false
-  };
+  let attempts = 0;
 
-  let authListeners = [];
+  function checkAuth() {
+    attempts++;
 
-  // Wait for MissionPulse client
-  function waitForMissionPulse(timeout = CONFIG.checkTimeout) {
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
-      
-      const check = () => {
-        if (global.MissionPulse && typeof global.MissionPulse.getSession === 'function') {
-          resolve(global.MissionPulse);
-          return;
-        }
-        
-        if (Date.now() - startTime > timeout) {
-          reject(new Error('MissionPulse client failed to load'));
-          return;
-        }
-        
-        setTimeout(check, 50);
-      };
-      
-      check();
-    });
-  }
-
-  // Notify listeners of auth state change
-  function notifyListeners() {
-    authListeners.forEach(cb => {
-      try {
-        cb({ ...authState });
-      } catch (e) {
-        console.error('[AuthGuard] Listener error:', e);
-      }
-    });
-  }
-
-  // Redirect to login
-  function redirectToLogin() {
-    sessionStorage.setItem(CONFIG.redirectKey, window.location.href);
-    window.location.replace(CONFIG.loginUrl);
-  }
-
-  // Check authentication
-  async function checkAuth() {
-    try {
-      const MissionPulse = await waitForMissionPulse();
-      
-      const { data: { session }, error } = await MissionPulse.getSession();
-      
-      if (error) {
-        console.error('[AuthGuard] Session check error:', error);
+    // Wait for MissionPulse to be available
+    if (typeof window.MissionPulse === 'undefined') {
+      if (attempts < MAX_ATTEMPTS) {
+        setTimeout(checkAuth, CHECK_INTERVAL);
+      } else {
+        console.error('[AuthGuard] MissionPulse not loaded, redirecting to login');
         redirectToLogin();
-        return;
       }
-      
-      if (!session) {
+      return;
+    }
+
+    // Demo mode bypass
+    if (window.MissionPulse.DEMO_MODE) {
+      console.log('[AuthGuard] Demo mode active, skipping auth check');
+      showContent();
+      return;
+    }
+
+    // Check session
+    window.MissionPulse.getSession().then(({ data }) => {
+      if (data?.session) {
+        console.log('[AuthGuard] Session valid:', data.session.user.email);
+        
+        // Load profile if not cached
+        if (!window.MissionPulse.currentProfile) {
+          window.MissionPulse.getCurrentUser().then(() => {
+            showContent();
+            updateUserDisplay();
+          });
+        } else {
+          showContent();
+          updateUserDisplay();
+        }
+      } else {
         console.log('[AuthGuard] No session, redirecting to login');
         redirectToLogin();
-        return;
       }
-      
-      // Authenticated!
-      authState = {
-        user: session.user,
-        session: session,
-        loading: false,
-        checked: true
-      };
-      
-      console.log('[AuthGuard] Authenticated:', session.user.email);
-      notifyListeners();
-      
-      // Set up auth state change listener
-      MissionPulse.onAuthStateChange(({ event, session: newSession }) => {
-        if (event === 'SIGNED_OUT' || !newSession) {
-          authState = { user: null, session: null, loading: false, checked: true };
-          notifyListeners();
-          redirectToLogin();
-        } else if (newSession) {
-          authState = { user: newSession.user, session: newSession, loading: false, checked: true };
-          notifyListeners();
-        }
-      });
-      
-    } catch (error) {
-      console.error('[AuthGuard] Error:', error);
+    }).catch(error => {
+      console.error('[AuthGuard] Session check error:', error);
       redirectToLogin();
-    }
+    });
   }
 
-  // Sign out helper
-  async function signOut() {
-    try {
-      await global.MissionPulse.signOut();
-      redirectToLogin();
-    } catch (error) {
-      console.error('[AuthGuard] Sign out error:', error);
-      redirectToLogin();
+  function redirectToLogin() {
+    // Store intended destination
+    const currentUrl = window.location.href;
+    if (!currentUrl.includes(LOGIN_URL)) {
+      sessionStorage.setItem('missionpulse_redirect', currentUrl);
     }
+    window.location.href = LOGIN_URL;
   }
 
-  // Subscribe to auth state changes
-  function onAuthStateChange(callback) {
-    authListeners.push(callback);
-    
-    // Immediately call with current state
-    callback({ ...authState });
-    
-    // Return unsubscribe function
-    return () => {
-      const index = authListeners.indexOf(callback);
-      if (index > -1) {
-        authListeners.splice(index, 1);
+  function showContent() {
+    // Remove any loading overlay
+    const loadingOverlay = document.getElementById('auth-loading-overlay');
+    if (loadingOverlay) {
+      loadingOverlay.style.opacity = '0';
+      setTimeout(() => loadingOverlay.remove(), 300);
+    }
+
+    // Show main content
+    document.body.classList.remove('auth-loading');
+    document.body.classList.add('auth-ready');
+  }
+
+  function updateUserDisplay() {
+    const profile = window.MissionPulse.currentProfile;
+    if (!profile) return;
+
+    // Update user name displays
+    document.querySelectorAll('[data-user-name]').forEach(el => {
+      el.textContent = profile.full_name || profile.email?.split('@')[0] || 'User';
+    });
+
+    // Update user email displays
+    document.querySelectorAll('[data-user-email]').forEach(el => {
+      el.textContent = profile.email || '';
+    });
+
+    // Update user role displays
+    document.querySelectorAll('[data-user-role]').forEach(el => {
+      el.textContent = profile.role || 'Partner';
+    });
+
+    // Update user avatar (initials)
+    document.querySelectorAll('[data-user-avatar]').forEach(el => {
+      const name = profile.full_name || profile.email || 'U';
+      const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      el.textContent = initials;
+    });
+
+    // Apply RBAC - hide elements user can't access
+    applyRBAC(profile.role);
+  }
+
+  function applyRBAC(role) {
+    // Hide elements based on required roles
+    document.querySelectorAll('[data-require-role]').forEach(el => {
+      const requiredRoles = el.dataset.requireRole.split(',').map(r => r.trim());
+      if (!requiredRoles.includes(role) && !['CEO', 'COO', 'Admin'].includes(role)) {
+        el.style.display = 'none';
       }
-    };
+    });
+
+    // Show elements for specific roles only
+    document.querySelectorAll('[data-show-role]').forEach(el => {
+      const showRoles = el.dataset.showRole.split(',').map(r => r.trim());
+      if (showRoles.includes(role)) {
+        el.style.display = '';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+
+    // Hide admin-only elements
+    document.querySelectorAll('[data-admin-only]').forEach(el => {
+      if (!['CEO', 'COO', 'Admin'].includes(role)) {
+        el.style.display = 'none';
+      }
+    });
   }
 
-  // Export global AuthGuard
-  global.AuthGuard = {
-    getState: () => ({ ...authState }),
-    onAuthStateChange,
-    signOut,
-    isAuthenticated: () => authState.user !== null && authState.session !== null,
-    getUser: () => authState.user,
-    getSession: () => authState.session
-  };
+  // Add loading styles
+  const style = document.createElement('style');
+  style.textContent = `
+    body.auth-loading > *:not(#auth-loading-overlay) {
+      visibility: hidden;
+    }
+    #auth-loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #0a0f1a 0%, #0d1526 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.3s ease;
+    }
+    #auth-loading-overlay .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(0, 229, 250, 0.2);
+      border-top-color: #00E5FA;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
 
-  // Auto-check on load
+  // Add loading overlay
+  document.body.classList.add('auth-loading');
+  const overlay = document.createElement('div');
+  overlay.id = 'auth-loading-overlay';
+  overlay.innerHTML = '<div class="spinner"></div>';
+  document.body.appendChild(overlay);
+
+  // Start auth check
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', checkAuth);
   } else {
     checkAuth();
   }
 
-  // Fallback timeout
-  setTimeout(() => {
-    if (authState.loading && !authState.checked) {
-      console.log('[AuthGuard] Timeout, redirecting to login');
-      redirectToLogin();
-    }
-  }, CONFIG.checkTimeout);
+  // Expose logout function globally
+  window.missionPulseLogout = async function() {
+    await window.MissionPulse.signOut();
+    window.location.href = LOGIN_URL;
+  };
 
-})(typeof window !== 'undefined' ? window : global);
+})();
