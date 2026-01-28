@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposal Calendar | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #000A1A 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); border-radius: 0.75rem; }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .cyan-glow { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+        .status-pending { background: rgba(107, 114, 128, 0.2); color: #D1D5DB; }
+        .status-in-progress { background: rgba(245, 158, 11, 0.2); color: #FCD34D; }
+        .status-completed { background: rgba(16, 185, 129, 0.2); color: #6EE7B7; }
+        .status-overdue { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; }
+        .status-blocked { background: rgba(139, 92, 246, 0.2); color: #C4B5FD; }
+        .type-internal { background: rgba(6, 182, 212, 0.2); color: #67E8F9; }
+        .type-government { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; }
+        .type-review { background: rgba(245, 158, 11, 0.2); color: #FCD34D; }
+        .type-submission { background: rgba(16, 185, 129, 0.2); color: #6EE7B7; }
+        .type-meeting { background: rgba(139, 92, 246, 0.2); color: #C4B5FD; }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #00B8D4 100%); color: #00050F; font-weight: 600; }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .modal-overlay { background: rgba(0, 5, 15, 0.9); backdrop-filter: blur(4px); }
+        .calendar-day { min-height: 100px; }
+        .calendar-day:hover { background: rgba(0, 229, 250, 0.05); }
+        .calendar-today { background: rgba(0, 229, 250, 0.1); border: 1px solid rgba(0, 229, 250, 0.4); }
+        .critical-badge { background: rgba(239, 68, 68, 0.3); border: 1px solid rgba(239, 68, 68, 0.5); animation: pulse 2s infinite; }
+        .gov-badge { background: rgba(220, 38, 38, 0.2); border: 1px solid rgba(220, 38, 38, 0.4); }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Sidebar -->
+    <div id="missionpulse-sidebar" data-current-page="calendar"></div>
+    <script src="missionpulse-nav.js"></script>
+
+    <!-- Main Content -->
+    <div class="main-content" style="margin-left: 260px;">
+        <!-- Header -->
+        <header class="border-b border-cyan-500/20 bg-black/40 backdrop-blur sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="text-3xl">📅</div>
+                        <div>
+                            <h1 class="text-2xl font-bold text-cyan-400">Proposal Calendar</h1>
+                            <p class="text-white/50 text-sm">Track milestones, deadlines, and critical dates</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+                            <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+                            <span class="text-white/50">Checking...</span>
+                        </div>
+                        <div class="flex border border-cyan-500/30 rounded-lg overflow-hidden">
+                            <button onclick="setView('calendar')" id="btnCalendar" class="px-4 py-2 text-sm bg-cyan-500/20 text-cyan-400">Calendar</button>
+                            <button onclick="setView('list')" id="btnList" class="px-4 py-2 text-sm text-white/60 hover:bg-cyan-500/10">List</button>
+                        </div>
+                        <button onclick="openModal()" class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2">
+                            <span>+ Add Milestone</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-6 py-8">
+            <!-- Opportunity Selector -->
+            <div class="mb-6">
+                <label class="block text-white/60 text-sm mb-2">Select Opportunity</label>
+                <select id="opportunitySelect" onchange="loadMilestones()" class="w-full md:w-96 bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-3 text-white focus:border-cyan-400 focus:outline-none">
+                    <option value="">Loading opportunities...</option>
+                </select>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
+                <div class="glass-card p-4 text-center">
+                    <div id="statTotal" class="text-2xl font-bold text-cyan-400">0</div>
+                    <div class="text-xs text-white/50">Total Milestones</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="statOverdue" class="text-2xl font-bold text-red-400">0</div>
+                    <div class="text-xs text-white/50">Overdue</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="statDueSoon" class="text-2xl font-bold text-yellow-400">0</div>
+                    <div class="text-xs text-white/50">Due in 7 Days</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="statInProgress" class="text-2xl font-bold text-cyan-400">0</div>
+                    <div class="text-xs text-white/50">In Progress</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="statCompleted" class="text-2xl font-bold text-green-400">0</div>
+                    <div class="text-xs text-white/50">Completed</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="statGovDeadlines" class="text-2xl font-bold text-red-400">0</div>
+                    <div class="text-xs text-white/50">Gov Deadlines</div>
+                </div>
+            </div>
+
+            <!-- Upcoming Critical Deadlines Banner -->
+            <div id="criticalBanner" class="hidden mb-6 glass-card critical-badge p-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">⚠️</span>
+                    <div>
+                        <div class="font-semibold text-red-300">Critical Deadline Approaching</div>
+                        <div id="criticalText" class="text-sm text-white/70"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar View -->
+            <div id="calendarView" class="glass-card cyan-glow overflow-hidden">
+                <!-- Calendar Header -->
+                <div class="bg-cyan-500/10 border-b border-cyan-500/20 p-4 flex items-center justify-between">
+                    <button onclick="changeMonth(-1)" class="px-3 py-1 border border-cyan-500/30 rounded hover:bg-cyan-500/10 text-cyan-400">← Prev</button>
+                    <h3 id="calendarTitle" class="text-xl font-bold text-cyan-400">January 2025</h3>
+                    <button onclick="changeMonth(1)" class="px-3 py-1 border border-cyan-500/30 rounded hover:bg-cyan-500/10 text-cyan-400">Next →</button>
+                </div>
+                <!-- Calendar Grid -->
+                <div class="grid grid-cols-7 border-b border-cyan-500/20">
+                    <div class="p-2 text-center text-xs font-semibold text-cyan-400 border-r border-cyan-500/10">Sun</div>
+                    <div class="p-2 text-center text-xs font-semibold text-cyan-400 border-r border-cyan-500/10">Mon</div>
+                    <div class="p-2 text-center text-xs font-semibold text-cyan-400 border-r border-cyan-500/10">Tue</div>
+                    <div class="p-2 text-center text-xs font-semibold text-cyan-400 border-r border-cyan-500/10">Wed</div>
+                    <div class="p-2 text-center text-xs font-semibold text-cyan-400 border-r border-cyan-500/10">Thu</div>
+                    <div class="p-2 text-center text-xs font-semibold text-cyan-400 border-r border-cyan-500/10">Fri</div>
+                    <div class="p-2 text-center text-xs font-semibold text-cyan-400">Sat</div>
+                </div>
+                <div id="calendarGrid" class="grid grid-cols-7">
+                    <!-- Calendar days populated by JS -->
+                </div>
+            </div>
+
+            <!-- List View -->
+            <div id="listView" class="hidden space-y-3">
+                <!-- List populated by JS -->
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-cyan-500/20 mt-12">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <p class="text-center text-white/30 text-xs">AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+                <p class="text-center text-white/20 text-xs mt-1">© 2025 Mission Meets Tech. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="milestoneModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-cyan-500/20 flex items-center justify-between">
+                <h3 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Milestone</h3>
+                <button onclick="closeModal()" class="text-white/50 hover:text-white text-2xl">&times;</button>
+            </div>
+            <form id="milestoneForm" onsubmit="saveMilestone(event)" class="p-6 space-y-4">
+                <input type="hidden" id="milestoneId">
+                
+                <div>
+                    <label class="block text-white/60 text-sm mb-1">Title *</label>
+                    <input type="text" id="milestoneTitle" required placeholder="e.g., Technical Volume Draft Due" class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-white/60 text-sm mb-1">Description</label>
+                    <textarea id="milestoneDescription" rows="2" placeholder="Details about this milestone" class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-white/60 text-sm mb-1">Type *</label>
+                        <select id="milestoneType" required class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none">
+                            <option value="internal">Internal Deadline</option>
+                            <option value="government">Government Deadline</option>
+                            <option value="review">Review Gate</option>
+                            <option value="submission">Submission</option>
+                            <option value="meeting">Meeting</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-white/60 text-sm mb-1">Category</label>
+                        <select id="milestoneCategory" class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none">
+                            <option value="general">General</option>
+                            <option value="technical">Technical Volume</option>
+                            <option value="management">Management Volume</option>
+                            <option value="pricing">Pricing Volume</option>
+                            <option value="past-performance">Past Performance</option>
+                            <option value="orals">Orals</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-white/60 text-sm mb-1">Due Date *</label>
+                        <input type="date" id="milestoneDueDate" required class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-white/60 text-sm mb-1">Due Time</label>
+                        <input type="time" id="milestoneDueTime" class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-white/60 text-sm mb-1">Status</label>
+                        <select id="milestoneStatus" class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none">
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="blocked">Blocked</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-white/60 text-sm mb-1">Assigned To</label>
+                        <input type="text" id="milestoneAssigned" placeholder="Team member" class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-white/60 text-sm mb-1">Reminder (days before)</label>
+                        <input type="number" id="milestoneReminder" value="3" min="0" max="30" class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="flex gap-6">
+                    <label class="flex items-center gap-2 text-white/70 cursor-pointer">
+                        <input type="checkbox" id="milestoneIsGov" class="rounded bg-black/40 border-cyan-500/30">
+                        <span class="text-sm">🏛️ Government Deadline</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-white/70 cursor-pointer">
+                        <input type="checkbox" id="milestoneIsCritical" class="rounded bg-black/40 border-cyan-500/30">
+                        <span class="text-sm">⚠️ Critical Path</span>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-white/60 text-sm mb-1">Notes</label>
+                    <textarea id="milestoneNotes" rows="2" placeholder="Additional notes" class="w-full bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-cyan-500/20">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-cyan-500/30 rounded-lg text-white/70 hover:bg-cyan-500/10">Cancel</button>
+                    <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Milestone</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Init
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTMwNjIsImV4cCI6MjA1Mjk4OTA2Mn0.gwBTnfAtsxSFDz96fDPL7HAIYdA5s_9hiv_l0ECWvYc';
+        
+        let supabase;
+        let allMilestones = [];
+        let currentOpportunityId = null;
+        let isLiveMode = false;
+        let currentView = 'calendar';
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+
+        // Demo Data
+        const demoOpportunities = [
+            { id: 'demo-1', title: 'DHA DHMSM Support', nickname: 'DHMSM' },
+            { id: 'demo-2', title: 'VA EHR Modernization', nickname: 'VA-EHR' }
+        ];
+
+        const today = new Date();
+        const demoMilestones = [
+            { id: 'm1', opportunity_id: 'demo-1', title: 'Questions to Government Due', description: 'Submit all RFP questions', milestone_type: 'government', category: 'general', due_date: formatDateForInput(addDays(today, -2)), due_time: '14:00', status: 'completed', assigned_to: 'Capture Lead', is_government_deadline: true, is_critical_path: true, completed_date: formatDateForInput(addDays(today, -3)), notes: '' },
+            { id: 'm2', opportunity_id: 'demo-1', title: 'Technical Volume Outline', description: 'Complete section outline with assignments', milestone_type: 'internal', category: 'technical', due_date: formatDateForInput(addDays(today, 2)), due_time: '17:00', status: 'in-progress', assigned_to: 'Tech Lead', is_government_deadline: false, is_critical_path: true, notes: '' },
+            { id: 'm3', opportunity_id: 'demo-1', title: 'Pink Team Review', description: 'Initial draft review - all volumes', milestone_type: 'review', category: 'general', due_date: formatDateForInput(addDays(today, 7)), due_time: '09:00', status: 'pending', assigned_to: 'QA Lead', is_government_deadline: false, is_critical_path: true, notes: 'Reserve conference room' },
+            { id: 'm4', opportunity_id: 'demo-1', title: 'Pricing Model Complete', description: 'Final BOE and pricing spreadsheets', milestone_type: 'internal', category: 'pricing', due_date: formatDateForInput(addDays(today, 5)), due_time: '17:00', status: 'pending', assigned_to: 'Pricing Lead', is_government_deadline: false, is_critical_path: false, notes: '' },
+            { id: 'm5', opportunity_id: 'demo-1', title: 'Red Team Review', description: 'Final review before submission', milestone_type: 'review', category: 'general', due_date: formatDateForInput(addDays(today, 14)), due_time: '09:00', status: 'pending', assigned_to: 'Review Board', is_government_deadline: false, is_critical_path: true, notes: '' },
+            { id: 'm6', opportunity_id: 'demo-1', title: 'Proposal Submission Deadline', description: 'Final submission to SAM.gov', milestone_type: 'submission', category: 'general', due_date: formatDateForInput(addDays(today, 21)), due_time: '14:00', status: 'pending', assigned_to: 'Proposal Manager', is_government_deadline: true, is_critical_path: true, notes: 'Upload by 12:00 to allow buffer' },
+            { id: 'm7', opportunity_id: 'demo-1', title: 'Teaming Agreement Finalized', description: 'Execute TA with subcontractor', milestone_type: 'internal', category: 'general', due_date: formatDateForInput(addDays(today, -5)), due_time: null, status: 'completed', assigned_to: 'Contracts', is_government_deadline: false, is_critical_path: false, completed_date: formatDateForInput(addDays(today, -6)), notes: '' },
+            { id: 'm8', opportunity_id: 'demo-1', title: 'Past Performance Write-ups', description: 'Complete all PP narratives', milestone_type: 'internal', category: 'past-performance', due_date: formatDateForInput(addDays(today, 4)), due_time: '17:00', status: 'in-progress', assigned_to: 'PP Lead', is_government_deadline: false, is_critical_path: false, notes: '' },
+            { id: 'm9', opportunity_id: 'demo-2', title: 'Capture Strategy Meeting', description: 'Initial capture planning session', milestone_type: 'meeting', category: 'general', due_date: formatDateForInput(addDays(today, 3)), due_time: '10:00', status: 'pending', assigned_to: 'Capture Manager', is_government_deadline: false, is_critical_path: false, notes: 'Teams link to be sent' }
+        ];
+
+        function addDays(date, days) {
+            const result = new Date(date);
+            result.setDate(result.getDate() + days);
+            return result;
+        }
+
+        function formatDateForInput(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        // Initialize
+        async function init() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                await loadOpportunities();
+            } catch (error) {
+                console.error('Init error:', error);
+                loadDemoMode();
+            }
+        }
+
+        async function loadOpportunities() {
+            try {
+                const { data, error } = await supabase.from('opportunities').select('id, title, nickname').order('title');
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    isLiveMode = true;
+                    updateConnectionStatus(true);
+                    populateOpportunitySelect(data);
+                } else {
+                    loadDemoMode();
+                }
+            } catch (error) {
+                console.error('Load opportunities error:', error);
+                loadDemoMode();
+            }
+        }
+
+        function loadDemoMode() {
+            isLiveMode = false;
+            updateConnectionStatus(false);
+            populateOpportunitySelect(demoOpportunities);
+        }
+
+        function updateConnectionStatus(isLive) {
+            const status = document.getElementById('connectionStatus');
+            if (isLive) {
+                status.innerHTML = '<div class="w-2 h-2 rounded-full bg-green-500"></div><span class="text-green-400">Live Database</span>';
+            } else {
+                status.innerHTML = '<div class="w-2 h-2 rounded-full bg-yellow-500"></div><span class="text-yellow-400">Demo Mode</span>';
+            }
+        }
+
+        function populateOpportunitySelect(opportunities) {
+            const select = document.getElementById('opportunitySelect');
+            select.innerHTML = '<option value="">-- Select Opportunity --</option>' + 
+                opportunities.map(o => `<option value="${o.id}">${o.nickname || o.title}</option>`).join('');
+        }
+
+        async function loadMilestones() {
+            const oppId = document.getElementById('opportunitySelect').value;
+            if (!oppId) {
+                allMilestones = [];
+                renderCurrentView();
+                updateStats([]);
+                return;
+            }
+            
+            currentOpportunityId = oppId;
+
+            if (isLiveMode) {
+                try {
+                    const { data, error } = await supabase
+                        .from('proposal_milestones')
+                        .select('*')
+                        .eq('opportunity_id', oppId)
+                        .order('due_date');
+                    
+                    if (error) throw error;
+                    allMilestones = data || [];
+                } catch (error) {
+                    console.error('Load milestones error:', error);
+                    allMilestones = demoMilestones.filter(m => m.opportunity_id === oppId);
+                }
+            } else {
+                allMilestones = demoMilestones.filter(m => m.opportunity_id === oppId);
+            }
+
+            renderCurrentView();
+            updateStats(allMilestones);
+            checkCriticalDeadlines();
+        }
+
+        function setView(view) {
+            currentView = view;
+            document.getElementById('btnCalendar').className = view === 'calendar' ? 'px-4 py-2 text-sm bg-cyan-500/20 text-cyan-400' : 'px-4 py-2 text-sm text-white/60 hover:bg-cyan-500/10';
+            document.getElementById('btnList').className = view === 'list' ? 'px-4 py-2 text-sm bg-cyan-500/20 text-cyan-400' : 'px-4 py-2 text-sm text-white/60 hover:bg-cyan-500/10';
+            document.getElementById('calendarView').classList.toggle('hidden', view !== 'calendar');
+            document.getElementById('listView').classList.toggle('hidden', view !== 'list');
+            renderCurrentView();
+        }
+
+        function renderCurrentView() {
+            if (currentView === 'calendar') {
+                renderCalendar();
+            } else {
+                renderList();
+            }
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            } else if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            document.getElementById('calendarTitle').textContent = `${months[currentMonth]} ${currentYear}`;
+
+            const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const today = new Date();
+            
+            let html = '';
+            
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div class="calendar-day border-r border-b border-cyan-500/10 p-2 bg-black/20"></div>';
+            }
+
+            // Days of month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isToday = today.getFullYear() === currentYear && today.getMonth() === currentMonth && today.getDate() === day;
+                const dayMilestones = allMilestones.filter(m => m.due_date === dateStr);
+                
+                html += `
+                    <div class="calendar-day border-r border-b border-cyan-500/10 p-2 ${isToday ? 'calendar-today' : ''}" onclick="showDayMilestones('${dateStr}')">
+                        <div class="text-sm font-semibold ${isToday ? 'text-cyan-400' : 'text-white/70'} mb-1">${day}</div>
+                        <div class="space-y-1">
+                            ${dayMilestones.slice(0, 3).map(m => `
+                                <div class="text-xs px-1.5 py-0.5 rounded truncate ${getTypeClass(m.milestone_type)} ${m.is_critical_path ? 'border-l-2 border-red-400' : ''}" title="${m.title}">
+                                    ${m.is_government_deadline ? '🏛️' : ''} ${m.title}
+                                </div>
+                            `).join('')}
+                            ${dayMilestones.length > 3 ? `<div class="text-xs text-white/40">+${dayMilestones.length - 3} more</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Empty cells after last day
+            const totalCells = firstDay + daysInMonth;
+            const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+            for (let i = 0; i < remainingCells; i++) {
+                html += '<div class="calendar-day border-r border-b border-cyan-500/10 p-2 bg-black/20"></div>';
+            }
+
+            document.getElementById('calendarGrid').innerHTML = html;
+        }
+
+        function renderList() {
+            const container = document.getElementById('listView');
+            
+            if (allMilestones.length === 0) {
+                container.innerHTML = '<div class="glass-card p-8 text-center text-white/40">No milestones found. Click "Add Milestone" to create one.</div>';
+                return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            const sorted = [...allMilestones].sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+            container.innerHTML = sorted.map(m => {
+                const isOverdue = m.due_date < today && m.status !== 'completed';
+                const statusClass = isOverdue ? 'status-overdue' : `status-${m.status}`;
+                
+                return `
+                    <div class="glass-card p-4 hover:border-cyan-400/50 transition-all ${m.is_critical_path ? 'border-l-4 border-l-red-500' : ''}">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-2">
+                                    ${m.is_government_deadline ? '<span class="gov-badge px-2 py-0.5 rounded text-xs text-red-300">🏛️ GOV</span>' : ''}
+                                    ${m.is_critical_path ? '<span class="critical-badge px-2 py-0.5 rounded text-xs text-red-300">⚠️ Critical</span>' : ''}
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium type-${m.milestone_type}">${formatType(m.milestone_type)}</span>
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium ${statusClass}">${isOverdue ? 'Overdue' : formatStatus(m.status)}</span>
+                                </div>
+                                <h4 class="font-semibold text-white mb-1">${m.title}</h4>
+                                ${m.description ? `<p class="text-sm text-white/60 mb-2">${m.description}</p>` : ''}
+                                <div class="flex items-center gap-4 text-xs text-white/40">
+                                    <span>📅 ${formatDate(m.due_date)}${m.due_time ? ' @ ' + formatTime(m.due_time) : ''}</span>
+                                    ${m.assigned_to ? `<span>👤 ${m.assigned_to}</span>` : ''}
+                                    ${m.category !== 'general' ? `<span>📁 ${formatCategory(m.category)}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                ${m.status !== 'completed' ? `<button onclick="markComplete('${m.id}')" class="text-green-400 hover:text-green-300 px-2 py-1 text-sm" title="Mark Complete">✓</button>` : ''}
+                                <button onclick="editMilestone('${m.id}')" class="text-cyan-400 hover:text-cyan-300 px-2 py-1 text-sm">✏️</button>
+                                <button onclick="deleteMilestone('${m.id}')" class="text-red-400 hover:text-red-300 px-2 py-1 text-sm">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateStats(milestones) {
+            const today = new Date().toISOString().split('T')[0];
+            const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            
+            document.getElementById('statTotal').textContent = milestones.length;
+            document.getElementById('statOverdue').textContent = milestones.filter(m => m.due_date < today && m.status !== 'completed').length;
+            document.getElementById('statDueSoon').textContent = milestones.filter(m => m.due_date >= today && m.due_date <= nextWeek && m.status !== 'completed').length;
+            document.getElementById('statInProgress').textContent = milestones.filter(m => m.status === 'in-progress').length;
+            document.getElementById('statCompleted').textContent = milestones.filter(m => m.status === 'completed').length;
+            document.getElementById('statGovDeadlines').textContent = milestones.filter(m => m.is_government_deadline && m.status !== 'completed').length;
+        }
+
+        function checkCriticalDeadlines() {
+            const today = new Date().toISOString().split('T')[0];
+            const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            
+            const critical = allMilestones.find(m => 
+                m.is_critical_path && 
+                m.status !== 'completed' && 
+                m.due_date >= today && 
+                m.due_date <= nextWeek
+            );
+
+            const banner = document.getElementById('criticalBanner');
+            if (critical) {
+                banner.classList.remove('hidden');
+                document.getElementById('criticalText').textContent = `${critical.title} - Due ${formatDate(critical.due_date)}${critical.due_time ? ' @ ' + formatTime(critical.due_time) : ''}`;
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        function showDayMilestones(dateStr) {
+            const dayMilestones = allMilestones.filter(m => m.due_date === dateStr);
+            if (dayMilestones.length === 1) {
+                editMilestone(dayMilestones[0].id);
+            } else if (dayMilestones.length > 1) {
+                // Switch to list view filtered to this day
+                setView('list');
+            }
+        }
+
+        function openModal(milestone = null) {
+            document.getElementById('milestoneModal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = milestone ? 'Edit Milestone' : 'Add Milestone';
+            
+            if (milestone) {
+                document.getElementById('milestoneId').value = milestone.id;
+                document.getElementById('milestoneTitle').value = milestone.title;
+                document.getElementById('milestoneDescription').value = milestone.description || '';
+                document.getElementById('milestoneType').value = milestone.milestone_type;
+                document.getElementById('milestoneCategory').value = milestone.category || 'general';
+                document.getElementById('milestoneDueDate').value = milestone.due_date;
+                document.getElementById('milestoneDueTime').value = milestone.due_time || '';
+                document.getElementById('milestoneStatus').value = milestone.status;
+                document.getElementById('milestoneAssigned').value = milestone.assigned_to || '';
+                document.getElementById('milestoneReminder').value = milestone.reminder_days || 3;
+                document.getElementById('milestoneIsGov').checked = milestone.is_government_deadline;
+                document.getElementById('milestoneIsCritical').checked = milestone.is_critical_path;
+                document.getElementById('milestoneNotes').value = milestone.notes || '';
+            } else {
+                document.getElementById('milestoneForm').reset();
+                document.getElementById('milestoneId').value = '';
+                document.getElementById('milestoneReminder').value = 3;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('milestoneModal').classList.add('hidden');
+        }
+
+        async function saveMilestone(event) {
+            event.preventDefault();
+            
+            const milestoneData = {
+                opportunity_id: currentOpportunityId,
+                title: document.getElementById('milestoneTitle').value,
+                description: document.getElementById('milestoneDescription').value || null,
+                milestone_type: document.getElementById('milestoneType').value,
+                category: document.getElementById('milestoneCategory').value,
+                due_date: document.getElementById('milestoneDueDate').value,
+                due_time: document.getElementById('milestoneDueTime').value || null,
+                status: document.getElementById('milestoneStatus').value,
+                assigned_to: document.getElementById('milestoneAssigned').value || null,
+                reminder_days: parseInt(document.getElementById('milestoneReminder').value) || 3,
+                is_government_deadline: document.getElementById('milestoneIsGov').checked,
+                is_critical_path: document.getElementById('milestoneIsCritical').checked,
+                notes: document.getElementById('milestoneNotes').value || null,
+                updated_at: new Date().toISOString()
+            };
+
+            const milestoneId = document.getElementById('milestoneId').value;
+
+            if (isLiveMode) {
+                try {
+                    if (milestoneId) {
+                        const { error } = await supabase.from('proposal_milestones').update(milestoneData).eq('id', milestoneId);
+                        if (error) throw error;
+                    } else {
+                        const { error } = await supabase.from('proposal_milestones').insert([milestoneData]);
+                        if (error) throw error;
+                    }
+                } catch (error) {
+                    console.error('Save error:', error);
+                    alert('Error saving milestone: ' + error.message);
+                    return;
+                }
+            } else {
+                if (milestoneId) {
+                    const idx = allMilestones.findIndex(m => m.id === milestoneId);
+                    if (idx !== -1) allMilestones[idx] = { ...allMilestones[idx], ...milestoneData };
+                } else {
+                    allMilestones.push({ id: 'demo-' + Date.now(), ...milestoneData });
+                }
+            }
+
+            closeModal();
+            loadMilestones();
+        }
+
+        function editMilestone(id) {
+            const milestone = allMilestones.find(m => m.id === id);
+            if (milestone) openModal(milestone);
+        }
+
+        async function markComplete(id) {
+            if (isLiveMode) {
+                try {
+                    const { error } = await supabase.from('proposal_milestones').update({
+                        status: 'completed',
+                        completed_date: new Date().toISOString().split('T')[0],
+                        updated_at: new Date().toISOString()
+                    }).eq('id', id);
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('Update error:', error);
+                    alert('Error updating milestone');
+                    return;
+                }
+            } else {
+                const idx = allMilestones.findIndex(m => m.id === id);
+                if (idx !== -1) {
+                    allMilestones[idx].status = 'completed';
+                    allMilestones[idx].completed_date = new Date().toISOString().split('T')[0];
+                }
+            }
+            loadMilestones();
+        }
+
+        async function deleteMilestone(id) {
+            if (!confirm('Delete this milestone?')) return;
+
+            if (isLiveMode) {
+                try {
+                    const { error } = await supabase.from('proposal_milestones').delete().eq('id', id);
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    alert('Error deleting milestone');
+                    return;
+                }
+            } else {
+                allMilestones = allMilestones.filter(m => m.id !== id);
+            }
+            loadMilestones();
+        }
+
+        // Utilities
+        function getTypeClass(type) {
+            return `type-${type}`;
+        }
+
+        function formatType(type) {
+            const map = {
+                'internal': 'Internal',
+                'government': 'Government',
+                'review': 'Review',
+                'submission': 'Submission',
+                'meeting': 'Meeting'
+            };
+            return map[type] || type;
+        }
+
+        function formatStatus(status) {
+            const map = {
+                'pending': 'Pending',
+                'in-progress': 'In Progress',
+                'completed': 'Completed',
+                'blocked': 'Blocked'
+            };
+            return map[status] || status;
+        }
+
+        function formatCategory(cat) {
+            const map = {
+                'general': 'General',
+                'technical': 'Technical',
+                'management': 'Management',
+                'pricing': 'Pricing',
+                'past-performance': 'Past Perf',
+                'orals': 'Orals'
+            };
+            return map[cat] || cat;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            const [hours, minutes] = timeStr.split(':');
+            const h = parseInt(hours);
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const h12 = h % 12 || 12;
+            return `${h12}:${minutes} ${ampm}`;
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
