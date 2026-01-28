@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Team Reviews | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); backdrop-filter: blur(10px); }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA, #00b8d4); color: #00050F; font-weight: 600; }
+        .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+        
+        /* Color Team Types */
+        .team-pink { background: rgba(236, 72, 153, 0.2); border-color: rgba(236, 72, 153, 0.5); }
+        .team-pink-badge { background: rgba(236, 72, 153, 0.3); color: #f472b6; }
+        .team-red { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.5); }
+        .team-red-badge { background: rgba(239, 68, 68, 0.3); color: #f87171; }
+        .team-gold { background: rgba(234, 179, 8, 0.2); border-color: rgba(234, 179, 8, 0.5); }
+        .team-gold-badge { background: rgba(234, 179, 8, 0.3); color: #facc15; }
+        .team-white { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.3); }
+        .team-white-badge { background: rgba(255, 255, 255, 0.2); color: #f3f4f6; }
+        .team-blue { background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.5); }
+        .team-blue-badge { background: rgba(59, 130, 246, 0.3); color: #60a5fa; }
+        
+        /* Comment Types */
+        .comment-critical { border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .comment-major { border-left: 3px solid #f97316; background: rgba(249, 115, 22, 0.1); }
+        .comment-minor { border-left: 3px solid #eab308; background: rgba(234, 179, 8, 0.1); }
+        .comment-observation { border-left: 3px solid #6b7280; background: rgba(107, 114, 128, 0.1); }
+        .comment-positive { border-left: 3px solid #22c55e; background: rgba(34, 197, 94, 0.1); }
+        .comment-question { border-left: 3px solid #3b82f6; background: rgba(59, 130, 246, 0.1); }
+        
+        /* Status badges */
+        .status-scheduled { background: rgba(107, 114, 128, 0.3); color: #9ca3af; }
+        .status-in-progress { background: rgba(59, 130, 246, 0.3); color: #60a5fa; }
+        .status-review-complete { background: rgba(168, 85, 247, 0.3); color: #c084fc; }
+        .status-debrief-scheduled { background: rgba(234, 179, 8, 0.3); color: #facc15; }
+        .status-debrief-complete { background: rgba(34, 197, 94, 0.3); color: #4ade80; }
+        .status-closed { background: rgba(107, 114, 128, 0.2); color: #6b7280; }
+        
+        /* Rating */
+        .rating-green { background: rgba(34, 197, 94, 0.3); color: #4ade80; }
+        .rating-yellow { background: rgba(234, 179, 8, 0.3); color: #facc15; }
+        .rating-red { background: rgba(239, 68, 68, 0.3); color: #f87171; }
+        
+        .tab-active { border-bottom: 2px solid #00E5FA; color: #00E5FA; }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Header -->
+    <header class="border-b border-cyan-500/20 bg-black/40 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="index.html" class="text-cyan-400 hover:text-cyan-300"><i class="fas fa-arrow-left"></i></a>
+                <div>
+                    <h1 class="text-xl font-bold text-cyan-400"><i class="fas fa-palette mr-2"></i>Color Team Reviews</h1>
+                    <p class="text-xs text-gray-400">Pink / Red / Gold / White Glove Review Management</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="connectionStatus" class="text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
+                    <i class="fas fa-circle text-[8px] mr-1"></i> Connecting...
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Opportunity Selector -->
+        <div class="flex flex-wrap items-center gap-4 mb-6">
+            <select id="opportunitySelect" onchange="loadReviews()" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm min-w-[250px]">
+                <option value="">Select Opportunity...</option>
+            </select>
+            <button onclick="openReviewModal()" class="btn-primary px-4 py-2 rounded text-sm">
+                <i class="fas fa-plus mr-2"></i>Schedule Review
+            </button>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8" id="statsRow">
+            <div class="glass-card rounded-lg p-4 text-center team-pink">
+                <div class="text-2xl font-bold text-pink-400" id="pinkCount">0</div>
+                <div class="text-xs text-gray-400">Pink Team</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center team-red">
+                <div class="text-2xl font-bold text-red-400" id="redCount">0</div>
+                <div class="text-xs text-gray-400">Red Team</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center team-gold">
+                <div class="text-2xl font-bold text-yellow-400" id="goldCount">0</div>
+                <div class="text-xs text-gray-400">Gold Team</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center team-white">
+                <div class="text-2xl font-bold text-gray-200" id="whiteCount">0</div>
+                <div class="text-xs text-gray-400">White Glove</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-cyan-400" id="totalComments">0</div>
+                <div class="text-xs text-gray-400">Comments</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-green-400" id="resolvedComments">0</div>
+                <div class="text-xs text-gray-400">Resolved</div>
+            </div>
+        </div>
+
+        <!-- Reviews Timeline -->
+        <div id="reviewsContainer" class="space-y-6">
+            <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                <i class="fas fa-palette text-4xl mb-4 opacity-50"></i>
+                <p>Select an opportunity to view color team reviews</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Review Modal -->
+    <div id="reviewModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="glass-card rounded-xl max-w-2xl w-full p-6 my-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-calendar-plus mr-2"></i><span id="reviewModalTitle">Schedule Review</span></h3>
+                <button onclick="closeReviewModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="reviewForm" onsubmit="saveReview(event)" class="space-y-4">
+                <input type="hidden" id="reviewId">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Review Type <span class="text-red-400">*</span></label>
+                        <select id="reviewType" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="Pink Team">Pink Team (Outline/Storyboard)</option>
+                            <option value="Red Team">Red Team (Draft Review)</option>
+                            <option value="Gold Team">Gold Team (Final Review)</option>
+                            <option value="White Glove">White Glove (Production)</option>
+                            <option value="Blue Team">Blue Team (Pricing)</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Review Name</label>
+                        <input type="text" id="reviewName" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Technical Volume Red Team">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Scheduled Date</label>
+                        <input type="date" id="scheduledDate" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Due Date</label>
+                        <input type="date" id="dueDate" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Debrief Date</label>
+                        <input type="date" id="debriefDate" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Location</label>
+                        <input type="text" id="location" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Conference Room A">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Meeting Link</label>
+                        <input type="url" id="meetingLink" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="https://teams.microsoft.com/...">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Objectives</label>
+                    <textarea id="objectives" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="Review objectives and goals..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Scope / Documents to Review</label>
+                    <textarea id="scope" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="List sections and documents in scope..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeReviewModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Save Review</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Comment Modal -->
+    <div id="commentModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-xl max-w-lg w-full p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-comment-alt mr-2"></i><span id="commentModalTitle">Add Comment</span></h3>
+                <button onclick="closeCommentModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="commentForm" onsubmit="saveComment(event)" class="space-y-4">
+                <input type="hidden" id="commentId">
+                <input type="hidden" id="commentReviewId">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Type <span class="text-red-400">*</span></label>
+                        <select id="commentType" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="Critical">🔴 Critical</option>
+                            <option value="Major">🟠 Major</option>
+                            <option value="Minor">🟡 Minor</option>
+                            <option value="Observation" selected>⚪ Observation</option>
+                            <option value="Positive">🟢 Positive</option>
+                            <option value="Question">🔵 Question</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Priority (1-5)</label>
+                        <select id="commentPriority" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="1">1 - Highest</option>
+                            <option value="2">2 - High</option>
+                            <option value="3" selected>3 - Medium</option>
+                            <option value="4">4 - Low</option>
+                            <option value="5">5 - Lowest</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Section Reference</label>
+                        <input type="text" id="sectionRef" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Vol II, Section 3.2">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Page Number</label>
+                        <input type="number" id="pageNumber" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., 15">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Comment <span class="text-red-400">*</span></label>
+                    <textarea id="commentText" required rows="3" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="Describe the issue or observation..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Recommendation</label>
+                    <textarea id="recommendation" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="Suggested fix or improvement..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeCommentModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Save Comment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Review Detail Modal -->
+    <div id="detailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="glass-card rounded-xl max-w-5xl w-full p-6 my-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400" id="detailTitle">Review Details</h3>
+                <button onclick="closeDetailModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+
+    <!-- Reviewer Assignment Modal -->
+    <div id="assignModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-xl max-w-md w-full p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-user-plus mr-2"></i>Assign Reviewer</h3>
+                <button onclick="closeAssignModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="assignForm" onsubmit="saveAssignment(event)" class="space-y-4">
+                <input type="hidden" id="assignReviewId">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Team Member</label>
+                    <select id="assignUser" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                        <option value="">Select reviewer...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Role</label>
+                    <select id="assignRole" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                        <option value="Reviewer">Reviewer</option>
+                        <option value="Review Lead">Review Lead</option>
+                        <option value="SME">SME</option>
+                        <option value="Facilitator">Facilitator</option>
+                        <option value="Notetaker">Notetaker</option>
+                        <option value="Observer">Observer</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Assigned Sections</label>
+                    <input type="text" id="assignSections" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Vol II Section 3, Vol III">
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeAssignModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Assign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-cyan-500/10 mt-12 py-6 text-center text-xs text-gray-500">
+        <p>AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+        <p class="mt-1">MissionPulse v2.0 | Mission Meets Tech | Shield & Pulse UX v8.0</p>
+    </footer>
+
+    <script>
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTc0NjMsImV4cCI6MjA1Mjk5MzQ2M30.GXfKRTONeK0kCHk9WJzJzeG3sEaH15uPlFwczw4MXCg';
+        
+        let supabase;
+        let opportunities = [], profiles = [], reviews = [], assignments = [], comments = [];
+
+        // Demo Data
+        const demoOpportunities = [
+            { id: 'o1', title: 'VA EHR Modernization', stage: 'Proposal' },
+            { id: 'o2', title: 'DHA Cybersecurity Support', stage: 'Capture' }
+        ];
+        const demoProfiles = [
+            { id: 'u1', full_name: 'Mary Womack', email: 'mary@mmt.com', role: 'CEO' },
+            { id: 'u2', full_name: 'Sarah Miller', email: 'sarah@mmt.com', role: 'Capture Manager' },
+            { id: 'u3', full_name: 'Mike Torres', email: 'mike@mmt.com', role: 'Solution Architect' },
+            { id: 'u4', full_name: 'Lisa Park', email: 'lisa@mmt.com', role: 'Proposal Manager' }
+        ];
+        const demoReviews = [
+            { id: 'r1', opportunity_id: 'o1', review_type: 'Pink Team', review_name: 'Technical Volume Pink Team', status: 'Debrief Complete', scheduled_date: '2025-01-15', due_date: '2025-01-17', debrief_date: '2025-01-18', overall_rating: 'Yellow', objectives: 'Review storyboards and outline for technical approach', executive_summary: 'Good foundation but needs more specific evidence and metrics.' },
+            { id: 'r2', opportunity_id: 'o1', review_type: 'Red Team', review_name: 'Full Proposal Red Team', status: 'In Progress', scheduled_date: '2025-01-28', due_date: '2025-01-30', debrief_date: '2025-01-31', objectives: 'Complete draft review of all volumes', location: 'Conference Room A' },
+            { id: 'r3', opportunity_id: 'o1', review_type: 'Gold Team', review_name: 'Final Review', status: 'Scheduled', scheduled_date: '2025-02-05', due_date: '2025-02-06', objectives: 'Final compliance and quality check before submission' }
+        ];
+        const demoAssignments = [
+            { id: 'a1', review_id: 'r2', user_id: 'u1', role: 'Review Lead', status: 'Accepted' },
+            { id: 'a2', review_id: 'r2', user_id: 'u2', role: 'Reviewer', assigned_sections: ['Vol II - Technical'], status: 'In Progress' },
+            { id: 'a3', review_id: 'r2', user_id: 'u3', role: 'SME', assigned_sections: ['Vol II - Section 3'], status: 'Assigned' },
+            { id: 'a4', review_id: 'r2', user_id: 'u4', role: 'Facilitator', status: 'Accepted' }
+        ];
+        const demoComments = [
+            { id: 'c1', review_id: 'r1', reviewer_id: 'u2', section_ref: 'Vol II, 3.1', page_number: 12, comment_type: 'Critical', comment_text: 'Missing required compliance matrix reference', recommendation: 'Add cross-reference to Section L requirements', status: 'Resolved', priority: 1 },
+            { id: 'c2', review_id: 'r1', reviewer_id: 'u3', section_ref: 'Vol II, 3.2', page_number: 15, comment_type: 'Major', comment_text: 'Technical approach lacks specific metrics for success', recommendation: 'Add quantifiable KPIs and SLAs', status: 'Resolved', priority: 2 },
+            { id: 'c3', review_id: 'r1', reviewer_id: 'u2', section_ref: 'Vol II, 4.1', page_number: 22, comment_type: 'Minor', comment_text: 'Acronym not defined on first use', recommendation: 'Add to acronym list and define', status: 'Resolved', priority: 4 },
+            { id: 'c4', review_id: 'r1', reviewer_id: 'u1', section_ref: 'Executive Summary', page_number: 1, comment_type: 'Positive', comment_text: 'Strong win theme integration in opening paragraph', status: 'Acknowledged', priority: 5 },
+            { id: 'c5', review_id: 'r2', reviewer_id: 'u2', section_ref: 'Vol II, 2.1', page_number: 8, comment_type: 'Critical', comment_text: 'Staffing plan does not align with labor categories in Section B', recommendation: 'Reconcile staffing with pricing volume', status: 'Open', priority: 1 },
+            { id: 'c6', review_id: 'r2', reviewer_id: 'u3', section_ref: 'Vol II, 3.3', page_number: 18, comment_type: 'Major', comment_text: 'Security approach needs CMMC 2.0 compliance statement', recommendation: 'Add explicit CMMC compliance narrative', status: 'In Progress', priority: 2 },
+            { id: 'c7', review_id: 'r2', reviewer_id: 'u2', section_ref: 'Vol III', page_number: 5, comment_type: 'Question', comment_text: 'Is past performance reference still valid? Contact may have changed positions.', status: 'Open', priority: 3 }
+        ];
+
+        async function init() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                const [opRes, profRes] = await Promise.all([
+                    supabase.from('opportunities').select('id, title, stage').order('title'),
+                    supabase.from('profiles').select('id, full_name, email, role').order('full_name')
+                ]);
+                opportunities = opRes.data?.length ? opRes.data : demoOpportunities;
+                profiles = profRes.data?.length ? profRes.data : demoProfiles;
+                updateStatus('connected', 'Live');
+            } catch (e) {
+                console.log('Demo mode:', e.message);
+                opportunities = demoOpportunities;
+                profiles = demoProfiles;
+                reviews = demoReviews;
+                assignments = demoAssignments;
+                comments = demoComments;
+                updateStatus('demo', 'Demo Mode');
+            }
+            populateSelects();
+        }
+
+        function updateStatus(type, text) {
+            const el = document.getElementById('connectionStatus');
+            el.className = type === 'connected' 
+                ? 'text-xs px-3 py-1 rounded-full bg-green-500/20 text-green-400'
+                : 'text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400';
+            el.innerHTML = `<i class="fas fa-circle text-[8px] mr-1"></i> ${text}`;
+        }
+
+        function populateSelects() {
+            const opSelect = document.getElementById('opportunitySelect');
+            const userSelect = document.getElementById('assignUser');
+            opportunities.forEach(o => opSelect.innerHTML += `<option value="${o.id}">${o.title}</option>`);
+            profiles.forEach(p => userSelect.innerHTML += `<option value="${p.id}">${p.full_name || p.email}</option>`);
+        }
+
+        async function loadReviews() {
+            const oppId = document.getElementById('opportunitySelect').value;
+            if (!oppId) {
+                document.getElementById('reviewsContainer').innerHTML = `
+                    <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                        <i class="fas fa-palette text-4xl mb-4 opacity-50"></i>
+                        <p>Select an opportunity to view color team reviews</p>
+                    </div>`;
+                resetStats();
+                return;
+            }
+
+            try {
+                const [revRes, assignRes, commRes] = await Promise.all([
+                    supabase.from('color_team_reviews').select('*').eq('opportunity_id', oppId).order('scheduled_date'),
+                    supabase.from('review_assignments').select('*'),
+                    supabase.from('review_comments').select('*')
+                ]);
+                reviews = revRes.data?.length ? revRes.data : demoReviews.filter(r => r.opportunity_id === oppId);
+                const reviewIds = reviews.map(r => r.id);
+                assignments = assignRes.data?.length ? assignRes.data.filter(a => reviewIds.includes(a.review_id)) : demoAssignments.filter(a => reviewIds.includes(a.review_id));
+                comments = commRes.data?.length ? commRes.data.filter(c => reviewIds.includes(c.review_id)) : demoComments.filter(c => reviewIds.includes(c.review_id));
+            } catch (e) {
+                reviews = demoReviews.filter(r => r.opportunity_id === oppId);
+                const reviewIds = reviews.map(r => r.id);
+                assignments = demoAssignments.filter(a => reviewIds.includes(a.review_id));
+                comments = demoComments.filter(c => reviewIds.includes(c.review_id));
+            }
+
+            updateStats();
+            renderReviews();
+        }
+
+        function resetStats() {
+            ['pinkCount', 'redCount', 'goldCount', 'whiteCount', 'totalComments', 'resolvedComments'].forEach(id => {
+                document.getElementById(id).textContent = '0';
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('pinkCount').textContent = reviews.filter(r => r.review_type === 'Pink Team').length;
+            document.getElementById('redCount').textContent = reviews.filter(r => r.review_type === 'Red Team').length;
+            document.getElementById('goldCount').textContent = reviews.filter(r => r.review_type === 'Gold Team').length;
+            document.getElementById('whiteCount').textContent = reviews.filter(r => r.review_type === 'White Glove').length;
+            document.getElementById('totalComments').textContent = comments.length;
+            document.getElementById('resolvedComments').textContent = comments.filter(c => c.status === 'Resolved').length;
+        }
+
+        function getTeamClass(type) {
+            const map = { 'Pink Team': 'pink', 'Red Team': 'red', 'Gold Team': 'gold', 'White Glove': 'white', 'Blue Team': 'blue' };
+            return map[type] || 'blue';
+        }
+
+        function renderReviews() {
+            const container = document.getElementById('reviewsContainer');
+            if (!reviews.length) {
+                container.innerHTML = `
+                    <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                        <i class="fas fa-calendar-plus text-4xl mb-4 opacity-50"></i>
+                        <p>No reviews scheduled. Create one to get started.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = reviews.map(r => {
+                const teamClass = getTeamClass(r.review_type);
+                const statusClass = `status-${r.status.toLowerCase().replace(/\s+/g, '-')}`;
+                const reviewComments = comments.filter(c => c.review_id === r.id);
+                const reviewAssignments = assignments.filter(a => a.review_id === r.id);
+                const criticalCount = reviewComments.filter(c => c.comment_type === 'Critical').length;
+                const openCount = reviewComments.filter(c => c.status === 'Open').length;
+
+                return `
+                    <div class="glass-card rounded-lg overflow-hidden team-${teamClass}">
+                        <div class="p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full flex items-center justify-center team-${teamClass}-badge text-xl font-bold">
+                                    ${r.review_type.charAt(0)}
+                                </div>
+                                <div>
+                                    <h3 class="font-medium text-white">${r.review_name || r.review_type}</h3>
+                                    <div class="flex items-center gap-3 text-xs text-gray-400">
+                                        <span class="team-${teamClass}-badge px-2 py-0.5 rounded">${r.review_type}</span>
+                                        <span class="${statusClass} px-2 py-0.5 rounded">${r.status}</span>
+                                        ${r.overall_rating ? `<span class="rating-${r.overall_rating.toLowerCase()} px-2 py-0.5 rounded">${r.overall_rating}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right text-sm">
+                                <div class="text-gray-400">${r.scheduled_date || 'TBD'}</div>
+                                <div class="text-xs text-gray-500">Due: ${r.due_date || 'TBD'}</div>
+                            </div>
+                        </div>
+                        <div class="px-4 pb-4 grid md:grid-cols-3 gap-4">
+                            <div class="bg-black/20 rounded-lg p-3">
+                                <div class="text-xs text-gray-400 mb-2"><i class="fas fa-users mr-1"></i>Reviewers (${reviewAssignments.length})</div>
+                                <div class="space-y-1">
+                                    ${reviewAssignments.slice(0, 3).map(a => {
+                                        const user = profiles.find(p => p.id === a.user_id);
+                                        return `<div class="text-xs"><span class="text-white">${user?.full_name || 'Unknown'}</span> <span class="text-gray-500">${a.role}</span></div>`;
+                                    }).join('')}
+                                    ${reviewAssignments.length > 3 ? `<div class="text-xs text-gray-500">+${reviewAssignments.length - 3} more</div>` : ''}
+                                </div>
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-3">
+                                <div class="text-xs text-gray-400 mb-2"><i class="fas fa-comments mr-1"></i>Comments (${reviewComments.length})</div>
+                                <div class="flex gap-4 text-xs">
+                                    <span class="text-red-400">${criticalCount} Critical</span>
+                                    <span class="text-yellow-400">${openCount} Open</span>
+                                </div>
+                                ${r.executive_summary ? `<p class="text-xs text-gray-300 mt-2 line-clamp-2">${r.executive_summary}</p>` : ''}
+                            </div>
+                            <div class="bg-black/20 rounded-lg p-3 flex flex-col justify-between">
+                                <div class="text-xs text-gray-400 mb-2"><i class="fas fa-calendar mr-1"></i>Debrief: ${r.debrief_date || 'TBD'}</div>
+                                <div class="flex gap-2 mt-2">
+                                    <button onclick="showDetail('${r.id}')" class="flex-1 btn-primary px-2 py-1 rounded text-xs">View</button>
+                                    <button onclick="openCommentModal('${r.id}')" class="flex-1 px-2 py-1 border border-cyan-500/50 text-cyan-400 rounded text-xs hover:bg-cyan-500/10">+ Comment</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showDetail(id) {
+            const r = reviews.find(x => x.id === id);
+            if (!r) return;
+            const reviewComments = comments.filter(c => c.review_id === id).sort((a, b) => a.priority - b.priority);
+            const reviewAssignments = assignments.filter(a => a.review_id === id);
+            const teamClass = getTeamClass(r.review_type);
+
+            document.getElementById('detailTitle').innerHTML = `<span class="team-${teamClass}-badge px-3 py-1 rounded mr-2">${r.review_type}</span>${r.review_name || 'Review Details'}`;
+            document.getElementById('detailContent').innerHTML = `
+                <div class="grid md:grid-cols-3 gap-6 mb-6">
+                    <div class="glass-card rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-cyan-400 mb-3"><i class="fas fa-info-circle mr-2"></i>Details</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-400">Status:</span><span class="status-${r.status.toLowerCase().replace(/\s+/g, '-')} px-2 py-0.5 rounded text-xs">${r.status}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Scheduled:</span><span>${r.scheduled_date || 'TBD'}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Due:</span><span>${r.due_date || 'TBD'}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Debrief:</span><span>${r.debrief_date || 'TBD'}</span></div>
+                            ${r.location ? `<div class="flex justify-between"><span class="text-gray-400">Location:</span><span>${r.location}</span></div>` : ''}
+                            ${r.overall_rating ? `<div class="flex justify-between"><span class="text-gray-400">Rating:</span><span class="rating-${r.overall_rating.toLowerCase()} px-2 py-0.5 rounded text-xs">${r.overall_rating}</span></div>` : ''}
+                        </div>
+                        ${r.objectives ? `<div class="mt-3 pt-3 border-t border-gray-700"><p class="text-xs text-gray-400 mb-1">Objectives:</p><p class="text-sm">${r.objectives}</p></div>` : ''}
+                    </div>
+                    <div class="glass-card rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-sm font-medium text-cyan-400"><i class="fas fa-users mr-2"></i>Reviewers</h4>
+                            <button onclick="openAssignModal('${id}')" class="text-xs text-cyan-400 hover:text-cyan-300"><i class="fas fa-plus mr-1"></i>Add</button>
+                        </div>
+                        ${reviewAssignments.length ? reviewAssignments.map(a => {
+                            const user = profiles.find(p => p.id === a.user_id);
+                            return `
+                                <div class="flex justify-between items-center p-2 bg-gray-800/50 rounded mb-2">
+                                    <div>
+                                        <div class="text-sm font-medium">${user?.full_name || 'Unknown'}</div>
+                                        <div class="text-xs text-gray-400">${a.role}</div>
+                                    </div>
+                                    <span class="text-xs px-2 py-0.5 rounded ${a.status === 'Submitted' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}">${a.status}</span>
+                                </div>
+                            `;
+                        }).join('') : '<p class="text-sm text-gray-500">No reviewers assigned</p>'}
+                    </div>
+                    <div class="glass-card rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-cyan-400 mb-3"><i class="fas fa-chart-pie mr-2"></i>Comment Summary</h4>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div class="bg-red-500/10 p-2 rounded text-center"><div class="text-red-400 font-bold">${reviewComments.filter(c => c.comment_type === 'Critical').length}</div><div class="text-xs text-gray-400">Critical</div></div>
+                            <div class="bg-orange-500/10 p-2 rounded text-center"><div class="text-orange-400 font-bold">${reviewComments.filter(c => c.comment_type === 'Major').length}</div><div class="text-xs text-gray-400">Major</div></div>
+                            <div class="bg-yellow-500/10 p-2 rounded text-center"><div class="text-yellow-400 font-bold">${reviewComments.filter(c => c.comment_type === 'Minor').length}</div><div class="text-xs text-gray-400">Minor</div></div>
+                            <div class="bg-green-500/10 p-2 rounded text-center"><div class="text-green-400 font-bold">${reviewComments.filter(c => c.status === 'Resolved').length}</div><div class="text-xs text-gray-400">Resolved</div></div>
+                        </div>
+                        <button onclick="openCommentModal('${id}')" class="w-full mt-3 btn-primary px-3 py-2 rounded text-sm"><i class="fas fa-plus mr-2"></i>Add Comment</button>
+                    </div>
+                </div>
+                <div class="glass-card rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-sm font-medium text-cyan-400"><i class="fas fa-comments mr-2"></i>Comments (${reviewComments.length})</h4>
+                        <div class="flex gap-2">
+                            <select onchange="filterComments(this.value, '${id}')" class="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs">
+                                <option value="">All Types</option>
+                                <option value="Critical">Critical</option>
+                                <option value="Major">Major</option>
+                                <option value="Minor">Minor</option>
+                                <option value="Open">Open Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="commentsContainer" class="space-y-2 max-h-96 overflow-y-auto">
+                        ${reviewComments.length ? reviewComments.map(c => renderComment(c)).join('') : '<p class="text-sm text-gray-500 text-center py-4">No comments yet</p>'}
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6 pt-4 border-t border-gray-700">
+                    <button onclick="editReview('${id}')" class="btn-primary px-4 py-2 rounded text-sm"><i class="fas fa-edit mr-2"></i>Edit Review</button>
+                    <button onclick="advanceStatus('${id}')" class="px-4 py-2 border border-cyan-500/50 text-cyan-400 rounded text-sm hover:bg-cyan-500/10"><i class="fas fa-arrow-right mr-2"></i>Advance Status</button>
+                    <button onclick="deleteReview('${id}')" class="px-4 py-2 border border-red-500/50 text-red-400 rounded text-sm hover:bg-red-500/10"><i class="fas fa-trash mr-2"></i>Delete</button>
+                </div>
+            `;
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        function renderComment(c) {
+            const reviewer = profiles.find(p => p.id === c.reviewer_id);
+            const typeClass = `comment-${c.comment_type.toLowerCase()}`;
+            const statusColors = { 'Open': 'text-yellow-400', 'Resolved': 'text-green-400', 'In Progress': 'text-blue-400', 'Deferred': 'text-gray-400' };
+            
+            return `
+                <div class="p-3 rounded ${typeClass}">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-medium">${c.comment_type}</span>
+                            ${c.section_ref ? `<span class="text-xs text-gray-400">${c.section_ref}</span>` : ''}
+                            ${c.page_number ? `<span class="text-xs text-gray-500">pg. ${c.page_number}</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs ${statusColors[c.status] || 'text-gray-400'}">${c.status}</span>
+                            <button onclick="event.stopPropagation(); toggleCommentStatus('${c.id}')" class="text-xs text-cyan-400 hover:text-cyan-300" title="Toggle Status"><i class="fas fa-check-circle"></i></button>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-200 mb-2">${c.comment_text}</p>
+                    ${c.recommendation ? `<p class="text-xs text-cyan-400"><i class="fas fa-lightbulb mr-1"></i>${c.recommendation}</p>` : ''}
+                    <div class="text-xs text-gray-500 mt-2">${reviewer?.full_name || 'Unknown'} • Priority ${c.priority}</div>
+                </div>
+            `;
+        }
+
+        function closeDetailModal() { document.getElementById('detailModal').classList.add('hidden'); }
+
+        // Review CRUD
+        function openReviewModal() {
+            if (!document.getElementById('opportunitySelect').value) { alert('Select an opportunity first'); return; }
+            document.getElementById('reviewForm').reset();
+            document.getElementById('reviewId').value = '';
+            document.getElementById('reviewModalTitle').textContent = 'Schedule Review';
+            document.getElementById('reviewModal').classList.remove('hidden');
+        }
+
+        function closeReviewModal() { document.getElementById('reviewModal').classList.add('hidden'); }
+
+        function editReview(id) {
+            closeDetailModal();
+            const r = reviews.find(x => x.id === id);
+            if (!r) return;
+            document.getElementById('reviewId').value = r.id;
+            document.getElementById('reviewType').value = r.review_type;
+            document.getElementById('reviewName').value = r.review_name || '';
+            document.getElementById('scheduledDate').value = r.scheduled_date || '';
+            document.getElementById('dueDate').value = r.due_date || '';
+            document.getElementById('debriefDate').value = r.debrief_date || '';
+            document.getElementById('location').value = r.location || '';
+            document.getElementById('meetingLink').value = r.meeting_link || '';
+            document.getElementById('objectives').value = r.objectives || '';
+            document.getElementById('scope').value = r.scope || '';
+            document.getElementById('reviewModalTitle').textContent = 'Edit Review';
+            document.getElementById('reviewModal').classList.remove('hidden');
+        }
+
+        async function saveReview(e) {
+            e.preventDefault();
+            const id = document.getElementById('reviewId').value;
+            const data = {
+                opportunity_id: document.getElementById('opportunitySelect').value,
+                review_type: document.getElementById('reviewType').value,
+                review_name: document.getElementById('reviewName').value || null,
+                scheduled_date: document.getElementById('scheduledDate').value || null,
+                due_date: document.getElementById('dueDate').value || null,
+                debrief_date: document.getElementById('debriefDate').value || null,
+                location: document.getElementById('location').value || null,
+                meeting_link: document.getElementById('meetingLink').value || null,
+                objectives: document.getElementById('objectives').value || null,
+                scope: document.getElementById('scope').value || null,
+                updated_at: new Date().toISOString()
+            };
+
+            try {
+                if (id) {
+                    await supabase.from('color_team_reviews').update(data).eq('id', id);
+                    const idx = reviews.findIndex(r => r.id === id);
+                    if (idx >= 0) reviews[idx] = { ...reviews[idx], ...data };
+                } else {
+                    data.status = 'Scheduled';
+                    const { data: newR } = await supabase.from('color_team_reviews').insert([data]).select().single();
+                    if (newR) reviews.push(newR);
+                    else reviews.push({ id: 'r' + Date.now(), ...data });
+                }
+            } catch (e) {
+                if (!id) reviews.push({ id: 'r' + Date.now(), ...data, status: 'Scheduled' });
+            }
+
+            closeReviewModal();
+            updateStats();
+            renderReviews();
+        }
+
+        async function deleteReview(id) {
+            if (!confirm('Delete this review and all its comments?')) return;
+            try { await supabase.from('color_team_reviews').delete().eq('id', id); } catch (e) {}
+            reviews = reviews.filter(r => r.id !== id);
+            comments = comments.filter(c => c.review_id !== id);
+            assignments = assignments.filter(a => a.review_id !== id);
+            closeDetailModal();
+            updateStats();
+            renderReviews();
+        }
+
+        async function advanceStatus(id) {
+            const r = reviews.find(x => x.id === id);
+            if (!r) return;
+            const statusOrder = ['Scheduled', 'In Progress', 'Review Complete', 'Debrief Scheduled', 'Debrief Complete', 'Closed'];
+            const currentIdx = statusOrder.indexOf(r.status);
+            if (currentIdx < statusOrder.length - 1) {
+                const newStatus = statusOrder[currentIdx + 1];
+                r.status = newStatus;
+                try { await supabase.from('color_team_reviews').update({ status: newStatus }).eq('id', id); } catch (e) {}
+                showDetail(id);
+                renderReviews();
+            }
+        }
+
+        // Comment CRUD
+        function openCommentModal(reviewId) {
+            document.getElementById('commentForm').reset();
+            document.getElementById('commentId').value = '';
+            document.getElementById('commentReviewId').value = reviewId;
+            document.getElementById('commentModalTitle').textContent = 'Add Comment';
+            document.getElementById('commentModal').classList.remove('hidden');
+        }
+
+        function closeCommentModal() { document.getElementById('commentModal').classList.add('hidden'); }
+
+        async function saveComment(e) {
+            e.preventDefault();
+            const data = {
+                review_id: document.getElementById('commentReviewId').value,
+                comment_type: document.getElementById('commentType').value,
+                priority: parseInt(document.getElementById('commentPriority').value),
+                section_ref: document.getElementById('sectionRef').value || null,
+                page_number: parseInt(document.getElementById('pageNumber').value) || null,
+                comment_text: document.getElementById('commentText').value,
+                recommendation: document.getElementById('recommendation').value || null,
+                status: 'Open'
+            };
+
+            try {
+                const { data: newC } = await supabase.from('review_comments').insert([data]).select().single();
+                if (newC) comments.push(newC);
+                else comments.push({ id: 'c' + Date.now(), ...data });
+            } catch (e) {
+                comments.push({ id: 'c' + Date.now(), ...data });
+            }
+
+            closeCommentModal();
+            updateStats();
+            showDetail(data.review_id);
+        }
+
+        async function toggleCommentStatus(id) {
+            const c = comments.find(x => x.id === id);
+            if (!c) return;
+            const statusOrder = ['Open', 'In Progress', 'Resolved'];
+            const currentIdx = statusOrder.indexOf(c.status);
+            const newStatus = statusOrder[(currentIdx + 1) % statusOrder.length];
+            c.status = newStatus;
+            try { await supabase.from('review_comments').update({ status: newStatus }).eq('id', id); } catch (e) {}
+            updateStats();
+            showDetail(c.review_id);
+        }
+
+        // Assignment CRUD
+        function openAssignModal(reviewId) {
+            document.getElementById('assignForm').reset();
+            document.getElementById('assignReviewId').value = reviewId;
+            document.getElementById('assignModal').classList.remove('hidden');
+        }
+
+        function closeAssignModal() { document.getElementById('assignModal').classList.add('hidden'); }
+
+        async function saveAssignment(e) {
+            e.preventDefault();
+            const data = {
+                review_id: document.getElementById('assignReviewId').value,
+                user_id: document.getElementById('assignUser').value,
+                role: document.getElementById('assignRole').value,
+                assigned_sections: document.getElementById('assignSections').value.split(',').map(s => s.trim()).filter(Boolean),
+                status: 'Assigned'
+            };
+
+            try {
+                const { data: newA } = await supabase.from('review_assignments').insert([data]).select().single();
+                if (newA) assignments.push(newA);
+                else assignments.push({ id: 'a' + Date.now(), ...data });
+            } catch (e) {
+                assignments.push({ id: 'a' + Date.now(), ...data });
+            }
+
+            closeAssignModal();
+            showDetail(data.review_id);
+        }
+
+        init();
+    </script>
+</body>
+</html>
