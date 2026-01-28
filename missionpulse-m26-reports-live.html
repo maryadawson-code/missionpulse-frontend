@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports & Exports | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #000A1A 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); border-radius: 0.75rem; }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .cyan-glow { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #00B8D4 100%); color: #00050F; font-weight: 600; }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-secondary { background: rgba(0, 229, 250, 0.1); border: 1px solid rgba(0, 229, 250, 0.3); color: #00E5FA; }
+        .btn-secondary:hover { background: rgba(0, 229, 250, 0.2); }
+        .report-card { transition: all 0.2s; cursor: pointer; }
+        .report-card:hover { transform: translateY(-2px); border-color: rgba(0, 229, 250, 0.5); }
+        .report-card.selected { border-color: #00E5FA; background: rgba(0, 229, 250, 0.1); }
+        .format-btn { transition: all 0.2s; }
+        .format-btn:hover { background: rgba(0, 229, 250, 0.15); }
+        .format-btn.selected { background: rgba(0, 229, 250, 0.2); border-color: #00E5FA; }
+        .generating { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Sidebar -->
+    <div id="missionpulse-sidebar" data-current-page="reports"></div>
+    <script src="missionpulse-nav.js"></script>
+
+    <!-- Main Content -->
+    <div class="main-content" style="margin-left: 260px;">
+        <!-- Header -->
+        <header class="border-b border-cyan-500/20 bg-black/40 backdrop-blur sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="text-3xl">📑</div>
+                        <div>
+                            <h1 class="text-2xl font-bold text-cyan-400">Reports & Exports</h1>
+                            <p class="text-white/50 text-sm">Generate and download proposal reports</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+                            <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+                            <span class="text-white/50">Checking...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-6 py-8">
+            <!-- Opportunity Selector -->
+            <div class="mb-8">
+                <label class="block text-white/60 text-sm mb-2">Select Opportunity (or All)</label>
+                <select id="opportunitySelect" onchange="updateReportOptions()" class="w-full md:w-96 bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-3 text-white focus:border-cyan-400 focus:outline-none">
+                    <option value="all">All Opportunities (Portfolio Report)</option>
+                </select>
+            </div>
+
+            <!-- Report Types Grid -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold text-cyan-400 mb-4">Select Report Type</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Executive Summary -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('executive')" data-report="executive">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">📊</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Executive Summary</h3>
+                                <p class="text-sm text-white/50">Pipeline overview, win rates, key metrics</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-300">Portfolio</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Opportunity Details -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('opportunity')" data-report="opportunity">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">🎯</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Opportunity Details</h3>
+                                <p class="text-sm text-white/50">Full opportunity data with all fields</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-300">Single/All</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Milestone Schedule -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('milestones')" data-report="milestones">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">📅</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Milestone Schedule</h3>
+                                <p class="text-sm text-white/50">All deadlines and milestones by date</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-300">Single/All</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Questions Log -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('questions')" data-report="questions">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">❓</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Questions to Government</h3>
+                                <p class="text-sm text-white/50">All Q&A with responses and status</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-300">Single</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Graphics Tracker -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('graphics')" data-report="graphics">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">🎨</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Graphics & Exhibits</h3>
+                                <p class="text-sm text-white/50">Exhibit list with status and assignments</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-pink-500/20 text-pink-300">Single</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Risk Register -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('risks')" data-report="risks">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">⚠️</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Risk Register</h3>
+                                <p class="text-sm text-white/50">All risks with mitigations and status</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-300">Single</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Compliance Matrix -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('compliance')" data-report="compliance">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">✅</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Compliance Matrix</h3>
+                                <p class="text-sm text-white/50">Requirements tracking with L/M sections</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-300">Single</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Team Assignments -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('teams')" data-report="teams">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">👥</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Team Assignments</h3>
+                                <p class="text-sm text-white/50">Team members and section assignments</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-indigo-500/20 text-indigo-300">Single</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Color Team Status -->
+                    <div class="report-card glass-card p-5" onclick="selectReport('colorteam')" data-report="colorteam">
+                        <div class="flex items-start gap-4">
+                            <div class="text-3xl">🎨</div>
+                            <div>
+                                <h3 class="font-semibold text-white mb-1">Color Team Reviews</h3>
+                                <p class="text-sm text-white/50">Review status and comments summary</p>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span class="px-2 py-0.5 rounded text-xs bg-orange-500/20 text-orange-300">Single</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Options -->
+            <div id="exportOptions" class="hidden mb-8">
+                <div class="glass-card cyan-glow p-6">
+                    <h2 class="text-lg font-semibold text-cyan-400 mb-4">Export Options</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Format Selection -->
+                        <div>
+                            <label class="block text-white/60 text-sm mb-3">Export Format</label>
+                            <div class="flex gap-3">
+                                <button onclick="selectFormat('csv')" class="format-btn selected flex-1 border border-cyan-500/30 rounded-lg p-4 text-center" data-format="csv">
+                                    <div class="text-2xl mb-1">📄</div>
+                                    <div class="text-sm font-medium text-white">CSV</div>
+                                    <div class="text-xs text-white/50">Spreadsheet</div>
+                                </button>
+                                <button onclick="selectFormat('json')" class="format-btn flex-1 border border-cyan-500/30 rounded-lg p-4 text-center" data-format="json">
+                                    <div class="text-2xl mb-1">📋</div>
+                                    <div class="text-sm font-medium text-white">JSON</div>
+                                    <div class="text-xs text-white/50">Data Export</div>
+                                </button>
+                                <button onclick="selectFormat('html')" class="format-btn flex-1 border border-cyan-500/30 rounded-lg p-4 text-center" data-format="html">
+                                    <div class="text-2xl mb-1">🌐</div>
+                                    <div class="text-sm font-medium text-white">HTML</div>
+                                    <div class="text-xs text-white/50">Printable</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Additional Options -->
+                        <div>
+                            <label class="block text-white/60 text-sm mb-3">Options</label>
+                            <div class="space-y-3">
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" id="optIncludeCompleted" checked class="rounded bg-black/40 border-cyan-500/30 text-cyan-500">
+                                    <span class="text-sm text-white/70">Include completed items</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" id="optIncludeNotes" checked class="rounded bg-black/40 border-cyan-500/30 text-cyan-500">
+                                    <span class="text-sm text-white/70">Include notes/descriptions</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" id="optTimestamp" checked class="rounded bg-black/40 border-cyan-500/30 text-cyan-500">
+                                    <span class="text-sm text-white/70">Add timestamp to filename</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <div class="mt-6 pt-6 border-t border-cyan-500/20 flex items-center justify-between">
+                        <div id="reportSummary" class="text-sm text-white/50">
+                            Select a report type to continue
+                        </div>
+                        <button onclick="generateReport()" id="generateBtn" disabled class="btn-primary px-6 py-3 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span id="generateBtnText">📥 Generate Report</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Exports -->
+            <div class="glass-card p-6">
+                <h2 class="text-lg font-semibold text-cyan-400 mb-4">Recent Exports</h2>
+                <div id="recentExports" class="space-y-2">
+                    <div class="text-white/40 text-sm">No recent exports this session</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-cyan-500/20 mt-12">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <p class="text-center text-white/30 text-xs">AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+                <p class="text-center text-white/20 text-xs mt-1">© 2025 Mission Meets Tech. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Supabase Init
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTMwNjIsImV4cCI6MjA1Mjk4OTA2Mn0.gwBTnfAtsxSFDz96fDPL7HAIYdA5s_9hiv_l0ECWvYc';
+        
+        let supabase;
+        let isLiveMode = false;
+        let selectedReport = null;
+        let selectedFormat = 'csv';
+        let recentExports = [];
+
+        // Demo Data
+        const demoOpportunities = [
+            { id: 'demo-1', title: 'DHA DHMSM Support', nickname: 'DHMSM', stage: 'proposal', ceiling: 125000000, pwin: 65 },
+            { id: 'demo-2', title: 'VA EHR Modernization', nickname: 'VA-EHR', stage: 'capture', ceiling: 89000000, pwin: 45 },
+            { id: 'demo-3', title: 'CMS Data Analytics', nickname: 'CMS-Analytics', stage: 'proposal', ceiling: 67000000, pwin: 70 }
+        ];
+
+        // Report Configurations
+        const reportConfigs = {
+            executive: {
+                name: 'Executive Summary',
+                table: 'opportunities',
+                columns: ['title', 'nickname', 'stage', 'ceiling', 'pwin', 'agency', 'contract_type'],
+                portfolioOnly: true
+            },
+            opportunity: {
+                name: 'Opportunity Details',
+                table: 'opportunities',
+                columns: ['title', 'nickname', 'description', 'stage', 'ceiling', 'pwin', 'agency', 'contract_type', 'naics', 'set_aside', 'created_at']
+            },
+            milestones: {
+                name: 'Milestone Schedule',
+                table: 'proposal_milestones',
+                columns: ['title', 'description', 'milestone_type', 'category', 'due_date', 'due_time', 'status', 'assigned_to', 'is_government_deadline', 'is_critical_path', 'notes']
+            },
+            questions: {
+                name: 'Questions to Government',
+                table: 'government_questions',
+                columns: ['question_number', 'question_text', 'section_reference', 'category', 'priority', 'status', 'submitted_date', 'response_text', 'response_date', 'response_impact', 'assigned_to'],
+                requiresOpportunity: true
+            },
+            graphics: {
+                name: 'Graphics & Exhibits',
+                table: 'exhibit_graphics',
+                columns: ['exhibit_number', 'title', 'description', 'section_reference', 'exhibit_type', 'status', 'assigned_to', 'page_limit', 'current_pages', 'due_date', 'notes'],
+                requiresOpportunity: true
+            },
+            risks: {
+                name: 'Risk Register',
+                table: 'risks',
+                columns: ['title', 'description', 'category', 'severity', 'likelihood', 'impact', 'status', 'owner', 'mitigation_plan', 'due_date', 'notes'],
+                requiresOpportunity: true
+            },
+            compliance: {
+                name: 'Compliance Matrix',
+                table: 'compliance_requirements',
+                columns: ['requirement_id', 'section', 'requirement_text', 'compliance_status', 'proposal_section', 'assigned_to', 'notes'],
+                requiresOpportunity: true
+            },
+            teams: {
+                name: 'Team Assignments',
+                table: 'team_assignments',
+                columns: ['team_member', 'role', 'section', 'responsibility', 'status', 'hours_allocated', 'notes'],
+                requiresOpportunity: true
+            },
+            colorteam: {
+                name: 'Color Team Reviews',
+                table: 'color_team_reviews',
+                columns: ['review_type', 'scheduled_date', 'status', 'section', 'reviewer', 'score', 'comments', 'action_items'],
+                requiresOpportunity: true
+            }
+        };
+
+        // Initialize
+        async function init() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                await loadOpportunities();
+            } catch (error) {
+                console.error('Init error:', error);
+                loadDemoMode();
+            }
+        }
+
+        async function loadOpportunities() {
+            try {
+                const { data, error } = await supabase.from('opportunities').select('id, title, nickname').order('title');
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    isLiveMode = true;
+                    updateConnectionStatus(true);
+                    populateOpportunitySelect(data);
+                } else {
+                    loadDemoMode();
+                }
+            } catch (error) {
+                console.error('Load opportunities error:', error);
+                loadDemoMode();
+            }
+        }
+
+        function loadDemoMode() {
+            isLiveMode = false;
+            updateConnectionStatus(false);
+            populateOpportunitySelect(demoOpportunities);
+        }
+
+        function updateConnectionStatus(isLive) {
+            const status = document.getElementById('connectionStatus');
+            if (isLive) {
+                status.innerHTML = '<div class="w-2 h-2 rounded-full bg-green-500"></div><span class="text-green-400">Live Database</span>';
+            } else {
+                status.innerHTML = '<div class="w-2 h-2 rounded-full bg-yellow-500"></div><span class="text-yellow-400">Demo Mode</span>';
+            }
+        }
+
+        function populateOpportunitySelect(opportunities) {
+            const select = document.getElementById('opportunitySelect');
+            select.innerHTML = '<option value="all">All Opportunities (Portfolio Report)</option>' + 
+                opportunities.map(o => `<option value="${o.id}">${o.nickname || o.title}</option>`).join('');
+        }
+
+        function selectReport(reportType) {
+            selectedReport = reportType;
+            
+            // Update UI
+            document.querySelectorAll('.report-card').forEach(card => {
+                card.classList.remove('selected');
+                if (card.dataset.report === reportType) {
+                    card.classList.add('selected');
+                }
+            });
+
+            // Show export options
+            document.getElementById('exportOptions').classList.remove('hidden');
+            
+            // Update summary
+            const config = reportConfigs[reportType];
+            const oppSelect = document.getElementById('opportunitySelect');
+            const oppValue = oppSelect.value;
+            const oppText = oppSelect.options[oppSelect.selectedIndex].text;
+            
+            let summary = `<strong>${config.name}</strong>`;
+            if (config.portfolioOnly) {
+                summary += ' • All opportunities';
+            } else if (config.requiresOpportunity && oppValue === 'all') {
+                summary = `<span class="text-yellow-400">⚠️ ${config.name} requires a specific opportunity</span>`;
+            } else {
+                summary += ` • ${oppText}`;
+            }
+            
+            document.getElementById('reportSummary').innerHTML = summary;
+            
+            // Enable/disable generate button
+            const canGenerate = !config.requiresOpportunity || oppValue !== 'all';
+            document.getElementById('generateBtn').disabled = !canGenerate;
+        }
+
+        function selectFormat(format) {
+            selectedFormat = format;
+            
+            document.querySelectorAll('.format-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.dataset.format === format) {
+                    btn.classList.add('selected');
+                }
+            });
+        }
+
+        function updateReportOptions() {
+            if (selectedReport) {
+                selectReport(selectedReport);
+            }
+        }
+
+        async function generateReport() {
+            if (!selectedReport) return;
+
+            const config = reportConfigs[selectedReport];
+            const oppId = document.getElementById('opportunitySelect').value;
+            const includeCompleted = document.getElementById('optIncludeCompleted').checked;
+            const includeNotes = document.getElementById('optIncludeNotes').checked;
+            const addTimestamp = document.getElementById('optTimestamp').checked;
+
+            // Update button state
+            const btn = document.getElementById('generateBtn');
+            const btnText = document.getElementById('generateBtnText');
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="generating">⏳ Generating...</span>';
+
+            try {
+                let data = [];
+
+                if (isLiveMode) {
+                    let query = supabase.from(config.table).select('*');
+                    
+                    if (oppId !== 'all' && !config.portfolioOnly) {
+                        query = query.eq('opportunity_id', oppId);
+                    }
+                    
+                    const { data: result, error } = await query;
+                    if (error) throw error;
+                    data = result || [];
+                } else {
+                    // Demo data
+                    data = generateDemoData(selectedReport, oppId);
+                }
+
+                // Filter columns if notes excluded
+                let columns = [...config.columns];
+                if (!includeNotes) {
+                    columns = columns.filter(c => !['notes', 'description', 'comments'].includes(c));
+                }
+
+                // Generate file
+                const filename = generateFilename(config.name, oppId, addTimestamp);
+                
+                switch (selectedFormat) {
+                    case 'csv':
+                        downloadCSV(data, columns, filename);
+                        break;
+                    case 'json':
+                        downloadJSON(data, filename);
+                        break;
+                    case 'html':
+                        downloadHTML(data, columns, config.name, filename);
+                        break;
+                }
+
+                // Add to recent exports
+                addRecentExport(config.name, selectedFormat, data.length);
+
+            } catch (error) {
+                console.error('Generate error:', error);
+                alert('Error generating report: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btnText.innerHTML = '📥 Generate Report';
+            }
+        }
+
+        function generateDemoData(reportType, oppId) {
+            // Generate sample demo data for each report type
+            const demos = {
+                executive: demoOpportunities,
+                opportunity: demoOpportunities.filter(o => oppId === 'all' || o.id === oppId),
+                milestones: [
+                    { title: 'Pink Team Review', milestone_type: 'review', category: 'general', due_date: '2025-02-05', status: 'pending', assigned_to: 'QA Lead', is_critical_path: true },
+                    { title: 'Technical Volume Draft', milestone_type: 'internal', category: 'technical', due_date: '2025-02-03', status: 'in-progress', assigned_to: 'Tech Lead', is_critical_path: true },
+                    { title: 'Proposal Submission', milestone_type: 'government', category: 'general', due_date: '2025-02-21', status: 'pending', assigned_to: 'PM', is_government_deadline: true, is_critical_path: true }
+                ],
+                questions: [
+                    { question_number: 'Q-001', question_text: 'Please clarify Section L.1.2 requirements', category: 'technical', priority: 'high', status: 'answered', response_text: 'The requirement refers to...' },
+                    { question_number: 'Q-002', question_text: 'Is there a page limit for attachments?', category: 'clarification', priority: 'medium', status: 'submitted' }
+                ],
+                graphics: [
+                    { exhibit_number: 'Figure 1', title: 'System Architecture', exhibit_type: 'diagram', status: 'approved', assigned_to: 'Graphics Lead' },
+                    { exhibit_number: 'Table 1', title: 'Labor Categories', exhibit_type: 'table', status: 'in-progress', assigned_to: 'Pricing Lead' }
+                ],
+                risks: [
+                    { title: 'Key personnel availability', category: 'staffing', severity: 'high', likelihood: 'medium', status: 'open', owner: 'HR Lead' },
+                    { title: 'Subcontractor performance', category: 'teaming', severity: 'medium', likelihood: 'low', status: 'mitigated', owner: 'Contracts' }
+                ],
+                compliance: [
+                    { requirement_id: 'L.1.1', section: 'Technical', requirement_text: 'Describe technical approach', compliance_status: 'compliant', assigned_to: 'Tech Lead' },
+                    { requirement_id: 'L.2.1', section: 'Management', requirement_text: 'Provide org chart', compliance_status: 'in-progress', assigned_to: 'PM' }
+                ],
+                teams: [
+                    { team_member: 'John Smith', role: 'Technical Lead', section: 'L.1', responsibility: 'Technical volume', status: 'active', hours_allocated: 120 },
+                    { team_member: 'Jane Doe', role: 'Pricing Lead', section: 'B', responsibility: 'Cost volume', status: 'active', hours_allocated: 80 }
+                ],
+                colorteam: [
+                    { review_type: 'Pink Team', scheduled_date: '2025-02-05', status: 'scheduled', section: 'All', reviewer: 'Review Board' },
+                    { review_type: 'Red Team', scheduled_date: '2025-02-15', status: 'pending', section: 'All', reviewer: 'External SMEs' }
+                ]
+            };
+
+            return demos[reportType] || [];
+        }
+
+        function generateFilename(reportName, oppId, addTimestamp) {
+            let name = reportName.toLowerCase().replace(/\s+/g, '-');
+            
+            if (oppId !== 'all') {
+                const select = document.getElementById('opportunitySelect');
+                const oppText = select.options[select.selectedIndex].text;
+                name = `${oppText.toLowerCase().replace(/\s+/g, '-')}-${name}`;
+            }
+            
+            if (addTimestamp) {
+                const now = new Date();
+                const ts = now.toISOString().split('T')[0];
+                name = `${name}-${ts}`;
+            }
+            
+            return name;
+        }
+
+        function downloadCSV(data, columns, filename) {
+            if (data.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            const headers = columns.map(c => c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+            let csv = headers.join(',') + '\n';
+            
+            data.forEach(row => {
+                const values = columns.map(col => {
+                    let val = row[col];
+                    if (val === null || val === undefined) val = '';
+                    if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+                        val = '"' + val.replace(/"/g, '""') + '"';
+                    }
+                    return val;
+                });
+                csv += values.join(',') + '\n';
+            });
+
+            downloadFile(csv, filename + '.csv', 'text/csv');
+        }
+
+        function downloadJSON(data, filename) {
+            const json = JSON.stringify(data, null, 2);
+            downloadFile(json, filename + '.json', 'application/json');
+        }
+
+        function downloadHTML(data, columns, reportName, filename) {
+            const headers = columns.map(c => c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+            
+            let html = `<!DOCTYPE html>
+<html>
+<head>
+    <title>${reportName} - MissionPulse Report</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; background: #f5f5f5; }
+        .header { background: linear-gradient(135deg, #00050F, #001a33); color: white; padding: 30px; margin: -40px -40px 30px; }
+        .header h1 { margin: 0; color: #00E5FA; }
+        .header p { margin: 10px 0 0; opacity: 0.7; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        th { background: #00E5FA; color: #00050F; padding: 12px; text-align: left; font-weight: 600; }
+        td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f9f9f9; }
+        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        @media print { body { margin: 20px; } .header { margin: -20px -20px 20px; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${reportName}</h1>
+        <p>Generated: ${new Date().toLocaleString()} • MissionPulse by Mission Meets Tech</p>
+    </div>
+    <table>
+        <thead>
+            <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+            ${data.map(row => `<tr>${columns.map(col => `<td>${row[col] || '-'}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+    </table>
+    <div class="footer">
+        <p>AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+        <p>© 2025 Mission Meets Tech. All rights reserved.</p>
+    </div>
+</body>
+</html>`;
+
+            downloadFile(html, filename + '.html', 'text/html');
+        }
+
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function addRecentExport(reportName, format, rowCount) {
+            recentExports.unshift({
+                name: reportName,
+                format: format.toUpperCase(),
+                rows: rowCount,
+                time: new Date().toLocaleTimeString()
+            });
+
+            if (recentExports.length > 5) recentExports.pop();
+
+            renderRecentExports();
+        }
+
+        function renderRecentExports() {
+            const container = document.getElementById('recentExports');
+            
+            if (recentExports.length === 0) {
+                container.innerHTML = '<div class="text-white/40 text-sm">No recent exports this session</div>';
+                return;
+            }
+
+            container.innerHTML = recentExports.map(e => `
+                <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <span class="text-lg">${e.format === 'CSV' ? '📄' : e.format === 'JSON' ? '📋' : '🌐'}</span>
+                        <div>
+                            <div class="text-sm font-medium text-white">${e.name}</div>
+                            <div class="text-xs text-white/50">${e.rows} rows • ${e.format}</div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-white/40">${e.time}</div>
+                </div>
+            `).join('');
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
