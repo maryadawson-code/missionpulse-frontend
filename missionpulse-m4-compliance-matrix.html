@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse M4 - Compliance Matrix</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'pulse-cyan': '#00E5FA',
+            'shield-navy': '#00050F',
+            'shield-dark': '#0a0f1a',
+            'shield-panel': '#0F172A',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-slideIn { animation: slideIn 0.4s ease-out; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-shimmer { 
+      background: linear-gradient(90deg, transparent, rgba(0,229,250,0.1), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+    }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(100, 116, 139, 0.2); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0F172A; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00E5FA; }
+    .status-compliant { background: rgba(16, 185, 129, 0.15); border-left: 4px solid #10B981; }
+    .status-partial { background: rgba(245, 158, 11, 0.15); border-left: 4px solid #F59E0B; }
+    .status-gap { background: rgba(239, 68, 68, 0.15); border-left: 4px solid #EF4444; }
+    .status-na { background: rgba(100, 116, 139, 0.15); border-left: 4px solid #64748B; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ========== DESIGN TOKENS ==========
+    const COLORS = {
+      bg: '#00050F',
+      surface: '#0F172A',
+      panel: '#1E293B',
+      border: '#334155',
+      muted: '#64748B',
+      text: '#F8FAFC',
+      cyan: '#00E5FA',
+      success: '#10B981',
+      warning: '#F59E0B',
+      danger: '#EF4444',
+      info: '#3B82F6',
+    };
+
+    // ========== ICONS ==========
+    const Icons = {
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      minus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>,
+      upload: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+      sparkles: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      document: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      link: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      filter: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+      list: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>,
+      user: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ========== STATUS CONFIG ==========
+    const STATUS_CONFIG = {
+      compliant: { label: 'Compliant', color: '#10B981', bgClass: 'status-compliant', icon: 'check' },
+      partial: { label: 'Partial', color: '#F59E0B', bgClass: 'status-partial', icon: 'alert' },
+      gap: { label: 'Gap', color: '#EF4444', bgClass: 'status-gap', icon: 'x' },
+      na: { label: 'N/A', color: '#64748B', bgClass: 'status-na', icon: 'minus' },
+    };
+
+    // ========== SHRED CHECKLIST ==========
+    const SHRED_CHECKLIST = [
+      { id: 'sh1', category: 'Administrative', item: 'Page/Volume limitations identified', critical: true },
+      { id: 'sh2', category: 'Administrative', item: 'Font size and margin requirements noted', critical: false },
+      { id: 'sh3', category: 'Administrative', item: 'Submission deadline/portal identified', critical: true },
+      { id: 'sh4', category: 'Administrative', item: 'Required certifications listed (SAM, DUNS, etc.)', critical: true },
+      { id: 'sh5', category: 'Technical', item: 'Key Personnel requirements extracted', critical: true },
+      { id: 'sh6', category: 'Technical', item: 'Certifications/Clearances required (FedRAMP, etc.)', critical: true },
+      { id: 'sh7', category: 'Technical', item: 'SOW/PWS tasks mapped to evaluation factors', critical: true },
+      { id: 'sh8', category: 'Technical', item: 'Deliverables list with CDRLs identified', critical: false },
+      { id: 'sh9', category: 'Technical', item: 'SLAs/Performance metrics documented', critical: true },
+      { id: 'sh10', category: 'Past Performance', item: 'Relevance criteria defined', critical: true },
+      { id: 'sh11', category: 'Past Performance', item: 'Number of references required', critical: true },
+      { id: 'sh12', category: 'Past Performance', item: 'Recency requirements (past X years)', critical: false },
+      { id: 'sh13', category: 'Price', item: 'Pricing structure identified (FFP/T&M/CPFF)', critical: true },
+      { id: 'sh14', category: 'Price', item: 'Labor category requirements extracted', critical: true },
+      { id: 'sh15', category: 'Price', item: 'ODC allowability determined', critical: false },
+      { id: 'sh16', category: 'Evaluation', item: 'Evaluation factors and weights noted', critical: true },
+      { id: 'sh17', category: 'Evaluation', item: 'Trade-off methodology documented', critical: true },
+      { id: 'sh18', category: 'Evaluation', item: 'Small business participation goals', critical: false },
+      { id: 'sh19', category: 'Compliance', item: 'FAR/DFARS clauses identified', critical: true },
+      { id: 'sh20', category: 'Compliance', item: 'Section 508 accessibility requirements', critical: false },
+      { id: 'sh21', category: 'Compliance', item: 'Cybersecurity/CMMC requirements noted', critical: true },
+      { id: 'sh22', category: 'Compliance', item: 'Insurance requirements documented', critical: false },
+    ];
+
+    // ========== DEMO REQUIREMENTS DATA ==========
+    const DEMO_REQUIREMENTS = [
+      { id: 'r1', refId: 'L.5.1.1', section: 'L', text: 'The contractor shall provide a Technical Approach demonstrating understanding of the healthcare data migration requirements.', status: 'compliant', owner: 'Sarah Chen', evidence: 'Vol II, Section 3.1', proposalRef: '3.1', evalFactor: 'Technical', critical: true },
+      { id: 'r2', refId: 'L.5.1.2', section: 'L', text: 'Offeror shall describe their approach to HIPAA compliance and data security measures.', status: 'compliant', owner: 'Mike Torres', evidence: 'Vol II, Section 3.4', proposalRef: '3.4', evalFactor: 'Technical', critical: true },
+      { id: 'r3', refId: 'L.5.1.3', section: 'L', text: 'Offeror shall provide resumes for all Key Personnel meeting minimum qualifications.', status: 'partial', owner: 'HR Team', evidence: 'Pending - 2 of 4 complete', proposalRef: '4.1', evalFactor: 'Technical', critical: true },
+      { id: 'r4', refId: 'L.5.2.1', section: 'L', text: 'Offeror shall provide three (3) past performance references within the last 5 years.', status: 'compliant', owner: 'BD Team', evidence: 'CPARS attached', proposalRef: '5.0', evalFactor: 'Past Performance', critical: true },
+      { id: 'r5', refId: 'L.5.2.2', section: 'L', text: 'Past performance references must demonstrate experience with DoD healthcare systems.', status: 'gap', owner: 'BD Team', evidence: 'Need DHA-specific reference', proposalRef: '5.0', evalFactor: 'Past Performance', critical: true },
+      { id: 'r6', refId: 'L.5.3.1', section: 'L', text: 'Pricing shall be submitted using the Government-provided pricing template.', status: 'compliant', owner: 'Finance', evidence: 'Template completed', proposalRef: '6.0', evalFactor: 'Price', critical: false },
+      { id: 'r7', refId: 'M.3.1', section: 'M', text: 'Technical Approach shall be evaluated based on understanding, methodology, and innovation.', status: 'partial', owner: 'Capture Lead', evidence: 'Innovation section needs work', proposalRef: '3.0', evalFactor: 'Technical', critical: true },
+      { id: 'r8', refId: 'M.3.2', section: 'M', text: 'Management Approach shall demonstrate qualified staff and realistic schedule.', status: 'compliant', owner: 'PM', evidence: 'IMS attached', proposalRef: '4.0', evalFactor: 'Management', critical: false },
+      { id: 'r9', refId: 'M.4.1', section: 'M', text: 'Oral presentation required for Technical volume - 60 minutes max.', status: 'na', owner: 'Orals Team', evidence: 'Post-shortlist requirement', proposalRef: 'N/A', evalFactor: 'Oral', critical: false },
+      { id: 'r10', refId: 'L.6.1', section: 'L', text: 'Contractor shall maintain FedRAMP Moderate authorization or equivalent.', status: 'compliant', owner: 'Security', evidence: 'FedRAMP cert on file', proposalRef: '3.5', evalFactor: 'Technical', critical: true },
+      { id: 'r11', refId: 'L.6.2', section: 'L', text: 'All key personnel must possess active Secret clearance.', status: 'gap', owner: 'Security', evidence: '1 pending investigation', proposalRef: '4.2', evalFactor: 'Technical', critical: true },
+      { id: 'r12', refId: 'L.7.1', section: 'L', text: 'Small Business subcontracting plan required per FAR 52.219-9.', status: 'partial', owner: 'Contracts', evidence: 'Draft plan - awaiting SB partners', proposalRef: '7.0', evalFactor: 'Administrative', critical: false },
+    ];
+
+    // ========== COMPONENTS ==========
+    const Badge = ({ children, variant = 'default', size = 'md', pulse = false }) => {
+      const variants = {
+        default: 'bg-slate-700 text-slate-300',
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        info: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+        cyan: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+      };
+      const sizes = {
+        xs: 'px-1.5 py-0.5 text-[10px]',
+        sm: 'px-2 py-0.5 text-xs',
+        md: 'px-2.5 py-1 text-xs',
+      };
+      return (
+        <span className={`inline-flex items-center gap-1 rounded-full font-medium ${variants[variant]} ${sizes[size]} ${pulse ? 'animate-pulse' : ''}`}>
+          {children}
+        </span>
+      );
+    };
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, disabled, onClick, className = '' }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white shadow-lg shadow-cyan-500/25',
+        danger: 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white',
+        success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white',
+        outline: 'border border-slate-600 text-slate-300 hover:bg-slate-800 hover:border-slate-500',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-800',
+      };
+      const sizes = {
+        sm: 'px-3 py-1.5 text-xs',
+        md: 'px-4 py-2 text-sm',
+        lg: 'px-6 py-3 text-base',
+      };
+      return (
+        <button
+          onClick={onClick}
+          disabled={disabled}
+          className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+        >
+          {icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    const Card = ({ children, className = '' }) => (
+      <div className={`rounded-xl border bg-slate-900/50 ${className}`} style={{ borderColor: COLORS.border }}>
+        {children}
+      </div>
+    );
+
+    // ========== STATUS BADGE COMPONENT ==========
+    const StatusBadge = ({ status, size = 'md' }) => {
+      const config = STATUS_CONFIG[status];
+      return (
+        <span 
+          className={`inline-flex items-center gap-1.5 rounded-full font-medium ${size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'}`}
+          style={{ 
+            backgroundColor: `${config.color}20`,
+            color: config.color,
+            border: `1px solid ${config.color}40`
+          }}
+        >
+          <Icon name={config.icon} className="w-3 h-3" />
+          {config.label}
+        </span>
+      );
+    };
+
+    // ========== COMPLIANCE STATS ==========
+    const ComplianceStats = ({ requirements }) => {
+      const stats = {
+        compliant: requirements.filter(r => r.status === 'compliant').length,
+        partial: requirements.filter(r => r.status === 'partial').length,
+        gap: requirements.filter(r => r.status === 'gap').length,
+        na: requirements.filter(r => r.status === 'na').length,
+      };
+      const total = requirements.filter(r => r.status !== 'na').length;
+      const score = total > 0 ? Math.round((stats.compliant / total) * 100) : 0;
+      
+      return (
+        <div className="grid grid-cols-5 gap-4">
+          {/* Score Gauge */}
+          <Card className="p-4 col-span-1">
+            <div className="text-center">
+              <div className="relative w-24 h-24 mx-auto mb-2">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="#1E293B" strokeWidth="8" />
+                  <circle 
+                    cx="48" cy="48" r="40" fill="none" 
+                    stroke={score >= 80 ? '#10B981' : score >= 60 ? '#F59E0B' : '#EF4444'}
+                    strokeWidth="8" 
+                    strokeLinecap="round"
+                    strokeDasharray={`${score * 2.51} 251`}
+                    className="transition-all duration-1000"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-white">{score}%</span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">Compliance Score</p>
+            </div>
+          </Card>
+          
+          {/* Status Breakdown */}
+          {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+            <Card key={key} className="p-4">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: `${config.color}20` }}
+                >
+                  <Icon name={config.icon} className="w-5 h-5" style={{ color: config.color }} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-white">{stats[key]}</p>
+                  <p className="text-xs text-slate-400">{config.label}</p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      );
+    };
+
+    // ========== REQUIREMENT ROW ==========
+    const RequirementRow = ({ req, onStatusChange, onEdit }) => {
+      const [expanded, setExpanded] = useState(false);
+      
+      return (
+        <div className={`${STATUS_CONFIG[req.status].bgClass} rounded-lg mb-2 overflow-hidden transition-all`}>
+          <div 
+            className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+            onClick={() => setExpanded(!expanded)}
+          >
+            <div className="flex items-start gap-4">
+              {/* Ref ID */}
+              <div className="w-20 flex-shrink-0">
+                <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded">
+                  {req.refId}
+                </span>
+              </div>
+              
+              {/* Requirement Text */}
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm text-slate-200 ${!expanded ? 'line-clamp-2' : ''}`}>
+                  {req.text}
+                </p>
+                {req.critical && (
+                  <Badge variant="danger" size="xs" className="mt-1">CRITICAL</Badge>
+                )}
+              </div>
+              
+              {/* Status */}
+              <div className="w-28 flex-shrink-0">
+                <StatusBadge status={req.status} size="sm" />
+              </div>
+              
+              {/* Owner */}
+              <div className="w-28 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center">
+                    <Icon name="user" className="w-3 h-3 text-slate-400" />
+                  </div>
+                  <span className="text-xs text-slate-300 truncate">{req.owner}</span>
+                </div>
+              </div>
+              
+              {/* Proposal Ref */}
+              <div className="w-16 flex-shrink-0 text-center">
+                <span className="text-xs text-slate-400">{req.proposalRef}</span>
+              </div>
+              
+              {/* Expand Arrow */}
+              <div className="w-6 flex-shrink-0">
+                <svg 
+                  className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} 
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          
+          {/* Expanded Content */}
+          {expanded && (
+            <div className="px-4 pb-4 border-t border-slate-700/50 pt-4 animate-slideIn">
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="text-xs text-slate-500 uppercase tracking-wide">Evidence/Notes</label>
+                  <p className="text-sm text-slate-300 mt-1">{req.evidence || 'No evidence documented'}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 uppercase tracking-wide">Evaluation Factor</label>
+                  <p className="text-sm text-slate-300 mt-1">{req.evalFactor}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 uppercase tracking-wide">Section</label>
+                  <p className="text-sm text-slate-300 mt-1">Section {req.section}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Change Status:</span>
+                {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                  <button
+                    key={key}
+                    onClick={(e) => { e.stopPropagation(); onStatusChange(req.id, key); }}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                      req.status === key 
+                        ? 'ring-2 ring-offset-2 ring-offset-slate-900'
+                        : 'hover:opacity-80'
+                    }`}
+                    style={{ 
+                      backgroundColor: `${config.color}20`,
+                      color: config.color,
+                      ...(req.status === key && { ringColor: config.color })
+                    }}
+                  >
+                    {config.label}
+                  </button>
+                ))}
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onEdit(req); }}
+                  className="ml-auto flex items-center gap-1 px-3 py-1 rounded-lg text-xs text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                >
+                  <Icon name="edit" className="w-3 h-3" />
+                  Edit
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ========== SHRED CHECKLIST PANEL ==========
+    const ShredChecklistPanel = ({ checkedItems, onToggle }) => {
+      const categories = [...new Set(SHRED_CHECKLIST.map(i => i.category))];
+      const progress = Math.round((checkedItems.length / SHRED_CHECKLIST.length) * 100);
+      
+      return (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                <Icon name="list" className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">RFP Shred Checklist</h3>
+                <p className="text-xs text-slate-400">{checkedItems.length} of {SHRED_CHECKLIST.length} items complete</p>
+              </div>
+            </div>
+            <div className="w-32 h-2 rounded-full bg-slate-700 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+            {categories.map(cat => (
+              <div key={cat}>
+                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">{cat}</h4>
+                <div className="space-y-1">
+                  {SHRED_CHECKLIST.filter(i => i.category === cat).map(item => (
+                    <label 
+                      key={item.id}
+                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                        checkedItems.includes(item.id) ? 'bg-emerald-500/10' : 'hover:bg-slate-800'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checkedItems.includes(item.id)}
+                        onChange={() => onToggle(item.id)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/50"
+                      />
+                      <span className={`text-sm ${checkedItems.includes(item.id) ? 'text-emerald-400 line-through' : 'text-slate-300'}`}>
+                        {item.item}
+                      </span>
+                      {item.critical && !checkedItems.includes(item.id) && (
+                        <Badge variant="danger" size="xs">Critical</Badge>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      );
+    };
+
+    // ========== RFP PARSER PANEL ==========
+    const RFPParserPanel = ({ onParse, isAnalyzing }) => {
+      const [rfpText, setRfpText] = useState('');
+      const [showPaste, setShowPaste] = useState(false);
+      
+      return (
+        <Card className="p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                <Icon name="document" className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Section L/M Parser</h3>
+                <p className="text-xs text-slate-400">Upload RFP or paste Section L/M text</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" icon="upload">
+                Upload RFP
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowPaste(!showPaste)}>
+                Paste Text
+              </Button>
+            </div>
+          </div>
+          
+          {showPaste && (
+            <div className="animate-slideIn">
+              <textarea
+                value={rfpText}
+                onChange={(e) => setRfpText(e.target.value)}
+                placeholder="Paste Section L (Instructions to Offerors) or Section M (Evaluation Criteria) text here..."
+                className="w-full h-32 p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none mb-3"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { setShowPaste(false); setRfpText(''); }}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="primary" 
+                  size="sm" 
+                  icon="sparkles"
+                  onClick={() => onParse(rfpText)}
+                  disabled={!rfpText.trim() || isAnalyzing}
+                >
+                  {isAnalyzing ? 'Analyzing...' : 'Extract Requirements'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      );
+    };
+
+    // ========== AI GAP ANALYSIS PANEL ==========
+    const AIGapAnalysisPanel = ({ requirements, onAnalyze, isAnalyzing }) => {
+      const gaps = requirements.filter(r => r.status === 'gap' || r.status === 'partial');
+      
+      return (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Icon name="sparkles" className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">AI Gap Analysis</h3>
+                <p className="text-xs text-slate-400">{gaps.length} items need attention</p>
+              </div>
+            </div>
+            <Button 
+              variant="primary" 
+              size="sm" 
+              icon="sparkles"
+              onClick={onAnalyze}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? (
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Analyzing...
+                </span>
+              ) : 'Run Analysis'}
+            </Button>
+          </div>
+          
+          {gaps.length > 0 && (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {gaps.map(gap => (
+                <div 
+                  key={gap.id} 
+                  className={`p-3 rounded-lg ${gap.status === 'gap' ? 'bg-red-500/10 border-l-2 border-red-500' : 'bg-amber-500/10 border-l-2 border-amber-500'}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-mono text-cyan-400">{gap.refId}</span>
+                        <StatusBadge status={gap.status} size="sm" />
+                        {gap.critical && <Badge variant="danger" size="xs">Critical</Badge>}
+                      </div>
+                      <p className="text-xs text-slate-300 line-clamp-2">{gap.text}</p>
+                      <p className="text-xs text-slate-500 mt-1">Evidence: {gap.evidence}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {gaps.length === 0 && (
+            <div className="text-center py-6">
+              <Icon name="check" className="w-12 h-12 text-emerald-400 mx-auto mb-2" />
+              <p className="text-sm text-emerald-400">All requirements addressed!</p>
+            </div>
+          )}
+        </Card>
+      );
+    };
+
+    // ========== MAIN COMPLIANCE MATRIX COMPONENT ==========
+    const ComplianceMatrix = () => {
+      const [requirements, setRequirements] = useState(DEMO_REQUIREMENTS);
+      const [checkedShredItems, setCheckedShredItems] = useState(['sh1', 'sh3', 'sh5', 'sh6', 'sh10', 'sh16']);
+      const [filter, setFilter] = useState('all');
+      const [searchTerm, setSearchTerm] = useState('');
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
+      const [activeTab, setActiveTab] = useState('matrix');
+      
+      const handleStatusChange = (reqId, newStatus) => {
+        setRequirements(prev => prev.map(r => 
+          r.id === reqId ? { ...r, status: newStatus } : r
+        ));
+      };
+      
+      const handleShredToggle = (itemId) => {
+        setCheckedShredItems(prev => 
+          prev.includes(itemId) 
+            ? prev.filter(id => id !== itemId)
+            : [...prev, itemId]
+        );
+      };
+      
+      const handleAIAnalysis = () => {
+        setIsAnalyzing(true);
+        setTimeout(() => setIsAnalyzing(false), 2000);
+      };
+      
+      const handleRFPParse = (text) => {
+        setIsAnalyzing(true);
+        setTimeout(() => setIsAnalyzing(false), 2000);
+      };
+      
+      const handleExportCSV = () => {
+        const headers = ['Ref ID', 'Section', 'Requirement', 'Status', 'Owner', 'Evidence', 'Proposal Ref', 'Eval Factor'];
+        const rows = requirements.map(r => [
+          r.refId, r.section, `"${r.text}"`, r.status, r.owner, r.evidence, r.proposalRef, r.evalFactor
+        ]);
+        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'compliance_matrix.csv';
+        a.click();
+      };
+      
+      const filteredRequirements = requirements.filter(r => {
+        const matchesFilter = filter === 'all' || r.status === filter;
+        const matchesSearch = searchTerm === '' || 
+          r.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          r.refId.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesFilter && matchesSearch;
+      });
+      
+      return (
+        <div className="min-h-screen" style={{ background: COLORS.bg }}>
+          {/* Header */}
+          <header className="border-b sticky top-0 z-50 glass" style={{ borderColor: COLORS.border }}>
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 flex items-center justify-center">
+                      <Icon name="shield" className="w-6 h-6 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-bold text-white">M4: Compliance Matrix</h1>
+                      <p className="text-xs text-slate-400">Section L/M Requirements Tracker</p>
+                    </div>
+                  </div>
+                  <Badge variant="cyan" size="sm">
+                    {requirements.length} Requirements
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" icon="download" onClick={handleExportCSV}>
+                    Export CSV
+                  </Button>
+                  <Button variant="primary" size="sm" icon="plus">
+                    Add Requirement
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-6 py-6">
+            {/* RFP Parser */}
+            <RFPParserPanel onParse={handleRFPParse} isAnalyzing={isAnalyzing} />
+            
+            {/* Stats */}
+            <div className="mb-6">
+              <ComplianceStats requirements={requirements} />
+            </div>
+            
+            {/* Tabs */}
+            <div className="flex gap-2 mb-6">
+              {[
+                { id: 'matrix', label: 'Compliance Matrix', icon: 'list' },
+                { id: 'shred', label: 'Shred Checklist', icon: 'document' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+                      : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+                  }`}
+                >
+                  <Icon name={tab.icon} className="w-4 h-4" />
+                  <span className="text-sm font-medium">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+            
+            <div className="grid grid-cols-12 gap-6">
+              {/* Main Content */}
+              <div className="col-span-8">
+                {activeTab === 'matrix' && (
+                  <>
+                    {/* Filters */}
+                    <Card className="p-4 mb-4">
+                      <div className="flex items-center gap-4">
+                        {/* Search */}
+                        <div className="flex-1 relative">
+                          <Icon name="search" className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Search requirements..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                          />
+                        </div>
+                        
+                        {/* Status Filter */}
+                        <div className="flex items-center gap-2">
+                          <Icon name="filter" className="w-4 h-4 text-slate-400" />
+                          {['all', ...Object.keys(STATUS_CONFIG)].map(status => (
+                            <button
+                              key={status}
+                              onClick={() => setFilter(status)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                filter === status
+                                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50'
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white'
+                              }`}
+                            >
+                              {status === 'all' ? 'All' : STATUS_CONFIG[status].label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </Card>
+                    
+                    {/* Requirements Table Header */}
+                    <div className="flex items-center gap-4 px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <div className="w-20">Ref ID</div>
+                      <div className="flex-1">Requirement</div>
+                      <div className="w-28">Status</div>
+                      <div className="w-28">Owner</div>
+                      <div className="w-16 text-center">Proposal</div>
+                      <div className="w-6"></div>
+                    </div>
+                    
+                    {/* Requirements List */}
+                    <div className="space-y-2">
+                      {filteredRequirements.map(req => (
+                        <RequirementRow
+                          key={req.id}
+                          req={req}
+                          onStatusChange={handleStatusChange}
+                          onEdit={(r) => console.log('Edit:', r)}
+                        />
+                      ))}
+                    </div>
+                    
+                    {filteredRequirements.length === 0 && (
+                      <Card className="p-8 text-center">
+                        <Icon name="search" className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <p className="text-slate-400">No requirements match your filters</p>
+                      </Card>
+                    )}
+                  </>
+                )}
+                
+                {activeTab === 'shred' && (
+                  <ShredChecklistPanel 
+                    checkedItems={checkedShredItems} 
+                    onToggle={handleShredToggle} 
+                  />
+                )}
+              </div>
+              
+              {/* Right Sidebar */}
+              <div className="col-span-4 space-y-6">
+                {/* AI Gap Analysis */}
+                <AIGapAnalysisPanel 
+                  requirements={requirements}
+                  onAnalyze={handleAIAnalysis}
+                  isAnalyzing={isAnalyzing}
+                />
+                
+                {/* Quick Stats by Eval Factor */}
+                <Card className="p-4">
+                  <h3 className="text-sm font-semibold text-white mb-4">By Evaluation Factor</h3>
+                  <div className="space-y-3">
+                    {['Technical', 'Past Performance', 'Management', 'Price', 'Administrative'].map(factor => {
+                      const factorReqs = requirements.filter(r => r.evalFactor === factor);
+                      const compliant = factorReqs.filter(r => r.status === 'compliant').length;
+                      const total = factorReqs.length;
+                      const pct = total > 0 ? Math.round((compliant / total) * 100) : 0;
+                      
+                      if (total === 0) return null;
+                      
+                      return (
+                        <div key={factor}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-slate-300">{factor}</span>
+                            <span className="text-xs text-slate-400">{compliant}/{total}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
+                            <div 
+                              className="h-full transition-all duration-500"
+                              style={{ 
+                                width: `${pct}%`,
+                                backgroundColor: pct >= 80 ? '#10B981' : pct >= 60 ? '#F59E0B' : '#EF4444'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+                
+                {/* Traceability Links */}
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Icon name="link" className="w-4 h-4 text-cyan-400" />
+                    <h3 className="text-sm font-semibold text-white">Proposal Traceability</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {['Vol I - Cover', 'Vol II - Technical', 'Vol III - Past Performance', 'Vol IV - Price'].map((vol, i) => (
+                      <div 
+                        key={vol}
+                        className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        <span className="text-xs text-slate-300">{vol}</span>
+                        <Badge variant="info" size="xs">
+                          {[3, 5, 2, 2][i]} refs
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </main>
+          
+          {/* AI Generated Footer */}
+          <footer className="fixed bottom-0 left-0 right-0 py-2 text-center text-xs text-slate-500 bg-shield-navy/90 backdrop-blur border-t border-slate-800">
+            AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse v2.0 | © 2025 Mission Meets Tech
+          </footer>
+        </div>
+      );
+    };
+
+    // Render
+    ReactDOM.createRoot(document.getElementById('root')).render(<ComplianceMatrix />);
+  </script>
+</body>
+</html>
