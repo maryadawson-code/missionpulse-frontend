@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse M6 - Writer Studio</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- API Client for AI Agents -->
+  <script src="render-api-client.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* Animations */
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes typewriter { from { width: 0; } to { width: 100%; } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(0,229,250,0.2); } 50% { box-shadow: 0 0 40px rgba(0,229,250,0.4); } }
+    
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+    .animate-glow { animation: glow 2s ease-in-out infinite; }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0F172A; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    /* Editor styles */
+    .editor-content {
+      min-height: 400px;
+      line-height: 1.8;
+    }
+    .compliance-tag {
+      background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(139,92,246,0.1));
+      border: 1px solid rgba(139,92,246,0.4);
+      border-radius: 4px;
+      padding: 0 4px;
+      font-size: 0.75rem;
+      color: #A78BFA;
+    }
+    .win-theme-highlight {
+      background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.1));
+      border-bottom: 2px solid #10B981;
+    }
+    
+    /* Glass effect */
+    .glass-card {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // =====================================================
+    // DESIGN TOKENS
+    // =====================================================
+    const COLORS = {
+      primary: '#00E5FA',
+      success: '#10B981',
+      warning: '#F59E0B',
+      danger: '#EF4444',
+      purple: '#8B5CF6',
+      pink: '#EC4899',
+      navy: '#00050F',
+    };
+
+    // =====================================================
+    // ICONS
+    // =====================================================
+    const Icons = {
+      document: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      sparkles: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      pencil: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+      tag: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>,
+      trophy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      chat: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+      loader: () => <svg className="w-full h-full animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      history: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      diff: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // =====================================================
+    // SECTION TEMPLATES DATA
+    // =====================================================
+    const SECTIONS = [
+      { id: 'exec', name: 'Executive Summary', icon: '📋', color: '#00E5FA', wordLimit: 2000, required: true },
+      { id: 'tech', name: 'Technical Approach', icon: '⚙️', color: '#8B5CF6', wordLimit: 8000, required: true },
+      { id: 'mgmt', name: 'Management Approach', icon: '👥', color: '#10B981', wordLimit: 5000, required: true },
+      { id: 'past', name: 'Past Performance', icon: '🏆', color: '#F59E0B', wordLimit: 4000, required: true },
+      { id: 'staff', name: 'Staffing Plan', icon: '📊', color: '#EC4899', wordLimit: 3000, required: false },
+    ];
+
+    const WIN_THEMES = [
+      { id: 'wt1', theme: 'SDVOSB Prime Leadership', color: '#10B981' },
+      { id: 'wt2', theme: 'Zero Downtime Migration', color: '#00E5FA' },
+      { id: 'wt3', theme: 'FedRAMP High Authorization', color: '#8B5CF6' },
+      { id: 'wt4', theme: 'Local Workforce Commitment', color: '#F59E0B' },
+    ];
+
+    const COMPLIANCE_REFS = [
+      { ref: 'L.4.1.1', desc: 'Technical Understanding' },
+      { ref: 'L.4.1.2', desc: 'Solution Architecture' },
+      { ref: 'L.4.2.1', desc: 'Management Structure' },
+      { ref: 'M.3.1', desc: 'Evaluation Criteria - Technical' },
+      { ref: 'M.3.2', desc: 'Evaluation Criteria - Management' },
+    ];
+
+    const VERSION_HISTORY = [
+      { version: 'v3', date: '2026-01-27 14:30', author: 'Mary W.', changes: 'Added win theme emphasis', current: true },
+      { version: 'v2', date: '2026-01-26 16:45', author: 'Alex J.', changes: 'Technical details expanded', current: false },
+      { version: 'v1', date: '2026-01-25 10:00', author: 'Mary W.', changes: 'Initial draft', current: false },
+    ];
+
+    // Sample content for sections
+    const SAMPLE_CONTENT = {
+      exec: `Our team brings unmatched expertise to the DHA Healthcare Data Platform modernization effort. As an SDVOSB prime contractor with deep roots in military health IT, we understand the critical nature of this mission.
+
+**Our Commitment:**
+We propose a comprehensive solution that leverages our proven track record in healthcare IT modernization, delivering [L.4.1.1] a technically sound approach that ensures zero downtime during the transition period.
+
+**Key Discriminators:**
+• SDVOSB-led team with 85% veteran workforce
+• FedRAMP High authorized cloud infrastructure
+• 99.999% uptime guarantee during migration
+• Local hiring commitment within 50 miles of DHA facilities`,
+
+      tech: `**Technical Understanding [L.4.1.1]**
+
+Our solution architecture addresses the core requirements outlined in the PWS through a phased modernization approach that minimizes risk while maximizing operational continuity.
+
+**Phase 1: Assessment & Planning (Months 1-3)**
+We will conduct comprehensive system analysis using our proprietary MissionPulse analytics platform to map existing data flows and identify optimization opportunities.
+
+**Phase 2: Infrastructure Modernization (Months 4-9)**
+Leveraging our FedRAMP High authorized cloud environment, we will migrate legacy systems using our proven zero-downtime methodology [L.4.1.2].
+
+**Compliance Framework:**
+All solutions comply with NIST 800-171 and DFARS 252.204-7012 requirements.`,
+    };
+
+    // =====================================================
+    // COMPONENTS
+    // =====================================================
+
+    // Badge Component
+    const Badge = ({ children, variant = 'default', size = 'sm', icon }) => {
+      const variants = {
+        default: 'bg-slate-700 text-slate-300',
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        purple: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-[10px]', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return (
+        <span className={`inline-flex items-center gap-1.5 font-medium rounded-full ${variants[variant]} ${sizes[size]}`}>
+          {icon && <Icon name={icon} className="w-3 h-3" />}
+          {children}
+        </span>
+      );
+    };
+
+    // Button Component
+    const Button = ({ children, variant = 'primary', size = 'md', icon, disabled, loading, className = '', ...props }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400 shadow-lg shadow-cyan-500/25',
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600',
+        success: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-400 hover:to-teal-400',
+        ghost: 'bg-transparent text-slate-400 hover:text-white hover:bg-slate-700/50',
+        danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-400 hover:to-rose-400',
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button
+          className={`inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 ${variants[variant]} ${sizes[size]} ${disabled || loading ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+          disabled={disabled || loading}
+          {...props}
+        >
+          {loading ? <Icon name="loader" className="w-4 h-4" /> : icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    // Card Component
+    const Card = ({ children, className = '', glow = false }) => (
+      <div className={`glass-card rounded-xl ${glow ? 'shadow-lg shadow-cyan-500/10 border-cyan-500/30' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    // Section Sidebar
+    const SectionSidebar = ({ sections, activeSection, onSelect }) => (
+      <div className="w-64 flex-shrink-0 border-r border-slate-700/50 p-4 space-y-2">
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Proposal Sections</h3>
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            onClick={() => onSelect(section.id)}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+              activeSection === section.id
+                ? 'bg-gradient-to-r from-cyan-500/20 to-teal-500/10 border border-cyan-500/30'
+                : 'hover:bg-slate-800/50 border border-transparent'
+            }`}
+          >
+            <span className="text-xl">{section.icon}</span>
+            <div className="flex-1 text-left">
+              <p className={`text-sm font-medium ${activeSection === section.id ? 'text-cyan-400' : 'text-white'}`}>
+                {section.name}
+              </p>
+              <p className="text-xs text-slate-500">{section.wordLimit.toLocaleString()} words max</p>
+            </div>
+            {section.required && (
+              <span className="w-2 h-2 rounded-full bg-red-500" title="Required" />
+            )}
+          </button>
+        ))}
+      </div>
+    );
+
+    // Word Counter Component
+    const WordCounter = ({ current, limit }) => {
+      const percentage = (current / limit) * 100;
+      const isOver = current > limit;
+      const isNear = percentage >= 90 && !isOver;
+      
+      return (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                isOver ? 'bg-red-500' : isNear ? 'bg-amber-500' : 'bg-cyan-500'
+              }`}
+              style={{ width: `${Math.min(percentage, 100)}%` }}
+            />
+          </div>
+          <span className={`text-sm font-mono ${isOver ? 'text-red-400' : isNear ? 'text-amber-400' : 'text-slate-400'}`}>
+            {current.toLocaleString()} / {limit.toLocaleString()}
+          </span>
+        </div>
+      );
+    };
+
+    // Compliance Tag Checker
+    const ComplianceChecker = ({ refs, content }) => {
+      const foundRefs = refs.filter(r => content.includes(r.ref));
+      const missingRefs = refs.filter(r => !content.includes(r.ref));
+      
+      return (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="shield" className="w-5 h-5 text-purple-400" />
+            <h4 className="font-semibold text-white">Compliance References</h4>
+          </div>
+          <div className="space-y-2">
+            {foundRefs.map(ref => (
+              <div key={ref.ref} className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <Icon name="check" className="w-4 h-4 text-emerald-400" />
+                <span className="compliance-tag">{ref.ref}</span>
+                <span className="text-xs text-slate-400">{ref.desc}</span>
+              </div>
+            ))}
+            {missingRefs.map(ref => (
+              <div key={ref.ref} className="flex items-center gap-2 p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 opacity-50">
+                <Icon name="x" className="w-4 h-4 text-slate-500" />
+                <span className="text-xs text-slate-500 font-mono">{ref.ref}</span>
+                <span className="text-xs text-slate-600">{ref.desc}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-700/50">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400">Coverage</span>
+              <span className={foundRefs.length === refs.length ? 'text-emerald-400' : 'text-amber-400'}>
+                {foundRefs.length}/{refs.length} referenced
+              </span>
+            </div>
+          </div>
+        </Card>
+      );
+    };
+
+    // Win Theme Injector
+    const WinThemeInjector = ({ themes, onInject }) => {
+      return (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="trophy" className="w-5 h-5 text-amber-400" />
+            <h4 className="font-semibold text-white">Win Themes</h4>
+          </div>
+          <p className="text-xs text-slate-400 mb-3">Click to inject theme language into your draft</p>
+          <div className="space-y-2">
+            {themes.map(t => (
+              <button
+                key={t.id}
+                onClick={() => onInject(t)}
+                className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-700/50 border border-slate-700/50 transition-all group"
+              >
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
+                <span className="text-sm text-white flex-1 text-left">{t.theme}</span>
+                <Icon name="plus" className="w-4 h-4 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ))}
+          </div>
+        </Card>
+      );
+    };
+
+    // Version History Panel
+    const VersionHistoryPanel = ({ versions, onRestore, onCompare }) => {
+      return (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="history" className="w-5 h-5 text-cyan-400" />
+            <h4 className="font-semibold text-white">Version History</h4>
+          </div>
+          <div className="space-y-2">
+            {versions.map((v, idx) => (
+              <div
+                key={v.version}
+                className={`p-3 rounded-lg border ${v.current ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-slate-800/50 border-slate-700/50'}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-bold ${v.current ? 'text-cyan-400' : 'text-white'}`}>{v.version}</span>
+                    {v.current && <Badge variant="primary" size="xs">Current</Badge>}
+                  </div>
+                  <span className="text-xs text-slate-500">{v.date}</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-2">{v.changes}</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">by {v.author}</span>
+                  {!v.current && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => onCompare(v)}
+                        className="px-2 py-1 text-xs text-cyan-400 hover:bg-cyan-500/10 rounded transition-colors"
+                      >
+                        Compare
+                      </button>
+                      <button
+                        onClick={() => onRestore(v)}
+                        className="px-2 py-1 text-xs text-amber-400 hover:bg-amber-500/10 rounded transition-colors"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      );
+    };
+
+    // Requirements Panel
+    const RequirementsPanel = ({ sectionId }) => {
+      const requirements = {
+        exec: [
+          { id: 'r1', text: 'Summarize technical approach in 2 pages', met: true },
+          { id: 'r2', text: 'Include all key personnel', met: true },
+          { id: 'r3', text: 'Reference all discriminators', met: false },
+        ],
+        tech: [
+          { id: 'r1', text: 'Address all PWS tasks', met: true },
+          { id: 'r2', text: 'Include WBS', met: false },
+          { id: 'r3', text: 'Demonstrate understanding', met: true },
+        ],
+      };
+      
+      const reqs = requirements[sectionId] || [];
+      
+      return (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="document" className="w-5 h-5 text-pink-400" />
+            <h4 className="font-semibold text-white">Section L Requirements</h4>
+          </div>
+          <div className="space-y-2">
+            {reqs.map(r => (
+              <div key={r.id} className="flex items-start gap-2 p-2 rounded-lg bg-slate-800/50">
+                <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${r.met ? 'bg-emerald-500' : 'bg-slate-600'}`}>
+                  {r.met && <Icon name="check" className="w-3 h-3 text-white" />}
+                </div>
+                <span className={`text-xs ${r.met ? 'text-slate-300' : 'text-slate-500'}`}>{r.text}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      );
+    };
+
+    // Main Editor Component
+    const Editor = ({ content, onChange, section, onAIDraft, onStrengthen, isGenerating }) => {
+      const [wordCount, setWordCount] = useState(0);
+      const textareaRef = useRef(null);
+
+      useEffect(() => {
+        const words = content.trim().split(/\s+/).filter(w => w.length > 0).length;
+        setWordCount(words);
+      }, [content]);
+
+      return (
+        <div className="flex-1 flex flex-col p-4">
+          {/* Editor Toolbar */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{section.icon}</span>
+              <h2 className="text-lg font-bold text-white">{section.name}</h2>
+              {section.required && <Badge variant="danger" size="xs">Required</Badge>}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                icon="sparkles"
+                onClick={onAIDraft}
+                loading={isGenerating}
+              >
+                AI Draft
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="zap"
+                onClick={onStrengthen}
+                disabled={!content}
+              >
+                Strengthen
+              </Button>
+              <Button variant="secondary" size="sm" icon="download">
+                Export .docx
+              </Button>
+            </div>
+          </div>
+
+          {/* Word Counter */}
+          <div className="mb-4">
+            <WordCounter current={wordCount} limit={section.wordLimit} />
+          </div>
+
+          {/* Editor Area */}
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={`Start writing your ${section.name.toLowerCase()} here...\n\nTip: Use [L.x.x.x] notation to reference Section L requirements.`}
+              className="w-full h-full min-h-[500px] p-4 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 placeholder-slate-600 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 outline-none resize-none editor-content"
+              style={{ lineHeight: '1.8' }}
+            />
+            {isGenerating && (
+              <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center rounded-xl">
+                <div className="text-center">
+                  <Icon name="loader" className="w-8 h-8 text-cyan-400 mx-auto mb-3" />
+                  <p className="text-cyan-400 font-medium">AI is drafting content...</p>
+                  <p className="text-xs text-slate-400 mt-1">Analyzing requirements and generating response</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Comments Section */}
+          <div className="mt-4 p-4 rounded-xl bg-slate-800/30 border border-slate-700/30">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="chat" className="w-4 h-4 text-slate-400" />
+              <span className="text-sm font-medium text-slate-400">Comments</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Add a comment or reviewer note..."
+                className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-600 focus:border-cyan-500/50 outline-none"
+              />
+              <Button variant="ghost" size="sm">Add</Button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // =====================================================
+    // MAIN APP
+    // =====================================================
+    const WriterStudio = () => {
+      const [activeSection, setActiveSection] = useState('exec');
+      const [contents, setContents] = useState({
+        exec: SAMPLE_CONTENT.exec,
+        tech: SAMPLE_CONTENT.tech,
+        mgmt: '',
+        past: '',
+        staff: '',
+      });
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [showDiffModal, setShowDiffModal] = useState(false);
+
+      const currentSection = SECTIONS.find(s => s.id === activeSection);
+
+      const handleAIDraft = () => {
+        setIsGenerating(true);
+        setTimeout(() => {
+          const newContent = contents[activeSection] + `\n\n**AI Generated Addition:**\nBased on our analysis of Section L requirements, we recommend emphasizing our proven track record in similar healthcare IT modernization efforts. Our team's experience with MHS GENESIS integration positions us uniquely to deliver this critical capability.`;
+          setContents(prev => ({ ...prev, [activeSection]: newContent }));
+          setIsGenerating(false);
+        }, 3000);
+      };
+
+      const handleStrengthen = () => {
+        setIsGenerating(true);
+        setTimeout(() => {
+          const strengthened = contents[activeSection].replace(
+            'Our team brings',
+            '**DISCRIMINATOR:** Our veteran-led team brings unparalleled'
+          );
+          setContents(prev => ({ ...prev, [activeSection]: strengthened }));
+          setIsGenerating(false);
+        }, 2000);
+      };
+
+      const handleInjectWinTheme = (theme) => {
+        const injection = `\n\n**Win Theme - ${theme.theme}:** [Expand on how this discriminator directly addresses the government's stated needs and creates measurable value.]\n`;
+        setContents(prev => ({ ...prev, [activeSection]: prev[activeSection] + injection }));
+      };
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-[#00050F] via-[#0A1628] to-[#00050F]">
+          {/* Header */}
+          <header className="border-b border-slate-800/50 bg-slate-900/30 backdrop-blur-xl sticky top-0 z-40">
+            <div className="max-w-full px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-lg shadow-pink-500/25">
+                    <Icon name="pencil" className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">Writer Studio</h1>
+                    <p className="text-sm text-slate-400">M6 • AI-Assisted Proposal Drafting</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="primary" size="md">DHA Healthcare Platform RFP</Badge>
+                  <Badge variant="warning" size="md" icon="clock">Due in 37 days</Badge>
+                  <Button variant="primary" size="sm" icon="download">Export All Sections</Button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <div className="flex h-[calc(100vh-80px)]">
+            {/* Section Sidebar */}
+            <SectionSidebar
+              sections={SECTIONS}
+              activeSection={activeSection}
+              onSelect={setActiveSection}
+            />
+
+            {/* Editor */}
+            <Editor
+              content={contents[activeSection]}
+              onChange={(val) => setContents(prev => ({ ...prev, [activeSection]: val }))}
+              section={currentSection}
+              onAIDraft={handleAIDraft}
+              onStrengthen={handleStrengthen}
+              isGenerating={isGenerating}
+            />
+
+            {/* Right Sidebar - Tools */}
+            <div className="w-80 flex-shrink-0 border-l border-slate-700/50 p-4 space-y-4 overflow-y-auto">
+              <RequirementsPanel sectionId={activeSection} />
+              <ComplianceChecker refs={COMPLIANCE_REFS} content={contents[activeSection]} />
+              <WinThemeInjector themes={WIN_THEMES} onInject={handleInjectWinTheme} />
+              <VersionHistoryPanel
+                versions={VERSION_HISTORY}
+                onRestore={(v) => console.log('Restore', v)}
+                onCompare={(v) => setShowDiffModal(true)}
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-800/50 px-6 py-2 backdrop-blur-xl">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500">MissionPulse v12.0 • Writer Studio • Auto-saved 2 min ago</span>
+              <Badge variant="warning" size="xs">AI GENERATED - REQUIRES HUMAN REVIEW</Badge>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<WriterStudio />, document.getElementById('root'));
+  </script>
+  <!-- AI Chat Widget - Writer Agent -->
+  <script src="ai-chat-widget.js" data-agent="writer"></script>
+</body>
+</html>
