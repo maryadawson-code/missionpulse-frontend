@@ -22,7 +22,6 @@
     .glass{background:rgba(30,41,59,0.5);backdrop-filter:blur(8px);border:1px solid rgba(71,85,105,0.3);border-radius:12px}
     .hover-lift{transition:transform 0.2s,box-shadow 0.2s}
     .hover-lift:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,229,250,0.1)}
-    .drag-over{background:rgba(0,229,250,0.1)!important;border-color:rgba(0,229,250,0.5)!important}
     ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
   </style>
 </head>
@@ -30,12 +29,44 @@
 <div id="root"></div>
 <script src="supabase-client.js"></script>
 <script type="text/babel">
-const{useState,useEffect,useRef,useCallback}=React;
+const{useState,useEffect,useCallback}=React;
 
 // ============================================================
 // CONFIGURATION
 // ============================================================
 const RENDER_API_URL='https://missionpulse-api.onrender.com';
+const SUPABASE_URL='https://djuviwarqdvlbgcfuupa.supabase.co';
+
+// ============================================================
+// AUTH HELPERS
+// ============================================================
+function checkAuth(){
+  const session=localStorage.getItem('MP_SESSION');
+  const user=localStorage.getItem('MP_USER');
+  if(!session||!user){
+    window.location.href='login.html';
+    return null;
+  }
+  try{
+    const parsed=JSON.parse(user);
+    // Check session expiry
+    const sess=JSON.parse(session);
+    if(sess.expires&&new Date(sess.expires)<new Date()){
+      localStorage.clear();
+      window.location.href='login.html';
+      return null;
+    }
+    return parsed;
+  }catch{
+    return{email:'demo@mmt.com',name:'Demo User',role:'CEO'};
+  }
+}
+
+function handleLogout(){
+  localStorage.removeItem('MP_SESSION');
+  localStorage.removeItem('MP_USER');
+  window.location.href='login.html';
+}
 
 // ============================================================
 // ROLES & MODULES
@@ -49,8 +80,6 @@ const ROLES=[
   {id:'FIN',name:'Pricing',fullName:'Jennifer Park',icon:'💰',access:['dashboard','pricing','contracts','launch','playbook']},
   {id:'CON',name:'Contracts',fullName:'Robert Williams',icon:'⚖️',access:['dashboard','compliance','contracts','hitl','playbook']},
   {id:'DEL',name:'Delivery',fullName:'Amanda Foster',icon:'👥',access:['dashboard','writer','post_award','orals','playbook']},
-  {id:'QA',name:'QA Lead',fullName:'James Thompson',icon:'✅',access:['dashboard','hitl','compliance','writer','playbook']},
-  {id:'Partner',name:'Partner',fullName:'External',icon:'🤝',access:['frenemy','writer'],external:true},
   {id:'Admin',name:'Admin',fullName:'System Admin',icon:'⚙️',access:['dashboard','pipeline','warroom','swimlane','compliance','contracts','writer','blackhat','pricing','hitl','orals','frenemy','launch','post_award','playbook','admin','training','audit']}
 ];
 
@@ -75,85 +104,167 @@ const MODULES=[
   {id:'audit',name:'Audit Log',icon:'📜',cat:'Admin',badge:'ADMIN'}
 ];
 
-const SHIPLEY_PHASES=['Qualify','Capture','Blue Team','Pink Team','Red Team','Gold Team','White Glove','Submit'];
+// ============================================================
+// AI SERVICE (with fallback)
+// ============================================================
+const AIService={
+  status:'checking',
+  async checkConnection(){
+    try{
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),5000);
+      const res=await fetch(`${RENDER_API_URL}/`,{signal:controller.signal});
+      clearTimeout(timeout);
+      this.status=res.ok?'connected':'offline';
+    }catch{this.status='offline'}
+    return this.status;
+  },
+  
+  async chat(agent,message,context={}){
+    // Try real API first
+    if(this.status==='connected'){
+      try{
+        const res=await fetch(`${RENDER_API_URL}/api/chat`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({agent,message,context})
+        });
+        if(res.ok){
+          const data=await res.json();
+          return{success:true,response:data.response||data.content||data,source:'api'};
+        }
+      }catch(e){console.warn('API error, using fallback')}
+    }
+    // Fallback to smart mock
+    return{success:true,response:this.getMockResponse(agent,message,context),source:'mock'};
+  },
+  
+  getMockResponse(agent,message,context){
+    const responses={
+      blackhat:`## Competitive Analysis: ${context.competitor?.name||'Competitor'}
+
+**Threat Assessment:** ${context.competitor?.threat?.toUpperCase()||'MEDIUM'}
+
+### Recommended Ghosting Strategy:
+${context.competitor?.ghostStrategy||'Focus on differentiation through technical innovation and proven past performance.'}
+
+### Key Attack Vectors:
+1. **Price Positioning** - Position 5-10% below their likely bid while maintaining margin
+2. **Technical Superiority** - Emphasize modern cloud-native architecture vs legacy approaches
+3. **Key Personnel** - Highlight stability and direct agency experience
+4. **Past Performance** - Reference similar successful contracts with quantified outcomes
+
+### Neutralization Tactics:
+- Address their strengths indirectly through your discriminators
+- Use "The Government has experienced..." language to ghost weaknesses
+- Quantify your advantages wherever possible
+
+⚠️ AI GENERATED - REQUIRES HUMAN REVIEW`,
+
+      writer:`## Generated Content: ${context.sectionType||'Section'}
+
+Based on your requirements, here is the draft content:
+
+${message}
+
+**Key Themes Incorporated:**
+- Mission alignment with agency objectives
+- Proven past performance with quantified results
+- Technical innovation and risk mitigation
+- Experienced key personnel with relevant clearances
+
+**Compliance Notes:**
+- Ensure all claims are substantiated with evidence
+- Verify page count meets RFP requirements
+- Cross-reference with compliance matrix
+
+⚠️ AI GENERATED - REQUIRES HUMAN REVIEW`,
+
+      compliance:`## Compliance Analysis
+
+**Requirements Analyzed:** ${context.requirements?.length||'Multiple'} items
+
+**Summary:**
+- ✅ Compliant: 85%
+- ⚠️ Partial: 10%
+- ❌ At Risk: 5%
+
+**Recommendations:**
+1. Address Section L requirements with specific technical details
+2. Ensure Section M pricing aligns with government estimates
+3. Verify all certifications and clearances are current
+
+⚠️ AI GENERATED - REQUIRES HUMAN REVIEW`,
+
+      assistant:`I can help with that! Based on Shipley methodology, here are some recommendations:
+
+1. **Focus on compliance first** - Ensure you're meeting all mandatory requirements
+2. **Develop strong win themes** - What makes your solution unique?
+3. **Ghost the competition** - Address competitor weaknesses indirectly
+4. **Quantify everything** - Use metrics and data to support claims
+
+What specific area would you like to dive deeper into?
+
+⚠️ AI GENERATED - REQUIRES HUMAN REVIEW`
+    };
+    return responses[agent]||responses.assistant;
+  }
+};
 
 // ============================================================
-// DEMO DATA FALLBACKS
+// DEMO DATA
 // ============================================================
 const DEMO_OPPS=[
-  {id:1,nickname:'DHA EHR Mod',title:'DHA MHS GENESIS Cloud Migration',agency:'DHA',ceiling:98450210,phase:'Pink Team',pWin:72,days:37,priority:'P-0',naics:'541512',setAside:'8(a)'},
-  {id:2,nickname:'VA Claims AI',title:'VA Enterprise Cloud Hosting',agency:'VA',ceiling:67500000,phase:'Blue Team',pWin:58,days:82,priority:'P-1',naics:'541519',setAside:'SDVOSB'},
-  {id:3,nickname:'CMS Analytics',title:'CMS Data Analytics Modernization',agency:'CMS',ceiling:125000000,phase:'Red Team',pWin:68,days:21,priority:'P-0',naics:'541512',setAside:'Full & Open'},
-  {id:4,nickname:'IHS Telehealth',title:'IHS Telehealth Expansion',agency:'IHS',ceiling:32000000,phase:'Capture',pWin:55,days:156,priority:'P-1',naics:'541511',setAside:'ISBEE'},
-  {id:5,nickname:'SSA Fraud ML',title:'SSA Fraud Detection ML Platform',agency:'SSA',ceiling:89000000,phase:'Gold Team',pWin:81,days:14,priority:'P-0',naics:'541512',setAside:'8(a)'},
-  {id:6,nickname:'CDC Surveillance',title:'CDC Disease Surveillance System',agency:'CDC',ceiling:78000000,phase:'Qualify',pWin:42,days:120,priority:'P-2',naics:'541519',setAside:'Full & Open'}
+  {id:1,nickname:'DHA EHR Mod',title:'DHA MHS GENESIS Cloud Migration',agency:'DHA',ceiling:98450210,phase:'Pink Team',pWin:72,days:37,priority:'P-0'},
+  {id:2,nickname:'VA Claims AI',title:'VA Enterprise Cloud Hosting',agency:'VA',ceiling:67500000,phase:'Blue Team',pWin:58,days:82,priority:'P-1'},
+  {id:3,nickname:'CMS Analytics',title:'CMS Data Analytics Modernization',agency:'CMS',ceiling:125000000,phase:'Red Team',pWin:68,days:21,priority:'P-0'},
+  {id:4,nickname:'IHS Telehealth',title:'IHS Telehealth Expansion',agency:'IHS',ceiling:32000000,phase:'Capture',pWin:55,days:156,priority:'P-1'},
+  {id:5,nickname:'SSA Fraud ML',title:'SSA Fraud Detection ML Platform',agency:'SSA',ceiling:89000000,phase:'Gold Team',pWin:81,days:14,priority:'P-0'},
+  {id:6,nickname:'CDC Surveillance',title:'CDC Disease Surveillance System',agency:'CDC',ceiling:78000000,phase:'Qualify',pWin:42,days:120,priority:'P-2'}
 ];
 
 const DEMO_COMPETITORS=[
-  {id:1,name:'Booz Allen Hamilton',threat:'high',strengths:['Incumbent','Deep bench'],weaknesses:['Expensive','Slow'],ghostStrategy:'Emphasize agility and cost efficiency'},
-  {id:2,name:'Deloitte Federal',threat:'medium',strengths:['Brand recognition','Healthcare expertise'],weaknesses:['Bureaucratic','High turnover'],ghostStrategy:'Highlight continuity and dedicated teams'},
-  {id:3,name:'GDIT',threat:'high',strengths:['Technical depth','Clearances'],weaknesses:['Integration issues','Communication'],ghostStrategy:'Focus on seamless delivery and transparency'}
+  {id:1,name:'Booz Allen Hamilton',threat:'high',strengths:['Incumbent','Deep bench 500+ staff','DHA relationships'],weaknesses:['Premium pricing 15-20% above','Slow tech adoption','High turnover'],ghostStrategy:'Emphasize agility and modern tech stack. Ghost their big company overhead in pricing discussions.'},
+  {id:2,name:'Deloitte Federal',threat:'high',strengths:['Brand recognition','Healthcare expertise','Global delivery'],weaknesses:['Cost overruns','Heavy subcontracting','VA performance issues'],ghostStrategy:'Reference their VA EHRM delays. Emphasize direct delivery model vs heavy subcontracting.'},
+  {id:3,name:'GDIT',threat:'high',strengths:['Technical depth','Strong clearances','CMMC L3'],weaknesses:['Merger integration issues','Communication problems','Recent layoffs'],ghostStrategy:'Focus on healthcare-first expertise. Ghost their merger integration challenges.'}
 ];
 
 const DEMO_PARTNERS=[
-  {id:1,name:'CloudFirst Solutions',status:'Active',capabilities:['AWS','Azure','GCP'],trustScore:92,assigned:['DHA EHR Mod','VA Claims AI'],socio:'SDVOSB'},
-  {id:2,name:'DataSecure Inc',status:'Active',capabilities:['Cybersecurity','FedRAMP','CMMC'],trustScore:88,assigned:['CMS Analytics'],socio:'8(a)'},
-  {id:3,name:'HealthTech Partners',status:'Pending',capabilities:['EHR','Telehealth','HL7'],trustScore:75,assigned:[],socio:'WOSB'}
+  {id:1,name:'CloudFirst Solutions',status:'Active',capabilities:['AWS','Azure','GCP','FedRAMP'],trustScore:92,socio:'SDVOSB',assigned:['DHA MHS GENESIS','VA Claims']},
+  {id:2,name:'DataSecure Inc',status:'Active',capabilities:['Cybersecurity','FedRAMP','CMMC','Zero Trust'],trustScore:88,socio:'8(a)',assigned:['CMS Analytics']},
+  {id:3,name:'HealthTech Partners',status:'Pending',capabilities:['EHR','HL7 FHIR','Telehealth'],trustScore:75,socio:'WOSB',assigned:[]}
 ];
 
-const DEMO_REQS=[
-  {id:1,ref:'L.1.1',title:'Technical Approach',section:'L',status:'compliant',owner:'Sarah Chen',confidence:92},
-  {id:2,ref:'L.1.2',title:'Management Approach',section:'L',status:'partial',owner:'Lisa Martinez',confidence:78},
-  {id:3,ref:'L.2.1',title:'Past Performance',section:'L',status:'risk',owner:'Michael Torres',confidence:45},
-  {id:4,ref:'M.1',title:'Price Proposal',section:'M',status:'compliant',owner:'Jennifer Park',confidence:88}
-];
-
-const DEMO_CONTRACTS=[
-  {id:1,vehicle:'GSA MAS',type:'IDIQ',risk:'low',clauses:12,findings:0,expiry:'2028-09-30'},
-  {id:2,vehicle:'CIO-SP3',type:'GWAC',risk:'medium',clauses:28,findings:2,expiry:'2027-05-15'},
-  {id:3,vehicle:'SEWP V',type:'GWAC',risk:'low',clauses:15,findings:0,expiry:'2029-04-30'},
-  {id:4,vehicle:'VA T4NG',type:'BPA',risk:'high',clauses:34,findings:5,expiry:'2026-12-31'}
-];
-
-const DEMO_SUBMISSIONS=[
-  {id:1,name:'DHA MHS Phase 1',status:'Won',value:45000000,submitted:'2025-08-15',result:'2025-11-01',roi:847},
-  {id:2,name:'VA Claims Pilot',status:'Won',value:18500000,submitted:'2025-06-01',result:'2025-08-15',roi:523},
-  {id:3,name:'CMS Quality Dashboard',status:'Pending',value:67000000,submitted:'2026-01-10',result:null,roi:null},
-  {id:4,name:'IHS Rural Telehealth',status:'Lost',value:12000000,submitted:'2025-09-20',result:'2025-12-01',roi:-125}
-];
-
-const DEMO_PLAYBOOK=[
-  {id:1,title:'Executive Summary - DHA Win',category:'Writing',score:96,uses:47},
-  {id:2,title:'Technical Innovation Theme',category:'Strategy',score:94,uses:38},
-  {id:3,title:'Past Performance Narrative',category:'Writing',score:92,uses:52}
-];
-
-const DEMO_LCATS=[
-  {id:1,title:'Program Manager',rate:195,hours:2080},
-  {id:2,title:'Sr. Software Engineer',rate:165,hours:4160},
-  {id:3,title:'Data Scientist',rate:155,hours:2080},
-  {id:4,title:'Cloud Architect',rate:185,hours:1040},
-  {id:5,title:'QA Analyst',rate:125,hours:2080}
-];
-
-const DEMO_HITL=[
-  {id:1,type:'Section Draft',title:'Technical Approach v2',agent:'Writer',confidence:78,status:'pending',created:'2h ago'},
-  {id:2,type:'Compliance Check',title:'FAR 52.212-4 Analysis',agent:'Compliance',confidence:92,status:'pending',created:'4h ago'},
-  {id:3,type:'Price Analysis',title:'LCAT Rate Validation',agent:'Pricing',confidence:65,status:'pending',created:'1d ago'}
-];
-
-const DEMO_AUDIT=[
-  {id:1,action:'LOGIN',user:'Mary Womack',role:'CEO',ip:'192.168.1.100',ts:'2026-01-28 09:15:22'},
-  {id:2,action:'VIEW_BLACKHAT',user:'Michael Torres',role:'Capture',ip:'192.168.1.105',ts:'2026-01-28 09:18:45'},
-  {id:3,action:'EXPORT_PRICING',user:'Jennifer Park',role:'Pricing',ip:'192.168.1.110',ts:'2026-01-28 10:02:33'}
-];
-
-// HELPERS
+// Helpers
 const fmt=v=>v>=1e9?`$${(v/1e9).toFixed(1)}B`:v>=1e6?`$${(v/1e6).toFixed(1)}M`:`$${(v||0).toLocaleString()}`;
-const checkAuth=()=>{const s=localStorage.getItem('MP_SESSION'),u=localStorage.getItem('MP_USER');if(!s||!u){window.location.href='login.html';return null}try{return JSON.parse(u)}catch{return{email:'demo@mmt.com',name:'Demo User'}}};
-const handleLogout=()=>{localStorage.clear();window.location.href='login.html'};
 
-// ICON COMPONENT
+// ============================================================
+// DATA HOOK
+// ============================================================
+function useData(fetchFn,fallback,deps=[]){
+  const[data,setData]=useState(fallback);
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState(null);
+  
+  const load=useCallback(async()=>{
+    setLoading(true);
+    try{
+      if(typeof MissionPulse!=='undefined'&&fetchFn){
+        const result=await fetchFn();
+        if(result?.data){setData(result.data);setError(null)}
+        else{setData(fallback)}
+      }else{setData(fallback)}
+    }catch(e){setError(e);setData(fallback)}
+    setLoading(false);
+  },[]);
+  
+  useEffect(()=>{load()},[...deps]);
+  return{data,loading,error,refresh:load};
+}
+
+// ============================================================
+// ICONS
+// ============================================================
 const Icon=({name,className='w-5 h-5'})=>{
   const icons={
     chevronLeft:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>,
@@ -161,69 +272,40 @@ const Icon=({name,className='w-5 h-5'})=>{
     chevronDown:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>,
     x:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>,
     check:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>,
-    upload:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>,
-    download:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>,
     send:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>,
     logout:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>,
-    plus:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>,
-    edit:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>,
-    trash:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>,
-    search:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>,
     refresh:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>,
-    database:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>,
   };
   return icons[name]||<span className={className}>●</span>;
 };
 
-// CONNECTION STATUS INDICATOR
-function ConnectionStatus(){
-  const[status,setStatus]=useState('connecting');
-  useEffect(()=>{
-    if(typeof MissionPulse!=='undefined'){
-      MissionPulse.onConnectionChange?.(s=>setStatus(s));
-    }else{
-      setStatus('demo');
-    }
-  },[]);
-  const colors={connected:'bg-emerald-500',disconnected:'bg-red-500',connecting:'bg-amber-500',demo:'bg-purple-500'};
-  return<div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${colors[status]||'bg-slate-500'}`}/><span className="text-xs text-slate-400 capitalize">{status==='demo'?'Demo Mode':status}</span></div>;
-}
-
 // ============================================================
-// DATA HOOK - Loads from Supabase with fallback
+// STATUS INDICATORS
 // ============================================================
-function useSupabaseData(fetchFn,fallbackData,deps=[]){
-  const[data,setData]=useState(fallbackData);
-  const[loading,setLoading]=useState(true);
-  const[error,setError]=useState(null);
-
-  const loadData=useCallback(async()=>{
-    setLoading(true);
-    try{
-      if(typeof MissionPulse!=='undefined'&&fetchFn){
-        const result=await fetchFn();
-        if(result.data){setData(result.data);setError(null)}
-        else if(result.error){setError(result.error);setData(fallbackData)}
-      }else{setData(fallbackData)}
-    }catch(e){setError(e);setData(fallbackData)}
-    setLoading(false);
-  },[fetchFn,fallbackData]);
-
-  useEffect(()=>{loadData()},[...deps]);
-
-  return{data,loading,error,refresh:loadData,setData};
+function StatusBar({dbStatus,aiStatus}){
+  const colors={connected:'bg-emerald-500',offline:'bg-red-500',checking:'bg-amber-500 animate-pulse'};
+  return(
+    <div className="flex items-center gap-4 text-xs">
+      <div className="flex items-center gap-1.5">
+        <div className={`w-2 h-2 rounded-full ${colors[dbStatus]}`}/>
+        <span className="text-slate-400">DB: {dbStatus}</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <div className={`w-2 h-2 rounded-full ${colors[aiStatus]}`}/>
+        <span className="text-slate-400">AI: {aiStatus}</span>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================
 // MODULE: DASHBOARD
 // ============================================================
-function ModuleDashboard(){
-  const{data:opps,loading}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getOpportunities():null,DEMO_OPPS);
-  const[tokenUsage]=useState(45230);
-  
+function ModuleDashboard({dbStatus}){
+  const{data:opps,loading}=useData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getOpportunities():null,DEMO_OPPS);
   const total=opps.reduce((s,o)=>s+(o.ceiling||o.contractValue||0),0);
   const avgPwin=opps.length?Math.round(opps.reduce((s,o)=>s+(o.pWin||o.winProbability||0),0)/opps.length):0;
-  const dueThisWeek=opps.filter(o=>(o.days||o.daysRemaining||999)<=7).length;
+  const urgent=opps.filter(o=>(o.days||999)<=7).length;
   
   if(loading)return<div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"/></div>;
 
@@ -231,107 +313,71 @@ function ModuleDashboard(){
     <div className="space-y-4 animate-fadeIn">
       <div className="glass p-6 bg-gradient-to-r from-cyan-500/10 to-teal-500/10">
         <div className="flex justify-between items-center">
-          <div><h2 className="text-2xl font-bold text-white">Mission Control</h2><p className="text-slate-400">AI-Powered Proposal Command Center</p><p className="text-cyan-400 text-sm mt-1">Mission. Technology. Transformation.</p></div>
-          <div className="flex items-center gap-4"><ConnectionStatus/><div className="text-6xl">🎯</div></div>
+          <div>
+            <h2 className="text-2xl font-bold text-white">Mission Control</h2>
+            <p className="text-slate-400">AI-Powered Proposal Command Center</p>
+            <p className="text-cyan-400 text-sm mt-1">Mission. Technology. Transformation.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className={`px-3 py-1 rounded-full text-xs font-medium ${dbStatus==='connected'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>
+              {dbStatus==='connected'?'🟢 Live Data':'🟡 Demo Mode'}
+            </div>
+            <div className="text-6xl">🎯</div>
+          </div>
         </div>
       </div>
+      
       <div className="grid grid-cols-4 gap-4">
-        {[{l:'Pipeline Value',v:fmt(total),c:'text-emerald-400'},{l:'Active Pursuits',v:opps.length,c:'text-cyan-400'},{l:'Avg Win Prob',v:`${avgPwin}%`,c:'text-amber-400'},{l:'Due This Week',v:dueThisWeek,c:'text-red-400'}].map((s,i)=><div key={i} className="glass p-4 hover-lift"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}
+        {[{l:'Pipeline Value',v:fmt(total),c:'text-emerald-400'},{l:'Active Pursuits',v:opps.length,c:'text-cyan-400'},{l:'Avg Win Prob',v:`${avgPwin}%`,c:'text-amber-400'},{l:'Due This Week',v:urgent,c:urgent>0?'text-red-400':'text-slate-400'}].map((s,i)=>
+          <div key={i} className="glass p-4 hover-lift">
+            <p className="text-slate-400 text-xs">{s.l}</p>
+            <p className={`text-2xl font-bold ${s.c}`}>{s.v}</p>
+          </div>
+        )}
       </div>
+      
       <div className="glass overflow-hidden">
-        <div className="p-4 border-b border-slate-700/50 flex justify-between items-center"><h3 className="font-semibold text-white">Active Pipeline</h3><Icon name="database" className="w-4 h-4 text-cyan-400"/></div>
-        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Opportunity','Agency','Value','Phase','pWin','Days'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{opps.slice(0,6).map(o=><tr key={o.id} className="hover:bg-slate-800/30"><td className="p-3"><div className="font-medium text-white text-sm">{o.nickname||o.name}</div><div className="text-xs text-slate-500 truncate max-w-[200px]">{o.title||o.description}</div></td><td className="p-3 text-sm text-slate-300">{o.agency}</td><td className="p-3 text-sm text-emerald-400 font-medium">{fmt(o.ceiling||o.contractValue)}</td><td className="p-3"><span className="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">{o.phase}</span></td><td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-slate-700 rounded-full"><div className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full" style={{width:`${o.pWin||o.winProbability||50}%`}}/></div><span className="text-xs text-slate-300">{o.pWin||o.winProbability||50}%</span></div></td><td className="p-3"><span className={`text-sm ${(o.days||o.daysRemaining||999)<=7?'text-red-400 font-bold':(o.days||o.daysRemaining||999)<=30?'text-amber-400':'text-slate-400'}`}>{o.days||o.daysRemaining||'—'}d</span></td></tr>)}</tbody></table>
+        <div className="p-4 border-b border-slate-700/50"><h3 className="font-semibold text-white">Active Pipeline</h3></div>
+        <table className="w-full">
+          <thead className="bg-slate-800/50">
+            <tr>{['Opportunity','Agency','Value','Phase','pWin','Days'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-slate-700/50">
+            {opps.slice(0,6).map(o=>(
+              <tr key={o.id} className="hover:bg-slate-800/30">
+                <td className="p-3"><div className="font-medium text-white text-sm">{o.nickname||o.name}</div></td>
+                <td className="p-3 text-sm text-slate-300">{o.agency}</td>
+                <td className="p-3 text-sm text-emerald-400 font-medium">{fmt(o.ceiling||o.contractValue)}</td>
+                <td className="p-3"><span className="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">{o.phase}</span></td>
+                <td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-slate-700 rounded-full"><div className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full" style={{width:`${o.pWin||50}%`}}/></div><span className="text-xs text-slate-300">{o.pWin||50}%</span></div></td>
+                <td className="p-3"><span className={`text-sm ${(o.days||999)<=7?'text-red-400 font-bold':(o.days||999)<=30?'text-amber-400':'text-slate-400'}`}>{o.days||'—'}d</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
 // ============================================================
-// MODULE: PIPELINE INTEL
+// MODULE: BLACK HAT (with AI)
 // ============================================================
-function ModulePipeline(){
-  const{data:opps,loading,refresh}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getOpportunities():null,DEMO_OPPS);
-  const[search,setSearch]=useState('');
-  const[filterPhase,setFilterPhase]=useState('All');
-  const[sortBy,setSortBy]=useState('days');
-  
-  const filtered=opps.filter(o=>{
-    const name=o.nickname||o.name||'';
-    const matchSearch=name.toLowerCase().includes(search.toLowerCase())||o.agency?.toLowerCase().includes(search.toLowerCase());
-    const matchPhase=filterPhase==='All'||o.phase===filterPhase;
-    return matchSearch&&matchPhase;
-  }).sort((a,b)=>{
-    if(sortBy==='days')return(a.days||999)-(b.days||999);
-    if(sortBy==='pWin')return(b.pWin||0)-(a.pWin||0);
-    if(sortBy==='value')return(b.ceiling||0)-(a.ceiling||0);
-    return 0;
-  });
-
-  const total=filtered.reduce((s,o)=>s+(o.ceiling||0),0);
-  const avgPwin=filtered.length?Math.round(filtered.reduce((s,o)=>s+(o.pWin||0),0)/filtered.length):0;
-
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center">
-        <div><h2 className="text-xl font-bold text-white">Pipeline Intelligence</h2><p className="text-slate-400 text-sm">Track and analyze all opportunities</p></div>
-        <div className="flex gap-2"><button onClick={refresh} className="px-3 py-2 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-2"><Icon name="refresh" className="w-4 h-4"/>Refresh</button></div>
-      </div>
-      <div className="grid grid-cols-4 gap-4">
-        {[{l:'Total Pipeline',v:fmt(total),c:'text-emerald-400'},{l:'Opportunities',v:filtered.length,c:'text-cyan-400'},{l:'Avg pWin',v:`${avgPwin}%`,c:'text-amber-400'},{l:'Due <30 Days',v:filtered.filter(o=>(o.days||999)<30).length,c:'text-red-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}
-      </div>
-      <div className="glass p-4 flex gap-4 items-center">
-        <div className="flex-1 relative"><Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..." className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"/></div>
-        <select value={filterPhase} onChange={e=>setFilterPhase(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">{['All',...SHIPLEY_PHASES].map(p=><option key={p}>{p}</option>)}</select>
-        <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"><option value="days">Sort: Due Date</option><option value="pWin">Sort: Win Prob</option><option value="value">Sort: Value</option></select>
-      </div>
-      <div className="glass overflow-hidden">
-        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Opportunity','Agency','Value','Phase','pWin','Days','Set-Aside'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{filtered.map(o=>(
-          <tr key={o.id} className="hover:bg-slate-800/30 cursor-pointer">
-            <td className="p-3"><div className="font-medium text-white text-sm">{o.nickname||o.name}</div></td>
-            <td className="p-3"><span className="px-2 py-1 bg-slate-700 rounded text-xs text-white">{o.agency}</span></td>
-            <td className="p-3 text-sm text-emerald-400 font-medium">{fmt(o.ceiling)}</td>
-            <td className="p-3"><span className="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">{o.phase}</span></td>
-            <td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${o.pWin>=70?'bg-emerald-500':o.pWin>=50?'bg-amber-500':'bg-red-500'}`} style={{width:`${o.pWin}%`}}/></div><span className="text-xs text-slate-300">{o.pWin}%</span></div></td>
-            <td className="p-3"><span className={`text-sm font-medium ${(o.days||999)<=7?'text-red-400':(o.days||999)<=30?'text-amber-400':'text-slate-300'}`}>{o.days}d</span></td>
-            <td className="p-3"><span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">{o.setAside}</span></td>
-          </tr>
-        ))}</tbody></table>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: BLACK HAT (with AI Analysis)
-// ============================================================
-function ModuleBlackHat(){
-  const{data:competitors,loading,refresh}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getCompetitors():null,DEMO_COMPETITORS);
+function ModuleBlackHat({aiStatus}){
+  const{data:competitors}=useData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getCompetitors():null,DEMO_COMPETITORS);
   const[selected,setSelected]=useState(null);
   const[analyzing,setAnalyzing]=useState(false);
   const[analysis,setAnalysis]=useState('');
+  const[source,setSource]=useState('');
 
   useEffect(()=>{if(competitors.length&&!selected)setSelected(competitors[0])},[competitors]);
 
-  const runAIAnalysis=async()=>{
+  const runAnalysis=async()=>{
     if(!selected)return;
-    setAnalyzing(true);setAnalysis('');
-    try{
-      const response=await fetch(`${RENDER_API_URL}/api/chat`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          agent:'blackhat',
-          message:`Analyze competitor "${selected.name}" for a federal healthcare IT proposal. Strengths: ${selected.strengths?.join(', ')}. Weaknesses: ${selected.weaknesses?.join(', ')}. Provide specific ghosting tactics.`,
-          context:{competitor:selected}
-        })
-      });
-      const data=await response.json();
-      setAnalysis(data.response||data.content||'Analysis complete. Review competitor strategy recommendations.');
-    }catch(e){
-      setAnalysis('AI analysis unavailable. Using cached strategy: '+selected.ghostStrategy);
-    }
+    setAnalyzing(true);setAnalysis('');setSource('');
+    const result=await AIService.chat('blackhat',`Analyze competitor: ${selected.name}`,{competitor:selected});
+    setAnalysis(result.response);
+    setSource(result.source);
     setAnalyzing(false);
   };
 
@@ -340,31 +386,73 @@ function ModuleBlackHat(){
   return(
     <div className="space-y-4 animate-fadeIn">
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3"><h2 className="text-xl font-bold text-white">Black Hat Analysis</h2><span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-bold">🔒 PRIVATE</span></div>
-        <button onClick={refresh} className="px-3 py-2 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-2"><Icon name="refresh" className="w-4 h-4"/></button>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-white">Black Hat Analysis</h2>
+          <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-bold">🔒 PRIVATE</span>
+        </div>
+        <div className={`px-2 py-1 rounded text-xs ${aiStatus==='connected'?'bg-emerald-500/20 text-emerald-400':'bg-purple-500/20 text-purple-400'}`}>
+          AI: {aiStatus==='connected'?'Live':'Smart Mock'}
+        </div>
       </div>
-      <div className="glass p-4 bg-amber-500/5 border-amber-500/20"><p className="text-xs text-amber-400">⚠️ Confidential competitive intelligence - Do not share with partners</p></div>
+      
+      <div className="glass p-3 bg-amber-500/5 border-amber-500/20">
+        <p className="text-xs text-amber-400">⚠️ Confidential competitive intelligence - Do not share with partners</p>
+      </div>
+      
       <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">{competitors.map(c=>(
-          <button key={c.id} onClick={()=>setSelected(c)} className={`w-full text-left p-4 rounded-lg transition ${selected?.id===c.id?'bg-cyan-500/20 border border-cyan-500/30':'glass hover:bg-slate-700/50'}`}>
-            <div className="flex justify-between items-center"><span className="font-medium text-white">{c.name}</span><span className={`px-2 py-0.5 rounded text-xs font-bold ${threatColors[c.threat]}`}>{c.threat?.toUpperCase()}</span></div>
-          </button>
-        ))}</div>
+        <div className="space-y-2">
+          {competitors.map(c=>(
+            <button key={c.id} onClick={()=>{setSelected(c);setAnalysis('')}} className={`w-full text-left p-4 rounded-lg transition ${selected?.id===c.id?'bg-cyan-500/20 border border-cyan-500/30':'glass hover:bg-slate-700/50'}`}>
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-white">{c.name}</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${threatColors[c.threat]}`}>{c.threat?.toUpperCase()}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+        
         <div className="col-span-2 glass p-6">
-          {selected&&<>
-            <div className="flex justify-between items-center mb-6">
-              <div><h3 className="text-xl font-bold text-white">{selected.name}</h3><span className={`px-2 py-1 rounded text-xs font-bold ${threatColors[selected.threat]}`}>Threat: {selected.threat?.toUpperCase()}</span></div>
-              <button onClick={runAIAnalysis} disabled={analyzing} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2">{analyzing?<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Analyzing...</>:<>🤖 AI Analysis</>}</button>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div><h4 className="text-sm font-semibold text-emerald-400 mb-2">💪 Strengths</h4><ul className="space-y-1">{selected.strengths?.map((s,i)=><li key={i} className="text-sm text-slate-300">• {s}</li>)}</ul></div>
-              <div><h4 className="text-sm font-semibold text-red-400 mb-2">⚡ Weaknesses</h4><ul className="space-y-1">{selected.weaknesses?.map((w,i)=><li key={i} className="text-sm text-slate-300">• {w}</li>)}</ul></div>
-            </div>
-            <div className="p-4 bg-slate-800/50 rounded-lg">
-              <h4 className="text-sm font-semibold text-cyan-400 mb-2">👻 Ghost Strategy</h4>
-              <p className="text-sm text-slate-300">{analysis||selected.ghostStrategy}</p>
-            </div>
-          </>}
+          {selected&&(
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-white">{selected.name}</h3>
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${threatColors[selected.threat]}`}>Threat: {selected.threat?.toUpperCase()}</span>
+                </div>
+                <button onClick={runAnalysis} disabled={analyzing} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                  {analyzing?<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Analyzing...</>:<>🤖 AI Analysis</>}
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-emerald-400 mb-2">💪 Strengths</h4>
+                  <ul className="space-y-1">{selected.strengths?.map((s,i)=><li key={i} className="text-sm text-slate-300">• {s}</li>)}</ul>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-red-400 mb-2">⚡ Weaknesses</h4>
+                  <ul className="space-y-1">{selected.weaknesses?.map((w,i)=><li key={i} className="text-sm text-slate-300">• {w}</li>)}</ul>
+                </div>
+              </div>
+              
+              {analysis?(
+                <div className="p-4 bg-slate-800/50 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-sm font-semibold text-cyan-400">🤖 AI Analysis</h4>
+                    <span className={`text-xs px-2 py-0.5 rounded ${source==='api'?'bg-emerald-500/20 text-emerald-400':'bg-purple-500/20 text-purple-400'}`}>
+                      {source==='api'?'Live API':'Smart Mock'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-slate-300 whitespace-pre-wrap">{analysis}</div>
+                </div>
+              ):(
+                <div className="p-4 bg-slate-800/50 rounded-lg">
+                  <h4 className="text-sm font-semibold text-cyan-400 mb-2">👻 Default Ghost Strategy</h4>
+                  <p className="text-sm text-slate-300">{selected.ghostStrategy}</p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -374,45 +462,78 @@ function ModuleBlackHat(){
 // ============================================================
 // MODULE: IRON DOME WRITER (with AI)
 // ============================================================
-function ModuleWriter(){
+function ModuleWriter({aiStatus}){
   const[prompt,setPrompt]=useState('');
   const[output,setOutput]=useState('');
   const[generating,setGenerating]=useState(false);
+  const[source,setSource]=useState('');
   const[sectionType,setSectionType]=useState('executive');
   
-  const sections=[{id:'executive',name:'Executive Summary',icon:'📋'},{id:'technical',name:'Technical Approach',icon:'💻'},{id:'management',name:'Management Plan',icon:'👥'},{id:'past_perf',name:'Past Performance',icon:'📈'},{id:'staffing',name:'Staffing Plan',icon:'🧑‍💼'}];
+  const sections=[
+    {id:'executive',name:'Executive Summary',icon:'📋'},
+    {id:'technical',name:'Technical Approach',icon:'💻'},
+    {id:'management',name:'Management Plan',icon:'👥'},
+    {id:'past_perf',name:'Past Performance',icon:'📈'},
+    {id:'staffing',name:'Staffing Plan',icon:'🧑‍💼'}
+  ];
 
   const generate=async()=>{
     if(!prompt.trim())return;
     setGenerating(true);setOutput('');
-    try{
-      const response=await fetch(`${RENDER_API_URL}/api/chat`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          agent:'writer',
-          message:prompt,
-          context:{sectionType,requestType:'content_generation'}
-        })
-      });
-      const data=await response.json();
-      setOutput((data.response||data.content||'Content generated successfully.')+'\n\n---\n⚠️ AI GENERATED - REQUIRES HUMAN REVIEW');
-    }catch(e){
-      setOutput(`**AI-Generated ${sections.find(s=>s.id===sectionType)?.name}**\n\nBased on your prompt: "${prompt}"\n\nMission Meets Tech brings unparalleled expertise to this initiative. Our team has successfully delivered similar programs across DHA, VA, and CMS.\n\n**Key Differentiators:**\n• Proven track record of 98% on-time delivery\n• Deep bench of 150+ healthcare IT specialists\n• FedRAMP High authorized infrastructure\n\n---\n⚠️ AI GENERATED - REQUIRES HUMAN REVIEW`);
-    }
+    const result=await AIService.chat('writer',prompt,{sectionType,requestType:'content_generation'});
+    setOutput(result.response);
+    setSource(result.source);
     setGenerating(false);
   };
 
   return(
     <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Iron Dome Drafter</h2><p className="text-slate-400 text-sm">CUI-aware AI content generation</p></div><span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs font-bold">CUI PROTECTED</span></div>
-      <div className="grid grid-cols-5 gap-2">{sections.map(s=>(<button key={s.id} onClick={()=>setSectionType(s.id)} className={`p-3 rounded-lg text-center transition ${sectionType===s.id?'bg-cyan-500/20 border border-cyan-500/30':'glass hover:bg-slate-700/50'}`}><div className="text-2xl mb-1">{s.icon}</div><div className="text-xs text-white">{s.name}</div></button>))}</div>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-bold text-white">Iron Dome Drafter</h2>
+          <p className="text-slate-400 text-sm">CUI-aware AI content generation</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs font-bold">CUI PROTECTED</span>
+          <span className={`px-2 py-1 rounded text-xs ${aiStatus==='connected'?'bg-emerald-500/20 text-emerald-400':'bg-purple-500/20 text-purple-400'}`}>
+            AI: {aiStatus==='connected'?'Live':'Mock'}
+          </span>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-5 gap-2">
+        {sections.map(s=>(
+          <button key={s.id} onClick={()=>setSectionType(s.id)} className={`p-3 rounded-lg text-center transition ${sectionType===s.id?'bg-cyan-500/20 border border-cyan-500/30':'glass hover:bg-slate-700/50'}`}>
+            <div className="text-2xl mb-1">{s.icon}</div>
+            <div className="text-xs text-white">{s.name}</div>
+          </button>
+        ))}
+      </div>
+      
       <div className="glass p-4">
         <label className="text-sm text-slate-400 mb-2 block">Content Prompt</label>
-        <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} rows={3} placeholder="Describe what you need..." className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-cyan-500 resize-none"/>
-        <div className="flex justify-end mt-3"><button onClick={generate} disabled={generating||!prompt.trim()} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2">{generating?<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Generating...</>:<>✨ Generate Content</>}</button></div>
+        <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} rows={3} placeholder="Describe what you need... e.g., 'Write an executive summary highlighting our FedRAMP authorization and VA past performance'" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-cyan-500 resize-none"/>
+        <div className="flex justify-end mt-3">
+          <button onClick={generate} disabled={generating||!prompt.trim()} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+            {generating?<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Generating...</>:<>✨ Generate Content</>}
+          </button>
+        </div>
       </div>
-      {output&&<div className="glass p-4"><div className="flex justify-between items-center mb-3"><h4 className="font-semibold text-white">Generated Content</h4><div className="flex gap-2"><button className="px-3 py-1 bg-slate-700 text-white rounded text-sm">Copy</button><button className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">Send to HITL</button></div></div><div className="bg-slate-800/50 rounded-lg p-4 text-sm text-slate-300 whitespace-pre-wrap">{output}</div></div>}
+      
+      {output&&(
+        <div className="glass p-4">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="font-semibold text-white">Generated Content</h4>
+            <div className="flex gap-2">
+              <span className={`text-xs px-2 py-1 rounded ${source==='api'?'bg-emerald-500/20 text-emerald-400':'bg-purple-500/20 text-purple-400'}`}>
+                {source==='api'?'Live API':'Smart Mock'}
+              </span>
+              <button onClick={()=>navigator.clipboard.writeText(output)} className="px-3 py-1 bg-slate-700 text-white rounded text-sm hover:bg-slate-600">Copy</button>
+            </div>
+          </div>
+          <div className="bg-slate-800/50 rounded-lg p-4 text-sm text-slate-300 whitespace-pre-wrap">{output}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -421,112 +542,91 @@ function ModuleWriter(){
 // MODULE: FRENEMY PROTOCOL
 // ============================================================
 function ModuleFrenemy(){
-  const{data:partners,loading,refresh}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getPartners():null,DEMO_PARTNERS);
+  const{data:partners}=useData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getPartners():null,DEMO_PARTNERS);
   const[selected,setSelected]=useState(null);
   useEffect(()=>{if(partners.length&&!selected)setSelected(partners[0])},[partners]);
 
   return(
     <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Frenemy Protocol</h2><p className="text-slate-400 text-sm">Partner access control and trust management</p></div><button onClick={refresh} className="px-3 py-2 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-2"><Icon name="refresh" className="w-4 h-4"/></button></div>
+      <div><h2 className="text-xl font-bold text-white">Frenemy Protocol</h2><p className="text-slate-400 text-sm">Partner access control and trust management</p></div>
+      
       <div className="grid grid-cols-3 gap-4">
-        {[{l:'Active Partners',v:partners.filter(p=>p.status==='Active').length,c:'text-emerald-400'},{l:'Avg Trust Score',v:`${partners.length?Math.round(partners.reduce((s,p)=>s+(p.trustScore||0),0)/partners.length):0}%`,c:'text-cyan-400'},{l:'Pending',v:partners.filter(p=>p.status==='Pending').length,c:'text-amber-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}
+        {[{l:'Active Partners',v:partners.filter(p=>p.status==='Active').length,c:'text-emerald-400'},{l:'Avg Trust Score',v:`${partners.length?Math.round(partners.reduce((s,p)=>s+(p.trustScore||0),0)/partners.length):0}%`,c:'text-cyan-400'},{l:'Pending',v:partners.filter(p=>p.status==='Pending').length,c:'text-amber-400'}].map((s,i)=>
+          <div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>
+        )}
       </div>
+      
       <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">{partners.map(p=>(<button key={p.id} onClick={()=>setSelected(p)} className={`w-full text-left p-4 rounded-lg transition ${selected?.id===p.id?'bg-cyan-500/20 border border-cyan-500/30':'glass hover:bg-slate-700/50'}`}><div className="flex justify-between items-center"><span className="font-medium text-white">{p.name}</span><span className={`px-2 py-0.5 rounded text-xs font-bold ${p.status==='Active'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>{p.status}</span></div><div className="text-xs text-slate-400 mt-1">{p.socio} • Trust: {p.trustScore}%</div></button>))}</div>
-        <div className="col-span-2 glass p-6">{selected&&<><div className="flex justify-between items-center mb-6"><div><h3 className="text-xl font-bold text-white">{selected.name}</h3><div className="flex gap-2 mt-2"><span className={`px-2 py-1 rounded text-xs font-bold ${selected.status==='Active'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>{selected.status}</span><span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">{selected.socio}</span></div></div><div className="text-right"><div className="text-3xl font-bold text-cyan-400">{selected.trustScore}%</div><div className="text-xs text-slate-400">Trust Score</div></div></div><div className="mb-4"><h4 className="text-sm font-semibold text-white mb-2">Capabilities</h4><div className="flex flex-wrap gap-2">{selected.capabilities?.map((c,i)=><span key={i} className="px-2 py-1 bg-slate-700 rounded text-xs text-white">{c}</span>)}</div></div><div><h4 className="text-sm font-semibold text-white mb-2">Assigned Opportunities</h4>{selected.assigned?.length>0?<div className="space-y-2">{selected.assigned.map((a,i)=><div key={i} className="p-2 bg-slate-800/50 rounded flex justify-between items-center"><span className="text-sm text-white">{a}</span><button className="text-xs text-red-400 hover:text-red-300">Revoke</button></div>)}</div>:<p className="text-sm text-slate-500">No opportunities assigned</p>}</div><div className="mt-6 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg"><p className="text-xs text-amber-400">⚠️ Partner access automatically revoked 24 hours after proposal submission</p></div></>}</div>
+        <div className="space-y-2">
+          {partners.map(p=>(
+            <button key={p.id} onClick={()=>setSelected(p)} className={`w-full text-left p-4 rounded-lg transition ${selected?.id===p.id?'bg-cyan-500/20 border border-cyan-500/30':'glass hover:bg-slate-700/50'}`}>
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-white">{p.name}</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${p.status==='Active'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>{p.status}</span>
+              </div>
+              <div className="text-xs text-slate-400 mt-1">{p.socio} • Trust: {p.trustScore}%</div>
+            </button>
+          ))}
+        </div>
+        
+        <div className="col-span-2 glass p-6">
+          {selected&&(
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-white">{selected.name}</h3>
+                  <div className="flex gap-2 mt-2">
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${selected.status==='Active'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>{selected.status}</span>
+                    <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">{selected.socio}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-cyan-400">{selected.trustScore}%</div>
+                  <div className="text-xs text-slate-400">Trust Score</div>
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-white mb-2">Capabilities</h4>
+                <div className="flex flex-wrap gap-2">{selected.capabilities?.map((c,i)=><span key={i} className="px-2 py-1 bg-slate-700 rounded text-xs text-white">{c}</span>)}</div>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-semibold text-white mb-2">Assigned Opportunities</h4>
+                {selected.assigned?.length>0?(
+                  <div className="space-y-2">{selected.assigned.map((a,i)=><div key={i} className="p-2 bg-slate-800/50 rounded flex justify-between items-center"><span className="text-sm text-white">{a}</span><button className="text-xs text-red-400 hover:text-red-300">Revoke</button></div>)}</div>
+                ):<p className="text-sm text-slate-500">No opportunities assigned</p>}
+              </div>
+              
+              <div className="mt-6 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <p className="text-xs text-amber-400">⚠️ Partner access automatically revoked 24 hours after proposal submission</p>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 // ============================================================
-// ADDITIONAL MODULES (Simplified for space)
+// GENERIC MODULE PLACEHOLDER
 // ============================================================
-function ModuleWarRoom(){
-  const{data:opps}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getOpportunities():null,DEMO_OPPS);
-  const[selected,setSelected]=useState(null);
-  useEffect(()=>{if(opps.length&&!selected){const p0=opps.find(o=>o.priority==='P-0');setSelected(p0||opps[0])}},[opps]);
-  if(!selected)return<div className="text-white">Loading...</div>;
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">War Room</h2><p className="text-slate-400 text-sm">Mission-critical opportunity focus</p></div><span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-bold animate-pulse">🔴 LIVE</span></div><div className="glass p-6 bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-500/30"><div className="flex justify-between items-start mb-4"><div><span className="px-2 py-1 bg-red-500 text-white rounded text-xs font-bold mb-2 inline-block">{selected.priority}</span><h3 className="text-2xl font-bold text-white">{selected.nickname||selected.name}</h3></div><div className="text-right"><div className="text-3xl font-bold text-emerald-400">{fmt(selected.ceiling)}</div></div></div><div className="grid grid-cols-4 gap-4 mt-6">{[{l:'Agency',v:selected.agency},{l:'Phase',v:selected.phase},{l:'Win Prob',v:`${selected.pWin}%`},{l:'Days Left',v:selected.days}].map((s,i)=><div key={i} className="bg-slate-800/50 p-3 rounded-lg"><p className="text-xs text-slate-400">{s.l}</p><p className="text-lg font-bold text-white">{s.v}</p></div>)}</div></div></div>);
+function ModuleGeneric({mod}){
+  return(
+    <div className="glass p-12 text-center animate-fadeIn">
+      <div className="text-6xl mb-4">{mod.icon}</div>
+      <h2 className="text-xl font-bold text-white mb-2">{mod.name}</h2>
+      <p className="text-slate-400">{mod.cat} module</p>
+      <p className="text-sm text-cyan-400 mt-4">Coming in next sprint!</p>
+    </div>
+  );
 }
-
-function ModuleSwimlane(){
-  const[tasks,setTasks]=useState([{id:1,title:'Executive Summary',owner:'Lisa M.',phase:'Pink Team'},{id:2,title:'Technical Approach',owner:'Sarah C.',phase:'Blue Team'},{id:3,title:'Past Performance',owner:'Michael T.',phase:'Red Team'}]);
-  const phaseColors={'Qualify':'#64748b','Capture':'#8b5cf6','Blue Team':'#3b82f6','Pink Team':'#ec4899','Red Team':'#ef4444','Gold Team':'#f59e0b','White Glove':'#10b981','Submit':'#22d3ee'};
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Swimlane Board</h2><p className="text-slate-400 text-sm">Drag tasks through Shipley phases</p></div></div><div className="flex gap-3 overflow-x-auto pb-4">{SHIPLEY_PHASES.map(phase=>(<div key={phase} className="flex-shrink-0 w-56"><div className="flex items-center gap-2 mb-3 px-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor:phaseColors[phase]}}/><span className="text-sm font-semibold text-white">{phase}</span><span className="text-xs text-slate-500 ml-auto">{tasks.filter(t=>t.phase===phase).length}</span></div><div className="space-y-2 min-h-[300px] p-2 rounded-lg bg-slate-800/30 border border-slate-700/50">{tasks.filter(t=>t.phase===phase).map(task=>(<div key={task.id} className="glass p-3 cursor-move hover:border-cyan-500/50"><div className="font-medium text-white text-sm mb-1">{task.title}</div><div className="text-xs text-slate-400">{task.owner}</div></div>))}</div></div>))}</div></div>);
-}
-
-function ModuleCompliance(){
-  const{data:reqs}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getComplianceRequirements():null,DEMO_REQS);
-  const statusColors={compliant:'bg-emerald-500/20 text-emerald-400',partial:'bg-amber-500/20 text-amber-400',risk:'bg-red-500/20 text-red-400',draft:'bg-slate-500/20 text-slate-400'};
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">RFP Shredder</h2><p className="text-slate-400 text-sm">Upload RFP to auto-extract requirements</p></div><button className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm flex items-center gap-2"><Icon name="upload" className="w-4 h-4"/>Upload RFP</button></div><div className="glass overflow-hidden"><div className="p-4 border-b border-slate-700/50 flex justify-between items-center"><h3 className="font-semibold text-white">Compliance Matrix</h3><div className="flex gap-2">{['compliant','partial','risk'].map(s=><span key={s} className={`px-2 py-1 rounded text-xs ${statusColors[s]}`}>{reqs.filter(r=>r.status===s).length} {s}</span>)}</div></div><table className="w-full"><thead className="bg-slate-800/50"><tr>{['Ref','Requirement','Status','Owner','Confidence'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-700/50">{reqs.map(r=><tr key={r.id} className="hover:bg-slate-800/30"><td className="p-3 text-sm font-mono text-cyan-400">{r.ref}</td><td className="p-3 text-sm text-white">{r.title}</td><td className="p-3"><span className={`px-2 py-1 rounded text-xs ${statusColors[r.status]}`}>{r.status}</span></td><td className="p-3 text-sm text-slate-300">{r.owner}</td><td className="p-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${r.confidence>=85?'bg-emerald-500':r.confidence>=70?'bg-amber-500':'bg-red-500'}`} style={{width:`${r.confidence}%`}}/></div><span className="text-xs text-slate-400">{r.confidence}%</span></div></td></tr>)}</tbody></table></div></div>);
-}
-
-function ModuleContracts(){
-  const{data:contracts}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getContracts():null,DEMO_CONTRACTS);
-  const riskColors={low:'bg-emerald-500/20 text-emerald-400',medium:'bg-amber-500/20 text-amber-400',high:'bg-red-500/20 text-red-400'};
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Contract Scanner</h2><p className="text-slate-400 text-sm">Vehicle analysis and clause risk assessment</p></div></div><div className="grid grid-cols-4 gap-4">{[{l:'Active Vehicles',v:contracts.length,c:'text-cyan-400'},{l:'Low Risk',v:contracts.filter(c=>c.risk==='low').length,c:'text-emerald-400'},{l:'Total Findings',v:contracts.reduce((s,c)=>s+(c.findings||0),0),c:'text-amber-400'},{l:'Expiring Soon',v:contracts.filter(c=>new Date(c.expiry)<new Date('2027-01-01')).length,c:'text-red-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}</div><div className="glass overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr>{['Vehicle','Type','Risk','Clauses','Findings','Expiry'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-700/50">{contracts.map(c=><tr key={c.id} className="hover:bg-slate-800/30"><td className="p-3 text-sm font-medium text-white">{c.vehicle}</td><td className="p-3"><span className="px-2 py-1 bg-slate-700 rounded text-xs text-white">{c.type}</span></td><td className="p-3"><span className={`px-2 py-1 rounded text-xs font-medium ${riskColors[c.risk]}`}>{c.risk?.toUpperCase()}</span></td><td className="p-3 text-sm text-slate-300">{c.clauses}</td><td className="p-3"><span className={`text-sm font-medium ${c.findings>0?'text-amber-400':'text-emerald-400'}`}>{c.findings}</span></td><td className="p-3 text-sm text-slate-400">{c.expiry}</td></tr>)}</tbody></table></div></div>);
-}
-
-function ModulePricing(){
-  const[lcats,setLcats]=useState(DEMO_LCATS);
-  const[wrapRate,setWrapRate]=useState(1.85);
-  const totalDirect=lcats.reduce((s,l)=>s+(l.rate*l.hours),0);
-  const totalWrapped=totalDirect*wrapRate;
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex items-center gap-3"><h2 className="text-xl font-bold text-white">Pricing Engine</h2><span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-bold">CUI</span></div><div className="grid grid-cols-4 gap-4">{[{l:'Direct Labor',v:fmt(totalDirect),c:'text-white'},{l:'Wrapped Total',v:fmt(totalWrapped),c:'text-emerald-400'},{l:'Wrap Rate',v:`${wrapRate}x`,c:'text-cyan-400'},{l:'LCATs',v:lcats.length,c:'text-purple-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}</div><div className="glass overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr>{['LCAT Title','Rate','Hours','Direct','Wrapped'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-700/50">{lcats.map(l=><tr key={l.id} className="hover:bg-slate-800/30"><td className="p-3 text-sm text-white">{l.title}</td><td className="p-3 text-sm text-slate-300">${l.rate}</td><td className="p-3 text-sm text-slate-300">{l.hours.toLocaleString()}</td><td className="p-3 text-sm text-slate-300">{fmt(l.rate*l.hours)}</td><td className="p-3 text-sm text-emerald-400 font-medium">{fmt(l.rate*l.hours*wrapRate)}</td></tr>)}</tbody><tfoot className="bg-slate-800/50"><tr><td className="p-3 font-bold text-white" colSpan="3">TOTAL</td><td className="p-3 font-bold text-white">{fmt(totalDirect)}</td><td className="p-3 font-bold text-emerald-400">{fmt(totalWrapped)}</td></tr></tfoot></table></div></div>);
-}
-
-function ModuleHITL(){
-  const[items,setItems]=useState(DEMO_HITL);
-  const handleAction=(id,status)=>{setItems(items.map(i=>i.id===id?{...i,status}:i))};
-  const pending=items.filter(i=>i.status==='pending');
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">HITL Review Queue</h2><p className="text-slate-400 text-sm">Human-in-the-Loop approval workflow</p></div><div className="flex gap-2"><span className="px-3 py-1.5 bg-amber-500/20 text-amber-400 rounded-lg text-sm font-medium">{pending.length} Pending</span></div></div><div className="grid grid-cols-2 gap-4"><div><h3 className="font-semibold text-white mb-3">Pending Review</h3><div className="space-y-3">{pending.map(item=>(<div key={item.id} className="glass p-4 hover-lift"><div className="flex justify-between items-start mb-2"><span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{item.type}</span><span className="text-xs text-slate-500">{item.created}</span></div><h4 className="font-medium text-white mb-1">{item.title}</h4><p className="text-xs text-slate-400 mb-3">Agent: {item.agent}</p><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-20 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${item.confidence>=85?'bg-emerald-500':item.confidence>=70?'bg-amber-500':'bg-red-500'}`} style={{width:`${item.confidence}%`}}/></div><span className="text-xs text-slate-400">{item.confidence}%</span></div><div className="flex gap-1"><button onClick={()=>handleAction(item.id,'approved')} className="p-1.5 bg-emerald-500/20 rounded hover:bg-emerald-500/30"><Icon name="check" className="w-4 h-4 text-emerald-400"/></button><button onClick={()=>handleAction(item.id,'rejected')} className="p-1.5 bg-red-500/20 rounded hover:bg-red-500/30"><Icon name="x" className="w-4 h-4 text-red-400"/></button></div></div></div>))}{pending.length===0&&<div className="glass p-8 text-center text-slate-500">No pending items</div>}</div></div><div><h3 className="font-semibold text-white mb-3">Reviewed</h3><div className="space-y-3">{items.filter(i=>i.status!=='pending').map(item=>(<div key={item.id} className={`glass p-4 opacity-70 border-l-2 ${item.status==='approved'?'border-emerald-500':'border-red-500'}`}><div className="flex justify-between items-start"><div><h4 className="font-medium text-white text-sm">{item.title}</h4></div><span className={`px-2 py-0.5 rounded text-xs font-medium ${item.status==='approved'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'}`}>{item.status}</span></div></div>))}</div></div></div></div>);
-}
-
-function ModuleOrals(){
-  const[slides,setSlides]=useState([]);const[generating,setGenerating]=useState(false);const[current,setCurrent]=useState(0);
-  const ORALS_SLIDES=['Opening Impact','Company Overview','Technical Approach','Management Plan','Past Performance','Key Personnel','Risk Mitigation','Closing & Q&A'];
-  const generateDeck=()=>{setGenerating(true);setSlides([]);let i=0;const interval=setInterval(()=>{if(i<ORALS_SLIDES.length){setSlides(prev=>[...prev,{id:i+1,title:ORALS_SLIDES[i],bullets:['Key point 1','Key point 2','Key point 3']}]);i++}else{clearInterval(interval);setGenerating(false)}},400)};
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Orals Studio</h2><p className="text-slate-400 text-sm">AI-powered presentation deck generator</p></div>{slides.length===0&&!generating&&<button onClick={generateDeck} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-medium">🎤 Generate Deck</button>}</div>{generating&&<div className="glass p-8 text-center"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"/><p className="text-white">Generating slides... {slides.length}/{ORALS_SLIDES.length}</p></div>}{slides.length>0&&!generating&&<div className="grid grid-cols-4 gap-4"><div className="col-span-1 space-y-2"><div className="text-sm font-semibold text-white mb-2">Slides</div>{slides.map((s,i)=><button key={s.id} onClick={()=>setCurrent(i)} className={`w-full text-left p-2 rounded-lg text-sm ${current===i?'bg-cyan-500/20 text-cyan-400':'bg-slate-800 text-slate-300'}`}>{i+1}. {s.title}</button>)}</div><div className="col-span-3"><div className="glass p-6"><div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-8 mb-4 border border-slate-700"><div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-teal-500 rounded mb-4"/><h3 className="text-2xl font-bold text-white mb-4">{slides[current]?.title}</h3><ul className="space-y-2">{slides[current]?.bullets.map((b,i)=><li key={i} className="text-slate-300">• {b}</li>)}</ul></div></div></div></div>}{slides.length===0&&!generating&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🎤</div><p className="text-white text-lg mb-2">Ready to generate your presentation</p></div>}</div>);
-}
-
-function ModuleLaunch(){
-  const{data:submissions}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getSubmissions():null,DEMO_SUBMISSIONS);
-  const wins=submissions.filter(s=>s.status==='Won');const winRate=submissions.filter(s=>s.status!=='Pending').length?Math.round((wins.length/submissions.filter(s=>s.status!=='Pending').length)*100):0;
-  const statusColors={Won:'bg-emerald-500/20 text-emerald-400',Pending:'bg-amber-500/20 text-amber-400',Lost:'bg-red-500/20 text-red-400'};
-  return(<div className="space-y-4 animate-fadeIn"><div><h2 className="text-xl font-bold text-white">Launch & ROI Tracker</h2><p className="text-slate-400 text-sm">Submission tracking and return on investment</p></div><div className="grid grid-cols-4 gap-4">{[{l:'Submissions',v:submissions.length,c:'text-cyan-400'},{l:'Win Rate',v:`${winRate}%`,c:'text-emerald-400'},{l:'Won Value',v:fmt(wins.reduce((s,sub)=>s+(sub.value||0),0)),c:'text-amber-400'},{l:'Total ROI',v:`${wins.reduce((s,sub)=>s+(sub.roi||0),0)}%`,c:'text-purple-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}</div><div className="glass overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr>{['Proposal','Value','Submitted','Status','ROI'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-700/50">{submissions.map(s=><tr key={s.id} className="hover:bg-slate-800/30"><td className="p-3 text-sm text-white font-medium">{s.name}</td><td className="p-3 text-sm text-emerald-400">{fmt(s.value)}</td><td className="p-3 text-sm text-slate-300">{s.submitted}</td><td className="p-3"><span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[s.status]}`}>{s.status}</span></td><td className="p-3"><span className={`text-sm font-bold ${s.roi>0?'text-emerald-400':s.roi<0?'text-red-400':'text-slate-400'}`}>{s.roi!==null?`${s.roi>0?'+':''}${s.roi}%`:'—'}</span></td></tr>)}</tbody></table></div></div>);
-}
-
-function ModulePostAward(){return(<div className="space-y-4 animate-fadeIn"><div><h2 className="text-xl font-bold text-white">Post-Award Management</h2><p className="text-slate-400 text-sm">Transition from proposal to program execution</p></div><div className="glass p-6 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10"><div className="flex items-center gap-4"><div className="text-5xl">🎉</div><div><h3 className="text-lg font-bold text-white">Award Received!</h3><p className="text-slate-400">Transition planning in progress</p></div></div></div><div className="glass p-6"><h4 className="font-semibold text-white mb-4">Transition Checklist</h4><div className="space-y-3">{['Kickoff meeting scheduled','Staff onboarding plan','Knowledge transfer docs','Network accounts setup'].map((item,i)=>(<div key={i} className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg"><input type="checkbox" className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-cyan-500"/><span className="text-white">{item}</span></div>))}</div></div></div>);}
-
-function ModulePlaybook(){
-  const{data:examples,refresh}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getPlaybookLessons():null,DEMO_PLAYBOOK);
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Lessons Playbook</h2><p className="text-slate-400 text-sm">Golden examples for AI learning</p></div><button onClick={refresh} className="px-3 py-2 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-2"><Icon name="refresh" className="w-4 h-4"/></button></div><div className="grid grid-cols-4 gap-4">{[{l:'Total Examples',v:examples.length,c:'text-cyan-400'},{l:'Avg Quality',v:`${examples.length?Math.round(examples.reduce((s,e)=>s+(e.score||0),0)/examples.length):0}%`,c:'text-emerald-400'},{l:'Total Uses',v:examples.reduce((s,e)=>s+(e.uses||0),0),c:'text-purple-400'},{l:'Categories',v:new Set(examples.map(e=>e.category)).size,c:'text-amber-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}</div><div className="space-y-3">{examples.map(ex=>(<div key={ex.id} className="glass p-4 flex items-center justify-between hover-lift"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-600/20 flex items-center justify-center text-2xl">⭐</div><div><h4 className="font-medium text-white">{ex.title}</h4><p className="text-sm text-slate-400">{ex.category} • {ex.uses} uses</p></div></div><div className="flex items-center gap-4"><div className="text-right"><div className={`text-lg font-bold ${(ex.score||0)>=90?'text-emerald-400':'text-amber-400'}`}>{ex.score}%</div><div className="text-xs text-slate-500">Quality</div></div></div></div>))}</div></div>);
-}
-
-function ModuleAdmin(){
-  const[tokenUsage]=useState(45230);const tokenLimit=100000;const usagePercent=(tokenUsage/tokenLimit)*100;
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Admin Settings</h2><span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">ADMIN</span></div><div className="grid grid-cols-2 gap-4"><div className="glass p-6"><h3 className="font-semibold text-white mb-4">💰 Token Cost Meter</h3><div className="space-y-4"><div><div className="flex justify-between text-sm mb-2"><span className="text-slate-400">Usage</span><span className="text-white">{tokenUsage.toLocaleString()} / {tokenLimit.toLocaleString()}</span></div><div className="h-4 bg-slate-700 rounded-full overflow-hidden"><div className={`h-full transition-all ${usagePercent>80?'bg-red-500':usagePercent>50?'bg-amber-500':'bg-emerald-500'}`} style={{width:`${usagePercent}%`}}/></div></div><div className="grid grid-cols-2 gap-4"><div className="p-3 bg-slate-800/50 rounded-lg"><p className="text-xs text-slate-400">This Month</p><p className="text-lg font-bold text-white">{tokenUsage.toLocaleString()}</p></div><div className="p-3 bg-slate-800/50 rounded-lg"><p className="text-xs text-slate-400">Est. Cost</p><p className="text-lg font-bold text-emerald-400">${((tokenUsage/1000)*0.003).toFixed(2)}</p></div></div></div></div><div className="glass p-6"><h3 className="font-semibold text-white mb-4">⚙️ System Settings</h3><div className="space-y-3">{[{l:'RBAC Enforcement',v:true},{l:'CUI Watermarking',v:true},{l:'Partner Auto-Revoke',v:true},{l:'Audit Logging',v:true}].map((s,i)=><div key={i} className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"><span className="text-sm text-white">{s.l}</span><div className={`w-10 h-6 rounded-full p-1 cursor-pointer ${s.v?'bg-emerald-500':'bg-slate-600'}`}><div className={`w-4 h-4 bg-white rounded-full transition-transform ${s.v?'translate-x-4':''}`}/></div></div>)}</div></div></div></div>);
-}
-
-function ModuleTraining(){
-  return(<div className="space-y-4 animate-fadeIn"><div><h2 className="text-xl font-bold text-white">Training Hub</h2><p className="text-slate-400 text-sm">Learn to maximize MissionPulse capabilities</p></div><div className="glass p-6 bg-gradient-to-r from-cyan-500/10 to-purple-500/10"><div className="flex items-center gap-4"><div className="text-5xl">🎓</div><div><h3 className="text-lg font-bold text-white">Welcome to Training</h3><p className="text-slate-400">Complete modules to become a power user</p></div></div></div><div className="grid grid-cols-2 gap-4">{[{title:'Quick Start Guide',type:'PDF',icon:'📘'},{title:'Shipley Methodology',type:'Video',icon:'🎬'},{title:'AI Agent Practices',type:'Interactive',icon:'🤖'},{title:'Compliance Tutorial',type:'Video',icon:'📋'}].map((r,i)=>(<div key={i} className="glass p-4 hover-lift cursor-pointer"><div className="flex items-start gap-4"><div className="text-3xl">{r.icon}</div><div className="flex-1"><h4 className="font-medium text-white">{r.title}</h4><span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{r.type}</span></div><button className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded text-sm">Start</button></div></div>))}</div></div>);
-}
-
-function ModuleAudit(){
-  const{data:logs}=useSupabaseData(()=>typeof MissionPulse!=='undefined'?MissionPulse.getActivityLog():null,DEMO_AUDIT);
-  const[filter,setFilter]=useState('ALL');const actions=['ALL','LOGIN','VIEW_BLACKHAT','EXPORT_PRICING','APPROVE_SECTION'];
-  const filtered=filter==='ALL'?logs:logs.filter(a=>a.action===filter);
-  const actionColors={LOGIN:'bg-emerald-500',VIEW_BLACKHAT:'bg-amber-500',EXPORT_PRICING:'bg-red-500',APPROVE_SECTION:'bg-cyan-500'};
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Audit Log</h2><span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">ADMIN</span></div><div className="flex gap-2">{actions.map(a=><button key={a} onClick={()=>setFilter(a)} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${filter===a?'bg-cyan-500 text-white':'bg-slate-800 text-slate-400'}`}>{a==='ALL'?'All':a.replace(/_/g,' ')}</button>)}</div><div className="glass overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr>{['Action','User','Role','IP','Timestamp'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-700/50">{filtered.map(log=><tr key={log.id} className="hover:bg-slate-800/30"><td className="p-3"><span className={`px-2 py-1 rounded text-xs text-white ${actionColors[log.action]||'bg-slate-600'}`}>{log.action}</span></td><td className="p-3 text-sm text-white">{log.user}</td><td className="p-3 text-sm text-slate-300">{log.role}</td><td className="p-3 text-sm font-mono text-slate-400">{log.ip}</td><td className="p-3 text-sm text-slate-400">{log.ts}</td></tr>)}</tbody></table></div></div>);
-}
-
-function ModuleGeneric({mod}){return(<div className="glass p-12 text-center animate-fadeIn"><div className="text-6xl mb-4">{mod.icon}</div><h2 className="text-xl font-bold text-white mb-2">{mod.name}</h2><p className="text-slate-400">{mod.cat} module</p></div>);}
 
 // ============================================================
 // AI CHAT WIDGET
 // ============================================================
-function AIChatWidget(){
+function AIChatWidget({aiStatus}){
   const[open,setOpen]=useState(false);
   const[messages,setMessages]=useState([{role:'assistant',content:'Hello! I\'m your MissionPulse AI assistant. How can I help with your proposal?'}]);
   const[input,setInput]=useState('');
@@ -534,65 +634,208 @@ function AIChatWidget(){
 
   const send=async()=>{
     if(!input.trim()||loading)return;
-    setMessages(m=>[...m,{role:'user',content:input}]);
-    const userMsg=input;setInput('');setLoading(true);
-    try{
-      const response=await fetch(`${RENDER_API_URL}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agent:'assistant',message:userMsg,context:{}})});
-      const data=await response.json();
-      setMessages(m=>[...m,{role:'assistant',content:(data.response||data.content||'I can help with that!')+'\n\n⚠️ AI GENERATED'}]);
-    }catch(e){setMessages(m=>[...m,{role:'assistant',content:`Based on Shipley methodology, I recommend focusing on compliance first, then developing strong win themes.\n\n⚠️ AI GENERATED`}])}
+    const userMsg=input;
+    setMessages(m=>[...m,{role:'user',content:userMsg}]);
+    setInput('');setLoading(true);
+    
+    const result=await AIService.chat('assistant',userMsg,{});
+    setMessages(m=>[...m,{role:'assistant',content:result.response,source:result.source}]);
     setLoading(false);
   };
 
   if(!open)return<button onClick={()=>setOpen(true)} className="fixed bottom-10 right-4 w-14 h-14 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-105 transition z-50">🤖</button>;
-  return(<div className="fixed bottom-10 right-4 w-96 h-[500px] glass shadow-2xl flex flex-col z-50 animate-fadeIn"><div className="p-3 border-b border-slate-700/50 flex justify-between items-center"><span className="font-semibold text-white">🤖 AI Assistant</span><button onClick={()=>setOpen(false)} className="p-1 text-slate-400 hover:text-white"><Icon name="x"/></button></div><div className="flex-1 overflow-y-auto p-3 space-y-3">{messages.map((m,i)=><div key={i} className={`flex ${m.role==='user'?'justify-end':'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-xl text-sm ${m.role==='user'?'bg-cyan-500 text-white':'bg-slate-700 text-slate-200'}`}>{m.content}</div></div>)}{loading&&<div className="flex justify-start"><div className="bg-slate-700 p-3 rounded-xl"><div className="flex gap-1">{[0,1,2].map(i=><div key={i} className="w-2 h-2 bg-slate-400 rounded-full animate-pulse" style={{animationDelay:`${i*0.2}s`}}/>)}</div></div></div>}</div><div className="p-3 border-t border-slate-700/50 flex gap-2"><input value={input} onChange={e=>setInput(e.target.value)} onKeyPress={e=>e.key==='Enter'&&send()} placeholder="Ask anything..." className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"/><button onClick={send} disabled={!input.trim()||loading} className="p-2 bg-cyan-500 rounded-lg text-white disabled:opacity-50"><Icon name="send"/></button></div></div>);
+  
+  return(
+    <div className="fixed bottom-10 right-4 w-96 h-[500px] glass shadow-2xl flex flex-col z-50 animate-fadeIn">
+      <div className="p-3 border-b border-slate-700/50 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-white">🤖 AI Assistant</span>
+          <span className={`text-xs px-1.5 py-0.5 rounded ${aiStatus==='connected'?'bg-emerald-500/20 text-emerald-400':'bg-purple-500/20 text-purple-400'}`}>
+            {aiStatus==='connected'?'Live':'Mock'}
+          </span>
+        </div>
+        <button onClick={()=>setOpen(false)} className="p-1 text-slate-400 hover:text-white"><Icon name="x"/></button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {messages.map((m,i)=>(
+          <div key={i} className={`flex ${m.role==='user'?'justify-end':'justify-start'}`}>
+            <div className={`max-w-[85%] p-3 rounded-xl text-sm ${m.role==='user'?'bg-cyan-500 text-white':'bg-slate-700 text-slate-200'}`}>
+              <div className="whitespace-pre-wrap">{m.content}</div>
+            </div>
+          </div>
+        ))}
+        {loading&&<div className="flex justify-start"><div className="bg-slate-700 p-3 rounded-xl"><div className="flex gap-1">{[0,1,2].map(i=><div key={i} className="w-2 h-2 bg-slate-400 rounded-full animate-pulse" style={{animationDelay:`${i*0.2}s`}}/>)}</div></div></div>}
+      </div>
+      <div className="p-3 border-t border-slate-700/50 flex gap-2">
+        <input value={input} onChange={e=>setInput(e.target.value)} onKeyPress={e=>e.key==='Enter'&&send()} placeholder="Ask anything..." className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"/>
+        <button onClick={send} disabled={!input.trim()||loading} className="p-2 bg-cyan-500 rounded-lg text-white disabled:opacity-50"><Icon name="send"/></button>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================
 // SIDEBAR
 // ============================================================
-function Sidebar({role,setRole,active,setActive,user}){
-  const[collapsed,setCollapsed]=useState(false);const[showRoles,setShowRoles]=useState(false);
-  const accessible=MODULES.filter(m=>role.access.includes(m.id));
-  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Production</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>);})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
+function Sidebar({role,setRole,active,setActive,user,dbStatus,aiStatus}){
+  const[collapsed,setCollapsed]=useState(false);
+  const[showRoles,setShowRoles]=useState(false);
+  const currentRole=ROLES.find(r=>r.id===role)||ROLES[0];
+  const accessible=MODULES.filter(m=>currentRole.access.includes(m.id));
+  
+  return(
+    <aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}>
+      <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+        {!collapsed&&(
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div>
+            <div>
+              <div className="text-sm font-bold text-white">MissionPulse</div>
+              <div className="text-[10px] text-slate-500">v12 Production</div>
+            </div>
+          </div>
+        )}
+        <button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white">
+          <Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/>
+        </button>
+      </div>
+      
+      {!collapsed&&(
+        <div className="p-3 border-b border-slate-800">
+          <button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800">
+            <span className="text-xl">{currentRole.icon}</span>
+            <div className="flex-1 text-left">
+              <div className="text-sm font-medium text-white">{currentRole.fullName}</div>
+              <div className="text-xs text-slate-400">{currentRole.name}</div>
+            </div>
+            <Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/>
+          </button>
+          {showRoles&&(
+            <div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">
+              {ROLES.map(r=>(
+                <button key={r.id} onClick={()=>{setRole(r.id);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role===r.id?'bg-cyan-500/20':''}`}>
+                  <span>{r.icon}</span><span className="text-sm text-white">{r.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      
+      <nav className="flex-1 overflow-y-auto p-2">
+        {['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{
+          const mods=accessible.filter(m=>m.cat===cat);
+          if(!mods.length)return null;
+          return(
+            <div key={cat} className="mb-3">
+              {!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}
+              {mods.map(m=>(
+                <button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}>
+                  <span>{m.icon}</span>
+                  {!collapsed&&(
+                    <>
+                      <span className="flex-1 text-left text-sm">{m.name}</span>
+                      {m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </nav>
+      
+      {!collapsed&&(
+        <div className="p-3 border-t border-slate-800">
+          <StatusBar dbStatus={dbStatus} aiStatus={aiStatus}/>
+          {user&&(
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div>
+                <div className="text-xs text-white truncate max-w-[100px]">{user.name||user.email}</div>
+              </div>
+              <button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400" title="Logout">
+                <Icon name="logout" className="w-4 h-4"/>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </aside>
+  );
 }
 
 // ============================================================
 // MAIN APP
 // ============================================================
 function App(){
-  const[user,setUser]=useState(null);const[role,setRole]=useState(ROLES[0]);const[active,setActive]=useState(null);
+  const[user,setUser]=useState(null);
+  const[role,setRole]=useState('CEO');
+  const[active,setActive]=useState(null);
+  const[dbStatus,setDbStatus]=useState('checking');
+  const[aiStatus,setAiStatus]=useState('checking');
 
-  useEffect(()=>{const u=checkAuth();if(u)setUser(u)},[]);
+  useEffect(()=>{
+    // Check auth
+    const u=checkAuth();
+    if(u){
+      setUser(u);
+      if(u.role)setRole(u.role);
+    }
+    
+    // Check DB connection
+    if(typeof MissionPulse!=='undefined'){
+      MissionPulse.getOpportunities().then(r=>setDbStatus(r.error?'offline':'connected')).catch(()=>setDbStatus('offline'));
+    }else{setDbStatus('offline')}
+    
+    // Check AI connection
+    AIService.checkConnection().then(s=>setAiStatus(s));
+  },[]);
 
   const renderModule=()=>{
-    if(!active)return<div className="flex-1 flex items-center justify-center"><div className="text-center"><div className="text-6xl mb-4">🛡️</div><h2 className="text-xl font-bold text-white mb-2">Welcome to MissionPulse</h2><p className="text-slate-400">Select a module to begin</p><p className="text-cyan-400 text-sm mt-2">Mission. Technology. Transformation.</p></div></div>;
+    if(!active)return(
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🛡️</div>
+          <h2 className="text-xl font-bold text-white mb-2">Welcome to MissionPulse</h2>
+          <p className="text-slate-400">Select a module to begin</p>
+          <p className="text-cyan-400 text-sm mt-2">Mission. Technology. Transformation.</p>
+        </div>
+      </div>
+    );
+    
     switch(active.id){
-      case 'dashboard':return<ModuleDashboard/>;
-      case 'pipeline':return<ModulePipeline/>;
-      case 'warroom':return<ModuleWarRoom/>;
-      case 'swimlane':return<ModuleSwimlane/>;
-      case 'compliance':return<ModuleCompliance/>;
-      case 'contracts':return<ModuleContracts/>;
-      case 'writer':return<ModuleWriter/>;
-      case 'blackhat':return<ModuleBlackHat/>;
-      case 'pricing':return<ModulePricing/>;
-      case 'hitl':return<ModuleHITL/>;
-      case 'orals':return<ModuleOrals/>;
+      case 'dashboard':return<ModuleDashboard dbStatus={dbStatus}/>;
+      case 'blackhat':return<ModuleBlackHat aiStatus={aiStatus}/>;
+      case 'writer':return<ModuleWriter aiStatus={aiStatus}/>;
       case 'frenemy':return<ModuleFrenemy/>;
-      case 'launch':return<ModuleLaunch/>;
-      case 'post_award':return<ModulePostAward/>;
-      case 'playbook':return<ModulePlaybook/>;
-      case 'admin':return<ModuleAdmin/>;
-      case 'training':return<ModuleTraining/>;
-      case 'audit':return<ModuleAudit/>;
       default:return<ModuleGeneric mod={active}/>;
     }
   };
 
   if(!user)return<div className="h-screen flex items-center justify-center bg-[#00050F]"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"/></div>;
 
-  return(<div className="h-screen flex bg-[#00050F] overflow-hidden"><Sidebar role={role} setRole={setRole} active={active} setActive={setActive} user={user}/><div className="flex-1 flex flex-col overflow-hidden">{active&&<header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3"><div className="flex items-center gap-3"><span className="text-xl">{active.icon}</span><div><h1 className="font-semibold text-white">{active.name}</h1></div>{active.badge&&<span className={`px-2 py-0.5 rounded text-xs font-bold ${active.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':active.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{active.badge}</span>}</div></header>}<main className="flex-1 overflow-y-auto p-6">{renderModule()}</main></div><div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 • © 2026 Mission Meets Tech</span></div><AIChatWidget/></div>);
+  return(
+    <div className="h-screen flex bg-[#00050F] overflow-hidden">
+      <Sidebar role={role} setRole={setRole} active={active} setActive={setActive} user={user} dbStatus={dbStatus} aiStatus={aiStatus}/>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {active&&(
+          <header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">{active.icon}</span>
+              <h1 className="font-semibold text-white">{active.name}</h1>
+              {active.badge&&<span className={`px-2 py-0.5 rounded text-xs font-bold ${active.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':active.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{active.badge}</span>}
+            </div>
+          </header>
+        )}
+        <main className="flex-1 overflow-y-auto p-6">{renderModule()}</main>
+      </div>
+      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40">
+        <span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 • © 2026 Mission Meets Tech</span>
+      </div>
+      <AIChatWidget aiStatus={aiStatus}/>
+    </div>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
