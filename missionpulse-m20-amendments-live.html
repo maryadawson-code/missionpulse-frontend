@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFP Amendments | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); backdrop-filter: blur(10px); }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA, #00b8d4); color: #00050F; font-weight: 600; }
+        .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+        
+        /* Amendment Types */
+        .type-administrative { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+        .type-technical { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .type-pricing { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .type-schedule { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+        .type-scope { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+        .type-qa { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+        .type-combined { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
+        
+        /* Priority */
+        .priority-critical { border-left: 3px solid #ef4444; }
+        .priority-high { border-left: 3px solid #f97316; }
+        .priority-medium { border-left: 3px solid #eab308; }
+        .priority-low { border-left: 3px solid #22c55e; }
+        
+        /* Status */
+        .status-new { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .status-under-review { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .status-analyzed { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+        .status-incorporated { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .status-closed { background: rgba(107, 114, 128, 0.2); color: #6b7280; }
+        
+        /* Impact Status */
+        .impact-pending { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+        .impact-in-progress { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .impact-complete { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .impact-deferred { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+        
+        .change-indicator { display: inline-flex; align-items: center; gap: 4px; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; }
+        .change-proposal { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .change-pricing { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .change-compliance { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Header -->
+    <header class="border-b border-cyan-500/20 bg-black/40 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="index.html" class="text-cyan-400 hover:text-cyan-300"><i class="fas fa-arrow-left"></i></a>
+                <div>
+                    <h1 class="text-xl font-bold text-cyan-400"><i class="fas fa-file-signature mr-2"></i>RFP Amendment Tracker</h1>
+                    <p class="text-xs text-gray-400">Track Amendments, Impacts & Required Actions</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="connectionStatus" class="text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
+                    <i class="fas fa-circle text-[8px] mr-1"></i> Connecting...
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Opportunity Selector -->
+        <div class="flex flex-wrap items-center gap-4 mb-6">
+            <select id="opportunitySelect" onchange="loadAmendments()" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm min-w-[250px]">
+                <option value="">Select Opportunity...</option>
+            </select>
+            <button onclick="openAmendmentModal()" class="btn-primary px-4 py-2 rounded text-sm">
+                <i class="fas fa-plus mr-2"></i>Add Amendment
+            </button>
+            <button onclick="exportAmendments()" class="px-4 py-2 border border-cyan-500/50 text-cyan-400 rounded text-sm hover:bg-cyan-500/10">
+                <i class="fas fa-download mr-2"></i>Export
+            </button>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-cyan-400" id="totalAmendments">0</div>
+                <div class="text-xs text-gray-400">Total Amendments</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-red-400" id="newCount">0</div>
+                <div class="text-xs text-gray-400">New / Unreviewed</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-blue-400" id="proposalChanges">0</div>
+                <div class="text-xs text-gray-400">Proposal Changes</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-green-400" id="pricingChanges">0</div>
+                <div class="text-xs text-gray-400">Pricing Changes</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-yellow-400" id="pendingImpacts">0</div>
+                <div class="text-xs text-gray-400">Pending Actions</div>
+            </div>
+            <div class="glass-card rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-green-400" id="incorporatedCount">0</div>
+                <div class="text-xs text-gray-400">Incorporated</div>
+            </div>
+        </div>
+
+        <!-- Amendments List -->
+        <div id="amendmentsContainer" class="space-y-4">
+            <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                <i class="fas fa-file-signature text-4xl mb-4 opacity-50"></i>
+                <p>Select an opportunity to view RFP amendments</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Amendment Modal -->
+    <div id="amendmentModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="glass-card rounded-xl max-w-2xl w-full p-6 my-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-file-alt mr-2"></i><span id="amendmentModalTitle">Add Amendment</span></h3>
+                <button onclick="closeAmendmentModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="amendmentForm" onsubmit="saveAmendment(event)" class="space-y-4">
+                <input type="hidden" id="amendmentId">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Amendment Number <span class="text-red-400">*</span></label>
+                        <input type="text" id="amendmentNumber" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., A001, Mod 01">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Amendment Type</label>
+                        <select id="amendmentType" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="Administrative">Administrative</option>
+                            <option value="Technical">Technical</option>
+                            <option value="Pricing">Pricing</option>
+                            <option value="Schedule">Schedule</option>
+                            <option value="Scope">Scope</option>
+                            <option value="Q&A">Q&A</option>
+                            <option value="Combined">Combined</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Title</label>
+                    <input type="text" id="amendmentTitle" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="Brief description of amendment">
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Release Date</label>
+                        <input type="date" id="releaseDate" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Response Due</label>
+                        <input type="date" id="responseDueDate" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Priority</label>
+                        <select id="amendmentPriority" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="Critical">Critical</option>
+                            <option value="High">High</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Source URL</label>
+                    <input type="url" id="sourceUrl" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="https://sam.gov/...">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Summary</label>
+                    <textarea id="amendmentSummary" rows="3" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="Key changes and impacts..."></textarea>
+                </div>
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="requiresProposal" class="rounded"> <span class="text-blue-400">Requires Proposal Change</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="requiresPricing" class="rounded"> <span class="text-green-400">Requires Pricing Change</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="requiresCompliance" class="rounded"> <span class="text-purple-400">Requires Compliance Update</span>
+                    </label>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Assigned To</label>
+                        <select id="assignedTo" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="">Unassigned</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Status</label>
+                        <select id="amendmentStatus" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="New">New</option>
+                            <option value="Under Review">Under Review</option>
+                            <option value="Analyzed">Analyzed</option>
+                            <option value="Incorporated">Incorporated</option>
+                            <option value="Closed">Closed</option>
+                            <option value="N/A">N/A</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeAmendmentModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Save Amendment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Impact Modal -->
+    <div id="impactModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-xl max-w-lg w-full p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400"><i class="fas fa-exclamation-triangle mr-2"></i>Add Impact</h3>
+                <button onclick="closeImpactModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="impactForm" onsubmit="saveImpact(event)" class="space-y-4">
+                <input type="hidden" id="impactId">
+                <input type="hidden" id="impactAmendmentId">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Impact Area <span class="text-red-400">*</span></label>
+                    <select id="impactArea" required class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                        <option value="Technical Approach">Technical Approach</option>
+                        <option value="Management Approach">Management Approach</option>
+                        <option value="Staffing">Staffing</option>
+                        <option value="Past Performance">Past Performance</option>
+                        <option value="Pricing">Pricing</option>
+                        <option value="Compliance">Compliance</option>
+                        <option value="Schedule">Schedule</option>
+                        <option value="Evaluation Criteria">Evaluation Criteria</option>
+                        <option value="Page Limits">Page Limits</option>
+                        <option value="Submission Requirements">Submission Requirements</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Section Affected</label>
+                    <input type="text" id="sectionAffected" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="e.g., Vol II Section 3.2">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Description <span class="text-red-400">*</span></label>
+                    <textarea id="impactDescription" required rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="What changed and how it affects the proposal..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Action Required</label>
+                    <textarea id="actionRequired" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2" placeholder="What needs to be done..."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Owner</label>
+                        <select id="impactOwner" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                            <option value="">Unassigned</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Due Date</label>
+                        <input type="date" id="impactDueDate" class="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeImpactModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded">Save Impact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="glass-card rounded-xl max-w-4xl w-full p-6 my-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-cyan-400" id="detailTitle">Amendment Details</h3>
+                <button onclick="closeDetailModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-cyan-500/10 mt-12 py-6 text-center text-xs text-gray-500">
+        <p>AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+        <p class="mt-1">MissionPulse v2.0 | Mission Meets Tech | Shield & Pulse UX v8.0</p>
+    </footer>
+
+    <script>
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTc0NjMsImV4cCI6MjA1Mjk5MzQ2M30.GXfKRTONeK0kCHk9WJzJzeG3sEaH15uPlFwczw4MXCg';
+        
+        let supabase;
+        let opportunities = [], profiles = [], amendments = [], impacts = [];
+
+        // Demo Data
+        const demoOpportunities = [
+            { id: 'o1', title: 'VA EHR Modernization', stage: 'Proposal' },
+            { id: 'o2', title: 'DHA Cybersecurity Support', stage: 'Capture' }
+        ];
+        const demoProfiles = [
+            { id: 'u1', full_name: 'Mary Womack', email: 'mary@mmt.com', role: 'CEO' },
+            { id: 'u2', full_name: 'Sarah Miller', email: 'sarah@mmt.com', role: 'Capture Manager' },
+            { id: 'u3', full_name: 'Mike Torres', email: 'mike@mmt.com', role: 'Solution Architect' },
+            { id: 'u4', full_name: 'Lisa Park', email: 'lisa@mmt.com', role: 'Proposal Manager' }
+        ];
+        const demoAmendments = [
+            { id: 'am1', opportunity_id: 'o1', amendment_number: 'A001', amendment_title: 'Q&A Responses Round 1', release_date: '2025-01-10', response_due_date: null, amendment_type: 'Q&A', status: 'Incorporated', priority: 'Medium', requires_proposal_change: true, requires_pricing_change: false, requires_compliance_update: false, summary: 'Government responses to 47 industry questions. Clarifications on technical requirements and evaluation criteria.', assigned_to: 'u2' },
+            { id: 'am2', opportunity_id: 'o1', amendment_number: 'A002', amendment_title: 'Extended Due Date', release_date: '2025-01-15', response_due_date: null, amendment_type: 'Schedule', status: 'Incorporated', priority: 'High', requires_proposal_change: false, requires_pricing_change: false, requires_compliance_update: false, summary: 'Proposal due date extended from Feb 10 to Feb 17, 2025.', assigned_to: 'u4' },
+            { id: 'am3', opportunity_id: 'o1', amendment_number: 'A003', amendment_title: 'Technical Requirements Update', release_date: '2025-01-20', response_due_date: '2025-01-25', amendment_type: 'Technical', status: 'Under Review', priority: 'Critical', requires_proposal_change: true, requires_pricing_change: true, requires_compliance_update: true, summary: 'Added CMMC 2.0 Level 2 certification requirement. Updated Section C SOW with new cybersecurity requirements. Modified Section L page limits for Technical Volume.', assigned_to: 'u3' },
+            { id: 'am4', opportunity_id: 'o1', amendment_number: 'A004', amendment_title: 'Pricing Clarification', release_date: '2025-01-25', response_due_date: null, amendment_type: 'Pricing', status: 'New', priority: 'High', requires_proposal_change: false, requires_pricing_change: true, requires_compliance_update: false, summary: 'Clarification on labor category pricing format. ODC ceiling increased to $2M.', assigned_to: null }
+        ];
+        const demoImpacts = [
+            { id: 'i1', amendment_id: 'am3', impact_area: 'Technical Approach', section_affected: 'Vol II Section 3', description: 'Must add CMMC 2.0 compliance narrative and implementation approach', action_required: 'Add 2-page CMMC section, update security approach', owner_id: 'u3', status: 'In Progress', due_date: '2025-01-28' },
+            { id: 'i2', amendment_id: 'am3', impact_area: 'Pricing', section_affected: 'Vol IV', description: 'Additional cybersecurity staffing required for CMMC compliance', action_required: 'Add ISSO and Security Engineer labor categories', owner_id: 'u1', status: 'Pending', due_date: '2025-01-30' },
+            { id: 'i3', amendment_id: 'am3', impact_area: 'Compliance', section_affected: 'Compliance Matrix', description: 'New CMMC requirement must be addressed in compliance matrix', action_required: 'Update L/M matrix with CMMC cross-references', owner_id: 'u2', status: 'Pending', due_date: '2025-01-27' },
+            { id: 'i4', amendment_id: 'am3', impact_area: 'Page Limits', section_affected: 'Vol II', description: 'Technical volume increased from 50 to 60 pages', action_required: 'Reallocate page budget across sections', owner_id: 'u4', status: 'Complete', due_date: '2025-01-22' },
+            { id: 'i5', amendment_id: 'am1', impact_area: 'Technical Approach', section_affected: 'Vol II Section 2.1', description: 'Clarification on transition approach requirements', action_required: 'Update transition plan per Q&A #23 response', owner_id: 'u3', status: 'Complete', due_date: '2025-01-15' },
+            { id: 'i6', amendment_id: 'am4', impact_area: 'Pricing', section_affected: 'Vol IV Section 2', description: 'Labor category pricing format changed to loaded rates', action_required: 'Reformat pricing workbook to match new template', owner_id: 'u1', status: 'Pending', due_date: '2025-01-30' }
+        ];
+
+        async function init() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                const [opRes, profRes] = await Promise.all([
+                    supabase.from('opportunities').select('id, title, stage').order('title'),
+                    supabase.from('profiles').select('id, full_name, email, role').order('full_name')
+                ]);
+                opportunities = opRes.data?.length ? opRes.data : demoOpportunities;
+                profiles = profRes.data?.length ? profRes.data : demoProfiles;
+                updateStatus('connected', 'Live');
+            } catch (e) {
+                console.log('Demo mode:', e.message);
+                opportunities = demoOpportunities;
+                profiles = demoProfiles;
+                amendments = demoAmendments;
+                impacts = demoImpacts;
+                updateStatus('demo', 'Demo Mode');
+            }
+            populateSelects();
+        }
+
+        function updateStatus(type, text) {
+            const el = document.getElementById('connectionStatus');
+            el.className = type === 'connected' 
+                ? 'text-xs px-3 py-1 rounded-full bg-green-500/20 text-green-400'
+                : 'text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400';
+            el.innerHTML = `<i class="fas fa-circle text-[8px] mr-1"></i> ${text}`;
+        }
+
+        function populateSelects() {
+            const opSelect = document.getElementById('opportunitySelect');
+            const assignSelect = document.getElementById('assignedTo');
+            const ownerSelect = document.getElementById('impactOwner');
+            opportunities.forEach(o => opSelect.innerHTML += `<option value="${o.id}">${o.title}</option>`);
+            profiles.forEach(p => {
+                assignSelect.innerHTML += `<option value="${p.id}">${p.full_name || p.email}</option>`;
+                ownerSelect.innerHTML += `<option value="${p.id}">${p.full_name || p.email}</option>`;
+            });
+        }
+
+        async function loadAmendments() {
+            const oppId = document.getElementById('opportunitySelect').value;
+            if (!oppId) {
+                document.getElementById('amendmentsContainer').innerHTML = `
+                    <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                        <i class="fas fa-file-signature text-4xl mb-4 opacity-50"></i>
+                        <p>Select an opportunity to view RFP amendments</p>
+                    </div>`;
+                resetStats();
+                return;
+            }
+
+            try {
+                const [amRes, impRes] = await Promise.all([
+                    supabase.from('rfp_amendments').select('*').eq('opportunity_id', oppId).order('release_date', { ascending: false }),
+                    supabase.from('amendment_impacts').select('*')
+                ]);
+                amendments = amRes.data?.length ? amRes.data : demoAmendments.filter(a => a.opportunity_id === oppId);
+                const amendmentIds = amendments.map(a => a.id);
+                impacts = impRes.data?.length ? impRes.data.filter(i => amendmentIds.includes(i.amendment_id)) : demoImpacts.filter(i => amendmentIds.includes(i.amendment_id));
+            } catch (e) {
+                amendments = demoAmendments.filter(a => a.opportunity_id === oppId);
+                const amendmentIds = amendments.map(a => a.id);
+                impacts = demoImpacts.filter(i => amendmentIds.includes(i.amendment_id));
+            }
+
+            updateStats();
+            renderAmendments();
+        }
+
+        function resetStats() {
+            ['totalAmendments', 'newCount', 'proposalChanges', 'pricingChanges', 'pendingImpacts', 'incorporatedCount'].forEach(id => {
+                document.getElementById(id).textContent = '0';
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('totalAmendments').textContent = amendments.length;
+            document.getElementById('newCount').textContent = amendments.filter(a => a.status === 'New').length;
+            document.getElementById('proposalChanges').textContent = amendments.filter(a => a.requires_proposal_change).length;
+            document.getElementById('pricingChanges').textContent = amendments.filter(a => a.requires_pricing_change).length;
+            document.getElementById('pendingImpacts').textContent = impacts.filter(i => i.status === 'Pending').length;
+            document.getElementById('incorporatedCount').textContent = amendments.filter(a => a.status === 'Incorporated').length;
+        }
+
+        function getTypeClass(type) {
+            return `type-${type.toLowerCase().replace(/&/g, '').replace(/\s+/g, '-')}`;
+        }
+
+        function renderAmendments() {
+            const container = document.getElementById('amendmentsContainer');
+            if (!amendments.length) {
+                container.innerHTML = `
+                    <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                        <i class="fas fa-check-circle text-4xl mb-4 opacity-50"></i>
+                        <p>No amendments recorded. Add one to start tracking.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = amendments.map(a => {
+                const typeClass = getTypeClass(a.amendment_type);
+                const statusClass = `status-${a.status.toLowerCase().replace(/\s+/g, '-')}`;
+                const priorityClass = `priority-${a.priority.toLowerCase()}`;
+                const amendmentImpacts = impacts.filter(i => i.amendment_id === a.id);
+                const pendingImpacts = amendmentImpacts.filter(i => i.status === 'Pending' || i.status === 'In Progress').length;
+                const assignee = profiles.find(p => p.id === a.assigned_to);
+
+                return `
+                    <div class="glass-card rounded-lg overflow-hidden ${priorityClass} cursor-pointer hover:border-cyan-400/50" onclick="showDetail('${a.id}')">
+                        <div class="p-4">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="text-2xl font-bold text-cyan-400">${a.amendment_number}</div>
+                                    <div>
+                                        <h3 class="font-medium text-white">${a.amendment_title || 'Untitled Amendment'}</h3>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="text-xs px-2 py-0.5 rounded ${typeClass}">${a.amendment_type}</span>
+                                            <span class="text-xs px-2 py-0.5 rounded ${statusClass}">${a.status}</span>
+                                            <span class="text-xs text-gray-500">${a.release_date || 'No date'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col items-end gap-2">
+                                    <div class="flex gap-1">
+                                        ${a.requires_proposal_change ? '<span class="change-indicator change-proposal"><i class="fas fa-file-alt"></i>Proposal</span>' : ''}
+                                        ${a.requires_pricing_change ? '<span class="change-indicator change-pricing"><i class="fas fa-dollar-sign"></i>Pricing</span>' : ''}
+                                        ${a.requires_compliance_update ? '<span class="change-indicator change-compliance"><i class="fas fa-shield-alt"></i>Compliance</span>' : ''}
+                                    </div>
+                                    ${a.response_due_date ? `<span class="text-xs text-red-400"><i class="fas fa-clock mr-1"></i>Due: ${a.response_due_date}</span>` : ''}
+                                </div>
+                            </div>
+                            ${a.summary ? `<p class="text-sm text-gray-300 mb-3 line-clamp-2">${a.summary}</p>` : ''}
+                            <div class="flex items-center justify-between text-xs text-gray-500">
+                                <div class="flex items-center gap-4">
+                                    <span><i class="fas fa-exclamation-triangle mr-1"></i>${amendmentImpacts.length} impacts</span>
+                                    ${pendingImpacts > 0 ? `<span class="text-yellow-400">${pendingImpacts} pending</span>` : ''}
+                                    ${assignee ? `<span><i class="fas fa-user mr-1"></i>${assignee.full_name}</span>` : ''}
+                                </div>
+                                <button onclick="event.stopPropagation(); openImpactModal('${a.id}')" class="text-cyan-400 hover:text-cyan-300">
+                                    <i class="fas fa-plus mr-1"></i>Add Impact
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showDetail(id) {
+            const a = amendments.find(x => x.id === id);
+            if (!a) return;
+            const amendmentImpacts = impacts.filter(i => i.amendment_id === id);
+            const assignee = profiles.find(p => p.id === a.assigned_to);
+            const typeClass = getTypeClass(a.amendment_type);
+            const statusClass = `status-${a.status.toLowerCase().replace(/\s+/g, '-')}`;
+
+            document.getElementById('detailTitle').innerHTML = `<span class="text-cyan-400">${a.amendment_number}</span> - ${a.amendment_title || 'Amendment Details'}`;
+            document.getElementById('detailContent').innerHTML = `
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <div class="glass-card rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-cyan-400 mb-3"><i class="fas fa-info-circle mr-2"></i>Amendment Details</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-400">Type:</span><span class="${typeClass} px-2 py-0.5 rounded text-xs">${a.amendment_type}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Status:</span><span class="${statusClass} px-2 py-0.5 rounded text-xs">${a.status}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Priority:</span><span>${a.priority}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">Released:</span><span>${a.release_date || 'N/A'}</span></div>
+                            ${a.response_due_date ? `<div class="flex justify-between"><span class="text-gray-400">Response Due:</span><span class="text-red-400">${a.response_due_date}</span></div>` : ''}
+                            ${assignee ? `<div class="flex justify-between"><span class="text-gray-400">Assigned:</span><span>${assignee.full_name}</span></div>` : ''}
+                            ${a.source_url ? `<div><a href="${a.source_url}" target="_blank" class="text-cyan-400 hover:underline text-xs"><i class="fas fa-external-link-alt mr-1"></i>View Source</a></div>` : ''}
+                        </div>
+                    </div>
+                    <div class="glass-card rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-cyan-400 mb-3"><i class="fas fa-tasks mr-2"></i>Change Requirements</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2 p-2 rounded ${a.requires_proposal_change ? 'bg-blue-500/10' : 'bg-gray-800/50'}">
+                                <i class="fas ${a.requires_proposal_change ? 'fa-check-circle text-blue-400' : 'fa-circle text-gray-600'}"></i>
+                                <span class="text-sm">Proposal Change Required</span>
+                            </div>
+                            <div class="flex items-center gap-2 p-2 rounded ${a.requires_pricing_change ? 'bg-green-500/10' : 'bg-gray-800/50'}">
+                                <i class="fas ${a.requires_pricing_change ? 'fa-check-circle text-green-400' : 'fa-circle text-gray-600'}"></i>
+                                <span class="text-sm">Pricing Change Required</span>
+                            </div>
+                            <div class="flex items-center gap-2 p-2 rounded ${a.requires_compliance_update ? 'bg-purple-500/10' : 'bg-gray-800/50'}">
+                                <i class="fas ${a.requires_compliance_update ? 'fa-check-circle text-purple-400' : 'fa-circle text-gray-600'}"></i>
+                                <span class="text-sm">Compliance Update Required</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ${a.summary ? `
+                    <div class="glass-card rounded-lg p-4 mb-6">
+                        <h4 class="text-sm font-medium text-cyan-400 mb-2"><i class="fas fa-align-left mr-2"></i>Summary</h4>
+                        <p class="text-sm text-gray-300">${a.summary}</p>
+                    </div>
+                ` : ''}
+                <div class="glass-card rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-sm font-medium text-cyan-400"><i class="fas fa-exclamation-triangle mr-2"></i>Impacts & Actions (${amendmentImpacts.length})</h4>
+                        <button onclick="openImpactModal('${id}')" class="text-xs text-cyan-400 hover:text-cyan-300"><i class="fas fa-plus mr-1"></i>Add Impact</button>
+                    </div>
+                    ${amendmentImpacts.length ? `
+                        <div class="space-y-3">
+                            ${amendmentImpacts.map(i => {
+                                const owner = profiles.find(p => p.id === i.owner_id);
+                                const impactStatusClass = `impact-${i.status.toLowerCase().replace(/\s+/g, '-')}`;
+                                return `
+                                    <div class="p-3 bg-gray-800/50 rounded-lg">
+                                        <div class="flex items-start justify-between mb-2">
+                                            <div>
+                                                <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400">${i.impact_area}</span>
+                                                ${i.section_affected ? `<span class="text-xs text-gray-500 ml-2">${i.section_affected}</span>` : ''}
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-xs px-2 py-0.5 rounded ${impactStatusClass}">${i.status}</span>
+                                                <button onclick="event.stopPropagation(); toggleImpactStatus('${i.id}')" class="text-xs text-cyan-400 hover:text-cyan-300" title="Toggle Status"><i class="fas fa-check-circle"></i></button>
+                                            </div>
+                                        </div>
+                                        <p class="text-sm text-gray-300 mb-2">${i.description}</p>
+                                        ${i.action_required ? `<p class="text-xs text-cyan-400"><i class="fas fa-arrow-right mr-1"></i>${i.action_required}</p>` : ''}
+                                        <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                            ${owner ? `<span><i class="fas fa-user mr-1"></i>${owner.full_name}</span>` : ''}
+                                            ${i.due_date ? `<span><i class="fas fa-calendar mr-1"></i>${i.due_date}</span>` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    ` : '<p class="text-sm text-gray-500 text-center py-4">No impacts recorded</p>'}
+                </div>
+                <div class="flex gap-3 mt-6 pt-4 border-t border-gray-700">
+                    <button onclick="editAmendment('${id}')" class="btn-primary px-4 py-2 rounded text-sm"><i class="fas fa-edit mr-2"></i>Edit</button>
+                    <button onclick="advanceStatus('${id}')" class="px-4 py-2 border border-cyan-500/50 text-cyan-400 rounded text-sm hover:bg-cyan-500/10"><i class="fas fa-arrow-right mr-2"></i>Advance Status</button>
+                    <button onclick="deleteAmendment('${id}')" class="px-4 py-2 border border-red-500/50 text-red-400 rounded text-sm hover:bg-red-500/10"><i class="fas fa-trash mr-2"></i>Delete</button>
+                </div>
+            `;
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        function closeDetailModal() { document.getElementById('detailModal').classList.add('hidden'); }
+
+        // Amendment CRUD
+        function openAmendmentModal() {
+            if (!document.getElementById('opportunitySelect').value) { alert('Select an opportunity first'); return; }
+            document.getElementById('amendmentForm').reset();
+            document.getElementById('amendmentId').value = '';
+            document.getElementById('amendmentModalTitle').textContent = 'Add Amendment';
+            document.getElementById('amendmentModal').classList.remove('hidden');
+        }
+
+        function closeAmendmentModal() { document.getElementById('amendmentModal').classList.add('hidden'); }
+
+        function editAmendment(id) {
+            closeDetailModal();
+            const a = amendments.find(x => x.id === id);
+            if (!a) return;
+            document.getElementById('amendmentId').value = a.id;
+            document.getElementById('amendmentNumber').value = a.amendment_number;
+            document.getElementById('amendmentType').value = a.amendment_type;
+            document.getElementById('amendmentTitle').value = a.amendment_title || '';
+            document.getElementById('releaseDate').value = a.release_date || '';
+            document.getElementById('responseDueDate').value = a.response_due_date || '';
+            document.getElementById('amendmentPriority').value = a.priority;
+            document.getElementById('sourceUrl').value = a.source_url || '';
+            document.getElementById('amendmentSummary').value = a.summary || '';
+            document.getElementById('requiresProposal').checked = a.requires_proposal_change;
+            document.getElementById('requiresPricing').checked = a.requires_pricing_change;
+            document.getElementById('requiresCompliance').checked = a.requires_compliance_update;
+            document.getElementById('assignedTo').value = a.assigned_to || '';
+            document.getElementById('amendmentStatus').value = a.status;
+            document.getElementById('amendmentModalTitle').textContent = 'Edit Amendment';
+            document.getElementById('amendmentModal').classList.remove('hidden');
+        }
+
+        async function saveAmendment(e) {
+            e.preventDefault();
+            const id = document.getElementById('amendmentId').value;
+            const data = {
+                opportunity_id: document.getElementById('opportunitySelect').value,
+                amendment_number: document.getElementById('amendmentNumber').value,
+                amendment_type: document.getElementById('amendmentType').value,
+                amendment_title: document.getElementById('amendmentTitle').value || null,
+                release_date: document.getElementById('releaseDate').value || null,
+                response_due_date: document.getElementById('responseDueDate').value || null,
+                priority: document.getElementById('amendmentPriority').value,
+                source_url: document.getElementById('sourceUrl').value || null,
+                summary: document.getElementById('amendmentSummary').value || null,
+                requires_proposal_change: document.getElementById('requiresProposal').checked,
+                requires_pricing_change: document.getElementById('requiresPricing').checked,
+                requires_compliance_update: document.getElementById('requiresCompliance').checked,
+                assigned_to: document.getElementById('assignedTo').value || null,
+                status: document.getElementById('amendmentStatus').value,
+                updated_at: new Date().toISOString()
+            };
+
+            try {
+                if (id) {
+                    await supabase.from('rfp_amendments').update(data).eq('id', id);
+                    const idx = amendments.findIndex(a => a.id === id);
+                    if (idx >= 0) amendments[idx] = { ...amendments[idx], ...data };
+                } else {
+                    const { data: newA } = await supabase.from('rfp_amendments').insert([data]).select().single();
+                    if (newA) amendments.unshift(newA);
+                    else amendments.unshift({ id: 'am' + Date.now(), ...data });
+                }
+            } catch (e) {
+                if (!id) amendments.unshift({ id: 'am' + Date.now(), ...data });
+            }
+
+            closeAmendmentModal();
+            updateStats();
+            renderAmendments();
+        }
+
+        async function deleteAmendment(id) {
+            if (!confirm('Delete this amendment and all impacts?')) return;
+            try { await supabase.from('rfp_amendments').delete().eq('id', id); } catch (e) {}
+            amendments = amendments.filter(a => a.id !== id);
+            impacts = impacts.filter(i => i.amendment_id !== id);
+            closeDetailModal();
+            updateStats();
+            renderAmendments();
+        }
+
+        async function advanceStatus(id) {
+            const a = amendments.find(x => x.id === id);
+            if (!a) return;
+            const statusOrder = ['New', 'Under Review', 'Analyzed', 'Incorporated', 'Closed'];
+            const currentIdx = statusOrder.indexOf(a.status);
+            if (currentIdx < statusOrder.length - 1) {
+                const newStatus = statusOrder[currentIdx + 1];
+                a.status = newStatus;
+                try { await supabase.from('rfp_amendments').update({ status: newStatus }).eq('id', id); } catch (e) {}
+                showDetail(id);
+                updateStats();
+                renderAmendments();
+            }
+        }
+
+        // Impact CRUD
+        function openImpactModal(amendmentId) {
+            document.getElementById('impactForm').reset();
+            document.getElementById('impactId').value = '';
+            document.getElementById('impactAmendmentId').value = amendmentId;
+            document.getElementById('impactModal').classList.remove('hidden');
+        }
+
+        function closeImpactModal() { document.getElementById('impactModal').classList.add('hidden'); }
+
+        async function saveImpact(e) {
+            e.preventDefault();
+            const data = {
+                amendment_id: document.getElementById('impactAmendmentId').value,
+                impact_area: document.getElementById('impactArea').value,
+                section_affected: document.getElementById('sectionAffected').value || null,
+                description: document.getElementById('impactDescription').value,
+                action_required: document.getElementById('actionRequired').value || null,
+                owner_id: document.getElementById('impactOwner').value || null,
+                due_date: document.getElementById('impactDueDate').value || null,
+                status: 'Pending'
+            };
+
+            try {
+                const { data: newI } = await supabase.from('amendment_impacts').insert([data]).select().single();
+                if (newI) impacts.push(newI);
+                else impacts.push({ id: 'i' + Date.now(), ...data });
+            } catch (e) {
+                impacts.push({ id: 'i' + Date.now(), ...data });
+            }
+
+            closeImpactModal();
+            updateStats();
+            showDetail(data.amendment_id);
+        }
+
+        async function toggleImpactStatus(id) {
+            const i = impacts.find(x => x.id === id);
+            if (!i) return;
+            const statusOrder = ['Pending', 'In Progress', 'Complete'];
+            const currentIdx = statusOrder.indexOf(i.status);
+            const newStatus = statusOrder[(currentIdx + 1) % statusOrder.length];
+            i.status = newStatus;
+            if (newStatus === 'Complete') i.completed_at = new Date().toISOString();
+            try { await supabase.from('amendment_impacts').update({ status: newStatus, completed_at: i.completed_at }).eq('id', id); } catch (e) {}
+            updateStats();
+            showDetail(i.amendment_id);
+        }
+
+        function exportAmendments() {
+            const rows = [['Amendment #', 'Title', 'Type', 'Status', 'Priority', 'Release Date', 'Proposal Change', 'Pricing Change', 'Summary']];
+            amendments.forEach(a => {
+                rows.push([a.amendment_number, a.amendment_title || '', a.amendment_type, a.status, a.priority, a.release_date || '', a.requires_proposal_change ? 'Yes' : 'No', a.requires_pricing_change ? 'Yes' : 'No', a.summary || '']);
+            });
+            const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'amendments_export.csv';
+            link.click();
+        }
+
+        init();
+    </script>
+</body>
+</html>
