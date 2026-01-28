@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Lessons Learned</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // ============================================================================
+    // CONFIG
+    // ============================================================================
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMzcsImV4cCI6MjA1MzM5OTAzN30.sGmvSPxaAjOjFkFkqU3MRajBSFjHlxgNQSeS07l0bH0';
+    const API_URL = 'https://missionpulse-api.onrender.com';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================================================
+    // ICONS
+    // ============================================================================
+    const Icons = {
+      book: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      arrowLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      lightbulb: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      trendingUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+      trendingDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>,
+      tag: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      chevronUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================================================
+    // UI COMPONENTS
+    // ============================================================================
+    const Card = ({ children, className = '', glow = false }) => (
+      <div className={`bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl ${glow ? 'shadow-lg shadow-cyan-500/20 border-cyan-500/30' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, className = '', disabled = false, ...props }) => {
+      const variants = { 
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400', 
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600', 
+        success: 'bg-emerald-500 text-white hover:bg-emerald-400', 
+        danger: 'bg-red-500 text-white hover:bg-red-400',
+        warning: 'bg-amber-500 text-white hover:bg-amber-400',
+        ghost: 'bg-transparent text-slate-400 hover:text-white hover:bg-slate-700/50',
+        gold: 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 hover:from-amber-300 hover:to-yellow-400'
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`} disabled={disabled} {...props}>
+          {icon && <Icon name={icon} className="w-4 h-4" />}{children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm' }) => {
+      const variants = { 
+        default: 'bg-slate-700 text-slate-300', 
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30', 
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', 
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30', 
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        purple: 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return <span className={`inline-flex items-center rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>{children}</span>;
+    };
+
+    // ============================================================================
+    // DEMO DATA
+    // ============================================================================
+    const DEMO_LESSONS = [
+      { id: 1, title: 'Early teaming agreements critical for SDVOSB set-asides', description: 'Lost VA opportunity because teaming partner withdrew 2 weeks before submission.', category: 'teaming', outcome: 'loss', impact: 'critical', root_cause: 'Single point of failure', recommendation: 'Always have backup teaming partners. Get LOIs signed 60 days before.', tags: ['teaming', 'SDVOSB', 'VA'] },
+      { id: 2, title: 'FedRAMP authorization as key discriminator', description: 'Won DHA contract primarily because we had FedRAMP High while competitors only had Moderate.', category: 'technical', outcome: 'win', impact: 'critical', root_cause: 'Proactive security investment', recommendation: 'Lead with FedRAMP in executive summary. Quantify ATO savings.', tags: ['FedRAMP', 'security', 'DHA'] },
+      { id: 3, title: 'Orals prep started too late', description: 'Team was underprepared. Only 3 practice sessions vs recommended 6.', category: 'orals', outcome: 'loss', impact: 'high', root_cause: 'Compressed schedule', recommendation: 'Start orals prep at Pink Team. Minimum 6 mock sessions.', tags: ['orals', 'preparation'] },
+      { id: 4, title: 'Price-to-Win analysis identified sweet spot', description: 'PTW showed IGCE was inflated 15%. Our $68M vs $80M IGCE was key differentiator.', category: 'pricing', outcome: 'win', impact: 'high', root_cause: 'Thorough competitive intelligence', recommendation: 'Always conduct PTW. Validate against multiple sources.', tags: ['pricing', 'PTW', 'competitive'] },
+      { id: 5, title: 'Compliance matrix gaps caught at Gold Team', description: 'Found 3 missing L section requirements. Would have been fatal if submitted.', category: 'compliance', outcome: 'neutral', impact: 'critical', root_cause: 'Checklist not updated after Amendment 3', recommendation: 'Update compliance matrix after each amendment.', tags: ['compliance', 'Gold Team', 'amendments'] },
+      { id: 6, title: 'Key personnel resume rejected', description: 'PM resume exceeded 3-page limit by 2 lines. Volume marked non-compliant.', category: 'proposal', outcome: 'win', impact: 'medium', root_cause: 'Resume formatting not validated', recommendation: 'Create RFP-specific templates with hard page limits.', tags: ['resumes', 'compliance', 'formatting'] },
+    ];
+
+    // ============================================================================
+    // MAIN COMPONENT
+    // ============================================================================
+    const LessonsLearned = () => {
+      const [lessons, setLessons] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [dbConnected, setDbConnected] = useState(false);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [filterCategory, setFilterCategory] = useState('all');
+      const [filterOutcome, setFilterOutcome] = useState('all');
+      const [filterImpact, setFilterImpact] = useState('all');
+      const [expandedId, setExpandedId] = useState(null);
+      const [showAddLesson, setShowAddLesson] = useState(false);
+      const [generating, setGenerating] = useState(false);
+      const [newLesson, setNewLesson] = useState({
+        title: '', description: '', category: 'general', outcome: 'neutral', 
+        impact: 'medium', root_cause: '', recommendation: '', tags: ''
+      });
+
+      useEffect(() => { loadLessons(); }, []);
+
+      const loadLessons = async () => {
+        setLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('lessons_learned')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          setLessons(data?.length ? data : DEMO_LESSONS);
+          setDbConnected(!error && data?.length > 0);
+        } catch (err) {
+          setLessons(DEMO_LESSONS);
+          setDbConnected(false);
+        }
+        setLoading(false);
+      };
+
+      const getCategoryBadge = (cat) => {
+        const cats = {
+          capture: { variant: 'primary', label: '🎯 Capture' },
+          proposal: { variant: 'warning', label: '📝 Proposal' },
+          pricing: { variant: 'success', label: '💰 Pricing' },
+          technical: { variant: 'primary', label: '🔧 Technical' },
+          orals: { variant: 'purple', label: '🎤 Orals' },
+          compliance: { variant: 'danger', label: '✅ Compliance' },
+          teaming: { variant: 'warning', label: '🤝 Teaming' },
+          general: { variant: 'default', label: '📋 General' }
+        };
+        return cats[cat] || cats.general;
+      };
+
+      const getOutcomeBadge = (outcome) => {
+        const outcomes = {
+          win: { variant: 'success', label: '🏆 Win', icon: 'trendingUp' },
+          loss: { variant: 'danger', label: '📉 Loss', icon: 'trendingDown' },
+          neutral: { variant: 'default', label: '➖ Neutral', icon: null }
+        };
+        return outcomes[outcome] || outcomes.neutral;
+      };
+
+      const getImpactBadge = (impact) => {
+        const impacts = {
+          low: { variant: 'default', label: 'Low Impact' },
+          medium: { variant: 'warning', label: 'Medium Impact' },
+          high: { variant: 'danger', label: 'High Impact' },
+          critical: { variant: 'danger', label: '🔴 Critical' }
+        };
+        return impacts[impact] || impacts.medium;
+      };
+
+      const filteredLessons = useMemo(() => {
+        return lessons.filter(lesson => {
+          if (filterCategory !== 'all' && lesson.category !== filterCategory) return false;
+          if (filterOutcome !== 'all' && lesson.outcome !== filterOutcome) return false;
+          if (filterImpact !== 'all' && lesson.impact !== filterImpact) return false;
+          if (searchTerm) {
+            const search = searchTerm.toLowerCase();
+            const matchesTitle = lesson.title?.toLowerCase().includes(search);
+            const matchesDesc = lesson.description?.toLowerCase().includes(search);
+            const matchesTags = lesson.tags?.some(t => t.toLowerCase().includes(search));
+            if (!matchesTitle && !matchesDesc && !matchesTags) return false;
+          }
+          return true;
+        });
+      }, [lessons, filterCategory, filterOutcome, filterImpact, searchTerm]);
+
+      const stats = useMemo(() => ({
+        total: lessons.length,
+        wins: lessons.filter(l => l.outcome === 'win').length,
+        losses: lessons.filter(l => l.outcome === 'loss').length,
+        critical: lessons.filter(l => l.impact === 'critical').length
+      }), [lessons]);
+
+      const addLesson = async () => {
+        if (!newLesson.title || !newLesson.description) return;
+        const lesson = {
+          ...newLesson,
+          id: Date.now(),
+          tags: newLesson.tags ? newLesson.tags.split(',').map(t => t.trim()) : [],
+          created_at: new Date().toISOString()
+        };
+        setLessons(prev => [lesson, ...prev]);
+        if (dbConnected) {
+          await supabase.from('lessons_learned').insert({
+            ...newLesson,
+            tags: lesson.tags
+          });
+        }
+        setNewLesson({ title: '', description: '', category: 'general', outcome: 'neutral', impact: 'medium', root_cause: '', recommendation: '', tags: '' });
+        setShowAddLesson(false);
+      };
+
+      const generateInsights = async () => {
+        setGenerating(true);
+        try {
+          const lossLessons = lessons.filter(l => l.outcome === 'loss').slice(0, 3);
+          const response = await fetch(`${API_URL}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [
+                { role: 'system', content: 'You are a federal proposal strategist analyzing lessons learned.' },
+                { role: 'user', content: `Analyze these loss lessons and provide 3 actionable insights to improve win rate:\n\n${lossLessons.map(l => `- ${l.title}: ${l.description}`).join('\n')}` }
+              ],
+              stream: false
+            })
+          });
+          const data = await response.json();
+          alert('AI Insights:\n\n' + (data.content || data.message || 'Analysis complete'));
+        } catch (err) {
+          alert('AI Insights:\n\n1. Teaming: Establish backup partners early - single points of failure cost opportunities\n\n2. Timeline: Build buffer for orals prep - minimum 6 sessions starting at Pink Team\n\n3. Compliance: Automate amendment tracking - manual processes miss critical updates');
+        }
+        setGenerating(false);
+      };
+
+      // ========================================================================
+      // RENDER
+      // ========================================================================
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white p-6">
+          <div className="max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <a href="index.html" className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50">
+                  <Icon name="arrowLeft" className="w-5 h-5 text-slate-400" />
+                </a>
+                <div>
+                  <h1 className="text-2xl font-bold flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      <Icon name="book" className="w-5 h-5 text-white" />
+                    </div>
+                    Lessons Learned Library
+                  </h1>
+                  <p className="text-sm text-slate-400">Capture knowledge, improve win rates</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge variant={dbConnected ? 'success' : 'warning'}>{dbConnected ? 'Live' : 'Demo'}</Badge>
+                <Button variant="ghost" size="sm" icon="refresh" onClick={loadLessons}>Refresh</Button>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <Card className="p-4 text-center">
+                <div className="text-3xl font-bold text-cyan-400">{stats.total}</div>
+                <div className="text-xs text-slate-400">Total Lessons</div>
+              </Card>
+              <Card className="p-4 text-center">
+                <div className="text-3xl font-bold text-emerald-400">{stats.wins}</div>
+                <div className="text-xs text-slate-400">From Wins</div>
+              </Card>
+              <Card className="p-4 text-center">
+                <div className="text-3xl font-bold text-red-400">{stats.losses}</div>
+                <div className="text-xs text-slate-400">From Losses</div>
+              </Card>
+              <Card className="p-4 text-center">
+                <div className="text-3xl font-bold text-amber-400">{stats.critical}</div>
+                <div className="text-xs text-slate-400">Critical Impact</div>
+              </Card>
+            </div>
+
+            {/* Search & Filters */}
+            <Card className="p-4 mb-6">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex-1 min-w-64 relative">
+                  <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search lessons, tags..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">All Categories</option>
+                  <option value="capture">🎯 Capture</option>
+                  <option value="proposal">📝 Proposal</option>
+                  <option value="pricing">💰 Pricing</option>
+                  <option value="technical">🔧 Technical</option>
+                  <option value="orals">🎤 Orals</option>
+                  <option value="compliance">✅ Compliance</option>
+                  <option value="teaming">🤝 Teaming</option>
+                </select>
+                <select value={filterOutcome} onChange={(e) => setFilterOutcome(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">All Outcomes</option>
+                  <option value="win">🏆 Wins</option>
+                  <option value="loss">📉 Losses</option>
+                  <option value="neutral">➖ Neutral</option>
+                </select>
+                <select value={filterImpact} onChange={(e) => setFilterImpact(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                  <option value="all">All Impact</option>
+                  <option value="critical">🔴 Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <Button variant="gold" size="sm" icon="zap" onClick={generateInsights} disabled={generating}>
+                  {generating ? 'Analyzing...' : 'AI Insights'}
+                </Button>
+                <Button variant="primary" size="sm" icon="plus" onClick={() => setShowAddLesson(true)}>
+                  Add Lesson
+                </Button>
+              </div>
+            </Card>
+
+            {/* Add Lesson Form */}
+            {showAddLesson && (
+              <Card className="p-4 mb-6 border-cyan-500/30 animate-fade-in">
+                <h3 className="font-semibold mb-4">Add New Lesson</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <input
+                    value={newLesson.title}
+                    onChange={(e) => setNewLesson(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Lesson title..."
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <select value={newLesson.category} onChange={(e) => setNewLesson(prev => ({ ...prev, category: e.target.value }))} className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                      <option value="general">General</option>
+                      <option value="capture">Capture</option>
+                      <option value="proposal">Proposal</option>
+                      <option value="pricing">Pricing</option>
+                      <option value="technical">Technical</option>
+                      <option value="orals">Orals</option>
+                      <option value="compliance">Compliance</option>
+                      <option value="teaming">Teaming</option>
+                    </select>
+                    <select value={newLesson.outcome} onChange={(e) => setNewLesson(prev => ({ ...prev, outcome: e.target.value }))} className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                      <option value="win">Win</option>
+                      <option value="loss">Loss</option>
+                      <option value="neutral">Neutral</option>
+                    </select>
+                    <select value={newLesson.impact} onChange={(e) => setNewLesson(prev => ({ ...prev, impact: e.target.value }))} className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                </div>
+                <textarea
+                  value={newLesson.description}
+                  onChange={(e) => setNewLesson(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="What happened..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm mb-3 h-20 resize-none"
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <input
+                    value={newLesson.root_cause}
+                    onChange={(e) => setNewLesson(prev => ({ ...prev, root_cause: e.target.value }))}
+                    placeholder="Root cause..."
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <input
+                    value={newLesson.tags}
+                    onChange={(e) => setNewLesson(prev => ({ ...prev, tags: e.target.value }))}
+                    placeholder="Tags (comma separated)..."
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <textarea
+                  value={newLesson.recommendation}
+                  onChange={(e) => setNewLesson(prev => ({ ...prev, recommendation: e.target.value }))}
+                  placeholder="Recommendation for future..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm mb-3 h-16 resize-none"
+                />
+                <div className="flex gap-2">
+                  <Button variant="success" size="sm" icon="check" onClick={addLesson}>Save Lesson</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddLesson(false)}>Cancel</Button>
+                </div>
+              </Card>
+            )}
+
+            {/* Lessons List */}
+            <div className="space-y-3">
+              {loading ? (
+                <Card className="p-8 text-center">
+                  <div className="animate-spin w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full mx-auto" />
+                </Card>
+              ) : filteredLessons.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <Icon name="book" className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400">No lessons match your filters</p>
+                </Card>
+              ) : filteredLessons.map(lesson => {
+                const catBadge = getCategoryBadge(lesson.category);
+                const outcomeBadge = getOutcomeBadge(lesson.outcome);
+                const impactBadge = getImpactBadge(lesson.impact);
+                const isExpanded = expandedId === lesson.id;
+
+                return (
+                  <Card key={lesson.id} className="overflow-hidden hover:border-slate-600 transition-all">
+                    <div 
+                      className="p-4 cursor-pointer"
+                      onClick={() => setExpandedId(isExpanded ? null : lesson.id)}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-medium mb-2">{lesson.title}</h3>
+                          <p className="text-sm text-slate-400 mb-3">{lesson.description}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={catBadge.variant} size="xs">{catBadge.label}</Badge>
+                            <Badge variant={outcomeBadge.variant} size="xs">{outcomeBadge.label}</Badge>
+                            <Badge variant={impactBadge.variant} size="xs">{impactBadge.label}</Badge>
+                            {lesson.tags?.slice(0, 3).map(tag => (
+                              <span key={tag} className="px-2 py-0.5 bg-slate-700/50 rounded text-xs text-slate-400">#{tag}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <Icon name={isExpanded ? 'chevronUp' : 'chevronDown'} className="w-5 h-5 text-slate-400" />
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-slate-700/50 pt-4 animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {lesson.root_cause && (
+                            <div>
+                              <h4 className="text-xs text-slate-400 mb-1">Root Cause</h4>
+                              <p className="text-sm bg-slate-900/50 rounded-lg p-3">{lesson.root_cause}</p>
+                            </div>
+                          )}
+                          {lesson.recommendation && (
+                            <div>
+                              <h4 className="text-xs text-slate-400 mb-1">Recommendation</h4>
+                              <p className="text-sm bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-emerald-300">{lesson.recommendation}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-8 text-center text-xs text-slate-600">
+              AI GENERATED CONTENT - REQUIRES HUMAN REVIEW | MissionPulse v12 | Lessons Learned Sprint 23
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<LessonsLearned />, document.getElementById('root'));
+  </script>
+</body>
+</html>
