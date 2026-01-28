@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 | AI Proposal Command Center</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --mmt-cyan: #00E5FA;
+      --mmt-navy: #00050F;
+      --mmt-surface: #0f172a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--mmt-navy); color: #e2e8f0; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-pulse { animation: pulse 2s infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+// ============================================================
+// MISSIONPULSE v12 - PRODUCTION MVP
+// Mission Meets Tech © 2026
+// ============================================================
+
+const { useState, useEffect, createContext, useContext } = React;
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+const CONFIG = {
+  SUPABASE_URL: 'https://qlbvbfaprymzdqywcsiq.supabase.co',
+  SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsYnZiZmFwcnltemRxeXdjc2lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NjQ4NjcsImV4cCI6MjA1MzM0MDg2N30.QEnpsflnMM9i9xvYPHJlJO7wGPazPTvTWSFIohHcA',
+  LOGIN_PAGE: 'login.html'
+};
+
+// Initialize Supabase
+const supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+
+// ============================================================
+// 11 SHIPLEY ROLES - COMPLETE RBAC
+// ============================================================
+const ROLES = [
+  { id: 'CEO', name: 'CEO', fullName: 'Mary Womack', icon: '👑', color: '#fbbf24', function: 'Executive Approver', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'launch', 'orals', 'frenemy', 'post_award'] },
+  { id: 'COO', name: 'COO', fullName: 'David Chen', icon: '📊', color: '#f97316', function: 'Capture Oversight', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'hitl', 'frenemy', 'launch', 'post_award', 'pricing'] },
+  { id: 'CAP', name: 'Capture', fullName: 'Michael Torres', icon: '🎯', color: '#f472b6', function: 'Capture Manager', access: ['dashboard', 'pipeline', 'blackhat', 'warroom', 'frenemy', 'swarm'] },
+  { id: 'PM', name: 'Proposal Mgr', fullName: 'Lisa Martinez', icon: '📋', color: '#60a5fa', function: 'Proposal Manager', access: ['dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'writer', 'hitl', 'launch', 'post_award', 'orals'] },
+  { id: 'SA', name: 'Solution Arch', fullName: 'Sarah Chen', icon: '🔧', color: '#22d3ee', function: 'Technical Lead', access: ['writer', 'compliance', 'contracts', 'orals', 'swarm'] },
+  { id: 'FIN', name: 'Pricing', fullName: 'Jennifer Park', icon: '💰', color: '#34d399', function: 'Volume Lead (Pricing)', access: ['pricing', 'contracts', 'launch', 'swarm'] },
+  { id: 'CON', name: 'Contracts', fullName: 'Robert Williams', icon: '⚖️', color: '#a78bfa', function: 'Contracts/Compliance', access: ['compliance', 'contracts', 'swarm', 'hitl'] },
+  { id: 'DEL', name: 'Delivery', fullName: 'Amanda Foster', icon: '👥', color: '#fb7185', function: 'Delivery/Staffing', access: ['swarm', 'writer', 'post_award', 'orals'] },
+  { id: 'QA', name: 'QA Lead', fullName: 'James Thompson', icon: '✅', color: '#2dd4bf', function: 'Quality Assurance', access: ['hitl', 'compliance', 'swarm', 'writer'] },
+  { id: 'Partner', name: 'Partner', fullName: 'External Partner', icon: '🤝', color: '#94a3b8', function: 'Teaming Partner', access: ['swarm', 'writer'], restricted: true },
+  { id: 'Admin', name: 'Admin', fullName: 'System Admin', icon: '⚙️', color: '#cbd5e1', function: 'System Admin', access: ['admin', 'audit', 'dashboard', 'pipeline', 'warroom', 'swarm', 'compliance', 'contracts', 'writer', 'blackhat', 'pricing', 'hitl', 'orals', 'frenemy', 'launch', 'post_award'] }
+];
+
+// ============================================================
+// 16 MODULES
+// ============================================================
+const MODULES = [
+  { id: 'dashboard', name: 'Mission Control', icon: '📊', color: '#facc15', category: 'Command', description: 'Executive Dashboard' },
+  { id: 'pipeline', name: 'Pipeline Intel', icon: '🔍', color: '#60a5fa', category: 'Strategy', description: 'Opportunity Tracking' },
+  { id: 'warroom', name: 'War Room', icon: '⚔️', color: '#818cf8', category: 'Strategy', description: 'Pursuit Strategy' },
+  { id: 'swarm', name: 'Agent Swarm', icon: '🤖', color: '#2dd4bf', category: 'Strategy', description: 'AI Assistants' },
+  { id: 'compliance', name: 'RFP Shredder', icon: '📄', color: '#f87171', category: 'Intelligence', description: 'Compliance Matrix' },
+  { id: 'contracts', name: 'Contract Scanner', icon: '⚖️', color: '#a78bfa', category: 'Intelligence', description: 'Risk Analysis' },
+  { id: 'writer', name: 'Iron Dome', icon: '✍️', color: '#c084fc', category: 'Intelligence', description: 'AI Writing Suite' },
+  { id: 'blackhat', name: 'Black Hat', icon: '🎭', color: '#fbbf24', category: 'Intelligence', description: 'Competitive Intel', badge: 'PRIVATE' },
+  { id: 'pricing', name: 'Pricing Engine', icon: '💵', color: '#4ade80', category: 'Delivery', description: 'LCAT & BOE', badge: 'CUI' },
+  { id: 'hitl', name: 'HITL Queue', icon: '👁️', color: '#fb923c', category: 'Delivery', description: 'Review Queue' },
+  { id: 'orals', name: 'Orals Studio', icon: '🎤', color: '#f472b6', category: 'Delivery', description: 'Presentation Prep' },
+  { id: 'frenemy', name: 'Frenemy Protocol', icon: '🛡️', color: '#22d3ee', category: 'Delivery', description: 'Partner Access' },
+  { id: 'launch', name: 'Launch & ROI', icon: '🚀', color: '#e879f9', category: 'Command', description: 'Submission' },
+  { id: 'post_award', name: 'Post-Award', icon: '📦', color: '#a78bfa', category: 'Command', description: 'Transition' },
+  { id: 'playbook', name: 'Playbook', icon: '📚', color: '#fbbf24', category: 'Admin', description: 'Golden Examples' },
+  { id: 'admin', name: 'Admin', icon: '⚙️', color: '#cbd5e1', category: 'Admin', description: 'Settings', badge: 'ADMIN' }
+];
+
+const CATEGORIES = ['Strategy', 'Intelligence', 'Delivery', 'Command', 'Admin'];
+
+// ============================================================
+// CONTEXT
+// ============================================================
+const AppContext = createContext(null);
+
+// ============================================================
+// AUTH CHECK
+// ============================================================
+function checkAuth() {
+  const session = localStorage.getItem('MP_SESSION');
+  const user = localStorage.getItem('MP_USER');
+  if (!session || !user) {
+    window.location.href = CONFIG.LOGIN_PAGE;
+    return null;
+  }
+  try {
+    return JSON.parse(user);
+  } catch {
+    return { email: 'demo@mmt.com', role: 'CEO', name: 'Demo User' };
+  }
+}
+
+// ============================================================
+// ICONS (Simple SVG)
+// ============================================================
+const Icons = {
+  menu: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+  close: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+  chevronDown: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+  logout: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
+  shield: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+  refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+};
+
+// ============================================================
+// SIDEBAR COMPONENT
+// ============================================================
+function Sidebar({ collapsed, setCollapsed, activeModule, setActiveModule, currentRole }) {
+  const roleAccess = ROLES.find(r => r.id === currentRole)?.access || [];
+  
+  const hasAccess = (moduleId) => {
+    if (currentRole === 'Admin') return true;
+    return roleAccess.includes(moduleId);
+  };
+
+  return (
+    <aside className={`fixed left-0 top-0 h-full bg-slate-900/95 border-r border-slate-700/50 transition-all duration-300 z-40 ${collapsed ? 'w-16' : 'w-64'}`}>
+      {/* Logo */}
+      <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700/50">
+        {!collapsed && (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+              <Icons.shield />
+            </div>
+            <span className="font-bold text-white">MissionPulse</span>
+          </div>
+        )}
+        <button onClick={() => setCollapsed(!collapsed)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white">
+          {collapsed ? <Icons.menu /> : <Icons.close />}
+        </button>
+      </div>
+
+      {/* Navigation */}
+      <nav className="p-2 space-y-1 overflow-y-auto h-[calc(100vh-8rem)]">
+        {CATEGORIES.map(category => {
+          const categoryModules = MODULES.filter(m => m.category === category && hasAccess(m.id));
+          if (categoryModules.length === 0) return null;
+          
+          return (
+            <div key={category} className="mb-4">
+              {!collapsed && <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">{category}</div>}
+              {categoryModules.map(module => (
+                <button
+                  key={module.id}
+                  onClick={() => setActiveModule(module.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                    activeModule === module.id 
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <span className="text-lg">{module.icon}</span>
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 text-left text-sm font-medium">{module.name}</span>
+                      {module.badge && (
+                        <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                          module.badge === 'PRIVATE' ? 'bg-amber-500/20 text-amber-400' :
+                          module.badge === 'CUI' ? 'bg-red-500/20 text-red-400' :
+                          'bg-slate-600 text-slate-300'
+                        }`}>{module.badge}</span>
+                      )}
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Footer */}
+      {!collapsed && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700/50">
+          <div className="text-xs text-slate-500 text-center">MissionPulse v12.0</div>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+// ============================================================
+// HEADER COMPONENT
+// ============================================================
+function Header({ user, currentRole, setCurrentRole, sidebarCollapsed }) {
+  const [roleDropdown, setRoleDropdown] = useState(false);
+  const role = ROLES.find(r => r.id === currentRole);
+
+  const handleLogout = () => {
+    localStorage.removeItem('MP_SESSION');
+    localStorage.removeItem('MP_USER');
+    localStorage.removeItem('mp_demo_mode');
+    window.location.href = CONFIG.LOGIN_PAGE;
+  };
+
+  return (
+    <header className={`fixed top-0 right-0 h-16 bg-slate-900/80 backdrop-blur border-b border-slate-700/50 z-30 transition-all ${sidebarCollapsed ? 'left-16' : 'left-64'}`}>
+      <div className="h-full px-6 flex items-center justify-between">
+        {/* Breadcrumb / Title */}
+        <div>
+          <h1 className="text-lg font-semibold text-white">Mission Control</h1>
+          <p className="text-xs text-slate-400">AI Proposal Command Center</p>
+        </div>
+
+        {/* Right Side */}
+        <div className="flex items-center gap-4">
+          {/* Role Switcher */}
+          <div className="relative">
+            <button 
+              onClick={() => setRoleDropdown(!roleDropdown)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 transition"
+            >
+              <span className="text-lg">{role?.icon}</span>
+              <div className="text-left">
+                <div className="text-sm font-medium text-white">{role?.name}</div>
+                <div className="text-xs text-slate-400">{role?.function}</div>
+              </div>
+              <Icons.chevronDown />
+            </button>
+            
+            {roleDropdown && (
+              <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-2 max-h-96 overflow-y-auto">
+                <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Switch Role (Demo)</div>
+                {ROLES.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => { setCurrentRole(r.id); setRoleDropdown(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-700 ${currentRole === r.id ? 'bg-cyan-500/10' : ''}`}
+                  >
+                    <span className="text-xl">{r.icon}</span>
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium text-white">{r.name}</div>
+                      <div className="text-xs text-slate-400">{r.function}</div>
+                    </div>
+                    {currentRole === r.id && <span className="text-cyan-400">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* User */}
+          <div className="flex items-center gap-3 pl-4 border-l border-slate-700">
+            <div className="text-right">
+              <div className="text-sm font-medium text-white">{user?.name || user?.email}</div>
+              <div className="text-xs text-slate-400">{user?.email}</div>
+            </div>
+            <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg" title="Sign Out">
+              <Icons.logout />
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ============================================================
+// DASHBOARD MODULE (M1)
+// ============================================================
+function DashboardModule({ opportunities, loading, currentRole }) {
+  const stats = {
+    totalValue: opportunities.reduce((sum, o) => sum + (parseFloat(o.ceiling) || 0), 0),
+    activeCount: opportunities.length,
+    avgPwin: 72,
+    dueThisMonth: opportunities.filter(o => {
+      const due = new Date(o.due_date || o.created_at);
+      const now = new Date();
+      return due.getMonth() === now.getMonth();
+    }).length
+  };
+
+  const formatCurrency = (val) => {
+    if (val >= 1e9) return `$${(val/1e9).toFixed(1)}B`;
+    if (val >= 1e6) return `$${(val/1e6).toFixed(0)}M`;
+    return `$${val.toLocaleString()}`;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Welcome Banner */}
+      <div className="glass rounded-2xl p-6 bg-gradient-to-r from-cyan-500/10 to-teal-500/10">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">Welcome to MissionPulse</h2>
+            <p className="text-slate-400">Your AI-powered proposal command center</p>
+          </div>
+          <div className="text-6xl">🎯</div>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="glass rounded-xl p-5">
+          <div className="text-slate-400 text-sm mb-1">Pipeline Value</div>
+          <div className="text-2xl font-bold text-white">{formatCurrency(stats.totalValue)}</div>
+          <div className="text-emerald-400 text-xs mt-1">↑ 12% from last month</div>
+        </div>
+        <div className="glass rounded-xl p-5">
+          <div className="text-slate-400 text-sm mb-1">Active Pursuits</div>
+          <div className="text-2xl font-bold text-white">{stats.activeCount}</div>
+          <div className="text-cyan-400 text-xs mt-1">{stats.dueThisMonth} due this month</div>
+        </div>
+        <div className="glass rounded-xl p-5">
+          <div className="text-slate-400 text-sm mb-1">Avg Win Probability</div>
+          <div className="text-2xl font-bold text-white">{stats.avgPwin}%</div>
+          <div className="text-emerald-400 text-xs mt-1">Above 65% target</div>
+        </div>
+        <div className="glass rounded-xl p-5">
+          <div className="text-slate-400 text-sm mb-1">Hours Saved</div>
+          <div className="text-2xl font-bold text-white">340+</div>
+          <div className="text-amber-400 text-xs mt-1">Per proposal cycle</div>
+        </div>
+      </div>
+
+      {/* Pipeline Table */}
+      <div className="glass rounded-2xl overflow-hidden">
+        <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
+          <h3 className="font-semibold text-white">Active Pipeline</h3>
+          <button className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300">
+            <Icons.refresh /> Refresh
+          </button>
+        </div>
+        
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            <p className="text-slate-400">Loading opportunities...</p>
+          </div>
+        ) : opportunities.length === 0 ? (
+          <div className="p-8 text-center text-slate-400">
+            <p>No opportunities found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="text-left p-4 text-xs font-semibold text-slate-400 uppercase">Opportunity</th>
+                  <th className="text-left p-4 text-xs font-semibold text-slate-400 uppercase">Agency</th>
+                  <th className="text-left p-4 text-xs font-semibold text-slate-400 uppercase">Value</th>
+                  <th className="text-left p-4 text-xs font-semibold text-slate-400 uppercase">Phase</th>
+                  <th className="text-left p-4 text-xs font-semibold text-slate-400 uppercase">pWin</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {opportunities.map(opp => (
+                  <tr key={opp.id} className="hover:bg-slate-800/30 cursor-pointer">
+                    <td className="p-4">
+                      <div className="font-medium text-white">{opp.nickname || opp.title}</div>
+                      <div className="text-xs text-slate-400">{opp.title}</div>
+                    </td>
+                    <td className="p-4 text-slate-300">{opp.agency || 'Federal'}</td>
+                    <td className="p-4 text-slate-300">{formatCurrency(parseFloat(opp.ceiling) || 0)}</td>
+                    <td className="p-4">
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-cyan-500/20 text-cyan-400">
+                        {opp.phase || 'Capture'}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full" style={{width: `${opp.pwin || 70}%`}}></div>
+                        </div>
+                        <span className="text-sm text-slate-300">{opp.pwin || 70}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-3 gap-4">
+        <button className="glass rounded-xl p-4 text-left hover:border-cyan-500/50 transition group">
+          <div className="text-2xl mb-2">📝</div>
+          <div className="font-medium text-white group-hover:text-cyan-400">Start New Capture</div>
+          <div className="text-xs text-slate-400">Begin opportunity pursuit</div>
+        </button>
+        <button className="glass rounded-xl p-4 text-left hover:border-cyan-500/50 transition group">
+          <div className="text-2xl mb-2">🤖</div>
+          <div className="font-medium text-white group-hover:text-cyan-400">Launch AI Agents</div>
+          <div className="text-xs text-slate-400">Get AI assistance</div>
+        </button>
+        <button className="glass rounded-xl p-4 text-left hover:border-cyan-500/50 transition group">
+          <div className="text-2xl mb-2">📊</div>
+          <div className="font-medium text-white group-hover:text-cyan-400">Generate Report</div>
+          <div className="text-xs text-slate-400">Export pipeline analytics</div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// GENERIC MODULE PLACEHOLDER
+// ============================================================
+function ModulePlaceholder({ module, currentRole }) {
+  const roleData = ROLES.find(r => r.id === currentRole);
+  
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+      <div className="text-6xl mb-6">{module.icon}</div>
+      <h2 className="text-2xl font-bold text-white mb-2">{module.name}</h2>
+      <p className="text-slate-400 mb-6">{module.description}</p>
+      
+      {module.badge && (
+        <div className={`px-3 py-1 rounded-full text-sm font-medium mb-6 ${
+          module.badge === 'PRIVATE' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+          module.badge === 'CUI' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+          'bg-slate-700 text-slate-300'
+        }`}>
+          {module.badge === 'PRIVATE' && '🔒 '}{module.badge}
+        </div>
+      )}
+
+      <div className="glass rounded-xl p-6 max-w-md">
+        <div className="text-sm text-slate-400 mb-4">
+          You are viewing as: <span className="text-cyan-400 font-medium">{roleData?.name}</span>
+        </div>
+        <p className="text-slate-500 text-sm">
+          This module is part of the MissionPulse v12 platform. Full functionality will be available in the production release.
+        </p>
+      </div>
+
+      <button className="mt-8 px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl hover:opacity-90 transition">
+        Launch {module.name} →
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN APP
+// ============================================================
+function App() {
+  const [user, setUser] = useState(null);
+  const [currentRole, setCurrentRole] = useState('CEO');
+  const [activeModule, setActiveModule] = useState('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Auth check
+  useEffect(() => {
+    const userData = checkAuth();
+    if (userData) {
+      setUser(userData);
+      setCurrentRole(userData.role || 'CEO');
+    }
+  }, []);
+
+  // Fetch opportunities
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabaseClient
+          .from('opportunities')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        setOpportunities(data || []);
+      } catch (err) {
+        console.error('Fetch error:', err);
+        // Use demo data on error
+        setOpportunities([
+          { id: 1, nickname: 'DHA EHR Mod', title: 'Electronic Health Record Modernization', agency: 'DHA', ceiling: 125000000, phase: 'Capture', pwin: 72 },
+          { id: 2, nickname: 'VA Claims AI', title: 'Veterans Benefits Claims Processing', agency: 'VA', ceiling: 89000000, phase: 'Proposal', pwin: 65 },
+          { id: 3, nickname: 'CMS Analytics', title: 'Medicare Data Analytics Platform', agency: 'CMS', ceiling: 156000000, phase: 'Blue Team', pwin: 78 },
+        ]);
+      }
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const activeModuleData = MODULES.find(m => m.id === activeModule);
+
+  return (
+    <div className="min-h-screen bg-[#00050F]">
+      <Sidebar 
+        collapsed={sidebarCollapsed} 
+        setCollapsed={setSidebarCollapsed}
+        activeModule={activeModule}
+        setActiveModule={setActiveModule}
+        currentRole={currentRole}
+      />
+      
+      <Header 
+        user={user}
+        currentRole={currentRole}
+        setCurrentRole={setCurrentRole}
+        sidebarCollapsed={sidebarCollapsed}
+      />
+
+      <main className={`pt-20 pb-8 px-6 min-h-screen transition-all ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+        {activeModule === 'dashboard' ? (
+          <DashboardModule opportunities={opportunities} loading={loading} currentRole={currentRole} />
+        ) : (
+          <ModulePlaceholder module={activeModuleData} currentRole={currentRole} />
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className={`fixed bottom-0 right-0 p-3 text-xs text-slate-600 transition-all ${sidebarCollapsed ? 'left-16' : 'left-64'}`}>
+        <div className="text-center">
+          AI GENERATED - REQUIRES HUMAN REVIEW • Mission Meets Tech © 2026
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Render
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
