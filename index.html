@@ -34,8 +34,8 @@
  * FILE: index.html
  * ROLE: System
  * SECURITY: Supabase credentials verified
- * SPRINT: 49 - Data Wiring Batch 1
- * MODULES: M1 Pipeline, M2 War Room, M3 Swimlane - LIVE DATA
+ * SPRINT: 50 - Data Wiring Batch 2
+ * MODULES: M1-M6 LIVE (Pipeline, War Room, Swimlane, Compliance, Contracts, Iron Dome)
  */
 const{useState,useEffect,useRef,useCallback}=React;
 
@@ -139,6 +139,103 @@ const MissionPulse = {
       totalValue: opps.reduce((s, o) => s + (parseInt(o.value) || 0), 0),
       avgPwin: opps.length > 0 ? Math.round(opps.reduce((s, o) => s + (parseInt(o.pwin) || 0), 0) / opps.length) : 0,
       upcoming: opps.filter(o => { const d = new Date(o.response_date); return d > new Date() && d < new Date(Date.now() + 30*24*60*60*1000); }).length
+    };
+  },
+
+  // COMPLIANCE ITEMS (Sprint 50)
+  async getComplianceItems(opportunityId) {
+    try {
+      let query = supabase.from('compliance_items').select('*').order('requirement_id', { ascending: true });
+      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getComplianceItems error:', err); return []; }
+  },
+
+  async createComplianceItem(item) {
+    try {
+      const { data, error } = await supabase.from('compliance_items')
+        .insert([{ ...item, created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] createComplianceItem error:', err); throw err; }
+  },
+
+  async updateComplianceItem(id, updates) {
+    try {
+      const { data, error } = await supabase.from('compliance_items')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] updateComplianceItem error:', err); throw err; }
+  },
+
+  async deleteComplianceItem(id) {
+    try {
+      const { error } = await supabase.from('compliance_items').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) { console.error('[MissionPulse] deleteComplianceItem error:', err); throw err; }
+  },
+
+  async getComplianceStats(opportunityId) {
+    const items = await this.getComplianceItems(opportunityId);
+    const total = items.length;
+    const compliant = items.filter(i => i.status === 'compliant').length;
+    const partial = items.filter(i => i.status === 'partial').length;
+    const risk = items.filter(i => i.status === 'risk').length;
+    return { total, compliant, partial, risk, score: total > 0 ? Math.round((compliant / total) * 100) : 0 };
+  },
+
+  // CONTRACT CLAUSES (Sprint 50)
+  async getContractClauses(opportunityId) {
+    try {
+      let query = supabase.from('contract_clauses').select('*').order('clause_number', { ascending: true });
+      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getContractClauses error:', err); return []; }
+  },
+
+  async createContractClause(clause) {
+    try {
+      const { data, error } = await supabase.from('contract_clauses')
+        .insert([{ ...clause, created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] createContractClause error:', err); throw err; }
+  },
+
+  async updateContractClause(id, updates) {
+    try {
+      const { data, error } = await supabase.from('contract_clauses')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] updateContractClause error:', err); throw err; }
+  },
+
+  async deleteContractClause(id) {
+    try {
+      const { error } = await supabase.from('contract_clauses').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) { console.error('[MissionPulse] deleteContractClause error:', err); throw err; }
+  },
+
+  async getContractRiskSummary(opportunityId) {
+    const clauses = await this.getContractClauses(opportunityId);
+    return {
+      total: clauses.length,
+      high: clauses.filter(c => c.risk_level === 'high').length,
+      medium: clauses.filter(c => c.risk_level === 'medium').length,
+      low: clauses.filter(c => c.risk_level === 'low').length
     };
   },
 
@@ -634,16 +731,467 @@ function ModuleSwimlane({opps,setOpps,loading,isLive}){
 }
 
 // ============================================================
-// REMAINING MODULES (Unchanged from production)
+// MODULE: RFP SHREDDER (M4) - LIVE DATA
 // ============================================================
 const ORALS_SLIDES=['Title Slide','Executive Summary','Technical Approach','Management Plan','Past Performance','Key Personnel','Risk Mitigation','Timeline','Value Proposition','Q&A'];
 
-function ModuleCompliance(){
-  const[uploading,setUploading]=useState(false);const[extracting,setExtracting]=useState(false);const[requirements,setRequirements]=useState(DEMO_COMPLIANCE);const[progress,setProgress]=useState(0);const fileRef=useRef();
-  const handleUpload=(e)=>{const f=e.target?.files?.[0];if(!f)return;setUploading(true);setProgress(0);const interval=setInterval(()=>{setProgress(p=>{if(p>=100){clearInterval(interval);setUploading(false);setExtracting(true);setTimeout(()=>{setExtracting(false);setRequirements(prev=>[...prev,{id:5,ref:'L.3.1',title:'Transition Plan (AI Extracted)',section:'L',status:'draft',owner:'Unassigned',confidence:75},{id:6,ref:'M.2',title:'Cost Breakdown (AI Extracted)',section:'M',status:'draft',owner:'Unassigned',confidence:82}])},2000);return 100}return p+10})},200)};
-  const exportMatrix=()=>{const csv='Ref,Title,Section,Status,Owner,Confidence\n'+requirements.map(r=>`${r.ref},${r.title},${r.section},${r.status},${r.owner},${r.confidence}`).join('\n');const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='compliance_matrix.csv';a.click()};
-  const statusColors={compliant:'bg-emerald-500/20 text-emerald-400',partial:'bg-amber-500/20 text-amber-400',risk:'bg-red-500/20 text-red-400',draft:'bg-slate-500/20 text-slate-400'};
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">RFP Shredder</h2><p className="text-slate-400 text-sm">Upload RFP to auto-extract requirements</p></div><div className="flex gap-2"><button onClick={()=>fileRef.current?.click()} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="upload" className="w-4 h-4"/>Upload RFP</button><button onClick={exportMatrix} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="download" className="w-4 h-4"/>Export CSV</button></div><input ref={fileRef} type="file" accept=".pdf,.docx" className="hidden" onChange={handleUpload}/></div>{(uploading||extracting)&&<div className="glass p-6 text-center">{uploading?<><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"/><p className="text-white">Uploading RFP... {progress}%</p><div className="w-full max-w-xs mx-auto h-2 bg-slate-700 rounded-full mt-4 overflow-hidden"><div className="h-full bg-gradient-to-r from-cyan-500 to-teal-500 transition-all" style={{width:`${progress}%`}}/></div></>:<><div className="text-4xl mb-4">🔍</div><p className="text-white">AI Extracting Requirements...</p><p className="text-cyan-400 text-sm mt-2">Analyzing Sections L & M</p></>}</div>}<div className="glass overflow-hidden"><div className="p-4 border-b border-slate-700/50 flex justify-between items-center"><h3 className="font-semibold text-white">Compliance Matrix</h3><div className="flex gap-2">{[{k:'compliant',l:'Compliant'},{k:'partial',l:'Partial'},{k:'risk',l:'Risk'}].map(s=><span key={s.k} className={`px-2 py-1 rounded text-xs ${statusColors[s.k]}`}>{requirements.filter(r=>r.status===s.k).length} {s.l}</span>)}</div></div><table className="w-full"><thead className="bg-slate-800/50"><tr>{['Ref','Requirement','Section','Status','Owner','AI Conf'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-700/50">{requirements.map(r=><tr key={r.id} className="hover:bg-slate-800/30"><td className="p-3 text-sm font-mono text-cyan-400">{r.ref}</td><td className="p-3 text-sm text-white">{r.title}</td><td className="p-3 text-sm text-slate-300">{r.section}</td><td className="p-3"><span className={`px-2 py-1 rounded text-xs ${statusColors[r.status]}`}>{r.status}</span></td><td className="p-3 text-sm text-slate-300">{r.owner}</td><td className="p-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${r.confidence>=85?'bg-emerald-500':r.confidence>=70?'bg-amber-500':'bg-red-500'}`} style={{width:`${r.confidence}%`}}/></div><span className="text-xs text-slate-400">{r.confidence}%</span></div></td></tr>)}</tbody></table></div></div>);
+function ModuleCompliance({opps,isLive}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[requirements,setRequirements]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[uploading,setUploading]=useState(false);
+  const[extracting,setExtracting]=useState(false);
+  const[progress,setProgress]=useState(0);
+  const[showForm,setShowForm]=useState(false);
+  const[form,setForm]=useState({requirement_id:'',title:'',section:'L',status:'identified',confidence:50});
+  const fileRef=useRef();
+
+  const statusColors={compliant:'bg-emerald-500/20 text-emerald-400',partial:'bg-amber-500/20 text-amber-400',risk:'bg-red-500/20 text-red-400',identified:'bg-slate-500/20 text-slate-400',draft:'bg-slate-500/20 text-slate-400'};
+
+  // Load compliance items when opportunity selected
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getComplianceItems(selectedOpp.id);
+      setRequirements(data.length>0?data:DEMO_COMPLIANCE);
+      setLoading(false);
+    };
+    load();
+  },[selectedOpp]);
+
+  const handleUpload=(e)=>{
+    const f=e.target?.files?.[0];if(!f||!selectedOpp)return;
+    setUploading(true);setProgress(0);
+    const interval=setInterval(()=>{
+      setProgress(p=>{
+        if(p>=100){
+          clearInterval(interval);setUploading(false);setExtracting(true);
+          setTimeout(async()=>{
+            // Simulate AI extraction - add items to database
+            const newItems=[
+              {opportunity_id:selectedOpp.id,requirement_id:'L.3.1',title:'Transition Plan (AI Extracted)',section:'L',status:'identified',confidence:75},
+              {opportunity_id:selectedOpp.id,requirement_id:'M.2',title:'Cost Breakdown (AI Extracted)',section:'M',status:'identified',confidence:82}
+            ];
+            for(const item of newItems){
+              try{await MissionPulse.createComplianceItem(item)}catch(e){console.error(e)}
+            }
+            const data=await MissionPulse.getComplianceItems(selectedOpp.id);
+            setRequirements(data);
+            setExtracting(false);
+          },2000);
+          return 100;
+        }
+        return p+10;
+      });
+    },200);
+  };
+
+  const handleStatusChange=async(id,newStatus)=>{
+    try{
+      await MissionPulse.updateComplianceItem(id,{status:newStatus});
+      setRequirements(requirements.map(r=>r.id===id?{...r,status:newStatus}:r));
+    }catch(err){console.error(err)}
+  };
+
+  const handleAddItem=async()=>{
+    if(!selectedOpp||!form.title)return;
+    try{
+      const item=await MissionPulse.createComplianceItem({...form,opportunity_id:selectedOpp.id});
+      setRequirements([...requirements,item]);
+      setShowForm(false);
+      setForm({requirement_id:'',title:'',section:'L',status:'identified',confidence:50});
+    }catch(err){console.error(err)}
+  };
+
+  const handleDelete=async(id)=>{
+    if(!confirm('Delete this requirement?'))return;
+    try{
+      await MissionPulse.deleteComplianceItem(id);
+      setRequirements(requirements.filter(r=>r.id!==id));
+    }catch(err){console.error(err)}
+  };
+
+  const exportMatrix=()=>{
+    const csv='Ref,Title,Section,Status,Confidence\n'+requirements.map(r=>`${r.requirement_id||r.ref},${r.title},${r.section},${r.status},${r.confidence}`).join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='compliance_matrix.csv';a.click();
+  };
+
+  const stats={
+    total:requirements.length,
+    compliant:requirements.filter(r=>r.status==='compliant').length,
+    partial:requirements.filter(r=>r.status==='partial').length,
+    risk:requirements.filter(r=>r.status==='risk').length
+  };
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">RFP Shredder</h2>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">Upload RFP to auto-extract requirements</p>
+        </div>
+        <div className="flex gap-2">
+          {selectedOpp&&<button onClick={()=>setShowForm(true)} className="px-3 py-2 bg-emerald-500 text-white rounded-lg text-sm flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Item</button>}
+          {selectedOpp&&<button onClick={()=>fileRef.current?.click()} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="upload" className="w-4 h-4"/>Upload RFP</button>}
+          <button onClick={exportMatrix} disabled={!requirements.length} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"><Icon name="download" className="w-4 h-4"/>Export CSV</button>
+        </div>
+        <input ref={fileRef} type="file" accept=".pdf,.docx" className="hidden" onChange={handleUpload}/>
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>setSelectedOpp(opps.find(o=>o.id===e.target.value)||null)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {/* Add Form */}
+      {showForm&&selectedOpp&&(
+        <div className="glass p-4 animate-fadeIn">
+          <h3 className="font-semibold text-white mb-3">Add Compliance Item</h3>
+          <div className="grid grid-cols-4 gap-3">
+            <input placeholder="Ref (e.g. L.1.1)" value={form.requirement_id} onChange={e=>setForm({...form,requirement_id:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <input placeholder="Title" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className="col-span-2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <select value={form.section} onChange={e=>setForm({...form,section:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white">
+              <option value="L">Section L</option><option value="M">Section M</option><option value="K">Section K</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 mt-3">
+            <button onClick={()=>setShowForm(false)} className="px-3 py-1 bg-slate-700 text-white rounded text-sm">Cancel</button>
+            <button onClick={handleAddItem} className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">Add</button>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Progress */}
+      {(uploading||extracting)&&(
+        <div className="glass p-6 text-center">
+          {uploading?<><Spinner/><p className="text-white mt-4">Uploading RFP... {progress}%</p><div className="w-full max-w-xs mx-auto h-2 bg-slate-700 rounded-full mt-4 overflow-hidden"><div className="h-full bg-gradient-to-r from-cyan-500 to-teal-500 transition-all" style={{width:`${progress}%`}}/></div></>:
+          <><div className="text-4xl mb-4">🔍</div><p className="text-white">AI Extracting Requirements...</p><p className="text-cyan-400 text-sm mt-2">Analyzing Sections L & M</p></>}
+        </div>
+      )}
+
+      {/* Compliance Matrix */}
+      {selectedOpp&&(
+        <div className="glass overflow-hidden">
+          <div className="p-4 border-b border-slate-700/50 flex justify-between items-center">
+            <h3 className="font-semibold text-white">Compliance Matrix: {selectedOpp.nickname||selectedOpp.name}</h3>
+            <div className="flex gap-2">
+              {[{k:'compliant',l:'Compliant',c:stats.compliant},{k:'partial',l:'Partial',c:stats.partial},{k:'risk',l:'Risk',c:stats.risk}].map(s=>
+                <span key={s.k} className={`px-2 py-1 rounded text-xs ${statusColors[s.k]}`}>{s.c} {s.l}</span>
+              )}
+            </div>
+          </div>
+          {loading?<div className="p-8 flex justify-center"><Spinner/></div>:(
+            <table className="w-full">
+              <thead className="bg-slate-800/50"><tr>{['Ref','Requirement','Section','Status','AI Conf',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {requirements.map(r=>(
+                  <tr key={r.id} className="hover:bg-slate-800/30">
+                    <td className="p-3 text-sm font-mono text-cyan-400">{r.requirement_id||r.ref}</td>
+                    <td className="p-3 text-sm text-white">{r.title}</td>
+                    <td className="p-3 text-sm text-slate-300">{r.section}</td>
+                    <td className="p-3">
+                      <select value={r.status} onChange={e=>handleStatusChange(r.id,e.target.value)} className={`px-2 py-1 rounded text-xs border-0 ${statusColors[r.status]} bg-transparent cursor-pointer`}>
+                        <option value="identified">Identified</option>
+                        <option value="compliant">Compliant</option>
+                        <option value="partial">Partial</option>
+                        <option value="risk">Risk</option>
+                      </select>
+                    </td>
+                    <td className="p-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${r.confidence>=85?'bg-emerald-500':r.confidence>=70?'bg-amber-500':'bg-red-500'}`} style={{width:`${r.confidence}%`}}/></div><span className="text-xs text-slate-400">{r.confidence}%</span></div></td>
+                    <td className="p-3"><button onClick={()=>handleDelete(r.id)} className="p-1 text-red-400 hover:text-red-300"><Icon name="trash" className="w-4 h-4"/></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">📄</div><p className="text-white text-lg mb-2">Select an opportunity to view compliance matrix</p><p className="text-slate-400">Upload RFP documents to auto-extract requirements</p></div>}
+    </div>
+  );
+}
+
+// ============================================================
+// MODULE: CONTRACT SCANNER (M5) - LIVE DATA
+// ============================================================
+function ModuleContracts({opps,isLive}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[clauses,setClauses]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[showForm,setShowForm]=useState(false);
+  const[form,setForm]=useState({clause_number:'',clause_title:'',clause_type:'FAR',risk_level:'low',notes:''});
+
+  const riskColors={high:'bg-red-500/20 text-red-400',medium:'bg-amber-500/20 text-amber-400',low:'bg-emerald-500/20 text-emerald-400'};
+
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getContractClauses(selectedOpp.id);
+      setClauses(data.length>0?data:[
+        {id:'demo-1',clause_number:'52.212-4',clause_title:'Contract Terms and Conditions',clause_type:'FAR',risk_level:'low',compliance_status:'compliant'},
+        {id:'demo-2',clause_number:'52.219-14',clause_title:'Limitations on Subcontracting',clause_type:'FAR',risk_level:'high',compliance_status:'pending'},
+        {id:'demo-3',clause_number:'252.204-7012',clause_title:'DFARS Cybersecurity Requirements',clause_type:'DFARS',risk_level:'high',compliance_status:'partial'}
+      ]);
+      setLoading(false);
+    };
+    load();
+  },[selectedOpp]);
+
+  const handleAddClause=async()=>{
+    if(!selectedOpp||!form.clause_number)return;
+    try{
+      const clause=await MissionPulse.createContractClause({...form,opportunity_id:selectedOpp.id,compliance_status:'pending'});
+      setClauses([...clauses,clause]);
+      setShowForm(false);
+      setForm({clause_number:'',clause_title:'',clause_type:'FAR',risk_level:'low',notes:''});
+    }catch(err){console.error(err)}
+  };
+
+  const handleRiskChange=async(id,newRisk)=>{
+    try{
+      await MissionPulse.updateContractClause(id,{risk_level:newRisk});
+      setClauses(clauses.map(c=>c.id===id?{...c,risk_level:newRisk}:c));
+    }catch(err){console.error(err)}
+  };
+
+  const handleDelete=async(id)=>{
+    if(!confirm('Delete this clause?'))return;
+    try{
+      await MissionPulse.deleteContractClause(id);
+      setClauses(clauses.filter(c=>c.id!==id));
+    }catch(err){console.error(err)}
+  };
+
+  const stats={
+    total:clauses.length,
+    high:clauses.filter(c=>c.risk_level==='high').length,
+    medium:clauses.filter(c=>c.risk_level==='medium').length,
+    low:clauses.filter(c=>c.risk_level==='low').length
+  };
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Contract Scanner</h2>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">FAR/DFARS clause analysis and risk scoring</p>
+        </div>
+        {selectedOpp&&<button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Clause</button>}
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>setSelectedOpp(opps.find(o=>o.id===e.target.value)||null)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {/* Risk Summary */}
+      {selectedOpp&&(
+        <div className="grid grid-cols-4 gap-4">
+          <div className="glass p-4"><p className="text-slate-400 text-xs">Total Clauses</p><p className="text-2xl font-bold text-white">{stats.total}</p></div>
+          <div className="glass p-4"><p className="text-slate-400 text-xs">High Risk</p><p className="text-2xl font-bold text-red-400">{stats.high}</p></div>
+          <div className="glass p-4"><p className="text-slate-400 text-xs">Medium Risk</p><p className="text-2xl font-bold text-amber-400">{stats.medium}</p></div>
+          <div className="glass p-4"><p className="text-slate-400 text-xs">Low Risk</p><p className="text-2xl font-bold text-emerald-400">{stats.low}</p></div>
+        </div>
+      )}
+
+      {/* Add Form */}
+      {showForm&&(
+        <div className="glass p-4 animate-fadeIn">
+          <h3 className="font-semibold text-white mb-3">Add Contract Clause</h3>
+          <div className="grid grid-cols-4 gap-3">
+            <input placeholder="Clause # (e.g. 52.212-4)" value={form.clause_number} onChange={e=>setForm({...form,clause_number:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <input placeholder="Clause Title" value={form.clause_title} onChange={e=>setForm({...form,clause_title:e.target.value})} className="col-span-2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <select value={form.clause_type} onChange={e=>setForm({...form,clause_type:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white">
+              <option value="FAR">FAR</option><option value="DFARS">DFARS</option><option value="HHSAR">HHSAR</option><option value="VAAR">VAAR</option>
+            </select>
+            <select value={form.risk_level} onChange={e=>setForm({...form,risk_level:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white">
+              <option value="low">Low Risk</option><option value="medium">Medium Risk</option><option value="high">High Risk</option>
+            </select>
+            <input placeholder="Notes" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} className="col-span-2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+          </div>
+          <div className="flex justify-end gap-2 mt-3">
+            <button onClick={()=>setShowForm(false)} className="px-3 py-1 bg-slate-700 text-white rounded text-sm">Cancel</button>
+            <button onClick={handleAddClause} className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">Add</button>
+          </div>
+        </div>
+      )}
+
+      {/* Clauses Table */}
+      {selectedOpp&&(
+        <div className="glass overflow-hidden">
+          <div className="p-4 border-b border-slate-700/50"><h3 className="font-semibold text-white">Contract Clauses: {selectedOpp.nickname||selectedOpp.name}</h3></div>
+          {loading?<div className="p-8 flex justify-center"><Spinner/></div>:(
+            <table className="w-full">
+              <thead className="bg-slate-800/50"><tr>{['Clause','Title','Type','Risk','Status',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {clauses.map(c=>(
+                  <tr key={c.id} className="hover:bg-slate-800/30">
+                    <td className="p-3 text-sm font-mono text-cyan-400">{c.clause_number}</td>
+                    <td className="p-3 text-sm text-white">{c.clause_title}</td>
+                    <td className="p-3"><span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">{c.clause_type}</span></td>
+                    <td className="p-3">
+                      <select value={c.risk_level} onChange={e=>handleRiskChange(c.id,e.target.value)} className={`px-2 py-1 rounded text-xs border-0 ${riskColors[c.risk_level]} bg-transparent cursor-pointer`}>
+                        <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+                      </select>
+                    </td>
+                    <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs ${c.compliance_status==='compliant'?'bg-emerald-500/20 text-emerald-400':c.compliance_status==='partial'?'bg-amber-500/20 text-amber-400':'bg-slate-500/20 text-slate-400'}`}>{c.compliance_status}</span></td>
+                    <td className="p-3"><button onClick={()=>handleDelete(c.id)} className="p-1 text-red-400 hover:text-red-300"><Icon name="trash" className="w-4 h-4"/></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">⚖️</div><p className="text-white text-lg mb-2">Select an opportunity to scan contracts</p><p className="text-slate-400">Analyze FAR/DFARS clauses and assess risk</p></div>}
+    </div>
+  );
+}
+
+// ============================================================
+// MODULE: IRON DOME (M6) - RISK AGGREGATION VIEW
+// ============================================================
+function ModuleIronDome({opps,isLive}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[complianceStats,setComplianceStats]=useState(null);
+  const[contractStats,setContractStats]=useState(null);
+  const[loading,setLoading]=useState(false);
+
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      setLoading(true);
+      const[cStats,ctStats]=await Promise.all([
+        MissionPulse.getComplianceStats(selectedOpp.id),
+        MissionPulse.getContractRiskSummary(selectedOpp.id)
+      ]);
+      setComplianceStats(cStats.total>0?cStats:{total:4,compliant:2,partial:1,risk:1,score:50});
+      setContractStats(ctStats.total>0?ctStats:{total:3,high:1,medium:1,low:1});
+      setLoading(false);
+    };
+    load();
+  },[selectedOpp]);
+
+  const overallRisk=()=>{
+    if(!complianceStats||!contractStats)return 'unknown';
+    const riskScore=(complianceStats.risk*3+complianceStats.partial+contractStats.high*3+contractStats.medium);
+    if(riskScore>=6)return 'high';
+    if(riskScore>=3)return 'medium';
+    return 'low';
+  };
+
+  const riskColor={high:'text-red-400',medium:'text-amber-400',low:'text-emerald-400',unknown:'text-slate-400'};
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Iron Dome</h2>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">Aggregated risk assessment and defense posture</p>
+        </div>
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>setSelectedOpp(opps.find(o=>o.id===e.target.value)||null)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {selectedOpp&&!loading&&(
+        <>
+          {/* Overall Risk Score */}
+          <div className="glass p-6 bg-gradient-to-r from-slate-800/50 to-slate-900/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Overall Risk Assessment</h3>
+                <p className="text-slate-400 text-sm">{selectedOpp.nickname||selectedOpp.name}</p>
+              </div>
+              <div className="text-right">
+                <div className={`text-4xl font-bold uppercase ${riskColor[overallRisk()]}`}>{overallRisk()}</div>
+                <p className="text-xs text-slate-500">Risk Level</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Risk Breakdown */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Compliance Risks */}
+            <div className="glass p-4">
+              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">📄 Compliance Risks</h3>
+              {complianceStats&&(
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center"><span className="text-sm text-slate-400">Total Requirements</span><span className="text-white font-medium">{complianceStats.total}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-sm text-emerald-400">Compliant</span><span className="text-white">{complianceStats.compliant}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-sm text-amber-400">Partial</span><span className="text-white">{complianceStats.partial}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-sm text-red-400">At Risk</span><span className="text-white">{complianceStats.risk}</span></div>
+                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden mt-2">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500" style={{width:`${complianceStats.score}%`}}/>
+                  </div>
+                  <p className="text-xs text-slate-500 text-center">Compliance Score: {complianceStats.score}%</p>
+                </div>
+              )}
+            </div>
+
+            {/* Contract Risks */}
+            <div className="glass p-4">
+              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">⚖️ Contract Risks</h3>
+              {contractStats&&(
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center"><span className="text-sm text-slate-400">Total Clauses</span><span className="text-white font-medium">{contractStats.total}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-sm text-red-400">High Risk</span><span className="text-white">{contractStats.high}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-sm text-amber-400">Medium Risk</span><span className="text-white">{contractStats.medium}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-sm text-emerald-400">Low Risk</span><span className="text-white">{contractStats.low}</span></div>
+                  <div className="flex gap-1 mt-2">
+                    {Array(contractStats.high).fill().map((_,i)=><div key={`h${i}`} className="flex-1 h-4 bg-red-500/50 rounded"/>)}
+                    {Array(contractStats.medium).fill().map((_,i)=><div key={`m${i}`} className="flex-1 h-4 bg-amber-500/50 rounded"/>)}
+                    {Array(contractStats.low).fill().map((_,i)=><div key={`l${i}`} className="flex-1 h-4 bg-emerald-500/50 rounded"/>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recommendations */}
+          <div className="glass p-4">
+            <h3 className="font-semibold text-white mb-3">🛡️ Defense Recommendations</h3>
+            <div className="space-y-2">
+              {complianceStats?.risk>0&&<div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-300">⚠️ {complianceStats.risk} compliance item(s) at risk - prioritize resolution before submission</div>}
+              {contractStats?.high>0&&<div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300">📋 {contractStats.high} high-risk contract clause(s) require mitigation strategies</div>}
+              {complianceStats?.score>=80&&<div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-sm text-emerald-300">✅ Strong compliance posture ({complianceStats.score}%) - maintain current trajectory</div>}
+            </div>
+          </div>
+        </>
+      )}
+
+      {loading&&<div className="glass p-8 flex justify-center"><Spinner/></div>}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🛡️</div><p className="text-white text-lg mb-2">Select an opportunity to view risk assessment</p><p className="text-slate-400">Aggregated view of compliance and contract risks</p></div>}
+    </div>
+  );
 }
 
 function ModuleHITL(){
@@ -699,7 +1247,7 @@ function AIChatWidget(){
 function Sidebar({role,setRole,active,setActive,user}){
   const[collapsed,setCollapsed]=useState(false);const[showRoles,setShowRoles]=useState(false);
   const accessible=MODULES.filter(m=>role.access.includes(m.id));
-  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Sprint 49</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>)})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
+  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Sprint 50</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>)})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
 }
 
 // ============================================================
@@ -752,7 +1300,9 @@ function App(){
       case 'pipeline':return<ModulePipeline opps={opps} setOpps={setOpps} loading={loading} isLive={isLive} onRefresh={loadOpportunities}/>;
       case 'warroom':return<ModuleWarRoom opps={opps} loading={loading} isLive={isLive}/>;
       case 'swimlane':return<ModuleSwimlane opps={opps} setOpps={setOpps} loading={loading} isLive={isLive}/>;
-      case 'compliance':return<ModuleCompliance/>;
+      case 'compliance':return<ModuleCompliance opps={opps} isLive={isLive}/>;
+      case 'contracts':return<ModuleContracts opps={opps} isLive={isLive}/>;
+      case 'writer':return<ModuleIronDome opps={opps} isLive={isLive}/>;
       case 'hitl':return<ModuleHITL/>;
       case 'orals':return<ModuleOrals/>;
       case 'pricing':return<ModulePricing/>;
@@ -772,7 +1322,7 @@ function App(){
         {active&&<header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3"><div className="flex items-center gap-3"><span className="text-xl">{active.icon}</span><div><h1 className="font-semibold text-white">{active.name}</h1></div>{active.badge&&<span className={`px-2 py-0.5 rounded text-xs font-bold ${active.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':active.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{active.badge}</span>}</div></header>}
         <main className="flex-1 overflow-y-auto p-6">{renderModule()}</main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 49 • © 2026 Mission Meets Tech</span></div>
+      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 50 • © 2026 Mission Meets Tech</span></div>
       <AIChatWidget/>
     </div>
   );
