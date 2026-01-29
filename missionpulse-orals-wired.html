@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orals Prep Studio | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="supabase-client-v2.1.js"></script>
+  <style>
+    :root {
+      --primary-cyan: #00E5FA;
+      --deep-navy: #00050F;
+      --card-bg: #0d1f3c;
+      --border-cyan: rgba(0, 229, 250, 0.3);
+    }
+    body { background: var(--deep-navy); color: white; font-family: system-ui, -apple-system, sans-serif; }
+    .card { background: var(--card-bg); border: 1px solid var(--border-cyan); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0099FF 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 229, 250, 0.3); }
+    .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+    .pulse-ring { animation: pulse-ring 2s infinite; }
+    @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(0, 229, 250, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0, 229, 250, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 229, 250, 0); } }
+    .timer-display { font-family: 'SF Mono', 'Monaco', monospace; font-size: 3rem; letter-spacing: 0.1em; }
+    .waveform-bar { animation: waveform 0.5s ease-in-out infinite alternate; }
+    @keyframes waveform { 0% { height: 20%; } 100% { height: 100%; } }
+    .ai-feedback { border-left: 3px solid var(--primary-cyan); }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="border-b border-cyan-500/20 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="text-cyan-400 hover:text-cyan-300">← Dashboard</a>
+        <div class="h-6 w-px bg-cyan-500/30"></div>
+        <h1 class="text-xl font-bold">
+          <span class="text-cyan-400">Orals</span> Prep Studio
+        </h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+          <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+          <span class="text-gray-400">Connecting...</span>
+        </div>
+        <select id="opportunitySelect" class="bg-gray-800 border border-cyan-500/30 rounded-lg px-3 py-2 text-sm">
+          <option value="">Select Opportunity</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <!-- Stats Row -->
+    <div class="grid grid-cols-4 gap-4 mb-8">
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Total Sessions</div>
+        <div id="statSessions" class="text-2xl font-bold text-cyan-400 glow-text">0</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Avg Confidence</div>
+        <div id="statConfidence" class="text-2xl font-bold text-green-400">0%</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Practice Time</div>
+        <div id="statTime" class="text-2xl font-bold text-purple-400">0h</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Questions Mastered</div>
+        <div id="statQuestions" class="text-2xl font-bold text-amber-400">0</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-6">
+      <!-- Left Column: Session Control -->
+      <div class="col-span-2 space-y-6">
+        <!-- Practice Session Card -->
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-semibold">Practice Session</h2>
+            <div class="flex items-center gap-2">
+              <select id="sessionType" class="bg-gray-800 border border-cyan-500/30 rounded px-3 py-1 text-sm">
+                <option value="mock">Mock Presentation</option>
+                <option value="qa">Q&A Drill</option>
+                <option value="scenario">Scenario Response</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Timer Display -->
+          <div class="bg-gray-900/50 rounded-xl p-8 text-center mb-6">
+            <div id="timerDisplay" class="timer-display text-cyan-400 glow-text mb-4">00:00</div>
+            <div class="flex justify-center gap-4">
+              <button id="btnStart" class="btn-primary px-6 py-3 rounded-lg flex items-center gap-2">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                Start
+              </button>
+              <button id="btnPause" class="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-lg flex items-center gap-2" disabled>
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"/></svg>
+                Pause
+              </button>
+              <button id="btnStop" class="bg-red-600 hover:bg-red-500 px-6 py-3 rounded-lg flex items-center gap-2" disabled>
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M5.25 3A2.25 2.25 0 003 5.25v9.5A2.25 2.25 0 005.25 17h9.5A2.25 2.25 0 0017 14.75v-9.5A2.25 2.25 0 0014.75 3h-9.5z"/></svg>
+                Stop & Save
+              </button>
+            </div>
+          </div>
+
+          <!-- Current Question -->
+          <div class="bg-gray-900/30 rounded-lg p-4 mb-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-cyan-400 uppercase tracking-wide">Current Question</span>
+              <span id="questionCategory" class="text-xs px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded">Technical</span>
+            </div>
+            <p id="currentQuestion" class="text-lg">Click "Start" to begin your practice session...</p>
+          </div>
+
+          <!-- Suggested Answer -->
+          <div class="ai-feedback bg-gray-900/30 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-3.815 10.631C7.237 13.452 8 14.702 8 16h4c0-1.298.763-2.548 1.815-3.369A6 6 0 0010 2z"/></svg>
+              <span class="text-xs text-cyan-400 uppercase tracking-wide">AI Suggested Answer</span>
+            </div>
+            <p id="suggestedAnswer" class="text-sm text-gray-300">Answer guidance will appear here...</p>
+          </div>
+        </div>
+
+        <!-- Past Sessions -->
+        <div class="card p-6">
+          <h2 class="text-lg font-semibold mb-4">Session History</h2>
+          <div id="sessionsList" class="space-y-3">
+            <div class="text-gray-500 text-center py-8">Loading sessions...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Q&A Bank -->
+      <div class="space-y-6">
+        <!-- Q&A Bank -->
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">Question Bank</h2>
+            <button id="btnAddQuestion" class="text-cyan-400 hover:text-cyan-300 text-sm">+ Add</button>
+          </div>
+          <div class="mb-4">
+            <select id="categoryFilter" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2 text-sm">
+              <option value="all">All Categories</option>
+              <option value="technical">Technical Approach</option>
+              <option value="management">Management</option>
+              <option value="past_performance">Past Performance</option>
+              <option value="cost">Cost/Pricing</option>
+              <option value="staffing">Staffing</option>
+              <option value="risk">Risk</option>
+              <option value="scenario">Scenario</option>
+            </select>
+          </div>
+          <div id="questionBank" class="space-y-3 max-h-96 overflow-y-auto">
+            <!-- Questions loaded dynamically -->
+          </div>
+        </div>
+
+        <!-- Evaluator Personas -->
+        <div class="card p-6">
+          <h2 class="text-lg font-semibold mb-4">Evaluator Personas</h2>
+          <div id="evaluatorList" class="space-y-3">
+            <div class="bg-gray-900/50 rounded-lg p-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                  <svg class="w-6 h-6 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+                </div>
+                <div>
+                  <div class="font-medium">Dr. Sarah Chen</div>
+                  <div class="text-xs text-gray-400">Technical Chair • VA OIT</div>
+                </div>
+              </div>
+              <div class="mt-2 text-xs text-gray-400">Hot buttons: FHIR, HL7, Epic integration</div>
+            </div>
+            <div class="bg-gray-900/50 rounded-lg p-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <svg class="w-6 h-6 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+                </div>
+                <div>
+                  <div class="font-medium">Col. James Morrison</div>
+                  <div class="text-xs text-gray-400">Source Selection • DHA</div>
+                </div>
+              </div>
+              <div class="mt-2 text-xs text-gray-400">Hot buttons: Schedule, risk mitigation</div>
+            </div>
+            <div class="bg-gray-900/50 rounded-lg p-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <svg class="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+                </div>
+                <div>
+                  <div class="font-medium">Linda Washington</div>
+                  <div class="text-xs text-gray-400">Contracting Officer • CMS</div>
+                </div>
+              </div>
+              <div class="mt-2 text-xs text-gray-400">Hot buttons: Compliance, FAR/DFARS</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-cyan-500/20 px-6 py-4 mt-8">
+    <div class="max-w-7xl mx-auto flex items-center justify-between text-sm text-gray-500">
+      <span>© 2026 Mission Meets Tech | MissionPulse v2.1</span>
+      <span class="text-cyan-400/50">AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</span>
+    </div>
+  </footer>
+
+  <script>
+    // ============================================================
+    // STATE
+    // ============================================================
+    let sessions = [];
+    let opportunities = [];
+    let currentOpportunityId = null;
+    let timerInterval = null;
+    let elapsedSeconds = 0;
+    let isRunning = false;
+
+    // Q&A Bank (default questions)
+    const defaultQuestions = [
+      { id: 1, category: 'technical', question: 'How will your team handle interoperability with existing VA systems?', answer: 'Our proven integration framework uses FHIR R4 APIs and HL7 v2.x messaging...', difficulty: 'high' },
+      { id: 2, category: 'past_performance', question: 'Describe a situation where your team recovered from a significant project setback.', answer: 'On our DHA MHS GENESIS deployment, we encountered unexpected data migration issues...', difficulty: 'medium' },
+      { id: 3, category: 'management', question: 'How do you ensure knowledge transfer and continuity when key personnel change?', answer: 'We maintain a robust Knowledge Management system with documented runbooks...', difficulty: 'medium' },
+      { id: 4, category: 'staffing', question: 'What is your plan if the proposed Program Manager becomes unavailable?', answer: 'Our bench includes 3 PMP-certified Program Managers with active federal clearances...', difficulty: 'high' },
+      { id: 5, category: 'technical', question: 'Explain your approach to achieving FedRAMP compliance for cloud components.', answer: 'We leverage our existing FedRAMP High authorized infrastructure through AWS GovCloud...', difficulty: 'high' },
+      { id: 6, category: 'cost', question: 'How do you justify the labor rates proposed for your senior technical staff?', answer: 'Our rates reflect GSA Schedule pricing and align with BLS data for the DC area...', difficulty: 'medium' },
+      { id: 7, category: 'risk', question: 'What are the top 3 risks you see in this contract, and how will you mitigate them?', answer: 'Risk 1: Data migration complexity - Mitigated through our proven ETL framework...', difficulty: 'high' },
+      { id: 8, category: 'scenario', question: 'The Government requests a 30% scope increase with no additional funding. How do you respond?', answer: 'We would first conduct a detailed impact analysis to understand the true cost...', difficulty: 'high' },
+    ];
+
+    let questionBank = [...defaultQuestions];
+    let currentQuestionIndex = 0;
+
+    // ============================================================
+    // DOM ELEMENTS
+    // ============================================================
+    const elements = {
+      connectionStatus: document.getElementById('connectionStatus'),
+      opportunitySelect: document.getElementById('opportunitySelect'),
+      timerDisplay: document.getElementById('timerDisplay'),
+      btnStart: document.getElementById('btnStart'),
+      btnPause: document.getElementById('btnPause'),
+      btnStop: document.getElementById('btnStop'),
+      currentQuestion: document.getElementById('currentQuestion'),
+      questionCategory: document.getElementById('questionCategory'),
+      suggestedAnswer: document.getElementById('suggestedAnswer'),
+      sessionsList: document.getElementById('sessionsList'),
+      questionBank: document.getElementById('questionBank'),
+      categoryFilter: document.getElementById('categoryFilter'),
+      statSessions: document.getElementById('statSessions'),
+      statConfidence: document.getElementById('statConfidence'),
+      statTime: document.getElementById('statTime'),
+      statQuestions: document.getElementById('statQuestions'),
+    };
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+    async function init() {
+      // Connection status listener
+      MissionPulse.onConnectionChange(status => {
+        const dot = elements.connectionStatus.querySelector('span:first-child');
+        const text = elements.connectionStatus.querySelector('span:last-child');
+        if (status === 'connected') {
+          dot.className = 'w-2 h-2 rounded-full bg-green-500';
+          text.textContent = 'Connected';
+          text.className = 'text-green-400';
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-yellow-500 animate-pulse';
+          text.textContent = 'Connecting...';
+          text.className = 'text-gray-400';
+        }
+      });
+
+      // Load opportunities for dropdown
+      await loadOpportunities();
+      
+      // Load sessions
+      await loadSessions();
+      
+      // Render question bank
+      renderQuestionBank();
+      
+      // Setup event listeners
+      setupEventListeners();
+      
+      // Subscribe to real-time updates
+      MissionPulse.oralsSessions.subscribe(handleRealtimeUpdate);
+    }
+
+    // ============================================================
+    // DATA LOADING
+    // ============================================================
+    async function loadOpportunities() {
+      const { data, error } = await MissionPulse.opportunities.getAll({ orderBy: 'due_date' });
+      if (error) {
+        console.error('Error loading opportunities:', error);
+        return;
+      }
+      opportunities = data || [];
+      elements.opportunitySelect.innerHTML = '<option value="">Select Opportunity</option>' +
+        opportunities.map(o => `<option value="${o.id}">${o.name} - ${o.agency}</option>`).join('');
+    }
+
+    async function loadSessions() {
+      const filter = currentOpportunityId ? { opportunity_id: currentOpportunityId } : {};
+      const { data, error } = await MissionPulse.oralsSessions.getAll({ 
+        orderBy: 'created_at', 
+        ascending: false,
+        filter 
+      });
+      
+      if (error) {
+        console.error('Error loading sessions:', error);
+        elements.sessionsList.innerHTML = '<div class="text-red-400 text-center py-4">Error loading sessions</div>';
+        return;
+      }
+      
+      sessions = data || [];
+      renderSessions();
+      updateStats();
+    }
+
+    // ============================================================
+    // RENDERING
+    // ============================================================
+    function renderSessions() {
+      if (sessions.length === 0) {
+        elements.sessionsList.innerHTML = '<div class="text-gray-500 text-center py-8">No practice sessions yet. Start one above!</div>';
+        return;
+      }
+
+      elements.sessionsList.innerHTML = sessions.map(s => `
+        <div class="bg-gray-900/50 rounded-lg p-4 hover:bg-gray-900/70 transition-colors">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-3">
+              <span class="px-2 py-1 rounded text-xs ${getSessionTypeClass(s.sessionType)}">${formatSessionType(s.sessionType)}</span>
+              <span class="text-sm text-gray-400">${formatDate(s.createdAt)}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm ${getConfidenceClass(s.confidenceScore)}">${s.confidenceScore || 0}%</span>
+              <button onclick="deleteSession('${s.id}')" class="text-gray-500 hover:text-red-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="text-sm">
+            <span class="text-gray-400">Duration:</span> 
+            <span class="text-white">${formatDuration(s.timeLimitMinutes)}</span>
+            ${s.presenterName ? `<span class="text-gray-400 ml-4">Presenter:</span> <span class="text-white">${s.presenterName}</span>` : ''}
+          </div>
+          ${s.aiFeedback ? `<div class="mt-2 text-xs text-cyan-400/70 italic">"${s.aiFeedback.substring(0, 100)}..."</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function renderQuestionBank() {
+      const filter = elements.categoryFilter.value;
+      const filtered = filter === 'all' ? questionBank : questionBank.filter(q => q.category === filter);
+      
+      elements.questionBank.innerHTML = filtered.map((q, i) => `
+        <div class="bg-gray-900/50 rounded-lg p-3 cursor-pointer hover:bg-gray-900/70" onclick="selectQuestion(${i})">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs px-2 py-0.5 rounded ${getCategoryClass(q.category)}">${formatCategory(q.category)}</span>
+            <span class="text-xs ${getDifficultyClass(q.difficulty)}">${q.difficulty}</span>
+          </div>
+          <p class="text-sm line-clamp-2">${q.question}</p>
+        </div>
+      `).join('');
+    }
+
+    function updateStats() {
+      elements.statSessions.textContent = sessions.length;
+      
+      const avgConfidence = sessions.length > 0 
+        ? Math.round(sessions.reduce((sum, s) => sum + (s.confidenceScore || 0), 0) / sessions.length)
+        : 0;
+      elements.statConfidence.textContent = `${avgConfidence}%`;
+      
+      const totalMinutes = sessions.reduce((sum, s) => sum + (s.timeLimitMinutes || 0), 0);
+      elements.statTime.textContent = `${Math.round(totalMinutes / 60)}h`;
+      
+      elements.statQuestions.textContent = questionBank.length;
+    }
+
+    // ============================================================
+    // TIMER CONTROLS
+    // ============================================================
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      elements.btnStart.disabled = true;
+      elements.btnPause.disabled = false;
+      elements.btnStop.disabled = false;
+      
+      // Show first question
+      showQuestion(currentQuestionIndex);
+      
+      timerInterval = setInterval(() => {
+        elapsedSeconds++;
+        updateTimerDisplay();
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      if (!isRunning) return;
+      isRunning = false;
+      clearInterval(timerInterval);
+      elements.btnStart.disabled = false;
+      elements.btnPause.disabled = true;
+    }
+
+    async function stopTimer() {
+      pauseTimer();
+      elements.btnStop.disabled = true;
+      
+      // Save session
+      const session = {
+        opportunityId: currentOpportunityId,
+        sessionType: document.getElementById('sessionType').value,
+        timeLimitMinutes: Math.ceil(elapsedSeconds / 60),
+        confidenceScore: Math.floor(Math.random() * 30) + 70, // Simulated score 70-100
+        aiFeedback: 'Good delivery with clear articulation. Consider slowing down during technical explanations.',
+        presenterName: 'Current User'
+      };
+      
+      const { data, error } = await MissionPulse.oralsSessions.create(session);
+      if (error) {
+        console.error('Error saving session:', error);
+        alert('Error saving session. Please try again.');
+      } else {
+        console.log('Session saved:', data);
+        await loadSessions();
+      }
+      
+      // Reset timer
+      elapsedSeconds = 0;
+      updateTimerDisplay();
+      elements.currentQuestion.textContent = 'Session saved! Click "Start" for a new session...';
+      elements.suggestedAnswer.textContent = 'Answer guidance will appear here...';
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const seconds = elapsedSeconds % 60;
+      elements.timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    // ============================================================
+    // QUESTION HANDLING
+    // ============================================================
+    function showQuestion(index) {
+      const q = questionBank[index];
+      if (!q) return;
+      
+      elements.currentQuestion.textContent = q.question;
+      elements.questionCategory.textContent = formatCategory(q.category);
+      elements.questionCategory.className = `text-xs px-2 py-1 rounded ${getCategoryClass(q.category)}`;
+      elements.suggestedAnswer.textContent = q.answer;
+    }
+
+    function selectQuestion(index) {
+      currentQuestionIndex = index;
+      showQuestion(index);
+    }
+
+    function nextQuestion() {
+      currentQuestionIndex = (currentQuestionIndex + 1) % questionBank.length;
+      showQuestion(currentQuestionIndex);
+    }
+
+    // ============================================================
+    // CRUD OPERATIONS
+    // ============================================================
+    async function deleteSession(id) {
+      if (!confirm('Delete this session?')) return;
+      
+      const { error } = await MissionPulse.oralsSessions.delete(id);
+      if (error) {
+        console.error('Error deleting session:', error);
+        alert('Error deleting session');
+      } else {
+        await loadSessions();
+      }
+    }
+
+    // ============================================================
+    // REAL-TIME UPDATES
+    // ============================================================
+    function handleRealtimeUpdate(event) {
+      console.log('Real-time update:', event);
+      loadSessions();
+    }
+
+    // ============================================================
+    // EVENT LISTENERS
+    // ============================================================
+    function setupEventListeners() {
+      elements.opportunitySelect.addEventListener('change', (e) => {
+        currentOpportunityId = e.target.value || null;
+        loadSessions();
+      });
+      
+      elements.btnStart.addEventListener('click', startTimer);
+      elements.btnPause.addEventListener('click', pauseTimer);
+      elements.btnStop.addEventListener('click', stopTimer);
+      
+      elements.categoryFilter.addEventListener('change', renderQuestionBank);
+      
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && isRunning) {
+          e.preventDefault();
+          nextQuestion();
+        }
+      });
+    }
+
+    // ============================================================
+    // UTILITY FUNCTIONS
+    // ============================================================
+    function formatDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDuration(minutes) {
+      if (!minutes) return '0 min';
+      if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+      return `${minutes} min`;
+    }
+
+    function formatSessionType(type) {
+      const types = { mock: 'Mock Presentation', qa: 'Q&A Drill', scenario: 'Scenario Response' };
+      return types[type] || type;
+    }
+
+    function formatCategory(cat) {
+      const categories = {
+        technical: 'Technical', management: 'Management', past_performance: 'Past Performance',
+        cost: 'Cost', staffing: 'Staffing', risk: 'Risk', scenario: 'Scenario'
+      };
+      return categories[cat] || cat;
+    }
+
+    function getSessionTypeClass(type) {
+      const classes = { mock: 'bg-purple-500/20 text-purple-400', qa: 'bg-cyan-500/20 text-cyan-400', scenario: 'bg-amber-500/20 text-amber-400' };
+      return classes[type] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    function getCategoryClass(cat) {
+      const classes = {
+        technical: 'bg-cyan-500/20 text-cyan-400', management: 'bg-purple-500/20 text-purple-400',
+        past_performance: 'bg-green-500/20 text-green-400', cost: 'bg-amber-500/20 text-amber-400',
+        staffing: 'bg-blue-500/20 text-blue-400', risk: 'bg-red-500/20 text-red-400',
+        scenario: 'bg-pink-500/20 text-pink-400'
+      };
+      return classes[cat] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    function getDifficultyClass(diff) {
+      const classes = { high: 'text-red-400', medium: 'text-amber-400', low: 'text-green-400' };
+      return classes[diff] || 'text-gray-400';
+    }
+
+    function getConfidenceClass(score) {
+      if (score >= 80) return 'text-green-400';
+      if (score >= 60) return 'text-amber-400';
+      return 'text-red-400';
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>

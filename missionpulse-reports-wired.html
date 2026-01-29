@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports & Analytics | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="supabase-client-v2.1.js"></script>
+  <style>
+    :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; --card-bg: #0d1f3c; --border-cyan: rgba(0, 229, 250, 0.3); }
+    body { background: var(--deep-navy); color: white; font-family: system-ui, -apple-system, sans-serif; }
+    .card { background: var(--card-bg); border: 1px solid var(--border-cyan); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0099FF 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 229, 250, 0.3); }
+    .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+    .chart-bar { background: linear-gradient(to top, rgba(0, 229, 250, 0.8), rgba(0, 153, 255, 0.5)); border-radius: 4px 4px 0 0; transition: height 0.5s ease; }
+    .report-card { transition: all 0.2s; cursor: pointer; }
+    .report-card:hover { transform: translateY(-2px); border-color: rgba(0, 229, 250, 0.5); }
+  </style>
+</head>
+<body class="min-h-screen">
+  <header class="border-b border-cyan-500/20 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="text-cyan-400 hover:text-cyan-300">← Dashboard</a>
+        <div class="h-6 w-px bg-cyan-500/30"></div>
+        <h1 class="text-xl font-bold"><span class="text-cyan-400">Reports</span> & Analytics</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+          <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+          <span class="text-gray-400">Connecting...</span>
+        </div>
+        <button onclick="generateReport()" class="btn-primary px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Generate Report
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <!-- Quick Stats Dashboard -->
+    <div class="grid grid-cols-4 gap-4 mb-8">
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Pipeline Value</div>
+        <div id="statPipeline" class="text-2xl font-bold text-cyan-400 glow-text">$0</div>
+        <div class="text-xs text-green-400 mt-1">↑ 12% vs last month</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Active Opportunities</div>
+        <div id="statOpps" class="text-2xl font-bold text-purple-400">0</div>
+        <div class="text-xs text-gray-500 mt-1">Across all phases</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Avg Win Probability</div>
+        <div id="statPwin" class="text-2xl font-bold text-green-400">0%</div>
+        <div class="text-xs text-gray-500 mt-1">Weighted average</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Reports Generated</div>
+        <div id="statReports" class="text-2xl font-bold text-amber-400">0</div>
+        <div class="text-xs text-gray-500 mt-1">This month</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-6">
+      <!-- Left Column: Pipeline Chart -->
+      <div class="col-span-2 space-y-6">
+        <!-- Pipeline by Phase Chart -->
+        <div class="card p-6">
+          <h2 class="text-lg font-semibold mb-4">Pipeline by Phase</h2>
+          <div id="pipelineChart" class="flex items-end justify-between h-64 gap-2 px-4">
+            <!-- Chart bars rendered dynamically -->
+          </div>
+          <div class="flex justify-between text-xs text-gray-500 mt-2 px-4">
+            <span>Gate 1</span><span>Blue</span><span>Pink</span><span>Red</span><span>Gold</span><span>Submitted</span>
+          </div>
+        </div>
+
+        <!-- Win Rate Trend -->
+        <div class="card p-6">
+          <h2 class="text-lg font-semibold mb-4">Win Rate Trend (Last 12 Months)</h2>
+          <div class="h-48 flex items-end gap-1">
+            <div id="winRateChart" class="flex items-end justify-between w-full h-full gap-1">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Reports -->
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">Recent Reports</h2>
+            <select id="reportTypeFilter" class="bg-gray-800 border border-cyan-500/30 rounded px-3 py-1 text-sm">
+              <option value="all">All Types</option>
+              <option value="pipeline">Pipeline Summary</option>
+              <option value="win_rate">Win Rate Analysis</option>
+              <option value="capture">Capture Status</option>
+              <option value="executive">Executive Brief</option>
+            </select>
+          </div>
+          <div id="recentReports" class="space-y-3">
+            <div class="text-gray-500 text-center py-8">Loading reports...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Report Templates & Quick Actions -->
+      <div class="space-y-6">
+        <!-- Report Templates -->
+        <div class="card p-6">
+          <h2 class="text-lg font-semibold mb-4">Report Templates</h2>
+          <div class="space-y-3">
+            <div onclick="generateReport('pipeline')" class="report-card bg-gray-900/50 rounded-lg p-4 border border-transparent hover:border-cyan-500/30">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded bg-cyan-500/20 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                </div>
+                <div>
+                  <div class="font-medium">Pipeline Summary</div>
+                  <div class="text-xs text-gray-400">All opportunities by phase & value</div>
+                </div>
+              </div>
+            </div>
+            <div onclick="generateReport('win_rate')" class="report-card bg-gray-900/50 rounded-lg p-4 border border-transparent hover:border-cyan-500/30">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded bg-green-500/20 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+                <div>
+                  <div class="font-medium">Win Rate Analysis</div>
+                  <div class="text-xs text-gray-400">Historical performance metrics</div>
+                </div>
+              </div>
+            </div>
+            <div onclick="generateReport('capture')" class="report-card bg-gray-900/50 rounded-lg p-4 border border-transparent hover:border-cyan-500/30">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded bg-purple-500/20 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                  <div class="font-medium">Capture Status</div>
+                  <div class="text-xs text-gray-400">Progress & action items by opp</div>
+                </div>
+              </div>
+            </div>
+            <div onclick="generateReport('executive')" class="report-card bg-gray-900/50 rounded-lg p-4 border border-transparent hover:border-cyan-500/30">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded bg-amber-500/20 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                </div>
+                <div>
+                  <div class="font-medium">Executive Brief</div>
+                  <div class="text-xs text-gray-400">C-suite summary with KPIs</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Opportunities -->
+        <div class="card p-6">
+          <h2 class="text-lg font-semibold mb-4">Top Opportunities</h2>
+          <div id="topOpps" class="space-y-3">
+            <div class="text-gray-500 text-center py-4">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Export Options -->
+        <div class="card p-6">
+          <h2 class="text-lg font-semibold mb-4">Export Options</h2>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="exportData('pdf')" class="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded text-sm flex items-center justify-center gap-2">
+              <svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
+              PDF
+            </button>
+            <button onclick="exportData('xlsx')" class="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded text-sm flex items-center justify-center gap-2">
+              <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
+              Excel
+            </button>
+            <button onclick="exportData('pptx')" class="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded text-sm flex items-center justify-center gap-2">
+              <svg class="w-4 h-4 text-orange-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
+              PowerPoint
+            </button>
+            <button onclick="exportData('csv')" class="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded text-sm flex items-center justify-center gap-2">
+              <svg class="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
+              CSV
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-cyan-500/20 px-6 py-4 mt-8">
+    <div class="max-w-7xl mx-auto flex items-center justify-between text-sm text-gray-500">
+      <span>© 2026 Mission Meets Tech | MissionPulse v2.1</span>
+      <span class="text-cyan-400/50">AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</span>
+    </div>
+  </footer>
+
+  <script>
+    let opportunities = [];
+    let reports = [];
+    let pipelineStats = null;
+
+    async function init() {
+      MissionPulse.onConnectionChange(status => {
+        const dot = document.querySelector('#connectionStatus span:first-child');
+        const text = document.querySelector('#connectionStatus span:last-child');
+        if (status === 'connected') {
+          dot.className = 'w-2 h-2 rounded-full bg-green-500';
+          text.textContent = 'Connected';
+          text.className = 'text-green-400';
+        }
+      });
+
+      await loadData();
+      setupEventListeners();
+    }
+
+    async function loadData() {
+      // Load opportunities
+      const { data: opps } = await MissionPulse.opportunities.getAll({ orderBy: 'contract_value', ascending: false });
+      opportunities = opps || [];
+
+      // Load reports
+      const { data: reps } = await MissionPulse.reports.getAll({ orderBy: 'created_at', ascending: false, limit: 10 });
+      reports = reps || [];
+
+      // Get pipeline stats
+      const { data: stats } = await MissionPulse.getPipelineStats();
+      pipelineStats = stats;
+
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      // Update stats
+      document.getElementById('statPipeline').textContent = MissionPulse.formatCurrency(pipelineStats?.totalValue || 0);
+      document.getElementById('statOpps').textContent = pipelineStats?.totalCount || 0;
+      document.getElementById('statPwin').textContent = `${pipelineStats?.avgPwin || 0}%`;
+      document.getElementById('statReports').textContent = reports.length;
+
+      // Render pipeline chart
+      renderPipelineChart();
+
+      // Render win rate chart
+      renderWinRateChart();
+
+      // Render recent reports
+      renderRecentReports();
+
+      // Render top opportunities
+      renderTopOpps();
+    }
+
+    function renderPipelineChart() {
+      const phases = ['gate_1', 'blue_team', 'pink_team', 'red_team', 'gold_team', 'submitted'];
+      const maxValue = Math.max(...phases.map(p => pipelineStats?.byPhase?.[p]?.value || 0), 1);
+
+      document.getElementById('pipelineChart').innerHTML = phases.map(phase => {
+        const data = pipelineStats?.byPhase?.[phase] || { count: 0, value: 0 };
+        const height = Math.max((data.value / maxValue) * 100, 5);
+        const phaseInfo = MissionPulse.getPhaseInfo(phase);
+        return `
+          <div class="flex-1 flex flex-col items-center">
+            <div class="text-xs text-gray-400 mb-1">${MissionPulse.formatCurrency(data.value)}</div>
+            <div class="w-full bg-gray-800 rounded-t relative" style="height: 200px;">
+              <div class="chart-bar absolute bottom-0 w-full" style="height: ${height}%; background: linear-gradient(to top, ${phaseInfo.color}, ${phaseInfo.color}88);"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">${data.count}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderWinRateChart() {
+      // Simulated win rate data
+      const monthlyRates = [65, 58, 72, 68, 75, 71, 78, 82, 76, 80, 85, 78];
+      const max = Math.max(...monthlyRates);
+
+      document.getElementById('winRateChart').innerHTML = monthlyRates.map((rate, i) => `
+        <div class="flex-1 flex flex-col items-center justify-end h-full">
+          <div class="text-xs text-gray-500 mb-1">${rate}%</div>
+          <div class="w-full rounded-t ${rate >= 75 ? 'bg-green-500' : rate >= 60 ? 'bg-amber-500' : 'bg-red-500'}" style="height: ${(rate / max) * 100}%"></div>
+        </div>
+      `).join('');
+    }
+
+    function renderRecentReports() {
+      const filter = document.getElementById('reportTypeFilter').value;
+      let filtered = reports;
+      if (filter !== 'all') filtered = filtered.filter(r => r.reportType === filter);
+
+      if (filtered.length === 0) {
+        document.getElementById('recentReports').innerHTML = '<div class="text-gray-500 text-center py-8">No reports found. Generate your first report!</div>';
+        return;
+      }
+
+      document.getElementById('recentReports').innerHTML = filtered.map(r => `
+        <div class="bg-gray-900/50 rounded-lg p-3 flex items-center justify-between hover:bg-gray-900/70 transition-colors">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded ${getReportTypeClass(r.reportType)} flex items-center justify-center">
+              ${getReportIcon(r.reportType)}
+            </div>
+            <div>
+              <div class="font-medium text-sm">${r.reportName || formatReportType(r.reportType)}</div>
+              <div class="text-xs text-gray-500">${formatDate(r.createdAt)} • ${r.generatedBy || 'System'}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="viewReport('${r.id}')" class="text-cyan-400 hover:text-cyan-300 text-xs">View</button>
+            <button onclick="downloadReport('${r.id}')" class="text-gray-400 hover:text-white text-xs">Download</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderTopOpps() {
+      const top5 = opportunities.slice(0, 5);
+      document.getElementById('topOpps').innerHTML = top5.length ? top5.map(o => `
+        <div class="bg-gray-900/50 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-medium text-sm line-clamp-1">${o.name}</span>
+            <span class="text-cyan-400 text-sm">${MissionPulse.formatCurrency(o.contractValue)}</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-gray-500">
+            <span>${o.agency}</span>
+            <span class="text-green-400">${o.winProbability || 0}% pWin</span>
+          </div>
+        </div>
+      `).join('') : '<div class="text-gray-500 text-center py-4">No opportunities found</div>';
+    }
+
+    async function generateReport(type = 'pipeline') {
+      const reportData = {
+        reportType: type,
+        reportName: `${formatReportType(type)} - ${new Date().toLocaleDateString()}`,
+        generatedBy: 'Current User',
+        generatedAt: new Date().toISOString(),
+        dateRangeStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        dateRangeEnd: new Date().toISOString(),
+        exportFormat: 'pdf',
+        reportData: JSON.stringify({
+          pipelineStats,
+          opportunityCount: opportunities.length,
+          totalValue: pipelineStats?.totalValue || 0,
+          avgPwin: pipelineStats?.avgPwin || 0
+        })
+      };
+
+      const { data, error } = await MissionPulse.reports.create(reportData);
+      if (error) {
+        alert('Error generating report');
+      } else {
+        alert(`Report generated: ${reportData.reportName}`);
+        await loadData();
+      }
+    }
+
+    function viewReport(id) {
+      const report = reports.find(r => r.id === id);
+      if (report) {
+        alert(`Viewing report: ${report.reportName}\n\nGenerated: ${formatDate(report.createdAt)}\nType: ${formatReportType(report.reportType)}`);
+      }
+    }
+
+    function downloadReport(id) {
+      alert('Download functionality would export the report to PDF/Excel');
+    }
+
+    function exportData(format) {
+      alert(`Exporting data as ${format.toUpperCase()}...`);
+    }
+
+    function setupEventListeners() {
+      document.getElementById('reportTypeFilter').addEventListener('change', renderRecentReports);
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatReportType(type) {
+      return { pipeline: 'Pipeline Summary', win_rate: 'Win Rate Analysis', capture: 'Capture Status', executive: 'Executive Brief' }[type] || type;
+    }
+
+    function getReportTypeClass(type) {
+      return { pipeline: 'bg-cyan-500/20', win_rate: 'bg-green-500/20', capture: 'bg-purple-500/20', executive: 'bg-amber-500/20' }[type] || 'bg-gray-500/20';
+    }
+
+    function getReportIcon(type) {
+      const icons = {
+        pipeline: '<svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>',
+        win_rate: '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>',
+        capture: '<svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+        executive: '<svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>'
+      };
+      return icons[type] || icons.pipeline;
+    }
+
+    init();
+  </script>
+</body>
+</html>

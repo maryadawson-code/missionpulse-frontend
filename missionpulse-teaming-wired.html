@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teaming Partners | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="supabase-client-v2.1.js"></script>
+  <style>
+    :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; --card-bg: #0d1f3c; --border-cyan: rgba(0, 229, 250, 0.3); }
+    body { background: var(--deep-navy); color: white; font-family: system-ui, -apple-system, sans-serif; }
+    .card { background: var(--card-bg); border: 1px solid var(--border-cyan); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0099FF 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 229, 250, 0.3); }
+    .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+    .status-active { color: #10b981; } .status-pending { color: #f59e0b; } .status-expired { color: #ef4444; }
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 50; }
+    .modal.active { display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="border-b border-cyan-500/20 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="text-cyan-400 hover:text-cyan-300">← Dashboard</a>
+        <div class="h-6 w-px bg-cyan-500/30"></div>
+        <h1 class="text-xl font-bold"><span class="text-cyan-400">Teaming</span> Partners</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+          <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+          <span class="text-gray-400">Connecting...</span>
+        </div>
+        <select id="opportunitySelect" class="bg-gray-800 border border-cyan-500/30 rounded-lg px-3 py-2 text-sm">
+          <option value="">All Opportunities</option>
+        </select>
+        <button onclick="openAddPartnerModal()" class="btn-primary px-4 py-2 rounded-lg text-sm">+ Add Partner</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <!-- Stats Row -->
+    <div class="grid grid-cols-5 gap-4 mb-8">
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Total Partners</div>
+        <div id="statTotal" class="text-2xl font-bold text-cyan-400 glow-text">0</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Active NDAs</div>
+        <div id="statNDAs" class="text-2xl font-bold text-green-400">0</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Active TAs</div>
+        <div id="statTAs" class="text-2xl font-bold text-purple-400">0</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Small Business</div>
+        <div id="statSB" class="text-2xl font-bold text-amber-400">0</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm">Total Workshare</div>
+        <div id="statWorkshare" class="text-2xl font-bold text-blue-400">0%</div>
+      </div>
+    </div>
+
+    <!-- Partners Grid -->
+    <div class="card p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-semibold">Partner Directory</h2>
+        <div class="flex items-center gap-4">
+          <input type="text" id="searchInput" placeholder="Search partners..." class="bg-gray-800 border border-cyan-500/30 rounded px-3 py-2 text-sm w-64">
+          <select id="typeFilter" class="bg-gray-800 border border-cyan-500/30 rounded px-3 py-2 text-sm">
+            <option value="all">All Types</option>
+            <option value="prime">Prime</option>
+            <option value="subcontractor">Subcontractor</option>
+            <option value="mentor">Mentor</option>
+            <option value="protege">Protégé</option>
+            <option value="jv">Joint Venture</option>
+          </select>
+        </div>
+      </div>
+      <div id="partnersList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="text-gray-500 text-center py-12 col-span-full">Loading partners...</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add/Edit Partner Modal -->
+  <div id="partnerModal" class="modal">
+    <div class="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h2 id="modalTitle" class="text-lg font-semibold">Add Partner</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="partnerForm" class="space-y-4">
+        <input type="hidden" id="partnerId">
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Partner Name *</label>
+            <input type="text" id="partnerName" required class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Partner Type *</label>
+            <select id="partnerType" required class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+              <option value="subcontractor">Subcontractor</option>
+              <option value="prime">Prime</option>
+              <option value="mentor">Mentor</option>
+              <option value="protege">Protégé</option>
+              <option value="jv">Joint Venture</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Set-Aside Status</label>
+            <select id="setAsideStatus" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+              <option value="">None</option>
+              <option value="SDVOSB">SDVOSB</option>
+              <option value="8a">8(a)</option>
+              <option value="WOSB">WOSB</option>
+              <option value="HUBZone">HUBZone</option>
+              <option value="small">Small Business</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Workshare %</label>
+            <input type="number" id="worksharePercent" min="0" max="100" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">CAGE Code</label>
+            <input type="text" id="cageCode" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">UEI/DUNS</label>
+            <input type="text" id="dunsNumber" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="border-t border-cyan-500/20 pt-4 mt-4">
+          <h3 class="text-sm font-semibold text-cyan-400 mb-3">Agreement Status</h3>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" id="ndaSigned" class="rounded"> NDA Signed
+              </label>
+              <input type="date" id="ndaExpiry" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2 mt-2" placeholder="NDA Expiry">
+            </div>
+            <div>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" id="taSigned" class="rounded"> Teaming Agreement Signed
+              </label>
+              <input type="date" id="taExpiry" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2 mt-2" placeholder="TA Expiry">
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-cyan-500/20 pt-4 mt-4">
+          <h3 class="text-sm font-semibold text-cyan-400 mb-3">Contact Information</h3>
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Contact Name</label>
+              <input type="text" id="contactName" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Email</label>
+              <input type="email" id="contactEmail" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Phone</label>
+              <input type="tel" id="contactPhone" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Capability Areas</label>
+          <textarea id="capabilityAreas" rows="2" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2" placeholder="e.g., Cloud Migration, Cybersecurity, EHR Implementation"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Opportunity</label>
+          <select id="partnerOpportunity" class="w-full bg-gray-800 border border-cyan-500/30 rounded px-3 py-2">
+            <option value="">Not opportunity-specific</option>
+          </select>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Partner</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-cyan-500/20 px-6 py-4 mt-8">
+    <div class="max-w-7xl mx-auto flex items-center justify-between text-sm text-gray-500">
+      <span>© 2026 Mission Meets Tech | MissionPulse v2.1</span>
+      <span class="text-cyan-400/50">AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</span>
+    </div>
+  </footer>
+
+  <script>
+    let partners = [];
+    let opportunities = [];
+    let currentFilter = { opportunity: null, type: 'all', search: '' };
+
+    const elements = {
+      connectionStatus: document.getElementById('connectionStatus'),
+      opportunitySelect: document.getElementById('opportunitySelect'),
+      partnersList: document.getElementById('partnersList'),
+      searchInput: document.getElementById('searchInput'),
+      typeFilter: document.getElementById('typeFilter'),
+      modal: document.getElementById('partnerModal'),
+      form: document.getElementById('partnerForm'),
+    };
+
+    // Stats elements
+    const stats = {
+      total: document.getElementById('statTotal'),
+      ndas: document.getElementById('statNDAs'),
+      tas: document.getElementById('statTAs'),
+      sb: document.getElementById('statSB'),
+      workshare: document.getElementById('statWorkshare'),
+    };
+
+    async function init() {
+      MissionPulse.onConnectionChange(status => {
+        const dot = elements.connectionStatus.querySelector('span:first-child');
+        const text = elements.connectionStatus.querySelector('span:last-child');
+        if (status === 'connected') {
+          dot.className = 'w-2 h-2 rounded-full bg-green-500';
+          text.textContent = 'Connected';
+          text.className = 'text-green-400';
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-yellow-500 animate-pulse';
+          text.textContent = 'Connecting...';
+          text.className = 'text-gray-400';
+        }
+      });
+
+      await loadOpportunities();
+      await loadPartners();
+      setupEventListeners();
+      MissionPulse.teamingPartners.subscribe(handleRealtimeUpdate);
+    }
+
+    async function loadOpportunities() {
+      const { data } = await MissionPulse.opportunities.getAll({ orderBy: 'due_date' });
+      opportunities = data || [];
+      elements.opportunitySelect.innerHTML = '<option value="">All Opportunities</option>' +
+        opportunities.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+      document.getElementById('partnerOpportunity').innerHTML = '<option value="">Not opportunity-specific</option>' +
+        opportunities.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+    }
+
+    async function loadPartners() {
+      const options = { orderBy: 'partner_name', ascending: true };
+      if (currentFilter.opportunity) options.filter = { opportunity_id: currentFilter.opportunity };
+      
+      const { data, error } = await MissionPulse.teamingPartners.getAll(options);
+      if (error) {
+        elements.partnersList.innerHTML = '<div class="text-red-400 text-center py-8 col-span-full">Error loading partners</div>';
+        return;
+      }
+      partners = data || [];
+      renderPartners();
+      updateStats();
+    }
+
+    function renderPartners() {
+      let filtered = partners;
+      if (currentFilter.type !== 'all') filtered = filtered.filter(p => p.partnerType === currentFilter.type);
+      if (currentFilter.search) {
+        const search = currentFilter.search.toLowerCase();
+        filtered = filtered.filter(p => 
+          p.partnerName?.toLowerCase().includes(search) ||
+          p.capabilityAreas?.toLowerCase().includes(search)
+        );
+      }
+
+      if (filtered.length === 0) {
+        elements.partnersList.innerHTML = '<div class="text-gray-500 text-center py-12 col-span-full">No partners found. Add your first teaming partner!</div>';
+        return;
+      }
+
+      elements.partnersList.innerHTML = filtered.map(p => `
+        <div class="bg-gray-900/50 rounded-lg p-4 hover:bg-gray-900/70 transition-colors border border-transparent hover:border-cyan-500/30">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="font-semibold">${p.partnerName || 'Unnamed Partner'}</h3>
+              <span class="text-xs px-2 py-0.5 rounded ${getTypeClass(p.partnerType)}">${formatType(p.partnerType)}</span>
+              ${p.setAsideStatus ? `<span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 ml-1">${p.setAsideStatus}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="editPartner('${p.id}')" class="text-cyan-400 hover:text-cyan-300 text-sm">Edit</button>
+              <button onclick="deletePartner('${p.id}')" class="text-gray-500 hover:text-red-400 text-sm">Delete</button>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+            <div>
+              <span class="text-gray-500">NDA:</span>
+              <span class="${p.ndaSigned ? 'status-active' : 'status-pending'}">${p.ndaSigned ? '✓ Signed' : 'Pending'}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">TA:</span>
+              <span class="${p.taSigned ? 'status-active' : 'status-pending'}">${p.taSigned ? '✓ Signed' : 'Pending'}</span>
+            </div>
+          </div>
+          
+          ${p.worksharePercent ? `<div class="mb-2"><div class="flex justify-between text-xs text-gray-400 mb-1"><span>Workshare</span><span>${p.worksharePercent}%</span></div><div class="h-2 bg-gray-700 rounded-full"><div class="h-full bg-cyan-500 rounded-full" style="width: ${p.worksharePercent}%"></div></div></div>` : ''}
+          
+          ${p.capabilityAreas ? `<div class="text-xs text-gray-400 mt-2">${p.capabilityAreas}</div>` : ''}
+          
+          ${p.contactName ? `<div class="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-700">${p.contactName} ${p.contactEmail ? `• ${p.contactEmail}` : ''}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function updateStats() {
+      stats.total.textContent = partners.length;
+      stats.ndas.textContent = partners.filter(p => p.ndaSigned).length;
+      stats.tas.textContent = partners.filter(p => p.taSigned).length;
+      stats.sb.textContent = partners.filter(p => p.setAsideStatus).length;
+      const totalWorkshare = partners.reduce((sum, p) => sum + (p.worksharePercent || 0), 0);
+      stats.workshare.textContent = `${totalWorkshare}%`;
+    }
+
+    function openAddPartnerModal() {
+      document.getElementById('modalTitle').textContent = 'Add Partner';
+      elements.form.reset();
+      document.getElementById('partnerId').value = '';
+      elements.modal.classList.add('active');
+    }
+
+    function editPartner(id) {
+      const partner = partners.find(p => p.id === id);
+      if (!partner) return;
+      
+      document.getElementById('modalTitle').textContent = 'Edit Partner';
+      document.getElementById('partnerId').value = partner.id;
+      document.getElementById('partnerName').value = partner.partnerName || '';
+      document.getElementById('partnerType').value = partner.partnerType || 'subcontractor';
+      document.getElementById('setAsideStatus').value = partner.setAsideStatus || '';
+      document.getElementById('worksharePercent').value = partner.worksharePercent || '';
+      document.getElementById('cageCode').value = partner.cageCode || '';
+      document.getElementById('dunsNumber').value = partner.dunsNumber || '';
+      document.getElementById('ndaSigned').checked = partner.ndaSigned || false;
+      document.getElementById('ndaExpiry').value = partner.ndaExpiry || '';
+      document.getElementById('taSigned').checked = partner.taSigned || false;
+      document.getElementById('taExpiry').value = partner.taExpiry || '';
+      document.getElementById('contactName').value = partner.contactName || '';
+      document.getElementById('contactEmail').value = partner.contactEmail || '';
+      document.getElementById('contactPhone').value = partner.contactPhone || '';
+      document.getElementById('capabilityAreas').value = partner.capabilityAreas || '';
+      document.getElementById('partnerOpportunity').value = partner.opportunityId || '';
+      
+      elements.modal.classList.add('active');
+    }
+
+    function closeModal() {
+      elements.modal.classList.remove('active');
+    }
+
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      
+      const partnerData = {
+        partnerName: document.getElementById('partnerName').value,
+        partnerType: document.getElementById('partnerType').value,
+        setAsideStatus: document.getElementById('setAsideStatus').value || null,
+        worksharePercent: parseInt(document.getElementById('worksharePercent').value) || null,
+        cageCode: document.getElementById('cageCode').value || null,
+        dunsNumber: document.getElementById('dunsNumber').value || null,
+        ndaSigned: document.getElementById('ndaSigned').checked,
+        ndaExpiry: document.getElementById('ndaExpiry').value || null,
+        taSigned: document.getElementById('taSigned').checked,
+        taExpiry: document.getElementById('taExpiry').value || null,
+        contactName: document.getElementById('contactName').value || null,
+        contactEmail: document.getElementById('contactEmail').value || null,
+        contactPhone: document.getElementById('contactPhone').value || null,
+        capabilityAreas: document.getElementById('capabilityAreas').value || null,
+        opportunityId: document.getElementById('partnerOpportunity').value || null,
+      };
+
+      const partnerId = document.getElementById('partnerId').value;
+      let result;
+      
+      if (partnerId) {
+        result = await MissionPulse.teamingPartners.update(partnerId, partnerData);
+      } else {
+        result = await MissionPulse.teamingPartners.create(partnerData);
+      }
+
+      if (result.error) {
+        alert('Error saving partner: ' + result.error.message);
+      } else {
+        closeModal();
+        await loadPartners();
+      }
+    }
+
+    async function deletePartner(id) {
+      if (!confirm('Delete this partner?')) return;
+      const { error } = await MissionPulse.teamingPartners.delete(id);
+      if (error) alert('Error deleting partner');
+      else await loadPartners();
+    }
+
+    function handleRealtimeUpdate(event) {
+      console.log('Real-time update:', event);
+      loadPartners();
+    }
+
+    function setupEventListeners() {
+      elements.opportunitySelect.addEventListener('change', (e) => {
+        currentFilter.opportunity = e.target.value || null;
+        loadPartners();
+      });
+      elements.typeFilter.addEventListener('change', (e) => {
+        currentFilter.type = e.target.value;
+        renderPartners();
+      });
+      elements.searchInput.addEventListener('input', (e) => {
+        currentFilter.search = e.target.value;
+        renderPartners();
+      });
+      elements.form.addEventListener('submit', handleFormSubmit);
+    }
+
+    function formatType(type) {
+      const types = { prime: 'Prime', subcontractor: 'Subcontractor', mentor: 'Mentor', protege: 'Protégé', jv: 'Joint Venture' };
+      return types[type] || type;
+    }
+
+    function getTypeClass(type) {
+      const classes = { prime: 'bg-purple-500/20 text-purple-400', subcontractor: 'bg-cyan-500/20 text-cyan-400', mentor: 'bg-green-500/20 text-green-400', protege: 'bg-blue-500/20 text-blue-400', jv: 'bg-pink-500/20 text-pink-400' };
+      return classes[type] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    init();
+  </script>
+</body>
+</html>
