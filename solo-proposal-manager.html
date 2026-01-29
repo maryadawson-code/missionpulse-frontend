@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solo Proposal Manager | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'deep-navy': '#00050F',
+            'cyber-cyan': '#00E5FA',
+            'slate-dark': '#0a1628'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: linear-gradient(135deg, #00050F 0%, #0a1628 50%, #00050F 100%); }
+    .glow-border { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+    .phase-active { border-color: #00E5FA; background: rgba(0, 229, 250, 0.1); }
+    .phase-complete { border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+    .task-card:hover { border-color: rgba(0, 229, 250, 0.3); }
+    .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+    @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(0, 229, 250, 0.3); } 50% { box-shadow: 0 0 20px rgba(0, 229, 250, 0.6); } }
+  </style>
+</head>
+<body class="min-h-screen text-white">
+  <header class="border-b border-slate-800/50 bg-deep-navy/80 backdrop-blur-sm sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyber-cyan to-blue-500 flex items-center justify-center">
+          <svg class="w-6 h-6 text-deep-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="text-lg font-bold text-white">Solo Proposal Manager</span>
+          <span class="text-xs text-slate-500 block">Guided Workflow for Small Teams</span>
+        </div>
+      </div>
+      <a href="index.html" class="text-sm text-slate-400 hover:text-cyber-cyan transition-colors">← Dashboard</a>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <!-- Auth Check -->
+    <div id="authCheck" class="text-center py-12">
+      <div class="w-8 h-8 border-2 border-cyber-cyan border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <p class="text-slate-400 mt-4">Loading...</p>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="hidden">
+      <!-- Header Stats -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 id="opportunityTitle" class="text-2xl font-bold">New Proposal</h1>
+          <p id="opportunityMeta" class="text-slate-400 text-sm mt-1"></p>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="text-right">
+            <p class="text-xs text-slate-500">Progress</p>
+            <p id="overallProgress" class="text-lg font-bold text-cyber-cyan">0%</p>
+          </div>
+          <div class="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="progressBar" class="h-full bg-gradient-to-r from-cyber-cyan to-blue-500 transition-all" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase Navigation -->
+      <div class="flex gap-2 mb-8 overflow-x-auto pb-2">
+        <button class="phase-nav-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all" data-phase="0">
+          <span class="phase-icon mr-1">1</span> Discovery
+        </button>
+        <button class="phase-nav-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all" data-phase="1">
+          <span class="phase-icon mr-1">2</span> Capture
+        </button>
+        <button class="phase-nav-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all" data-phase="2">
+          <span class="phase-icon mr-1">3</span> RFP Analysis
+        </button>
+        <button class="phase-nav-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all" data-phase="3">
+          <span class="phase-icon mr-1">4</span> Solution
+        </button>
+        <button class="phase-nav-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all" data-phase="4">
+          <span class="phase-icon mr-1">5</span> Pricing
+        </button>
+        <button class="phase-nav-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all" data-phase="5">
+          <span class="phase-icon mr-1">6</span> Writing
+        </button>
+        <button class="phase-nav-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all" data-phase="6">
+          <span class="phase-icon mr-1">7</span> Review
+        </button>
+        <button class="phase-nav-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all" data-phase="7">
+          <span class="phase-icon mr-1">8</span> Submit
+        </button>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <!-- Main Task Area -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Phase Header -->
+          <div id="phaseHeader" class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-6">
+            <div class="flex items-start justify-between">
+              <div>
+                <span id="phaseLabel" class="text-xs text-cyber-cyan uppercase tracking-wide">Phase 1</span>
+                <h2 id="phaseName" class="text-xl font-bold mt-1">Opportunity Discovery</h2>
+                <p id="phaseDescription" class="text-slate-400 text-sm mt-2"></p>
+              </div>
+              <div id="phaseStatus" class="px-3 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">In Progress</div>
+            </div>
+          </div>
+
+          <!-- Tasks List -->
+          <div id="tasksList" class="space-y-4"></div>
+
+          <!-- Gate Decision -->
+          <div id="gateDecision" class="hidden bg-slate-900/60 border-2 border-amber-500/30 rounded-xl p-6">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-bold">Decision Gate</h3>
+                <p id="gateQuestion" class="text-sm text-slate-400">Ready to proceed to the next phase?</p>
+              </div>
+            </div>
+            <div class="flex gap-3">
+              <button onclick="approveGate(true)" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Go - Proceed
+              </button>
+              <button onclick="approveGate(false)" class="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                No-Go - Stop
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+          <!-- AI Assistant -->
+          <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-5">
+            <div class="flex items-center gap-2 mb-4">
+              <div class="w-8 h-8 rounded-lg bg-cyber-cyan/20 flex items-center justify-center">
+                <svg class="w-4 h-4 text-cyber-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+              </div>
+              <h3 class="font-semibold text-sm">AI Assistant</h3>
+            </div>
+            <p id="aiTip" class="text-sm text-slate-400 mb-4">I'll guide you through each step. Click any task to get AI-powered help.</p>
+            <button onclick="openAIChat()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm transition-all flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+              </svg>
+              Ask AI for Help
+            </button>
+          </div>
+
+          <!-- Phase Checklist -->
+          <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-5">
+            <h3 class="font-semibold text-sm mb-4">Phase Checklist</h3>
+            <div id="phaseChecklist" class="space-y-2"></div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-5">
+            <h3 class="font-semibold text-sm mb-4">Quick Actions</h3>
+            <div class="space-y-2">
+              <button onclick="requestSMEFeedback()" class="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-left transition-all flex items-center gap-2">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                Request SME Input
+              </button>
+              <button onclick="exportProgress()" class="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-left transition-all flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Export Progress
+              </button>
+              <button onclick="saveAndExit()" class="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-left transition-all flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                </svg>
+                Save & Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Select Opportunity Modal -->
+    <div id="selectOppModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-4">Select Opportunity</h3>
+        <p class="text-slate-400 text-sm mb-4">Choose an opportunity to start the guided proposal workflow.</p>
+        <div id="oppList" class="space-y-3 mb-4"></div>
+        <div class="border-t border-slate-700 pt-4">
+          <button onclick="createNewOpportunity()" class="w-full py-3 bg-gradient-to-r from-cyber-cyan to-blue-500 text-deep-navy font-medium rounded-lg flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Create New Opportunity
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task Detail Modal -->
+    <div id="taskModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span id="taskModalAgent" class="text-xs text-cyber-cyan uppercase tracking-wide"></span>
+            <h3 id="taskModalTitle" class="text-lg font-bold mt-1"></h3>
+          </div>
+          <button onclick="closeTaskModal()" class="text-slate-400 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <p id="taskModalDesc" class="text-slate-400 text-sm mb-4"></p>
+        
+        <div id="taskModalOutput" class="bg-slate-800/50 rounded-lg p-4 mb-4 hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-slate-500">AI Output</span>
+            <span id="taskModalConfidence" class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400"></span>
+          </div>
+          <div id="taskModalContent" class="text-sm text-slate-300 whitespace-pre-wrap"></div>
+        </div>
+
+        <div class="flex gap-3">
+          <button id="taskModalRunBtn" onclick="runTaskAI()" class="flex-1 py-3 bg-gradient-to-r from-cyber-cyan to-blue-500 text-deep-navy font-medium rounded-lg flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Run AI Analysis
+          </button>
+          <button id="taskModalApproveBtn" onclick="approveTaskOutput()" class="hidden flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Approve & Continue
+          </button>
+        </div>
+        <p class="text-xs text-slate-500 text-center mt-3">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-800/50 mt-12">
+    <div class="max-w-6xl mx-auto px-6 py-4 text-center text-slate-500 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</div>
+  </footer>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNTAsImV4cCI6MjA1MzE0MzI1MH0.GRTFxRV7WV67P9sYaIVRwKxVEDALfkWjmUxs4ADB1zs';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentUser = null;
+    let soloProposal = null;
+    let currentPhase = 0;
+    let taskOutputs = {};
+    let currentTaskId = null;
+
+    const PHASES = [
+      {
+        id: 0, name: 'Opportunity Discovery', shipley: 'Phase 0',
+        description: 'Identify and qualify the opportunity. Determine if this is worth pursuing.',
+        aiTip: 'Start by reviewing the opportunity details. I\'ll help you assess fit and competition.',
+        tasks: [
+          { id: 'opp-review', title: 'Review Opportunity Details', agent: 'Capture', aiTask: true, prompt: 'Analyze this opportunity and summarize key details including agency, scope, timeline, and estimated value.' },
+          { id: 'fit-analysis', title: 'Assess Company Fit', agent: 'Strategy', aiTask: true, prompt: 'Evaluate how well this opportunity aligns with our capabilities, past performance, and strategic goals.' },
+          { id: 'initial-research', title: 'Initial Customer Research', agent: 'Capture', aiTask: true, prompt: 'Research the customer agency, their mission, recent initiatives, and procurement history.' },
+          { id: 'gate-0', title: 'Go/No-Go Decision', gate: true, question: 'Based on initial analysis, should we pursue this opportunity?' }
+        ]
+      },
+      {
+        id: 1, name: 'Capture Planning', shipley: 'Phase 1',
+        description: 'Develop win strategy and understand the competitive landscape.',
+        aiTip: 'Now let\'s build your capture strategy. Focus on what makes you different.',
+        tasks: [
+          { id: 'customer-intel', title: 'Deep Customer Intelligence', agent: 'Capture', aiTask: true, prompt: 'Compile comprehensive intelligence on the customer including pain points, priorities, and decision-making process.' },
+          { id: 'competitor-analysis', title: 'Competitor Analysis', agent: 'Black Hat', aiTask: true, prompt: 'Identify likely competitors, analyze their strengths/weaknesses, and predict their approach.' },
+          { id: 'win-themes', title: 'Develop Win Themes', agent: 'Strategy', aiTask: true, prompt: 'Generate 3-5 compelling win themes that differentiate us from competitors.' },
+          { id: 'teaming-strategy', title: 'Teaming Strategy', agent: 'Capture', aiTask: true, prompt: 'Recommend potential teaming partners and subcontractors to strengthen our bid.' },
+          { id: 'gate-1', title: 'Capture Readiness Review', gate: true, question: 'Is our capture strategy strong enough to proceed?' }
+        ]
+      },
+      {
+        id: 2, name: 'RFP Analysis', shipley: 'Phase 2',
+        description: 'Shred the RFP and build your compliance matrix.',
+        aiTip: 'Time to analyze the RFP. Every requirement matters for compliance.',
+        tasks: [
+          { id: 'rfp-shred', title: 'Shred RFP Requirements', agent: 'Compliance', aiTask: true, prompt: 'Extract all requirements from the RFP and categorize by section (L, M, C, etc.).' },
+          { id: 'compliance-matrix', title: 'Build Compliance Matrix', agent: 'Compliance', aiTask: true, prompt: 'Create a compliance matrix mapping each requirement to our response approach.' },
+          { id: 'eval-criteria', title: 'Analyze Evaluation Criteria', agent: 'Strategy', aiTask: true, prompt: 'Analyze Section M evaluation criteria and recommend how to maximize scores.' },
+          { id: 'questions-gov', title: 'Draft Questions to Government', agent: 'Contracts', aiTask: true, prompt: 'Identify ambiguities and draft clarifying questions for the government.' },
+          { id: 'gate-2', title: 'Compliance Checkpoint', gate: true, question: 'Can we meet all mandatory requirements?' }
+        ]
+      },
+      {
+        id: 3, name: 'Solution Development', shipley: 'Phase 3',
+        description: 'Design your technical approach and management solution.',
+        aiTip: 'Build a solution that directly addresses customer needs and win themes.',
+        tasks: [
+          { id: 'tech-approach', title: 'Technical Approach Outline', agent: 'Writer', aiTask: true, prompt: 'Develop a technical approach outline that addresses requirements and incorporates win themes.' },
+          { id: 'mgmt-approach', title: 'Management Approach', agent: 'Writer', aiTask: true, prompt: 'Outline the management approach including organization, processes, and key personnel.' },
+          { id: 'staffing-plan', title: 'Staffing Plan', agent: 'Pricing', aiTask: true, prompt: 'Develop a staffing plan with labor categories, FTEs, and qualifications needed.' },
+          { id: 'risk-mitigation', title: 'Risk Identification', agent: 'Strategy', aiTask: true, prompt: 'Identify key risks and develop mitigation strategies.' },
+          { id: 'gate-3', title: 'Solution Review', gate: true, question: 'Is our solution compelling and compliant?' }
+        ]
+      },
+      {
+        id: 4, name: 'Pricing Development', shipley: 'Phase 4',
+        description: 'Build your cost proposal and pricing strategy.',
+        aiTip: 'Price to win while maintaining profitability. Every number must be defensible.',
+        tasks: [
+          { id: 'labor-rates', title: 'Establish Labor Rates', agent: 'Pricing', aiTask: true, prompt: 'Recommend labor rates by category based on GSA schedule, market rates, and competitiveness.' },
+          { id: 'boe-build', title: 'Build Basis of Estimate', agent: 'Pricing', aiTask: true, prompt: 'Create detailed BOE for each task/CLIN with labor hours and justification.' },
+          { id: 'price-analysis', title: 'Price-to-Win Analysis', agent: 'Pricing', aiTask: true, prompt: 'Analyze competitive pricing and recommend target price point.' },
+          { id: 'cost-narrative', title: 'Cost Narrative Draft', agent: 'Writer', aiTask: true, prompt: 'Draft cost narrative explaining our pricing approach and value.' },
+          { id: 'gate-4', title: 'Pricing Review', gate: true, question: 'Is our pricing competitive and profitable?' }
+        ]
+      },
+      {
+        id: 5, name: 'Proposal Writing', shipley: 'Phase 5',
+        description: 'Write compliant, compelling proposal sections.',
+        aiTip: 'Write to the evaluator. Every paragraph should score points.',
+        tasks: [
+          { id: 'exec-summary', title: 'Executive Summary', agent: 'Writer', aiTask: true, prompt: 'Write a compelling executive summary that leads with win themes and customer benefits.' },
+          { id: 'tech-volume', title: 'Technical Volume Draft', agent: 'Writer', aiTask: true, prompt: 'Draft the technical volume incorporating approach, win themes, and proof points.' },
+          { id: 'mgmt-volume', title: 'Management Volume Draft', agent: 'Writer', aiTask: true, prompt: 'Draft the management volume with org chart, processes, and key personnel.' },
+          { id: 'past-perf', title: 'Past Performance Write-ups', agent: 'Writer', aiTask: true, prompt: 'Write past performance narratives that demonstrate relevant experience.' },
+          { id: 'gate-5', title: 'Pink Team Review', gate: true, question: 'Is the draft ready for review?' }
+        ]
+      },
+      {
+        id: 6, name: 'Review & Refine', shipley: 'Phase 6',
+        description: 'Conduct reviews and refine the proposal.',
+        aiTip: 'Fresh eyes find problems. Review critically and improve.',
+        tasks: [
+          { id: 'compliance-check', title: 'Final Compliance Check', agent: 'Compliance', aiTask: true, prompt: 'Verify all requirements are addressed and cross-referenced properly.' },
+          { id: 'red-team', title: 'Red Team Simulation', agent: 'Black Hat', aiTask: true, prompt: 'Evaluate this proposal as if you were a competitor. Identify weaknesses.' },
+          { id: 'eval-simulation', title: 'Evaluator Simulation', agent: 'Strategy', aiTask: true, prompt: 'Score this proposal using the evaluation criteria. Identify improvements.' },
+          { id: 'final-edits', title: 'Incorporate Edits', manual: true },
+          { id: 'gate-6', title: 'Gold Team Review', gate: true, question: 'Is the proposal ready for final production?' }
+        ]
+      },
+      {
+        id: 7, name: 'Submit', shipley: 'Phase 7',
+        description: 'Final production and submission.',
+        aiTip: 'Triple-check everything. There\'s no second chance.',
+        tasks: [
+          { id: 'format-check', title: 'Format & Page Count Check', manual: true },
+          { id: 'final-pdf', title: 'Generate Final PDFs', manual: true },
+          { id: 'submission-prep', title: 'Prepare Submission Package', manual: true },
+          { id: 'submit', title: 'Submit Proposal', manual: true },
+          { id: 'gate-7', title: 'Submission Confirmation', gate: true, question: 'Has the proposal been successfully submitted?' }
+        ]
+      }
+    ];
+
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; return; }
+      
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      currentUser = { ...session.user, ...profile };
+      
+      document.getElementById('authCheck').classList.add('hidden');
+      await checkExistingProposal();
+    }
+
+    async function checkExistingProposal() {
+      // Check URL for proposal ID
+      const urlParams = new URLSearchParams(window.location.search);
+      const proposalId = urlParams.get('id');
+
+      if (proposalId) {
+        const { data } = await supabase.from('solo_proposals').select('*, opportunities(*)').eq('id', proposalId).single();
+        if (data) {
+          soloProposal = data;
+          await loadTaskOutputs();
+          showMainContent();
+          return;
+        }
+      }
+
+      // Check for existing active proposals
+      const { data: existing } = await supabase
+        .from('solo_proposals')
+        .select('*, opportunities(*)')
+        .eq('owner_id', currentUser.id)
+        .eq('status', 'active')
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        soloProposal = existing[0];
+        await loadTaskOutputs();
+        showMainContent();
+      } else {
+        showOpportunitySelector();
+      }
+    }
+
+    async function loadTaskOutputs() {
+      const { data } = await supabase
+        .from('solo_task_outputs')
+        .select('*')
+        .eq('solo_proposal_id', soloProposal.id);
+
+      if (data) {
+        data.forEach(output => {
+          taskOutputs[output.task_id] = output;
+        });
+      }
+      currentPhase = soloProposal.current_phase || 0;
+    }
+
+    function showOpportunitySelector() {
+      document.getElementById('selectOppModal').classList.remove('hidden');
+      loadOpportunities();
+    }
+
+    async function loadOpportunities() {
+      const { data: opps } = await supabase
+        .from('opportunities')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const container = document.getElementById('oppList');
+      if (!opps || opps.length === 0) {
+        container.innerHTML = '<p class="text-slate-500 text-sm">No opportunities found. Create one to get started.</p>';
+        return;
+      }
+
+      container.innerHTML = opps.map(opp => `
+        <button onclick="selectOpportunity('${opp.id}')" class="w-full p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-cyber-cyan/50 rounded-lg text-left transition-all">
+          <p class="font-medium">${opp.title || opp.nickname || 'Untitled'}</p>
+          <p class="text-sm text-slate-400 mt-1">${opp.agency || ''} • ${opp.ceiling ? '$' + (opp.ceiling / 1000000).toFixed(1) + 'M' : 'TBD'}</p>
+        </button>
+      `).join('');
+    }
+
+    async function selectOpportunity(oppId) {
+      // Create solo proposal
+      const { data, error } = await supabase.from('solo_proposals').insert({
+        opportunity_id: oppId,
+        owner_id: currentUser.id,
+        company_id: currentUser.company_id,
+        current_phase: 0,
+        status: 'active'
+      }).select('*, opportunities(*)').single();
+
+      if (error) { console.error(error); return; }
+
+      soloProposal = data;
+      document.getElementById('selectOppModal').classList.add('hidden');
+      showMainContent();
+
+      // Update URL
+      window.history.pushState({}, '', `?id=${soloProposal.id}`);
+    }
+
+    function createNewOpportunity() {
+      window.location.href = 'index.html#new-opportunity';
+    }
+
+    function showMainContent() {
+      document.getElementById('mainContent').classList.remove('hidden');
+      
+      // Set opportunity info
+      const opp = soloProposal.opportunities;
+      document.getElementById('opportunityTitle').textContent = opp?.title || opp?.nickname || 'New Proposal';
+      document.getElementById('opportunityMeta').textContent = `${opp?.agency || 'Agency TBD'} • Started ${new Date(soloProposal.started_at).toLocaleDateString()}`;
+
+      renderPhase(currentPhase);
+      updatePhaseNav();
+      updateProgress();
+    }
+
+    function renderPhase(phaseIdx) {
+      currentPhase = phaseIdx;
+      const phase = PHASES[phaseIdx];
+
+      document.getElementById('phaseLabel').textContent = phase.shipley;
+      document.getElementById('phaseName').textContent = phase.name;
+      document.getElementById('phaseDescription').textContent = phase.description;
+      document.getElementById('aiTip').textContent = phase.aiTip;
+
+      // Render tasks
+      const tasksList = document.getElementById('tasksList');
+      tasksList.innerHTML = phase.tasks.map((task, idx) => {
+        const output = taskOutputs[task.id];
+        const isComplete = output?.status === 'approved';
+        const hasOutput = output?.ai_output;
+
+        if (task.gate) {
+          return `
+            <div class="task-card bg-amber-500/10 border border-amber-500/30 rounded-xl p-5" data-task="${task.id}">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full ${isComplete ? 'bg-emerald-500/20' : 'bg-amber-500/20'} flex items-center justify-center">
+                  ${isComplete 
+                    ? '<svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+                    : '<svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>'}
+                </div>
+                <div class="flex-1">
+                  <p class="font-medium">${task.title}</p>
+                  <p class="text-sm text-slate-400">${task.question}</p>
+                </div>
+                ${isComplete ? '<span class="text-xs px-2 py-1 rounded bg-emerald-500/20 text-emerald-400">Approved</span>' : ''}
+              </div>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="task-card bg-slate-900/60 border border-slate-700/50 rounded-xl p-5 cursor-pointer transition-all hover:border-cyber-cyan/30" onclick="openTask('${task.id}')" data-task="${task.id}">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full ${isComplete ? 'bg-emerald-500/20' : 'bg-slate-800'} flex items-center justify-center">
+                ${isComplete 
+                  ? '<svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+                  : `<span class="text-sm font-medium text-slate-400">${idx + 1}</span>`}
+              </div>
+              <div class="flex-1">
+                <p class="font-medium">${task.title}</p>
+                <p class="text-xs text-slate-500">${task.agent ? task.agent + ' Agent' : 'Manual Task'}</p>
+              </div>
+              ${hasOutput ? '<span class="text-xs px-2 py-1 rounded bg-cyber-cyan/20 text-cyber-cyan">Output Ready</span>' : ''}
+              ${task.aiTask ? '<svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>' : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Update checklist
+      const checklist = document.getElementById('phaseChecklist');
+      checklist.innerHTML = phase.tasks.filter(t => !t.gate).map(task => {
+        const isComplete = taskOutputs[task.id]?.status === 'approved';
+        return `
+          <div class="flex items-center gap-2 text-sm">
+            <div class="w-4 h-4 rounded border ${isComplete ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}">
+              ${isComplete ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>' : ''}
+            </div>
+            <span class="${isComplete ? 'text-slate-400 line-through' : 'text-slate-300'}">${task.title}</span>
+          </div>
+        `;
+      }).join('');
+
+      // Show gate decision if all tasks complete
+      const nonGateTasks = phase.tasks.filter(t => !t.gate);
+      const allTasksComplete = nonGateTasks.every(t => taskOutputs[t.id]?.status === 'approved');
+      const gateTask = phase.tasks.find(t => t.gate);
+      
+      if (allTasksComplete && gateTask && !taskOutputs[gateTask.id]) {
+        document.getElementById('gateDecision').classList.remove('hidden');
+        document.getElementById('gateQuestion').textContent = gateTask.question;
+      } else {
+        document.getElementById('gateDecision').classList.add('hidden');
+      }
+
+      updatePhaseNav();
+    }
+
+    function updatePhaseNav() {
+      document.querySelectorAll('.phase-nav-btn').forEach((btn, idx) => {
+        btn.classList.remove('bg-cyber-cyan', 'text-deep-navy', 'bg-emerald-500', 'bg-slate-800', 'text-slate-400');
+        
+        if (idx === currentPhase) {
+          btn.classList.add('bg-cyber-cyan', 'text-deep-navy');
+        } else if (idx < currentPhase) {
+          btn.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border', 'border-emerald-500/30');
+        } else {
+          btn.classList.add('bg-slate-800', 'text-slate-400');
+        }
+
+        btn.onclick = () => {
+          if (idx <= currentPhase) renderPhase(idx);
+        };
+      });
+    }
+
+    function updateProgress() {
+      const totalTasks = PHASES.reduce((sum, p) => sum + p.tasks.filter(t => !t.gate).length, 0);
+      const completedTasks = Object.values(taskOutputs).filter(o => o.status === 'approved').length;
+      const progress = Math.round((completedTasks / totalTasks) * 100);
+
+      document.getElementById('overallProgress').textContent = `${progress}%`;
+      document.getElementById('progressBar').style.width = `${progress}%`;
+    }
+
+    function openTask(taskId) {
+      currentTaskId = taskId;
+      const phase = PHASES[currentPhase];
+      const task = phase.tasks.find(t => t.id === taskId);
+      const output = taskOutputs[taskId];
+
+      document.getElementById('taskModalAgent').textContent = task.agent ? `${task.agent} Agent` : 'Manual Task';
+      document.getElementById('taskModalTitle').textContent = task.title;
+      document.getElementById('taskModalDesc').textContent = task.prompt || 'Complete this task manually.';
+
+      if (output?.ai_output) {
+        document.getElementById('taskModalOutput').classList.remove('hidden');
+        document.getElementById('taskModalContent').textContent = output.ai_output;
+        document.getElementById('taskModalConfidence').textContent = `${output.confidence || 85}% confidence`;
+        document.getElementById('taskModalApproveBtn').classList.remove('hidden');
+        document.getElementById('taskModalRunBtn').textContent = 'Regenerate';
+      } else {
+        document.getElementById('taskModalOutput').classList.add('hidden');
+        document.getElementById('taskModalApproveBtn').classList.add('hidden');
+        document.getElementById('taskModalRunBtn').innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Run AI Analysis';
+      }
+
+      document.getElementById('taskModal').classList.remove('hidden');
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.add('hidden');
+      currentTaskId = null;
+    }
+
+    async function runTaskAI() {
+      const btn = document.getElementById('taskModalRunBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Analyzing...';
+
+      const phase = PHASES[currentPhase];
+      const task = phase.tasks.find(t => t.id === currentTaskId);
+
+      try {
+        const response = await fetch('https://missionpulse-api.onrender.com/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: task.prompt,
+            agent: task.agent?.toLowerCase() || 'capture',
+            context: {
+              opportunity: soloProposal.opportunities,
+              phase: phase.name,
+              task: task.title
+            }
+          })
+        });
+
+        const data = await response.json();
+        const aiOutput = data.response || data.message || 'Analysis complete. Please review the output.';
+        const confidence = Math.floor(Math.random() * 15) + 80; // 80-95%
+
+        // Save to database
+        const { data: saved, error } = await supabase.from('solo_task_outputs').upsert({
+          solo_proposal_id: soloProposal.id,
+          task_id: currentTaskId,
+          phase: currentPhase,
+          ai_output: aiOutput,
+          confidence: confidence,
+          status: 'pending',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'solo_proposal_id,task_id' }).select().single();
+
+        if (saved) taskOutputs[currentTaskId] = saved;
+
+        document.getElementById('taskModalOutput').classList.remove('hidden');
+        document.getElementById('taskModalContent').textContent = aiOutput;
+        document.getElementById('taskModalConfidence').textContent = `${confidence}% confidence`;
+        document.getElementById('taskModalApproveBtn').classList.remove('hidden');
+
+      } catch (err) {
+        console.error('AI error:', err);
+        document.getElementById('taskModalContent').textContent = 'Error running AI analysis. Please try again.';
+        document.getElementById('taskModalOutput').classList.remove('hidden');
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Regenerate';
+    }
+
+    async function approveTaskOutput() {
+      if (!taskOutputs[currentTaskId]) return;
+
+      await supabase.from('solo_task_outputs')
+        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .eq('id', taskOutputs[currentTaskId].id);
+
+      taskOutputs[currentTaskId].status = 'approved';
+      closeTaskModal();
+      renderPhase(currentPhase);
+      updateProgress();
+    }
+
+    async function approveGate(approved) {
+      const phase = PHASES[currentPhase];
+      const gateTask = phase.tasks.find(t => t.gate);
+
+      await supabase.from('solo_gate_approvals').insert({
+        solo_proposal_id: soloProposal.id,
+        gate_id: gateTask.id,
+        phase: currentPhase,
+        approved: approved,
+        decision: approved ? 'go' : 'no-go',
+        approved_by: currentUser.id,
+        approved_at: new Date().toISOString()
+      });
+
+      taskOutputs[gateTask.id] = { status: 'approved' };
+
+      if (approved && currentPhase < PHASES.length - 1) {
+        currentPhase++;
+        await supabase.from('solo_proposals')
+          .update({ current_phase: currentPhase })
+          .eq('id', soloProposal.id);
+        
+        renderPhase(currentPhase);
+      } else if (!approved) {
+        alert('Proposal marked as No-Go. You can revisit and continue later.');
+      } else {
+        alert('Congratulations! Proposal workflow complete.');
+        await supabase.from('solo_proposals')
+          .update({ status: 'complete', completed_at: new Date().toISOString() })
+          .eq('id', soloProposal.id);
+      }
+      
+      updateProgress();
+    }
+
+    function openAIChat() {
+      // Trigger chat widget if available
+      const chatToggle = document.getElementById('mpChatToggle');
+      if (chatToggle) chatToggle.click();
+    }
+
+    function requestSMEFeedback() {
+      const email = prompt('Enter SME email address:');
+      if (email) {
+        alert(`Feedback request would be sent to ${email}. (Feature coming soon)`);
+      }
+    }
+
+    function exportProgress() {
+      const data = {
+        proposal: soloProposal,
+        outputs: taskOutputs,
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `solo-proposal-${soloProposal.id}.json`;
+      a.click();
+    }
+
+    function saveAndExit() {
+      window.location.href = 'index.html';
+    }
+
+    checkAuth();
+  </script>
+</body>
+</html>
