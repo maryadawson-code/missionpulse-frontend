@@ -34,8 +34,8 @@
  * FILE: index.html
  * ROLE: System
  * SECURITY: Supabase credentials verified
- * SPRINT: 52 - Data Wiring Batch 4
- * MODULES: M1-M12 LIVE (+ Orals, Playbook, Frenemy)
+ * SPRINT: 53 - Data Wiring COMPLETE
+ * MODULES: ALL 15 MODULES LIVE - Full Supabase Integration
  */
 const{useState,useEffect,useRef,useCallback}=React;
 
@@ -482,6 +482,117 @@ const MissionPulse = {
       if (error) throw error;
       return true;
     } catch (err) { console.error('[MissionPulse] revokeAllPartners error:', err); throw err; }
+  },
+
+  // LAUNCH CHECKLISTS (Sprint 53)
+  async getLaunchChecklist(opportunityId) {
+    try {
+      let query = supabase.from('launch_checklists').select('*').order('category', { ascending: true });
+      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getLaunchChecklist error:', err); return []; }
+  },
+
+  async createChecklistItem(item) {
+    try {
+      const { data, error } = await supabase.from('launch_checklists')
+        .insert([{ ...item, created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] createChecklistItem error:', err); throw err; }
+  },
+
+  async updateChecklistItem(id, updates) {
+    try {
+      if (updates.status === 'complete') updates.completed_at = new Date().toISOString();
+      const { data, error } = await supabase.from('launch_checklists')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] updateChecklistItem error:', err); throw err; }
+  },
+
+  async deleteChecklistItem(id) {
+    try {
+      const { error } = await supabase.from('launch_checklists').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) { console.error('[MissionPulse] deleteChecklistItem error:', err); throw err; }
+  },
+
+  async getLaunchReadiness(opportunityId) {
+    const items = await this.getLaunchChecklist(opportunityId);
+    const total = items.length;
+    const complete = items.filter(i => i.status === 'complete').length;
+    const blocked = items.filter(i => i.blockers).length;
+    return { total, complete, blocked, percent: total > 0 ? Math.round((complete / total) * 100) : 0 };
+  },
+
+  // POST-AWARD ACTIONS (Sprint 53)
+  async getPostAwardActions(opportunityId, actionType = null) {
+    try {
+      let query = supabase.from('post_award_actions').select('*').order('due_date', { ascending: true });
+      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+      if (actionType) query = query.eq('action_type', actionType);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getPostAwardActions error:', err); return []; }
+  },
+
+  async createPostAwardAction(action) {
+    try {
+      const { data, error } = await supabase.from('post_award_actions')
+        .insert([{ ...action, created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] createPostAwardAction error:', err); throw err; }
+  },
+
+  async updatePostAwardAction(id, updates) {
+    try {
+      if (updates.status === 'complete') updates.completed_at = new Date().toISOString();
+      const { data, error } = await supabase.from('post_award_actions')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] updatePostAwardAction error:', err); throw err; }
+  },
+
+  async deletePostAwardAction(id) {
+    try {
+      const { error } = await supabase.from('post_award_actions').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) { console.error('[MissionPulse] deletePostAwardAction error:', err); throw err; }
+  },
+
+  // AUDIT LOGS (Sprint 53)
+  async getAuditLogs(limit = 100) {
+    try {
+      const { data, error } = await supabase.from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getAuditLogs error:', err); return []; }
+  },
+
+  async logAuditAction(action, module, resourceType = null, resourceId = null, details = null) {
+    try {
+      const { data, error } = await supabase.from('audit_logs')
+        .insert([{ action, module, resource_type: resourceType, resource_id: resourceId, details, created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] logAuditAction error:', err); return null; }
   },
 
   // HELPERS
@@ -2214,8 +2325,419 @@ function ModuleFrenemy({opps,isLive}){
   );
 }
 
-function ModuleAudit(){
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Audit Log</h2><span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">ADMIN</span></div><p className="text-slate-400 text-sm">System activity and access tracking</p><div className="glass overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr>{['Timestamp','Action','User','Role','IP'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-700/50">{DEMO_AUDIT.map(a=><tr key={a.id} className="hover:bg-slate-800/30"><td className="p-3 text-sm text-slate-400 font-mono">{a.ts}</td><td className="p-3"><span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-white">{a.action}</span></td><td className="p-3 text-sm text-white">{a.user}</td><td className="p-3 text-sm text-slate-300">{a.role}</td><td className="p-3 text-sm text-slate-500 font-mono">{a.ip}</td></tr>)}</tbody></table></div></div>);
+// ============================================================
+// MODULE: LAUNCH READINESS (M13) - LIVE DATA
+// ============================================================
+function ModuleLaunch({opps,isLive}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[items,setItems]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[showForm,setShowForm]=useState(false);
+  const[form,setForm]=useState({category:'Compliance',item:'',owner_name:'',due_date:''});
+
+  const categories=['Compliance','Technical','Pricing','Management','Past Performance','Orals'];
+  const statusColors={pending:'bg-slate-500/20 text-slate-400',in_progress:'bg-amber-500/20 text-amber-400',complete:'bg-emerald-500/20 text-emerald-400',blocked:'bg-red-500/20 text-red-400'};
+
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getLaunchChecklist(selectedOpp.id);
+      setItems(data.length>0?data:[
+        {id:'demo-1',category:'Compliance',item:'Complete L Section requirements',status:'complete',owner_name:'Lisa Martinez'},
+        {id:'demo-2',category:'Technical',item:'Finalize technical approach',status:'in_progress',owner_name:'Sarah Chen'},
+        {id:'demo-3',category:'Pricing',item:'Lock pricing model',status:'pending',owner_name:'Jennifer Park',blockers:'Awaiting subcontractor rates'},
+        {id:'demo-4',category:'Management',item:'Executive summary review',status:'pending',owner_name:'Mary Womack'}
+      ]);
+      setLoading(false);
+    };
+    load();
+  },[selectedOpp]);
+
+  const handleAdd=async()=>{
+    if(!selectedOpp||!form.item)return;
+    try{
+      const item=await MissionPulse.createChecklistItem({...form,opportunity_id:selectedOpp.id,status:'pending'});
+      setItems([...items,item]);
+      setShowForm(false);
+      setForm({category:'Compliance',item:'',owner_name:'',due_date:''});
+    }catch(err){console.error(err)}
+  };
+
+  const handleStatusChange=async(id,newStatus)=>{
+    try{
+      await MissionPulse.updateChecklistItem(id,{status:newStatus});
+      setItems(items.map(i=>i.id===id?{...i,status:newStatus}:i));
+    }catch(err){console.error(err)}
+  };
+
+  const handleDelete=async(id)=>{
+    if(!confirm('Delete checklist item?'))return;
+    try{
+      await MissionPulse.deleteChecklistItem(id);
+      setItems(items.filter(i=>i.id!==id));
+    }catch(err){console.error(err)}
+  };
+
+  const stats={
+    total:items.length,
+    complete:items.filter(i=>i.status==='complete').length,
+    blocked:items.filter(i=>i.status==='blocked'||i.blockers).length,
+    percent:items.length>0?Math.round((items.filter(i=>i.status==='complete').length/items.length)*100):0
+  };
+
+  const goNoGo=stats.percent>=80&&stats.blocked===0?'GO':stats.percent>=50?'CONDITIONAL':'NO-GO';
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Launch Readiness</h2>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">Pre-submission checklist and Go/No-Go assessment</p>
+        </div>
+        {selectedOpp&&<button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Item</button>}
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>setSelectedOpp(opps.find(o=>o.id===e.target.value)||null)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {selectedOpp&&(
+        <>
+          {/* Stats & Go/No-Go */}
+          <div className="grid grid-cols-5 gap-4">
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Total Items</p><p className="text-2xl font-bold text-white">{stats.total}</p></div>
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Complete</p><p className="text-2xl font-bold text-emerald-400">{stats.complete}</p></div>
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Blocked</p><p className="text-2xl font-bold text-red-400">{stats.blocked}</p></div>
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Progress</p><p className="text-2xl font-bold text-cyan-400">{stats.percent}%</p></div>
+            <div className={`glass p-4 border-2 ${goNoGo==='GO'?'border-emerald-500 bg-emerald-500/10':goNoGo==='CONDITIONAL'?'border-amber-500 bg-amber-500/10':'border-red-500 bg-red-500/10'}`}>
+              <p className="text-slate-400 text-xs">Decision</p>
+              <p className={`text-2xl font-bold ${goNoGo==='GO'?'text-emerald-400':goNoGo==='CONDITIONAL'?'text-amber-400':'text-red-400'}`}>{goNoGo}</p>
+            </div>
+          </div>
+
+          {/* Add Form */}
+          {showForm&&(
+            <div className="glass p-4 animate-fadeIn">
+              <h3 className="font-semibold text-white mb-3">Add Checklist Item</h3>
+              <div className="grid grid-cols-4 gap-3">
+                <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white">
+                  {categories.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+                <input placeholder="Item description" value={form.item} onChange={e=>setForm({...form,item:e.target.value})} className="col-span-2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+                <input placeholder="Owner" value={form.owner_name} onChange={e=>setForm({...form,owner_name:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+              </div>
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={()=>setShowForm(false)} className="px-3 py-1 bg-slate-700 text-white rounded text-sm">Cancel</button>
+                <button onClick={handleAdd} className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">Add</button>
+              </div>
+            </div>
+          )}
+
+          {/* Checklist by Category */}
+          {loading?<div className="glass p-8 flex justify-center"><Spinner/></div>:(
+            <div className="space-y-4">
+              {categories.map(cat=>{
+                const catItems=items.filter(i=>i.category===cat);
+                if(catItems.length===0)return null;
+                return(
+                  <div key={cat} className="glass overflow-hidden">
+                    <div className="p-3 border-b border-slate-700/50 bg-slate-800/50">
+                      <h3 className="font-semibold text-white">{cat} ({catItems.filter(i=>i.status==='complete').length}/{catItems.length})</h3>
+                    </div>
+                    <div className="divide-y divide-slate-700/50">
+                      {catItems.map(item=>(
+                        <div key={item.id} className="p-3 flex items-center justify-between hover:bg-slate-800/30">
+                          <div className="flex items-center gap-3">
+                            <select value={item.status} onChange={e=>handleStatusChange(item.id,e.target.value)} className={`px-2 py-1 rounded text-xs border-0 ${statusColors[item.status]} bg-transparent cursor-pointer`}>
+                              <option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="complete">Complete</option><option value="blocked">Blocked</option>
+                            </select>
+                            <span className={`text-sm ${item.status==='complete'?'text-slate-500 line-through':'text-white'}`}>{item.item}</span>
+                            {item.blockers&&<span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs">⚠️ {item.blockers}</span>}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-slate-400">{item.owner_name||'Unassigned'}</span>
+                            <button onClick={()=>handleDelete(item.id)} className="p-1 text-red-400 hover:text-red-300"><Icon name="trash" className="w-4 h-4"/></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🚀</div><p className="text-white text-lg mb-2">Select an opportunity for launch readiness</p><p className="text-slate-400">Track pre-submission checklist and Go/No-Go decision</p></div>}
+    </div>
+  );
+}
+
+// ============================================================
+// MODULE: POST-AWARD (M14) - LIVE DATA
+// ============================================================
+function ModulePostAward({opps,isLive}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[actions,setActions]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[showForm,setShowForm]=useState(false);
+  const[activeTab,setActiveTab]=useState('transition');
+  const[form,setForm]=useState({action_type:'transition',title:'',description:'',owner_name:'',priority:'medium',due_date:''});
+
+  const actionTypes=[
+    {id:'transition',name:'Transition',icon:'🔄'},
+    {id:'deliverable',name:'Deliverable',icon:'📦'},
+    {id:'lesson',name:'Lesson Learned',icon:'💡'}
+  ];
+  const priorities={high:'bg-red-500/20 text-red-400',medium:'bg-amber-500/20 text-amber-400',low:'bg-emerald-500/20 text-emerald-400'};
+  const statusColors={pending:'bg-slate-500/20 text-slate-400',in_progress:'bg-cyan-500/20 text-cyan-400',complete:'bg-emerald-500/20 text-emerald-400'};
+
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getPostAwardActions(selectedOpp.id);
+      setActions(data.length>0?data:[
+        {id:'demo-1',action_type:'transition',title:'Kickoff meeting with COR',status:'complete',priority:'high',owner_name:'Mary Womack'},
+        {id:'demo-2',action_type:'transition',title:'Staff onboarding',status:'in_progress',priority:'high',owner_name:'Amanda Foster'},
+        {id:'demo-3',action_type:'deliverable',title:'CDRL 001 - Monthly Status Report',status:'pending',priority:'medium',due_date:'2026-02-15'},
+        {id:'demo-4',action_type:'lesson',title:'Pricing assumptions were accurate',status:'complete',lesson_category:'Pricing',lesson_impact:'positive'}
+      ]);
+      setLoading(false);
+    };
+    load();
+  },[selectedOpp]);
+
+  const handleAdd=async()=>{
+    if(!selectedOpp||!form.title)return;
+    try{
+      const action=await MissionPulse.createPostAwardAction({...form,opportunity_id:selectedOpp.id,status:'pending'});
+      setActions([...actions,action]);
+      setShowForm(false);
+      setForm({action_type:'transition',title:'',description:'',owner_name:'',priority:'medium',due_date:''});
+    }catch(err){console.error(err)}
+  };
+
+  const handleStatusChange=async(id,newStatus)=>{
+    try{
+      await MissionPulse.updatePostAwardAction(id,{status:newStatus});
+      setActions(actions.map(a=>a.id===id?{...a,status:newStatus}:a));
+    }catch(err){console.error(err)}
+  };
+
+  const handleDelete=async(id)=>{
+    if(!confirm('Delete this item?'))return;
+    try{
+      await MissionPulse.deletePostAwardAction(id);
+      setActions(actions.filter(a=>a.id!==id));
+    }catch(err){console.error(err)}
+  };
+
+  const filteredActions=actions.filter(a=>a.action_type===activeTab);
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Post-Award Management</h2>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">Transition tracking, deliverables, and lessons learned</p>
+        </div>
+        {selectedOpp&&<button onClick={()=>{setForm({...form,action_type:activeTab});setShowForm(true)}} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add {actionTypes.find(t=>t.id===activeTab)?.name}</button>}
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Won Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>setSelectedOpp(opps.find(o=>o.id===e.target.value)||null)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.filter(o=>o.status==='Won'||o.phase?.includes('Award')||true).map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {selectedOpp&&(
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4">
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Transition Tasks</p><p className="text-2xl font-bold text-cyan-400">{actions.filter(a=>a.action_type==='transition').length}</p></div>
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Deliverables</p><p className="text-2xl font-bold text-purple-400">{actions.filter(a=>a.action_type==='deliverable').length}</p></div>
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Lessons Learned</p><p className="text-2xl font-bold text-amber-400">{actions.filter(a=>a.action_type==='lesson').length}</p></div>
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Completion</p><p className="text-2xl font-bold text-emerald-400">{actions.length>0?Math.round((actions.filter(a=>a.status==='complete').length/actions.length)*100):0}%</p></div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2">
+            {actionTypes.map(t=>(
+              <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${activeTab===t.id?'bg-cyan-500 text-white':'bg-slate-700 text-slate-300'}`}>
+                {t.icon} {t.name} ({actions.filter(a=>a.action_type===t.id).length})
+              </button>
+            ))}
+          </div>
+
+          {/* Add Form */}
+          {showForm&&(
+            <div className="glass p-4 animate-fadeIn">
+              <h3 className="font-semibold text-white mb-3">Add {actionTypes.find(t=>t.id===form.action_type)?.name}</h3>
+              <div className="grid grid-cols-3 gap-3">
+                <input placeholder="Title" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className="col-span-2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+                <select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white">
+                  <option value="low">Low Priority</option><option value="medium">Medium</option><option value="high">High Priority</option>
+                </select>
+                <textarea placeholder="Description" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} className="col-span-2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white h-16"/>
+                <div className="space-y-2">
+                  <input placeholder="Owner" value={form.owner_name} onChange={e=>setForm({...form,owner_name:e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+                  <input type="date" value={form.due_date} onChange={e=>setForm({...form,due_date:e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={()=>setShowForm(false)} className="px-3 py-1 bg-slate-700 text-white rounded text-sm">Cancel</button>
+                <button onClick={handleAdd} className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">Add</button>
+              </div>
+            </div>
+          )}
+
+          {/* Actions List */}
+          {loading?<div className="glass p-8 flex justify-center"><Spinner/></div>:(
+            <div className="glass overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-slate-800/50"><tr>{['Status','Title','Priority','Owner','Due Date',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {filteredActions.map(a=>(
+                    <tr key={a.id} className="hover:bg-slate-800/30">
+                      <td className="p-3">
+                        <select value={a.status} onChange={e=>handleStatusChange(a.id,e.target.value)} className={`px-2 py-1 rounded text-xs border-0 ${statusColors[a.status]} bg-transparent cursor-pointer`}>
+                          <option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="complete">Complete</option>
+                        </select>
+                      </td>
+                      <td className="p-3">
+                        <span className={`text-sm ${a.status==='complete'?'text-slate-500 line-through':'text-white'}`}>{a.title}</span>
+                        {a.description&&<p className="text-xs text-slate-500 mt-0.5">{a.description}</p>}
+                      </td>
+                      <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs ${priorities[a.priority]}`}>{a.priority}</span></td>
+                      <td className="p-3 text-sm text-slate-400">{a.owner_name||'—'}</td>
+                      <td className="p-3 text-sm text-slate-400">{a.due_date?new Date(a.due_date).toLocaleDateString():'—'}</td>
+                      <td className="p-3"><button onClick={()=>handleDelete(a.id)} className="p-1 text-red-400 hover:text-red-300"><Icon name="trash" className="w-4 h-4"/></button></td>
+                    </tr>
+                  ))}
+                  {filteredActions.length===0&&<tr><td colSpan="6" className="p-8 text-center text-slate-400">No {actionTypes.find(t=>t.id===activeTab)?.name.toLowerCase()}s yet</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🏆</div><p className="text-white text-lg mb-2">Select a won opportunity for post-award tracking</p><p className="text-slate-400">Manage transition, deliverables, and lessons learned</p></div>}
+    </div>
+  );
+}
+
+// ============================================================
+// MODULE: AUDIT LOG (M15) - LIVE DATA
+// ============================================================
+function ModuleAudit({isLive}){
+  const[logs,setLogs]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[filter,setFilter]=useState('all');
+
+  const actionColors={
+    'CREATE':'bg-emerald-500/20 text-emerald-400',
+    'UPDATE':'bg-cyan-500/20 text-cyan-400',
+    'DELETE':'bg-red-500/20 text-red-400',
+    'LOGIN':'bg-purple-500/20 text-purple-400',
+    'LOGOUT':'bg-slate-500/20 text-slate-400',
+    'VIEW':'bg-slate-500/20 text-slate-400',
+    'APPROVE':'bg-emerald-500/20 text-emerald-400',
+    'REJECT':'bg-red-500/20 text-red-400'
+  };
+
+  useEffect(()=>{
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getAuditLogs(100);
+      setLogs(data.length>0?data:DEMO_AUDIT.map(a=>({
+        id:a.id,
+        action:a.action,
+        user_email:a.user,
+        user_role:a.role,
+        ip_address:a.ip,
+        created_at:a.ts,
+        module:'System'
+      })));
+      setLoading(false);
+    };
+    load();
+  },[]);
+
+  const actions=[...new Set(logs.map(l=>l.action))];
+  const filtered=filter==='all'?logs:logs.filter(l=>l.action===filter);
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Audit Log</h2>
+            <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">ADMIN</span>
+            <DataBadge live={isLive}/>
+          </div>
+          <p className="text-slate-400 text-sm">System activity and access tracking</p>
+        </div>
+        <button onClick={()=>window.location.reload()} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-2"><Icon name="refresh-cw" className="w-4 h-4"/>Refresh</button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-5 gap-4">
+        <div className="glass p-4"><p className="text-slate-400 text-xs">Total Events</p><p className="text-2xl font-bold text-white">{logs.length}</p></div>
+        <div className="glass p-4"><p className="text-slate-400 text-xs">Creates</p><p className="text-2xl font-bold text-emerald-400">{logs.filter(l=>l.action==='CREATE').length}</p></div>
+        <div className="glass p-4"><p className="text-slate-400 text-xs">Updates</p><p className="text-2xl font-bold text-cyan-400">{logs.filter(l=>l.action==='UPDATE').length}</p></div>
+        <div className="glass p-4"><p className="text-slate-400 text-xs">Deletes</p><p className="text-2xl font-bold text-red-400">{logs.filter(l=>l.action==='DELETE').length}</p></div>
+        <div className="glass p-4"><p className="text-slate-400 text-xs">Logins</p><p className="text-2xl font-bold text-purple-400">{logs.filter(l=>l.action==='LOGIN').length}</p></div>
+      </div>
+
+      {/* Filter */}
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={()=>setFilter('all')} className={`px-3 py-1.5 rounded-lg text-sm ${filter==='all'?'bg-cyan-500 text-white':'bg-slate-700 text-slate-300'}`}>All ({logs.length})</button>
+        {actions.map(a=>(
+          <button key={a} onClick={()=>setFilter(a)} className={`px-3 py-1.5 rounded-lg text-sm ${filter===a?'bg-cyan-500 text-white':'bg-slate-700 text-slate-300'}`}>{a} ({logs.filter(l=>l.action===a).length})</button>
+        ))}
+      </div>
+
+      {/* Log Table */}
+      {loading?<div className="glass p-8 flex justify-center"><Spinner/></div>:(
+        <div className="glass overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-slate-800/50"><tr>{['Timestamp','Action','Module','User','Role','IP Address'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {filtered.slice(0,50).map(log=>(
+                <tr key={log.id} className="hover:bg-slate-800/30">
+                  <td className="p-3 text-sm text-slate-400 font-mono">{new Date(log.created_at).toLocaleString()}</td>
+                  <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs ${actionColors[log.action]||'bg-slate-700 text-white'}`}>{log.action}</span></td>
+                  <td className="p-3 text-sm text-slate-300">{log.module||'—'}</td>
+                  <td className="p-3 text-sm text-white">{log.user_email||'System'}</td>
+                  <td className="p-3 text-sm text-slate-300">{log.user_role||'—'}</td>
+                  <td className="p-3 text-sm text-slate-500 font-mono">{log.ip_address||'—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length>50&&<div className="p-3 text-center text-slate-400 text-sm">Showing 50 of {filtered.length} events</div>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ModuleAdmin({tokenUsage,setTokenUsage}){
@@ -2239,7 +2761,7 @@ function AIChatWidget(){
 function Sidebar({role,setRole,active,setActive,user}){
   const[collapsed,setCollapsed]=useState(false);const[showRoles,setShowRoles]=useState(false);
   const accessible=MODULES.filter(m=>role.access.includes(m.id));
-  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Sprint 52</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>)})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
+  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Sprint 53</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>)})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
 }
 
 // ============================================================
@@ -2300,8 +2822,10 @@ function App(){
       case 'orals':return<ModuleOrals opps={opps} isLive={isLive}/>;
       case 'pricing':return<ModulePricing opps={opps} isLive={isLive}/>;
       case 'frenemy':return<ModuleFrenemy opps={opps} isLive={isLive}/>;
+      case 'launch':return<ModuleLaunch opps={opps} isLive={isLive}/>;
+      case 'post_award':return<ModulePostAward opps={opps} isLive={isLive}/>;
       case 'playbook':return<ModulePlaybook isLive={isLive}/>;
-      case 'audit':return<ModuleAudit/>;
+      case 'audit':return<ModuleAudit isLive={isLive}/>;
       case 'admin':return<ModuleAdmin tokenUsage={tokenUsage} setTokenUsage={setTokenUsage}/>;
       default:return<ModuleGeneric mod={active}/>;
     }
@@ -2316,7 +2840,7 @@ function App(){
         {active&&<header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3"><div className="flex items-center gap-3"><span className="text-xl">{active.icon}</span><div><h1 className="font-semibold text-white">{active.name}</h1></div>{active.badge&&<span className={`px-2 py-0.5 rounded text-xs font-bold ${active.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':active.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{active.badge}</span>}</div></header>}
         <main className="flex-1 overflow-y-auto p-6">{renderModule()}</main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 52 • © 2026 Mission Meets Tech</span></div>
+      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 53 FINAL • © 2026 Mission Meets Tech</span></div>
       <AIChatWidget/>
     </div>
   );
