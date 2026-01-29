@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Teaming Partners</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .strength-strong { border-left: 4px solid #10B981; }
+    .strength-moderate { border-left: 4px solid #F59E0B; }
+    .strength-weak { border-left: 4px solid #EF4444; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Teaming</span> Partners</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <input type="text" id="searchInput" placeholder="Search partners..." class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm" oninput="filterPartners()">
+      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ Add Partner</button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-5 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Total Partners</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statStrong" class="text-3xl font-bold text-green-400">0</div>
+      <div class="text-gray-400 text-sm">Strong Relations</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statActive" class="text-3xl font-bold text-amber-400">0</div>
+      <div class="text-gray-400 text-sm">Active</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statCleared" class="text-3xl font-bold text-purple-400">0</div>
+      <div class="text-gray-400 text-sm">Cleared</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statRevenue" class="text-2xl font-bold text-blue-400">$0</div>
+      <div class="text-gray-400 text-sm">Combined Revenue</div>
+    </div>
+  </div>
+
+  <!-- Partners Grid -->
+  <div id="partnersContainer" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="card p-8 text-center text-gray-500 col-span-full">Loading partners...</div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="partnerModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Partner</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="partnerForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="partnerId">
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Company Name *</label>
+            <input type="text" id="companyName" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Website</label>
+            <input type="url" id="website" placeholder="https://..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">DUNS</label>
+            <input type="text" id="dunsNumber" placeholder="123456789" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">CAGE Code</label>
+            <input type="text" id="cageCode" placeholder="ABC12" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">UEI</label>
+            <input type="text" id="uei" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Clearance</label>
+            <select id="clearanceLevel" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="">None</option>
+              <option value="Secret">Secret</option>
+              <option value="Top Secret">Top Secret</option>
+              <option value="TS/SCI">TS/SCI</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">HQ Location</label>
+            <input type="text" id="hqLocation" placeholder="Washington, DC" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Company Size</label>
+            <select id="companySize" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="small">Small Business</option>
+              <option value="sdvosb">SDVOSB</option>
+              <option value="8a">8(a)</option>
+              <option value="hubzone">HUBZone</option>
+              <option value="wosb">WOSB</option>
+              <option value="large">Large Business</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Annual Revenue ($M)</label>
+            <input type="number" id="annualRevenue" placeholder="50" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Employee Count</label>
+            <input type="number" id="employeeCount" placeholder="500" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Primary NAICS</label>
+            <input type="text" id="primaryNaics" placeholder="541512" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Contract Vehicles</label>
+          <input type="text" id="contractVehicles" placeholder="GSA IT-70, CIO-SP3, SEWP V..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Relationship Status</label>
+            <select id="relationshipStatus" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="active">Active</option>
+              <option value="potential">Potential</option>
+              <option value="past">Past</option>
+              <option value="dormant">Dormant</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Relationship Strength</label>
+            <select id="relationshipStrength" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="strong">Strong</option>
+              <option value="moderate">Moderate</option>
+              <option value="weak">Weak</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Last Engagement</label>
+            <input type="date" id="lastEngagement" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Strategic Value</label>
+          <textarea id="strategicValue" rows="2" placeholder="Why this partner is valuable..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Past Performance Summary</label>
+          <textarea id="pastPerfSummary" rows="2" placeholder="Key contracts and capabilities..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Notes</label>
+          <textarea id="notes" rows="2" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Partner</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    let supabase, allPartners = [], editingId = null;
+
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      document.getElementById('connectionStatus').innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    async function loadPartners() {
+      try {
+        const { data, error } = await supabase.from('teaming_partners').select('*').order('company_name');
+        if (error) throw error;
+        allPartners = data || [];
+        filterPartners();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load partners:', err);
+        showEmptyState('Failed to load partners');
+      }
+    }
+
+    function filterPartners() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = allPartners.filter(p => 
+        !search || 
+        p.company_name?.toLowerCase().includes(search) ||
+        p.primary_naics?.includes(search) ||
+        p.contract_vehicles?.toLowerCase().includes(search)
+      );
+      renderPartners(filtered);
+    }
+
+    function renderPartners(partners) {
+      const container = document.getElementById('partnersContainer');
+      if (partners.length === 0) {
+        showEmptyState('No partners found');
+        return;
+      }
+      
+      container.innerHTML = partners.map(p => `
+        <div class="card p-4 strength-${p.relationship_strength || 'moderate'} hover:border-cyan-400/50 cursor-pointer" onclick="openEditModal('${p.id}')">
+          <div class="flex items-start justify-between mb-2">
+            <div>
+              <h3 class="font-semibold text-lg">${p.company_name || 'Unknown'}</h3>
+              <span class="text-xs text-gray-500">${p.headquarters_location || 'Location TBD'}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-xs px-2 py-0.5 rounded ${getStatusClass(p.relationship_status)}">${(p.relationship_status || 'potential').toUpperCase()}</span>
+              ${p.clearance_level ? `<div class="text-xs text-purple-400 mt-1">🔐 ${p.clearance_level}</div>` : ''}
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
+            ${p.cage_code ? `<div class="bg-slate-800 rounded p-2"><span class="text-gray-500">CAGE:</span> <span class="text-cyan-400">${p.cage_code}</span></div>` : ''}
+            ${p.company_size ? `<div class="bg-slate-800 rounded p-2"><span class="text-gray-500">Size:</span> <span class="text-green-400">${formatSize(p.company_size)}</span></div>` : ''}
+            ${p.employee_count ? `<div class="bg-slate-800 rounded p-2"><span class="text-gray-500">Emp:</span> <span>${p.employee_count}</span></div>` : ''}
+          </div>
+          
+          ${p.annual_revenue ? `<div class="text-sm text-green-400 mb-2">💰 $${(p.annual_revenue).toFixed(0)}M Revenue</div>` : ''}
+          
+          ${p.contract_vehicles ? `<div class="text-xs text-cyan-400/70 mb-2">📜 ${truncate(p.contract_vehicles, 50)}</div>` : ''}
+          
+          ${p.strategic_value ? `<div class="text-xs text-gray-400 mb-2 line-clamp-2">💎 ${truncate(p.strategic_value, 80)}</div>` : ''}
+          
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
+            <div class="flex items-center gap-2">
+              <span class="text-xs ${getStrengthClass(p.relationship_strength)}">${(p.relationship_strength || 'moderate').toUpperCase()}</span>
+              ${p.last_engagement_date ? `<span class="text-xs text-gray-500">Last: ${formatDate(p.last_engagement_date)}</span>` : ''}
+            </div>
+            <button onclick="event.stopPropagation(); deletePartner('${p.id}')" class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showEmptyState(message) {
+      document.getElementById('partnersContainer').innerHTML = `
+        <div class="card p-8 text-center text-gray-500 col-span-full">
+          <p>${message}</p>
+          <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Add First Partner</button>
+        </div>`;
+    }
+
+    function getStatusClass(status) {
+      return { active: 'bg-green-500/20 text-green-400', potential: 'bg-cyan-500/20 text-cyan-400', past: 'bg-gray-500/20 text-gray-400', dormant: 'bg-amber-500/20 text-amber-400' }[status] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    function getStrengthClass(str) {
+      return { strong: 'text-green-400', moderate: 'text-amber-400', weak: 'text-red-400' }[str] || 'text-gray-400';
+    }
+
+    function formatSize(size) {
+      const labels = { small: 'Small', sdvosb: 'SDVOSB', '8a': '8(a)', hubzone: 'HUBZone', wosb: 'WOSB', large: 'Large' };
+      return labels[size] || size;
+    }
+
+    function truncate(str, len) { return str && str.length > len ? str.substring(0, len) + '...' : str || ''; }
+    function formatDate(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'; }
+
+    function updateStats() {
+      const strong = allPartners.filter(p => p.relationship_strength === 'strong').length;
+      const active = allPartners.filter(p => p.relationship_status === 'active').length;
+      const cleared = allPartners.filter(p => p.clearance_level).length;
+      const totalRevenue = allPartners.reduce((sum, p) => sum + (p.annual_revenue || 0), 0);
+      
+      document.getElementById('statTotal').textContent = allPartners.length;
+      document.getElementById('statStrong').textContent = strong;
+      document.getElementById('statActive').textContent = active;
+      document.getElementById('statCleared').textContent = cleared;
+      document.getElementById('statRevenue').textContent = '$' + (totalRevenue).toFixed(0) + 'M';
+    }
+
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'Add Partner';
+      document.getElementById('partnerForm').reset();
+      document.getElementById('partnerModal').classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      const partner = allPartners.find(p => p.id === id);
+      if (!partner) return;
+      
+      editingId = id;
+      document.getElementById('modalTitle').textContent = 'Edit Partner';
+      document.getElementById('partnerId').value = id;
+      document.getElementById('companyName').value = partner.company_name || '';
+      document.getElementById('website').value = partner.website || '';
+      document.getElementById('dunsNumber').value = partner.duns_number || '';
+      document.getElementById('cageCode').value = partner.cage_code || '';
+      document.getElementById('uei').value = partner.uei || '';
+      document.getElementById('clearanceLevel').value = partner.clearance_level || '';
+      document.getElementById('hqLocation').value = partner.headquarters_location || '';
+      document.getElementById('companySize').value = partner.company_size || 'small';
+      document.getElementById('annualRevenue').value = partner.annual_revenue || '';
+      document.getElementById('employeeCount').value = partner.employee_count || '';
+      document.getElementById('primaryNaics').value = partner.primary_naics || '';
+      document.getElementById('contractVehicles').value = partner.contract_vehicles || '';
+      document.getElementById('relationshipStatus').value = partner.relationship_status || 'potential';
+      document.getElementById('relationshipStrength').value = partner.relationship_strength || 'moderate';
+      document.getElementById('lastEngagement').value = partner.last_engagement_date || '';
+      document.getElementById('strategicValue').value = partner.strategic_value || '';
+      document.getElementById('pastPerfSummary').value = partner.past_performance_summary || '';
+      document.getElementById('notes').value = partner.notes || '';
+      document.getElementById('partnerModal').classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('partnerModal').classList.add('hidden'); editingId = null; }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      const partnerData = {
+        company_name: document.getElementById('companyName').value,
+        website: document.getElementById('website').value || null,
+        duns_number: document.getElementById('dunsNumber').value || null,
+        cage_code: document.getElementById('cageCode').value || null,
+        uei: document.getElementById('uei').value || null,
+        clearance_level: document.getElementById('clearanceLevel').value || null,
+        headquarters_location: document.getElementById('hqLocation').value || null,
+        company_size: document.getElementById('companySize').value || null,
+        annual_revenue: parseFloat(document.getElementById('annualRevenue').value) || null,
+        employee_count: parseInt(document.getElementById('employeeCount').value) || null,
+        primary_naics: document.getElementById('primaryNaics').value || null,
+        contract_vehicles: document.getElementById('contractVehicles').value || null,
+        relationship_status: document.getElementById('relationshipStatus').value,
+        relationship_strength: document.getElementById('relationshipStrength').value,
+        last_engagement_date: document.getElementById('lastEngagement').value || null,
+        strategic_value: document.getElementById('strategicValue').value || null,
+        past_performance_summary: document.getElementById('pastPerfSummary').value || null,
+        notes: document.getElementById('notes').value || null,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          const { error } = await supabase.from('teaming_partners').update(partnerData).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          partnerData.created_at = new Date().toISOString();
+          const { error } = await supabase.from('teaming_partners').insert([partnerData]);
+          if (error) throw error;
+        }
+        closeModal();
+        await loadPartners();
+      } catch (err) { console.error('Failed to save:', err); alert('Failed to save: ' + err.message); }
+    }
+
+    async function deletePartner(id) {
+      if (!confirm('Delete this partner?')) return;
+      try {
+        const { error } = await supabase.from('teaming_partners').delete().eq('id', id);
+        if (error) throw error;
+        await loadPartners();
+      } catch (err) { console.error('Failed to delete:', err); }
+    }
+
+    function subscribeToChanges() {
+      supabase.channel('partners_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'teaming_partners' }, () => loadPartners()).subscribe();
+    }
+
+    async function init() {
+      if (!initSupabase()) { updateConnectionStatus(false); return; }
+      await loadPartners();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</body>
+</html>

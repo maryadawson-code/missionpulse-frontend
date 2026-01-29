@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Black Hat Analysis</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .threat-high { border-left: 4px solid #EF4444; }
+    .threat-medium { border-left: 4px solid #F59E0B; }
+    .threat-low { border-left: 4px solid #10B981; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Black Hat</span> Analysis</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">Select Opportunity</option>
+      </select>
+      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ Add Competitor</button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Competitors</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statHigh" class="text-3xl font-bold text-red-400">0</div>
+      <div class="text-gray-400 text-sm">High Threat</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statIncumbent" class="text-3xl font-bold text-amber-400">0</div>
+      <div class="text-gray-400 text-sm">Incumbents</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statGhosted" class="text-3xl font-bold text-purple-400">0</div>
+      <div class="text-gray-400 text-sm">Ghost Themes</div>
+    </div>
+  </div>
+
+  <!-- Competitors Grid -->
+  <div id="competitorsContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card p-8 text-center text-gray-500 col-span-full">Select an opportunity to view competitors</div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="compModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Competitor</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="compForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="compId">
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Company Name *</label>
+            <input type="text" id="companyName" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Threat Level</label>
+            <select id="threatLevel" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Estimated Price ($)</label>
+            <input type="number" id="estimatedPrice" placeholder="10000000" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div class="flex items-center pt-6">
+            <label class="flex items-center gap-2">
+              <input type="checkbox" id="isIncumbent" class="rounded border-slate-600">
+              <span class="text-sm text-gray-400">Incumbent Contractor</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Strengths</label>
+          <textarea id="strengths" rows="2" placeholder="Their competitive advantages..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Weaknesses</label>
+          <textarea id="weaknesses" rows="2" placeholder="Their vulnerabilities..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Ghost Strategy <span class="text-cyan-400">(Counter-positioning)</span></label>
+          <textarea id="ghostStrategy" rows="3" placeholder="How to position against them without naming them..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Notes</label>
+          <textarea id="notes" rows="2" placeholder="Additional intel..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Competitor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    let supabase, allCompetitors = [], opportunities = [], editingId = null;
+
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      document.getElementById('connectionStatus').innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    async function loadOpportunities() {
+      try {
+        const { data } = await supabase.from('opportunities').select('id, title, name').order('title');
+        opportunities = data || [];
+        document.getElementById('opportunityFilter').innerHTML = `<option value="">Select Opportunity</option>` + 
+          opportunities.map(o => `<option value="${o.id}">${o.title || o.name}</option>`).join('');
+      } catch (err) { console.error('Failed to load opportunities:', err); }
+    }
+
+    async function loadCompetitors() {
+      try {
+        const oppFilter = document.getElementById('opportunityFilter').value;
+        if (!oppFilter) {
+          showEmptyState('Select an opportunity to view competitors');
+          return;
+        }
+        
+        const { data, error } = await supabase.from('competitors')
+          .select('*')
+          .eq('opportunity_id', oppFilter)
+          .order('threat_level');
+        if (error) throw error;
+        
+        allCompetitors = data || [];
+        renderCompetitors();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load competitors:', err);
+        showEmptyState('Failed to load competitors');
+      }
+    }
+
+    function renderCompetitors() {
+      const container = document.getElementById('competitorsContainer');
+      if (allCompetitors.length === 0) {
+        showEmptyState('No competitors found');
+        return;
+      }
+      
+      container.innerHTML = allCompetitors.map(c => `
+        <div class="card p-4 threat-${c.threat_level || 'medium'} hover:border-cyan-400/50 cursor-pointer" onclick="openEditModal('${c.id}')">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-semibold text-lg">${c.company_name || 'Unknown'}</h3>
+                ${c.incumbent ? '<span class="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">INCUMBENT</span>' : ''}
+              </div>
+            </div>
+            <span class="text-xs px-2 py-1 rounded ${getThreatClass(c.threat_level)}">${(c.threat_level || 'medium').toUpperCase()} THREAT</span>
+          </div>
+          
+          ${c.estimated_price ? `<div class="text-sm text-green-400 mb-3">💰 Est. Price: $${(c.estimated_price / 1000000).toFixed(1)}M</div>` : ''}
+          
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            ${c.strengths ? `<div class="bg-green-500/10 rounded p-2"><div class="text-xs text-green-400 mb-1">💪 Strengths</div><p class="text-xs text-gray-300">${truncate(c.strengths, 100)}</p></div>` : ''}
+            ${c.weaknesses ? `<div class="bg-red-500/10 rounded p-2"><div class="text-xs text-red-400 mb-1">⚠️ Weaknesses</div><p class="text-xs text-gray-300">${truncate(c.weaknesses, 100)}</p></div>` : ''}
+          </div>
+          
+          ${c.ghost_strategy ? `<div class="bg-purple-500/10 rounded p-2 mb-3"><div class="text-xs text-purple-400 mb-1">👻 Ghost Strategy</div><p class="text-xs text-gray-300">${truncate(c.ghost_strategy, 150)}</p></div>` : ''}
+          
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
+            <span class="text-xs text-gray-500">${formatDate(c.updated_at)}</span>
+            <button onclick="event.stopPropagation(); deleteCompetitor('${c.id}')" class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showEmptyState(message) {
+      document.getElementById('competitorsContainer').innerHTML = `
+        <div class="card p-8 text-center text-gray-500 col-span-full">
+          <p>${message}</p>
+          ${document.getElementById('opportunityFilter').value ? `<button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Add First Competitor</button>` : ''}
+        </div>`;
+    }
+
+    function getThreatClass(threat) {
+      return { high: 'bg-red-500/20 text-red-400', medium: 'bg-amber-500/20 text-amber-400', low: 'bg-green-500/20 text-green-400' }[threat] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    function truncate(str, len) { return str && str.length > len ? str.substring(0, len) + '...' : str || ''; }
+    function formatDate(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'; }
+
+    function updateStats() {
+      document.getElementById('statTotal').textContent = allCompetitors.length;
+      document.getElementById('statHigh').textContent = allCompetitors.filter(c => c.threat_level === 'high').length;
+      document.getElementById('statIncumbent').textContent = allCompetitors.filter(c => c.incumbent).length;
+      document.getElementById('statGhosted').textContent = allCompetitors.filter(c => c.ghost_strategy).length;
+    }
+
+    function openAddModal() {
+      if (!document.getElementById('opportunityFilter').value) {
+        alert('Please select an opportunity first');
+        return;
+      }
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'Add Competitor';
+      document.getElementById('compForm').reset();
+      document.getElementById('compModal').classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      const comp = allCompetitors.find(c => c.id === id);
+      if (!comp) return;
+      
+      editingId = id;
+      document.getElementById('modalTitle').textContent = 'Edit Competitor';
+      document.getElementById('compId').value = id;
+      document.getElementById('companyName').value = comp.company_name || '';
+      document.getElementById('threatLevel').value = comp.threat_level || 'medium';
+      document.getElementById('estimatedPrice').value = comp.estimated_price || '';
+      document.getElementById('isIncumbent').checked = comp.incumbent || false;
+      document.getElementById('strengths').value = comp.strengths || '';
+      document.getElementById('weaknesses').value = comp.weaknesses || '';
+      document.getElementById('ghostStrategy').value = comp.ghost_strategy || '';
+      document.getElementById('notes').value = comp.notes || '';
+      document.getElementById('compModal').classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('compModal').classList.add('hidden'); editingId = null; }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      const compData = {
+        company_name: document.getElementById('companyName').value,
+        threat_level: document.getElementById('threatLevel').value,
+        estimated_price: parseInt(document.getElementById('estimatedPrice').value) || null,
+        incumbent: document.getElementById('isIncumbent').checked,
+        strengths: document.getElementById('strengths').value || null,
+        weaknesses: document.getElementById('weaknesses').value || null,
+        ghost_strategy: document.getElementById('ghostStrategy').value || null,
+        notes: document.getElementById('notes').value || null,
+        opportunity_id: document.getElementById('opportunityFilter').value,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          const { error } = await supabase.from('competitors').update(compData).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          compData.created_at = new Date().toISOString();
+          const { error } = await supabase.from('competitors').insert([compData]);
+          if (error) throw error;
+        }
+        closeModal();
+        await loadCompetitors();
+      } catch (err) { console.error('Failed to save:', err); alert('Failed to save: ' + err.message); }
+    }
+
+    async function deleteCompetitor(id) {
+      if (!confirm('Delete this competitor?')) return;
+      try {
+        const { error } = await supabase.from('competitors').delete().eq('id', id);
+        if (error) throw error;
+        await loadCompetitors();
+      } catch (err) { console.error('Failed to delete:', err); }
+    }
+
+    function subscribeToChanges() {
+      supabase.channel('comp_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'competitors' }, () => loadCompetitors()).subscribe();
+    }
+
+    document.getElementById('opportunityFilter').addEventListener('change', loadCompetitors);
+
+    async function init() {
+      if (!initSupabase()) { updateConnectionStatus(false); return; }
+      await loadOpportunities();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</body>
+</html>

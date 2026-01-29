@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - HITL Queue</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .status-pending { border-left: 4px solid #F59E0B; }
+    .status-approved { border-left: 4px solid #10B981; }
+    .status-rejected { border-left: 4px solid #EF4444; }
+    .status-revision { border-left: 4px solid #8B5CF6; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">HITL</span> Queue</h1>
+      <span class="text-xs text-gray-500">Human-in-the-Loop AI Review</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="statusFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">All Status</option>
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="revision">Needs Revision</option>
+      </select>
+      <select id="agentFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">All Agents</option>
+        <option value="capture">Capture Agent</option>
+        <option value="strategy">Strategy Agent</option>
+        <option value="pricing">Pricing Agent</option>
+        <option value="compliance">Compliance Agent</option>
+        <option value="writer">Writer Agent</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-5 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statPending" class="text-3xl font-bold text-amber-400">0</div>
+      <div class="text-gray-400 text-sm">Pending Review</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statApproved" class="text-3xl font-bold text-green-400">0</div>
+      <div class="text-gray-400 text-sm">Approved</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statRejected" class="text-3xl font-bold text-red-400">0</div>
+      <div class="text-gray-400 text-sm">Rejected</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statRevision" class="text-3xl font-bold text-purple-400">0</div>
+      <div class="text-gray-400 text-sm">Needs Revision</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statAvgConfidence" class="text-3xl font-bold text-cyan-400">-</div>
+      <div class="text-gray-400 text-sm">Avg Confidence</div>
+    </div>
+  </div>
+
+  <!-- Queue Items -->
+  <div id="queueContainer" class="space-y-4">
+    <div class="card p-8 text-center text-gray-500">Loading AI outputs for review...</div>
+  </div>
+
+  <!-- Review Modal -->
+  <div id="reviewModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-cyan-400">Review AI Output</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      
+      <input type="hidden" id="reviewId">
+      
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <div class="bg-slate-800 rounded p-3">
+          <div class="text-xs text-gray-500">Agent</div>
+          <div id="reviewAgent" class="font-semibold text-cyan-400">-</div>
+        </div>
+        <div class="bg-slate-800 rounded p-3">
+          <div class="text-xs text-gray-500">Content Type</div>
+          <div id="reviewType" class="font-semibold">-</div>
+        </div>
+        <div class="bg-slate-800 rounded p-3">
+          <div class="text-xs text-gray-500">Confidence</div>
+          <div id="reviewConfidence" class="font-semibold">-</div>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <div class="text-sm text-gray-400 mb-1">Title</div>
+        <div id="reviewTitle" class="bg-slate-800 rounded p-3 font-medium">-</div>
+      </div>
+
+      <div class="mb-4">
+        <div class="text-sm text-gray-400 mb-1">AI Generated Content</div>
+        <div id="reviewContent" class="bg-slate-800 rounded p-3 text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">-</div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Reviewer Notes</label>
+        <textarea id="reviewerNotes" rows="3" placeholder="Add your feedback here..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+      </div>
+
+      <div class="flex justify-between">
+        <button onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+        <div class="flex gap-2">
+          <button onclick="updateStatus('rejected')" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500">Reject</button>
+          <button onclick="updateStatus('revision')" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500">Request Revision</button>
+          <button onclick="updateStatus('approved')" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 font-semibold">Approve</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    let supabase, allItems = [], currentReviewId = null;
+
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      document.getElementById('connectionStatus').innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    async function loadQueue() {
+      try {
+        let query = supabase.from('ai_approvals').select('*').order('created_at', { ascending: false });
+        
+        const statusFilter = document.getElementById('statusFilter').value;
+        const agentFilter = document.getElementById('agentFilter').value;
+        
+        if (statusFilter) query = query.eq('status', statusFilter);
+        if (agentFilter) query = query.eq('agent_type', agentFilter);
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allItems = data || [];
+        renderQueue();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load queue:', err);
+        showEmptyState('Failed to load review queue');
+      }
+    }
+
+    function renderQueue() {
+      const container = document.getElementById('queueContainer');
+      if (allItems.length === 0) {
+        showEmptyState('No items in queue');
+        return;
+      }
+      
+      container.innerHTML = allItems.map(item => `
+        <div class="card p-4 status-${item.status || 'pending'} hover:border-cyan-400/50 cursor-pointer" onclick="openReviewModal('${item.id}')">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">${getAgentIcon(item.agent_type)}</span>
+              <div>
+                <h3 class="font-semibold">${item.title || 'Untitled'}</h3>
+                <span class="text-xs text-gray-500">${item.agent_type || 'Unknown Agent'} • ${item.content_type || 'Content'}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="text-right">
+                <div class="text-xs text-gray-500">Confidence</div>
+                <div class="font-semibold ${getConfidenceColor(item.confidence)}">${item.confidence || 0}%</div>
+              </div>
+              <span class="text-xs px-2 py-1 rounded ${getStatusClass(item.status)}">${(item.status || 'pending').toUpperCase()}</span>
+            </div>
+          </div>
+          
+          <p class="text-sm text-gray-400 mb-3 line-clamp-2">${truncate(item.content, 200)}</p>
+          
+          ${item.reviewer_notes ? `<div class="text-xs text-purple-400 bg-purple-500/10 rounded p-2 mb-2">📝 ${truncate(item.reviewer_notes, 100)}</div>` : ''}
+          
+          <div class="flex items-center justify-between text-xs text-gray-500">
+            <span>${formatDate(item.created_at)}</span>
+            ${item.reviewed_at ? `<span>Reviewed: ${formatDate(item.reviewed_at)}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showEmptyState(message) {
+      document.getElementById('queueContainer').innerHTML = `<div class="card p-8 text-center text-gray-500"><p>${message}</p></div>`;
+    }
+
+    function getAgentIcon(agent) {
+      const icons = { capture: '🎯', strategy: '♟️', pricing: '💰', compliance: '✓', writer: '✍️', blackhat: '🕵️' };
+      return icons[agent] || '🤖';
+    }
+
+    function getStatusClass(status) {
+      return { pending: 'bg-amber-500/20 text-amber-400', approved: 'bg-green-500/20 text-green-400', rejected: 'bg-red-500/20 text-red-400', revision: 'bg-purple-500/20 text-purple-400' }[status] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    function getConfidenceColor(conf) {
+      if (!conf) return 'text-gray-400';
+      if (conf >= 80) return 'text-green-400';
+      if (conf >= 60) return 'text-amber-400';
+      return 'text-red-400';
+    }
+
+    function truncate(str, len) { return str && str.length > len ? str.substring(0, len) + '...' : str || ''; }
+    function formatDate(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'; }
+
+    function updateStats() {
+      const pending = allItems.filter(i => i.status === 'pending').length;
+      const approved = allItems.filter(i => i.status === 'approved').length;
+      const rejected = allItems.filter(i => i.status === 'rejected').length;
+      const revision = allItems.filter(i => i.status === 'revision').length;
+      const avgConf = allItems.length > 0 ? Math.round(allItems.reduce((sum, i) => sum + (i.confidence || 0), 0) / allItems.length) : 0;
+      
+      document.getElementById('statPending').textContent = pending;
+      document.getElementById('statApproved').textContent = approved;
+      document.getElementById('statRejected').textContent = rejected;
+      document.getElementById('statRevision').textContent = revision;
+      document.getElementById('statAvgConfidence').textContent = avgConf ? avgConf + '%' : '-';
+    }
+
+    function openReviewModal(id) {
+      const item = allItems.find(i => i.id === id);
+      if (!item) return;
+      
+      currentReviewId = id;
+      document.getElementById('reviewId').value = id;
+      document.getElementById('reviewAgent').textContent = item.agent_type || 'Unknown';
+      document.getElementById('reviewType').textContent = item.content_type || 'Content';
+      document.getElementById('reviewConfidence').textContent = (item.confidence || 0) + '%';
+      document.getElementById('reviewConfidence').className = 'font-semibold ' + getConfidenceColor(item.confidence);
+      document.getElementById('reviewTitle').textContent = item.title || 'Untitled';
+      document.getElementById('reviewContent').textContent = item.content || 'No content';
+      document.getElementById('reviewerNotes').value = item.reviewer_notes || '';
+      document.getElementById('reviewModal').classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('reviewModal').classList.add('hidden'); currentReviewId = null; }
+
+    async function updateStatus(newStatus) {
+      if (!currentReviewId) return;
+      
+      try {
+        const { error } = await supabase.from('ai_approvals').update({
+          status: newStatus,
+          reviewer_notes: document.getElementById('reviewerNotes').value || null,
+          reviewed_at: new Date().toISOString()
+        }).eq('id', currentReviewId);
+        
+        if (error) throw error;
+        closeModal();
+        await loadQueue();
+      } catch (err) {
+        console.error('Failed to update:', err);
+        alert('Failed to update: ' + err.message);
+      }
+    }
+
+    function subscribeToChanges() {
+      supabase.channel('hitl_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'ai_approvals' }, () => loadQueue()).subscribe();
+    }
+
+    document.getElementById('statusFilter').addEventListener('change', loadQueue);
+    document.getElementById('agentFilter').addEventListener('change', loadQueue);
+
+    async function init() {
+      if (!initSupabase()) { updateConnectionStatus(false); return; }
+      await loadQueue();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</body>
+</html>
