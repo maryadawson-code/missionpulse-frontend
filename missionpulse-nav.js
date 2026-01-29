@@ -1,13 +1,13 @@
 // FILE: missionpulse-nav.js
-// ROLE: All Users
-// SECURITY: No secrets, client-side navigation only
-// VERSION: 2.0 - Updated Sprint 38 with 26 modules
+// ROLE: All Users  
+// VERSION: 2.2 - Complete with all 26 modules
+// © 2025 Mission Meets Tech
 
 const MissionPulseNav = {
     modules: [
         // Core
         { id: 'dashboard', name: 'Dashboard', icon: '🎯', href: 'index.html', category: 'core' },
-        { id: 'executive', name: 'Executive View', icon: '📊', href: 'missionpulse-m25-executive-live.html', category: 'core' },
+        { id: 'executive', name: 'Executive Dashboard', icon: '📊', href: 'missionpulse-m25-executive-live.html', category: 'core' },
         { id: 'agents', name: 'AI Agent Hub', icon: '🤖', href: 'missionpulse-agent-hub.html', category: 'core' },
         
         // Capture
@@ -77,244 +77,97 @@ const MissionPulseNav = {
     },
 
     loadState() {
-        try {
-            const saved = localStorage.getItem('missionpulse-nav-collapsed');
-            this.isCollapsed = saved === 'true';
-        } catch (e) {}
+        try { this.isCollapsed = localStorage.getItem('missionpulse-nav-collapsed') === 'true'; } catch (e) {}
     },
 
     saveState() {
-        try {
-            localStorage.setItem('missionpulse-nav-collapsed', this.isCollapsed);
-        } catch (e) {}
+        try { localStorage.setItem('missionpulse-nav-collapsed', this.isCollapsed); } catch (e) {}
     },
 
     renderSidebar() {
         const sidebar = document.getElementById('missionpulse-sidebar');
         if (!sidebar) return;
-
         const grouped = this.groupByCategory();
         const width = this.isCollapsed ? '64px' : '260px';
         
         let html = `
-            <div class="sidebar-header" style="padding: 1rem; border-bottom: 1px solid rgba(0, 229, 250, 0.2); display: flex; align-items: center; justify-content: space-between;">
-                <a href="index.html" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none; overflow: hidden;">
-                    <img src="MMT_icon_transparent.png" alt="MMT" style="width: 32px; height: 32px; flex-shrink: 0;" onerror="this.style.display='none'">
-                    ${!this.isCollapsed ? `
-                    <div style="white-space: nowrap;">
-                        <div style="font-size: 1rem; font-weight: 700; color: #00E5FA;">MissionPulse</div>
-                        <div style="font-size: 0.5rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em;">MISSION MEETS TECH</div>
-                    </div>
-                    ` : ''}
+            <div style="padding: 1rem; border-bottom: 1px solid rgba(0, 229, 250, 0.2); display: flex; align-items: center; justify-content: space-between;">
+                <a href="index.html" style="display: flex; align-items: center; gap: 0.75rem; text-decoration: none;">
+                    <img src="MMT_icon_transparent.png" alt="MMT" style="width: 32px; height: 32px;" onerror="this.style.display='none'">
+                    ${!this.isCollapsed ? `<div><div style="font-size: 1rem; font-weight: 700; color: #00E5FA;">MissionPulse</div><div style="font-size: 0.5rem; color: rgba(255,255,255,0.4);">MISSION MEETS TECH</div></div>` : ''}
                 </a>
-                <button onclick="MissionPulseNav.toggleCollapse()" style="background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; padding: 0.25rem; font-size: 1rem;" title="${this.isCollapsed ? 'Expand' : 'Collapse'}">
-                    ${this.isCollapsed ? '→' : '←'}
-                </button>
+                <button onclick="MissionPulseNav.toggleCollapse()" style="background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer;">${this.isCollapsed ? '→' : '←'}</button>
             </div>
-            <nav class="sidebar-nav" style="padding: 0.75rem; overflow-y: auto; flex: 1;">
+            <nav style="padding: 0.75rem; overflow-y: auto; flex: 1;">
         `;
 
         for (const [catKey, modules] of Object.entries(grouped)) {
             const cat = this.categories[catKey];
-            html += `
-                <div class="nav-category" style="margin-bottom: 1rem;">
-                    ${!this.isCollapsed ? `
-                    <div style="font-size: 0.625rem; font-weight: 600; color: ${cat.color}; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.375rem; padding-left: 0.5rem; display: flex; align-items: center; gap: 0.375rem;">
-                        <span>${cat.icon}</span> ${cat.name}
-                    </div>
-                    ` : `
-                    <div style="text-align: center; margin-bottom: 0.25rem; font-size: 0.75rem; color: ${cat.color};" title="${cat.name}">${cat.icon}</div>
-                    `}
-            `;
-            
+            if (!cat) continue;
+            html += `<div style="margin-bottom: 1rem;">`;
+            if (!this.isCollapsed) {
+                html += `<div style="font-size: 0.625rem; font-weight: 600; color: ${cat.color}; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.375rem; padding-left: 0.5rem;">${cat.icon} ${cat.name}</div>`;
+            } else {
+                html += `<div style="text-align: center; margin-bottom: 0.25rem; font-size: 0.75rem; color: ${cat.color};" title="${cat.name}">${cat.icon}</div>`;
+            }
             for (const mod of modules) {
                 const isActive = mod.id === this.currentPage;
-                html += `
-                    <a href="${mod.href}" class="nav-link ${isActive ? 'active' : ''}" style="
-                        display: flex;
-                        align-items: center;
-                        ${this.isCollapsed ? 'justify-content: center;' : 'gap: 0.625rem;'}
-                        padding: ${this.isCollapsed ? '0.5rem' : '0.5rem 0.625rem'};
-                        border-radius: 0.375rem;
-                        text-decoration: none;
-                        color: ${isActive ? '#00E5FA' : 'rgba(255,255,255,0.6)'};
-                        background: ${isActive ? 'rgba(0, 229, 250, 0.1)' : 'transparent'};
-                        border-left: ${this.isCollapsed ? 'none' : (isActive ? '2px solid #00E5FA' : '2px solid transparent')};
-                        font-size: 0.8125rem;
-                        transition: all 0.15s;
-                        margin-bottom: 0.125rem;
-                    " onmouseover="this.style.background='rgba(0, 229, 250, 0.05)'; this.style.color='#00E5FA';"
-                       onmouseout="this.style.background='${isActive ? 'rgba(0, 229, 250, 0.1)' : 'transparent'}'; this.style.color='${isActive ? '#00E5FA' : 'rgba(255,255,255,0.6)}';"
-                       title="${mod.name}">
-                        <span style="font-size: 0.875rem;">${mod.icon}</span>
-                        ${!this.isCollapsed ? `<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mod.name}</span>` : ''}
-                    </a>
-                `;
+                html += `<a href="${mod.href}" style="display: flex; align-items: center; ${this.isCollapsed ? 'justify-content: center;' : 'gap: 0.625rem;'} padding: ${this.isCollapsed ? '0.5rem' : '0.5rem 0.625rem'}; border-radius: 0.375rem; text-decoration: none; color: ${isActive ? '#00E5FA' : 'rgba(255,255,255,0.6)'}; background: ${isActive ? 'rgba(0, 229, 250, 0.1)' : 'transparent'}; border-left: ${this.isCollapsed ? 'none' : (isActive ? '2px solid #00E5FA' : '2px solid transparent')}; font-size: 0.8125rem; margin-bottom: 0.125rem;" title="${mod.name}"><span style="font-size: 0.875rem;">${mod.icon}</span>${!this.isCollapsed ? `<span>${mod.name}</span>` : ''}</a>`;
             }
             html += `</div>`;
         }
 
-        html += `
-            </nav>
-            <div class="sidebar-footer" style="padding: 0.75rem; border-top: 1px solid rgba(0, 229, 250, 0.2); font-size: 0.5625rem; color: rgba(255,255,255,0.3); text-align: center;">
-                ${!this.isCollapsed ? `
-                <div id="nav-connection-status" style="margin-bottom: 0.25rem;">Checking...</div>
-                <div>© 2025 Mission Meets Tech</div>
-                ` : `
-                <div id="nav-connection-status" title="Connection status">●</div>
-                `}
-            </div>
-        `;
+        html += `</nav><div style="padding: 0.75rem; border-top: 1px solid rgba(0, 229, 250, 0.2); font-size: 0.5625rem; color: rgba(255,255,255,0.3); text-align: center;">${!this.isCollapsed ? '<div id="nav-connection-status">Checking...</div><div>© 2025 Mission Meets Tech</div>' : '<div id="nav-connection-status">●</div>'}</div>`;
 
         sidebar.innerHTML = html;
-        sidebar.style.cssText = `
-            width: ${width};
-            height: 100vh;
-            position: fixed;
-            left: 0;
-            top: 0;
-            background: linear-gradient(180deg, #000510 0%, #00050F 100%);
-            border-right: 1px solid rgba(0, 229, 250, 0.2);
-            display: flex;
-            flex-direction: column;
-            z-index: 1000;
-            transition: width 0.2s ease;
-        `;
-
-        // Update main content margin
-        const mainContent = document.querySelector('.main-content');
-        if (mainContent) {
-            mainContent.style.marginLeft = width;
-            mainContent.style.transition = 'margin-left 0.2s ease';
-        }
-
+        sidebar.style.cssText = `width: ${width}; height: 100vh; position: fixed; left: 0; top: 0; background: linear-gradient(180deg, #000510 0%, #00050F 100%); border-right: 1px solid rgba(0, 229, 250, 0.2); display: flex; flex-direction: column; z-index: 1000; transition: width 0.2s;`;
+        
+        const main = document.querySelector('.main-content');
+        if (main) { main.style.marginLeft = width; main.style.transition = 'margin-left 0.2s'; }
         this.checkConnection();
     },
 
-    toggleCollapse() {
-        this.isCollapsed = !this.isCollapsed;
-        this.saveState();
-        this.renderSidebar();
-    },
+    toggleCollapse() { this.isCollapsed = !this.isCollapsed; this.saveState(); this.renderSidebar(); },
 
     renderMobileMenu() {
-        let mobileBtn = document.getElementById('mobile-menu-btn');
-        if (!mobileBtn) {
-            mobileBtn = document.createElement('button');
-            mobileBtn.id = 'mobile-menu-btn';
-            mobileBtn.innerHTML = '☰';
-            mobileBtn.style.cssText = `
-                display: none;
-                position: fixed;
-                top: 1rem;
-                left: 1rem;
-                z-index: 1001;
-                background: rgba(0, 229, 250, 0.1);
-                border: 1px solid rgba(0, 229, 250, 0.3);
-                color: #00E5FA;
-                font-size: 1.25rem;
-                padding: 0.5rem 0.75rem;
-                border-radius: 0.5rem;
-                cursor: pointer;
-            `;
-            mobileBtn.onclick = () => this.toggleMobile();
-            document.body.appendChild(mobileBtn);
-        }
-
-        // Responsive styles
+        if (document.getElementById('mobile-menu-btn')) return;
+        const btn = document.createElement('button');
+        btn.id = 'mobile-menu-btn';
+        btn.innerHTML = '☰';
+        btn.style.cssText = 'display: none; position: fixed; top: 1rem; left: 1rem; z-index: 1001; background: rgba(0, 229, 250, 0.1); border: 1px solid rgba(0, 229, 250, 0.3); color: #00E5FA; font-size: 1.25rem; padding: 0.5rem 0.75rem; border-radius: 0.5rem; cursor: pointer;';
+        btn.onclick = () => document.getElementById('missionpulse-sidebar')?.classList.toggle('open');
+        document.body.appendChild(btn);
         if (!document.getElementById('missionpulse-nav-styles')) {
             const style = document.createElement('style');
             style.id = 'missionpulse-nav-styles';
-            style.textContent = `
-                @media (max-width: 1024px) {
-                    #missionpulse-sidebar {
-                        transform: translateX(-100%);
-                        transition: transform 0.3s ease;
-                    }
-                    #missionpulse-sidebar.open {
-                        transform: translateX(0);
-                    }
-                    #mobile-menu-btn {
-                        display: block !important;
-                    }
-                    .main-content {
-                        margin-left: 0 !important;
-                    }
-                }
-            `;
+            style.textContent = '@media (max-width: 1024px) { #missionpulse-sidebar { transform: translateX(-100%); } #missionpulse-sidebar.open { transform: translateX(0); } #mobile-menu-btn { display: block !important; } .main-content { margin-left: 0 !important; } }';
             document.head.appendChild(style);
         }
     },
 
-    toggleMobile() {
-        const sidebar = document.getElementById('missionpulse-sidebar');
-        if (sidebar) {
-            sidebar.classList.toggle('open');
-        }
-    },
-
     groupByCategory() {
-        const grouped = {};
-        const order = ['core', 'capture', 'strategy', 'compliance', 'pricing', 'writing', 'review', 'management', 'orals', 'knowledge', 'tools'];
-        
-        for (const cat of order) {
-            grouped[cat] = [];
-        }
-        
-        for (const mod of this.modules) {
-            if (grouped[mod.category]) {
-                grouped[mod.category].push(mod);
-            }
-        }
-        
-        // Remove empty categories
-        for (const cat of Object.keys(grouped)) {
-            if (grouped[cat].length === 0) delete grouped[cat];
-        }
-        
+        const grouped = {}, order = ['core', 'capture', 'strategy', 'compliance', 'pricing', 'writing', 'review', 'management', 'orals', 'knowledge', 'tools'];
+        for (const cat of order) grouped[cat] = [];
+        for (const mod of this.modules) if (grouped[mod.category]) grouped[mod.category].push(mod);
+        for (const cat of Object.keys(grouped)) if (!grouped[cat].length) delete grouped[cat];
         return grouped;
     },
 
     async checkConnection() {
-        const statusEl = document.getElementById('nav-connection-status');
-        if (!statusEl) return;
-
+        const el = document.getElementById('nav-connection-status');
+        if (!el) return;
         try {
             if (typeof supabase !== 'undefined') {
-                const { data, error } = await supabase.from('opportunities').select('id').limit(1);
-                if (!error) {
-                    statusEl.innerHTML = this.isCollapsed ? 
-                        '<span style="color: #10B981;">●</span>' : 
-                        '<span style="color: #10B981;">● Live Database</span>';
-                    return;
-                }
+                const { error } = await supabase.from('opportunities').select('id').limit(1);
+                el.innerHTML = error ? (this.isCollapsed ? '<span style="color: #F59E0B;">●</span>' : '<span style="color: #F59E0B;">● Demo Mode</span>') : (this.isCollapsed ? '<span style="color: #10B981;">●</span>' : '<span style="color: #10B981;">● Live Database</span>');
+                return;
             }
-            statusEl.innerHTML = this.isCollapsed ? 
-                '<span style="color: #F59E0B;">●</span>' : 
-                '<span style="color: #F59E0B;">● Demo Mode</span>';
-        } catch (e) {
-            statusEl.innerHTML = this.isCollapsed ? 
-                '<span style="color: #F59E0B;">●</span>' : 
-                '<span style="color: #F59E0B;">● Demo Mode</span>';
-        }
-    },
-
-    // Get module by ID
-    getModule(id) {
-        return this.modules.find(m => m.id === id);
-    },
-
-    // Get modules by category
-    getModulesByCategory(category) {
-        return this.modules.filter(m => m.category === category);
+        } catch (e) {}
+        el.innerHTML = this.isCollapsed ? '<span style="color: #F59E0B;">●</span>' : '<span style="color: #F59E0B;">● Demo Mode</span>';
     }
 };
 
-// Auto-init
 document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('missionpulse-sidebar');
-    if (sidebar) {
-        const pageId = sidebar.dataset.currentPage || 'dashboard';
-        MissionPulseNav.init(pageId);
-    }
+    if (sidebar) MissionPulseNav.init(sidebar.dataset.currentPage || 'dashboard');
 });
