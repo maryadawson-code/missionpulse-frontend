@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse | Iron Dome Compliance</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="MMT_icon_32px.png">
+  
+  <!-- Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Supabase Client -->
+  <script src="supabase-client-v2.1.js"></script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+// ============================================================
+// MISSIONPULSE IRON DOME COMPLIANCE
+// RFP Shredder & Compliance Matrix
+// Mission Meets Tech © 2026
+// ============================================================
+
+const { useState, useEffect, useCallback, useMemo } = React;
+
+// ============================================================
+// ICONS
+// ============================================================
+const Icons = {
+  shield: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+  refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+  check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+  x: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+  alert: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+  clock: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+  file: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+  filter: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+  upload: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+};
+
+// ============================================================
+// COMPLIANCE CATEGORIES
+// ============================================================
+const COMPLIANCE_CATEGORIES = [
+  { id: 'technical', name: 'Technical Requirements', icon: '⚙️', color: '#00E5FA' },
+  { id: 'management', name: 'Management Approach', icon: '📋', color: '#8B5CF6' },
+  { id: 'security', name: 'Security/CMMC', icon: '🔒', color: '#EF4444' },
+  { id: 'staffing', name: 'Staffing/Key Personnel', icon: '👥', color: '#F59E0B' },
+  { id: 'past_perf', name: 'Past Performance', icon: '📊', color: '#10B981' },
+  { id: 'pricing', name: 'Pricing/Cost', icon: '💵', color: '#22C55E' },
+];
+
+const STATUS_MAP = {
+  compliant: { label: 'Compliant', color: '#10b981', bg: 'bg-emerald-500/20', icon: '✓' },
+  partial: { label: 'Partial', color: '#f59e0b', bg: 'bg-amber-500/20', icon: '◐' },
+  non_compliant: { label: 'Gap', color: '#ef4444', bg: 'bg-red-500/20', icon: '✗' },
+  not_started: { label: 'Not Started', color: '#64748b', bg: 'bg-slate-500/20', icon: '○' },
+};
+
+// ============================================================
+// COMPONENTS
+// ============================================================
+const Badge = ({ children, variant = 'default', size = 'sm' }) => {
+  const variants = {
+    default: 'bg-slate-700 text-slate-300',
+    compliant: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    partial: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+    non_compliant: 'bg-red-500/20 text-red-400 border border-red-500/30',
+    not_started: 'bg-slate-600/20 text-slate-400 border border-slate-500/30',
+  };
+  const sizes = { xs: 'px-1.5 py-0.5 text-[10px]', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+  return <span className={`inline-flex items-center gap-1 rounded-full font-semibold ${variants[variant]} ${sizes[size]}`}>{children}</span>;
+};
+
+const Spinner = () => (
+  <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+);
+
+const ProgressRing = ({ percent, size = 80, strokeWidth = 8, color = '#10b981' }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (percent / 100) * circumference;
+  
+  return (
+    <svg width={size} height={size} className="transform -rotate-90">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#334155"
+        strokeWidth={strokeWidth}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        className="transition-all duration-500"
+      />
+    </svg>
+  );
+};
+
+// ============================================================
+// REQUIREMENT ROW
+// ============================================================
+const RequirementRow = ({ req, onStatusChange }) => {
+  const status = STATUS_MAP[req.status] || STATUS_MAP.not_started;
+  const category = COMPLIANCE_CATEGORIES.find(c => c.id === req.category);
+  
+  return (
+    <tr className="border-b border-slate-700/50 hover:bg-slate-800/30 transition animate-slideIn">
+      <td className="p-3">
+        <div className="flex items-center gap-2">
+          <span>{category?.icon || '📄'}</span>
+          <span className="font-mono text-xs text-slate-500">{req.reference}</span>
+        </div>
+      </td>
+      <td className="p-3">
+        <div className="font-medium text-white text-sm">{req.title}</div>
+        <div className="text-xs text-slate-400 mt-1 line-clamp-2">{req.description}</div>
+      </td>
+      <td className="p-3">
+        <Badge variant={req.status || 'not_started'}>{status.icon} {status.label}</Badge>
+      </td>
+      <td className="p-3">
+        <div className="text-xs text-slate-400">{req.section || 'L.4.1'}</div>
+      </td>
+      <td className="p-3">
+        <select
+          value={req.status || 'not_started'}
+          onChange={e => onStatusChange(req.id, e.target.value)}
+          className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-sm text-white"
+        >
+          <option value="not_started">Not Started</option>
+          <option value="partial">Partial</option>
+          <option value="compliant">Compliant</option>
+          <option value="non_compliant">Gap</option>
+        </select>
+      </td>
+    </tr>
+  );
+};
+
+// ============================================================
+// MAIN APP
+// ============================================================
+function IronDomeCompliance() {
+  const [requirements, setRequirements] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
+  const [selectedOpp, setSelectedOpp] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dbStatus, setDbStatus] = useState('connecting');
+  const [filter, setFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  
+  // Load from Supabase
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    
+    try {
+      if (typeof MissionPulse === 'undefined') {
+        throw new Error('MissionPulse client not loaded');
+      }
+      
+      // Load opportunities
+      const oppsResult = await MissionPulse.opportunities?.getAll();
+      if (oppsResult?.data) {
+        setOpportunities(oppsResult.data);
+        if (oppsResult.data.length > 0 && !selectedOpp) {
+          setSelectedOpp(oppsResult.data[0].id);
+        }
+      }
+      
+      // Load compliance requirements
+      const compResult = await MissionPulse.compliance?.getAll();
+      if (compResult?.data?.length) {
+        setRequirements(compResult.data);
+      } else {
+        setRequirements(generateDemoData());
+      }
+      
+      setDbStatus('connected');
+      
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setRequirements(generateDemoData());
+      setOpportunities([{ id: 'demo', nickname: 'DHA Healthcare Platform' }]);
+      setSelectedOpp('demo');
+      setDbStatus('demo');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedOpp]);
+  
+  const generateDemoData = () => [
+    { id: 1, reference: 'L.4.1.1', title: 'Zero Trust Architecture Implementation', description: 'Implement ZTA per NIST SP 800-207 with continuous verification', category: 'technical', status: 'compliant', section: 'Technical Volume' },
+    { id: 2, reference: 'L.4.1.2', title: 'FedRAMP High Authorization', description: 'Maintain FedRAMP High authorization for all cloud services', category: 'security', status: 'compliant', section: 'Technical Volume' },
+    { id: 3, reference: 'L.4.2.1', title: 'API Gateway Integration', description: 'RESTful API gateway with OAuth 2.0 and SAML support', category: 'technical', status: 'partial', section: 'Technical Volume' },
+    { id: 4, reference: 'L.4.3.1', title: 'Data Migration Strategy', description: 'Migration of legacy CHCS data to MHS GENESIS platform', category: 'technical', status: 'partial', section: 'Technical Volume' },
+    { id: 5, reference: 'M.3.1', title: 'Program Management Plan', description: 'Comprehensive PMP with WBS, IMS, and risk management', category: 'management', status: 'compliant', section: 'Management Volume' },
+    { id: 6, reference: 'M.3.2', title: 'Quality Assurance Surveillance Plan', description: 'QASP aligned with contract requirements', category: 'management', status: 'not_started', section: 'Management Volume' },
+    { id: 7, reference: 'S.2.1', title: 'CMMC Level 2 Certification', description: 'Active CMMC Level 2 certification required', category: 'security', status: 'compliant', section: 'Security Volume' },
+    { id: 8, reference: 'S.2.2', title: 'NIST 800-171 Compliance', description: 'Full compliance with 110 NIST 800-171 controls', category: 'security', status: 'partial', section: 'Security Volume' },
+    { id: 9, reference: 'S.2.3', title: 'CUI Handling Procedures', description: 'Documented CUI marking, storage, and transmission procedures', category: 'security', status: 'compliant', section: 'Security Volume' },
+    { id: 10, reference: 'K.1.1', title: 'Program Manager Qualification', description: 'PM with 10+ years federal healthcare IT experience', category: 'staffing', status: 'compliant', section: 'Key Personnel' },
+    { id: 11, reference: 'K.1.2', title: 'Technical Lead Qualification', description: 'Technical Lead with CISSP and cloud architecture certs', category: 'staffing', status: 'partial', section: 'Key Personnel' },
+    { id: 12, reference: 'P.1.1', title: 'Relevant Past Performance', description: 'Three contracts of similar scope within 5 years', category: 'past_perf', status: 'compliant', section: 'Past Performance' },
+    { id: 13, reference: 'P.1.2', title: 'CPARS Ratings', description: 'All CPARS ratings of Satisfactory or higher', category: 'past_perf', status: 'compliant', section: 'Past Performance' },
+    { id: 14, reference: 'C.1.1', title: 'GSA Schedule Compliance', description: 'Pricing aligned with GSA MAS Schedule rates', category: 'pricing', status: 'compliant', section: 'Cost Volume' },
+    { id: 15, reference: 'C.1.2', title: 'Cost Realism Analysis', description: 'Detailed BOE supporting proposed costs', category: 'pricing', status: 'non_compliant', section: 'Cost Volume' },
+  ];
+  
+  useEffect(() => {
+    const timer = setTimeout(loadData, 500);
+    return () => clearTimeout(timer);
+  }, [loadData]);
+  
+  // Actions
+  const handleStatusChange = (id, newStatus) => {
+    setRequirements(prev => prev.map(r => r.id === id ? { ...r, status: newStatus } : r));
+  };
+  
+  // Filters
+  const filtered = useMemo(() => {
+    return requirements.filter(r => {
+      if (filter !== 'all' && r.status !== filter) return false;
+      if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
+      return true;
+    });
+  }, [requirements, filter, categoryFilter]);
+  
+  // Stats
+  const stats = useMemo(() => {
+    const total = requirements.length;
+    const compliant = requirements.filter(r => r.status === 'compliant').length;
+    const partial = requirements.filter(r => r.status === 'partial').length;
+    const gaps = requirements.filter(r => r.status === 'non_compliant').length;
+    const notStarted = requirements.filter(r => r.status === 'not_started').length;
+    const complianceScore = total > 0 ? Math.round(((compliant + partial * 0.5) / total) * 100) : 0;
+    
+    return { total, compliant, partial, gaps, notStarted, complianceScore };
+  }, [requirements]);
+  
+  const scoreColor = stats.complianceScore >= 90 ? '#10b981' : stats.complianceScore >= 70 ? '#f59e0b' : '#ef4444';
+  
+  return (
+    <div className="min-h-screen bg-[#00050F]">
+      {/* Header */}
+      <header className="bg-slate-900/80 backdrop-blur border-b border-red-500/30 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <a href="missionpulse-production-dashboard.html" className="flex items-center gap-3 hover:opacity-80 transition">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center shadow-lg shadow-red-500/30">
+                  <span className="text-xl">🛡️</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">Iron Dome Compliance</h1>
+                  <p className="text-xs text-slate-400">RFP Shredder & Compliance Matrix</p>
+                </div>
+              </a>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Opportunity Selector */}
+              <select
+                value={selectedOpp || ''}
+                onChange={e => setSelectedOpp(e.target.value)}
+                className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm"
+              >
+                {opportunities.map(o => (
+                  <option key={o.id} value={o.id}>{o.nickname || o.title}</option>
+                ))}
+              </select>
+              
+              <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white font-medium hover:from-red-400 hover:to-pink-400 transition shadow-lg shadow-red-500/25">
+                <Icons.upload /> Upload RFP
+              </button>
+              
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700">
+                <div className={`w-2 h-2 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-400' : dbStatus === 'demo' ? 'bg-amber-400' : 'bg-red-400'}`}></div>
+                <span className="text-xs text-slate-400">
+                  {dbStatus === 'connected' ? 'Live' : dbStatus === 'demo' ? 'Demo' : 'Offline'}
+                </span>
+              </div>
+              
+              <button 
+                onClick={loadData}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 transition text-slate-400 hover:text-white disabled:opacity-50"
+              >
+                <span className={loading ? 'animate-spin' : ''}><Icons.refresh /></span>
+              </button>
+              
+              <a 
+                href="missionpulse-production-dashboard.html"
+                className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 transition text-slate-300 hover:text-white text-sm"
+              >
+                ← Dashboard
+              </a>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Score Overview */}
+        <div className="grid grid-cols-6 gap-4 mb-8">
+          <div className="glass rounded-xl p-4 flex items-center justify-center col-span-1">
+            <div className="relative">
+              <ProgressRing percent={stats.complianceScore} color={scoreColor} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl font-bold text-white">{stats.complianceScore}%</span>
+              </div>
+            </div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-white">{stats.total}</div>
+            <div className="text-xs text-slate-400">Total Requirements</div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center border-emerald-500/30">
+            <div className="text-2xl font-bold text-emerald-400">{stats.compliant}</div>
+            <div className="text-xs text-slate-400">Compliant</div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center border-amber-500/30">
+            <div className="text-2xl font-bold text-amber-400">{stats.partial}</div>
+            <div className="text-xs text-slate-400">Partial</div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center border-red-500/30">
+            <div className="text-2xl font-bold text-red-400">{stats.gaps}</div>
+            <div className="text-xs text-slate-400">Gaps</div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-slate-400">{stats.notStarted}</div>
+            <div className="text-xs text-slate-400">Not Started</div>
+          </div>
+        </div>
+        
+        {/* Category Progress */}
+        <div className="glass rounded-xl p-4 mb-6">
+          <h3 className="text-sm font-semibold text-white mb-3">Category Progress</h3>
+          <div className="grid grid-cols-6 gap-4">
+            {COMPLIANCE_CATEGORIES.map(cat => {
+              const catReqs = requirements.filter(r => r.category === cat.id);
+              const catCompliant = catReqs.filter(r => r.status === 'compliant').length;
+              const catPercent = catReqs.length > 0 ? Math.round((catCompliant / catReqs.length) * 100) : 0;
+              
+              return (
+                <div 
+                  key={cat.id} 
+                  onClick={() => setCategoryFilter(categoryFilter === cat.id ? 'all' : cat.id)}
+                  className={`p-3 rounded-lg cursor-pointer transition ${categoryFilter === cat.id ? 'bg-slate-700 ring-2 ring-cyan-500' : 'bg-slate-800/50 hover:bg-slate-800'}`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span>{cat.icon}</span>
+                    <span className="text-xs text-slate-300 truncate">{cat.name}</span>
+                  </div>
+                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${catPercent}%`, backgroundColor: cat.color }}
+                    ></div>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">{catCompliant}/{catReqs.length}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        {/* Filters */}
+        <div className="flex items-center gap-2 mb-6">
+          {['all', 'compliant', 'partial', 'non_compliant', 'not_started'].map(f => {
+            const label = f === 'all' ? 'All' : f === 'non_compliant' ? 'Gaps' : f.replace('_', ' ');
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition capitalize ${
+                  filter === f 
+                    ? f === 'compliant' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                    : f === 'partial' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
+                    : f === 'non_compliant' ? 'bg-red-500/20 text-red-400 border border-red-500/50'
+                    : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' 
+                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        
+        {/* Requirements Table */}
+        <div className="glass rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <h2 className="font-semibold text-white">Compliance Requirements</h2>
+            <span className="text-sm text-slate-400">{filtered.length} items</span>
+          </div>
+          
+          {loading ? (
+            <div className="p-12 text-center">
+              <Spinner />
+              <p className="text-slate-400 mt-4">Loading compliance matrix...</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase w-24">Ref</th>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">Requirement</th>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase w-28">Status</th>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase w-32">Section</th>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase w-36">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(req => (
+                  <RequirementRow
+                    key={req.id}
+                    req={req}
+                    onStatusChange={handleStatusChange}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </main>
+      
+      {/* Footer */}
+      <footer className="bg-slate-900/80 border-t border-slate-700/50 px-6 py-3 mt-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-500">
+          <span>© 2026 Mission Meets Tech • MissionPulse v12</span>
+          <span>AI GENERATED - REQUIRES HUMAN REVIEW</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Render
+ReactDOM.createRoot(document.getElementById('root')).render(<IronDomeCompliance />);
+  </script>
+</body>
+</html>

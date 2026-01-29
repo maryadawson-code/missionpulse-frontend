@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse | Pricing Engine</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="MMT_icon_32px.png">
+  
+  <!-- Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Supabase Client -->
+  <script src="supabase-client-v2.1.js"></script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+// ============================================================
+// MISSIONPULSE PRICING ENGINE
+// LCAT Mapping & BOE Calculator - CUI Protected
+// Mission Meets Tech © 2026
+// ============================================================
+
+const { useState, useEffect, useCallback, useMemo } = React;
+
+// ============================================================
+// ICONS
+// ============================================================
+const Icons = {
+  shield: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+  refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+  dollar: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  plus: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+  trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+  lock: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+  calculator: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+  download: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+};
+
+// ============================================================
+// LCAT DATA
+// ============================================================
+const LCAT_CATEGORIES = [
+  { id: 'pm', name: 'Program Manager', gsaRate: 195, laborCat: 'SCA' },
+  { id: 'sa', name: 'Solutions Architect', gsaRate: 185, laborCat: 'IT' },
+  { id: 'sme', name: 'Subject Matter Expert', gsaRate: 175, laborCat: 'IT' },
+  { id: 'dev-sr', name: 'Senior Developer', gsaRate: 165, laborCat: 'IT' },
+  { id: 'dev-mid', name: 'Mid Developer', gsaRate: 135, laborCat: 'IT' },
+  { id: 'dev-jr', name: 'Junior Developer', gsaRate: 95, laborCat: 'IT' },
+  { id: 'ba', name: 'Business Analyst', gsaRate: 125, laborCat: 'SCA' },
+  { id: 'qa', name: 'QA Engineer', gsaRate: 115, laborCat: 'IT' },
+  { id: 'admin', name: 'Administrative Support', gsaRate: 65, laborCat: 'SCA' },
+];
+
+// ============================================================
+// UTILITIES
+// ============================================================
+const formatCurrency = (val) => {
+  if (!val) return '$0';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(val);
+};
+
+// ============================================================
+// COMPONENTS
+// ============================================================
+const Badge = ({ children, variant = 'default', size = 'sm' }) => {
+  const variants = {
+    default: 'bg-slate-700 text-slate-300',
+    cui: 'bg-red-500/20 text-red-400 border border-red-500/30',
+    success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+  };
+  const sizes = { xs: 'px-1.5 py-0.5 text-[10px]', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+  return <span className={`inline-flex items-center gap-1 rounded-full font-semibold ${variants[variant]} ${sizes[size]}`}>{children}</span>;
+};
+
+const Spinner = () => (
+  <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+);
+
+// ============================================================
+// PRICING TABLE ROW
+// ============================================================
+const PricingRow = ({ item, onUpdate, onDelete }) => {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(item);
+  
+  const totalCost = (form.hours || 0) * (form.rate || 0);
+  const gsaComparison = LCAT_CATEGORIES.find(l => l.id === form.lcat_id);
+  const rateDiff = gsaComparison ? form.rate - gsaComparison.gsaRate : 0;
+  
+  const handleSave = () => {
+    onUpdate({ ...form, total_cost: totalCost });
+    setEditing(false);
+  };
+  
+  if (editing) {
+    return (
+      <tr className="bg-slate-800/50">
+        <td className="p-3">
+          <select
+            value={form.lcat_id}
+            onChange={e => setForm({...form, lcat_id: e.target.value})}
+            className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white text-sm"
+          >
+            {LCAT_CATEGORIES.map(l => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </td>
+        <td className="p-3">
+          <input
+            type="number"
+            value={form.hours}
+            onChange={e => setForm({...form, hours: parseInt(e.target.value) || 0})}
+            className="w-20 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white text-sm"
+          />
+        </td>
+        <td className="p-3">
+          <input
+            type="number"
+            value={form.rate}
+            onChange={e => setForm({...form, rate: parseFloat(e.target.value) || 0})}
+            className="w-24 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white text-sm"
+          />
+        </td>
+        <td className="p-3 font-mono text-emerald-400">{formatCurrency(totalCost)}</td>
+        <td className="p-3">
+          <div className="flex gap-2">
+            <button onClick={handleSave} className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs">Save</button>
+            <button onClick={() => setEditing(false)} className="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs">Cancel</button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+  
+  const lcatName = LCAT_CATEGORIES.find(l => l.id === item.lcat_id)?.name || item.lcat_id;
+  
+  return (
+    <tr className="border-b border-slate-700/50 hover:bg-slate-800/30 transition animate-slideIn">
+      <td className="p-3">
+        <div className="font-medium text-white">{lcatName}</div>
+        <div className="text-xs text-slate-500">{item.labor_category || 'IT'}</div>
+      </td>
+      <td className="p-3 font-mono text-slate-300">{item.hours?.toLocaleString()}</td>
+      <td className="p-3">
+        <div className="font-mono text-white">${item.rate}/hr</div>
+        {gsaComparison && (
+          <div className={`text-xs ${rateDiff <= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {rateDiff <= 0 ? '↓' : '↑'} ${Math.abs(rateDiff)} vs GSA
+          </div>
+        )}
+      </td>
+      <td className="p-3 font-mono font-bold text-emerald-400">{formatCurrency(item.total_cost || (item.hours * item.rate))}</td>
+      <td className="p-3">
+        <div className="flex gap-2">
+          <button onClick={() => setEditing(true)} className="p-1.5 rounded bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600 transition">
+            <Icons.calculator />
+          </button>
+          <button onClick={() => onDelete(item.id)} className="p-1.5 rounded bg-slate-700 text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition">
+            <Icons.trash />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+};
+
+// ============================================================
+// MAIN APP
+// ============================================================
+function PricingEngine() {
+  const [items, setItems] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
+  const [selectedOpp, setSelectedOpp] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dbStatus, setDbStatus] = useState('connecting');
+  
+  // Load from Supabase
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    
+    try {
+      if (typeof MissionPulse === 'undefined') {
+        throw new Error('MissionPulse client not loaded');
+      }
+      
+      // Load opportunities
+      const oppsResult = await MissionPulse.opportunities?.getAll();
+      if (oppsResult?.data) {
+        setOpportunities(oppsResult.data);
+        if (oppsResult.data.length > 0 && !selectedOpp) {
+          setSelectedOpp(oppsResult.data[0].id);
+        }
+      }
+      
+      // Load pricing items
+      const pricingResult = await MissionPulse.pricingItems?.getAll();
+      if (pricingResult?.data?.length) {
+        setItems(pricingResult.data);
+      } else {
+        setItems(generateDemoData());
+      }
+      
+      setDbStatus('connected');
+      
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setItems(generateDemoData());
+      setOpportunities([{ id: 'demo', nickname: 'DHA Healthcare Platform', ceiling: 100000000 }]);
+      setSelectedOpp('demo');
+      setDbStatus('demo');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedOpp]);
+  
+  const generateDemoData = () => [
+    { id: 1, lcat_id: 'pm', hours: 2080, rate: 185, total_cost: 384800, labor_category: 'SCA' },
+    { id: 2, lcat_id: 'sa', hours: 4160, rate: 175, total_cost: 728000, labor_category: 'IT' },
+    { id: 3, lcat_id: 'sme', hours: 2080, rate: 165, total_cost: 343200, labor_category: 'IT' },
+    { id: 4, lcat_id: 'dev-sr', hours: 8320, rate: 155, total_cost: 1289600, labor_category: 'IT' },
+    { id: 5, lcat_id: 'dev-mid', hours: 12480, rate: 125, total_cost: 1560000, labor_category: 'IT' },
+    { id: 6, lcat_id: 'dev-jr', hours: 6240, rate: 85, total_cost: 530400, labor_category: 'IT' },
+    { id: 7, lcat_id: 'ba', hours: 4160, rate: 115, total_cost: 478400, labor_category: 'SCA' },
+    { id: 8, lcat_id: 'qa', hours: 4160, rate: 105, total_cost: 436800, labor_category: 'IT' },
+  ];
+  
+  useEffect(() => {
+    const timer = setTimeout(loadData, 500);
+    return () => clearTimeout(timer);
+  }, [loadData]);
+  
+  // Actions
+  const handleUpdate = (updated) => {
+    setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+  };
+  
+  const handleDelete = (id) => {
+    if (confirm('Delete this line item?')) {
+      setItems(prev => prev.filter(i => i.id !== id));
+    }
+  };
+  
+  const handleAdd = () => {
+    const newItem = {
+      id: Date.now(),
+      lcat_id: 'dev-mid',
+      hours: 2080,
+      rate: 125,
+      total_cost: 260000,
+      labor_category: 'IT',
+    };
+    setItems(prev => [...prev, newItem]);
+  };
+  
+  // Calculations
+  const totals = useMemo(() => {
+    const totalHours = items.reduce((s, i) => s + (i.hours || 0), 0);
+    const totalCost = items.reduce((s, i) => s + (i.total_cost || i.hours * i.rate || 0), 0);
+    const avgRate = totalHours > 0 ? totalCost / totalHours : 0;
+    const fte = totalHours / 2080;
+    return { totalHours, totalCost, avgRate, fte };
+  }, [items]);
+  
+  const currentOpp = opportunities.find(o => o.id === selectedOpp);
+  const priceToWin = currentOpp?.ceiling ? currentOpp.ceiling * 0.85 : totals.totalCost * 1.1;
+  const margin = priceToWin - totals.totalCost;
+  const marginPercent = priceToWin > 0 ? (margin / priceToWin) * 100 : 0;
+  
+  return (
+    <div className="min-h-screen bg-[#00050F]">
+      {/* Header */}
+      <header className="bg-slate-900/80 backdrop-blur border-b border-emerald-500/30 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <a href="missionpulse-production-dashboard.html" className="flex items-center gap-3 hover:opacity-80 transition">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                  <span className="text-xl">💵</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-white">Pricing Engine</h1>
+                    <Badge variant="cui"><Icons.lock /> CUI</Badge>
+                  </div>
+                  <p className="text-xs text-slate-400">LCAT Mapping & BOE Calculator</p>
+                </div>
+              </a>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Opportunity Selector */}
+              <select
+                value={selectedOpp || ''}
+                onChange={e => setSelectedOpp(e.target.value)}
+                className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm"
+              >
+                {opportunities.map(o => (
+                  <option key={o.id} value={o.id}>{o.nickname || o.title}</option>
+                ))}
+              </select>
+              
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700">
+                <div className={`w-2 h-2 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-400' : dbStatus === 'demo' ? 'bg-amber-400' : 'bg-red-400'}`}></div>
+                <span className="text-xs text-slate-400">
+                  {dbStatus === 'connected' ? 'Live' : dbStatus === 'demo' ? 'Demo' : 'Offline'}
+                </span>
+              </div>
+              
+              <button 
+                onClick={loadData}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 transition text-slate-400 hover:text-white disabled:opacity-50"
+              >
+                <span className={loading ? 'animate-spin' : ''}><Icons.refresh /></span>
+              </button>
+              
+              <a 
+                href="missionpulse-production-dashboard.html"
+                className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 transition text-slate-300 hover:text-white text-sm"
+              >
+                ← Dashboard
+              </a>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-5 gap-4 mb-8">
+          <div className="glass rounded-xl p-4 text-center">
+            <div className="text-xs text-slate-400 mb-1">Total Labor Cost</div>
+            <div className="text-2xl font-bold text-emerald-400 font-mono">{formatCurrency(totals.totalCost)}</div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <div className="text-xs text-slate-400 mb-1">Total Hours</div>
+            <div className="text-2xl font-bold text-white font-mono">{totals.totalHours.toLocaleString()}</div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <div className="text-xs text-slate-400 mb-1">FTE</div>
+            <div className="text-2xl font-bold text-cyan-400 font-mono">{totals.fte.toFixed(1)}</div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <div className="text-xs text-slate-400 mb-1">Avg Rate</div>
+            <div className="text-2xl font-bold text-white font-mono">${totals.avgRate.toFixed(0)}/hr</div>
+          </div>
+          <div className="glass rounded-xl p-4 text-center border-emerald-500/30">
+            <div className="text-xs text-slate-400 mb-1">Est. Margin</div>
+            <div className={`text-2xl font-bold font-mono ${marginPercent >= 15 ? 'text-emerald-400' : marginPercent >= 10 ? 'text-amber-400' : 'text-red-400'}`}>
+              {marginPercent.toFixed(1)}%
+            </div>
+          </div>
+        </div>
+        
+        {/* Price to Win Indicator */}
+        <div className="glass rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-slate-400">Price Position vs. Ceiling</span>
+            <span className="text-sm text-slate-300">
+              {formatCurrency(totals.totalCost)} / {formatCurrency(currentOpp?.ceiling || priceToWin)}
+            </span>
+          </div>
+          <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+            <div 
+              className="h-full rounded-full transition-all"
+              style={{ 
+                width: `${Math.min((totals.totalCost / (currentOpp?.ceiling || priceToWin)) * 100, 100)}%`,
+                background: totals.totalCost <= priceToWin * 0.85 
+                  ? 'linear-gradient(90deg, #10b981, #22c55e)' 
+                  : totals.totalCost <= priceToWin 
+                    ? 'linear-gradient(90deg, #f59e0b, #eab308)'
+                    : 'linear-gradient(90deg, #ef4444, #dc2626)'
+              }}
+            ></div>
+          </div>
+          <div className="flex justify-between mt-1 text-xs text-slate-500">
+            <span>Target: 85% of ceiling</span>
+            <span>Ceiling: {formatCurrency(currentOpp?.ceiling || priceToWin)}</span>
+          </div>
+        </div>
+        
+        {/* Pricing Table */}
+        <div className="glass rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <h2 className="font-semibold text-white">Labor Categories & Rates</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAdd}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition text-sm"
+              >
+                <Icons.plus /> Add LCAT
+              </button>
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition text-sm">
+                <Icons.download /> Export BOE
+              </button>
+            </div>
+          </div>
+          
+          {loading ? (
+            <div className="p-12 text-center">
+              <Spinner />
+              <p className="text-slate-400 mt-4">Loading pricing data...</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">Labor Category</th>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">Hours</th>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">Rate</th>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">Total</th>
+                  <th className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(item => (
+                  <PricingRow
+                    key={item.id}
+                    item={item}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-800/70 border-t border-slate-600">
+                <tr>
+                  <td className="p-3 font-bold text-white">TOTAL</td>
+                  <td className="p-3 font-mono font-bold text-white">{totals.totalHours.toLocaleString()}</td>
+                  <td className="p-3 font-mono text-slate-400">${totals.avgRate.toFixed(0)} avg</td>
+                  <td className="p-3 font-mono font-bold text-emerald-400 text-lg">{formatCurrency(totals.totalCost)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+      </main>
+      
+      {/* Footer */}
+      <footer className="bg-slate-900/80 border-t border-slate-700/50 px-6 py-3 mt-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-500">
+          <span>© 2026 Mission Meets Tech • MissionPulse v12</span>
+          <span>🔒 CUI PROTECTED - AI GENERATED - REQUIRES HUMAN REVIEW</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Render
+ReactDOM.createRoot(document.getElementById('root')).render(<PricingEngine />);
+  </script>
+</body>
+</html>
