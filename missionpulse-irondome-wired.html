@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Iron Dome Writer</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    @keyframes typing { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .animate-typing { animation: typing 1s ease-in-out infinite; }
+    .cui-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .prose-editor { min-height: 200px; font-family: 'Georgia', serif; line-height: 1.8; }
+    .section-locked { opacity: 0.6; pointer-events: none; }
+    .volume-tab.active { border-bottom: 2px solid #00E5FA; color: #00E5FA; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold">
+        <span class="text-cyan-400 glow-text">Iron Dome</span> Writer
+      </h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">Select Opportunity</option>
+      </select>
+      <select id="cuiMarking" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="CUI//PROPIN">CUI//PROPIN</option>
+        <option value="CUI//FEDCON">CUI//FEDCON</option>
+        <option value="UNCLASSIFIED">UNCLASSIFIED</option>
+        <option value="CUI//SP-CTI">CUI//SP-CTI</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-5 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statSections" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Total Sections</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statComplete" class="text-3xl font-bold text-green-400">0</div>
+      <div class="text-gray-400 text-sm">Complete</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statInProgress" class="text-3xl font-bold text-amber-400">0</div>
+      <div class="text-gray-400 text-sm">In Progress</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statWordCount" class="text-3xl font-bold text-purple-400">0</div>
+      <div class="text-gray-400 text-sm">Word Count</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statAIPercent" class="text-3xl font-bold text-pink-400">0%</div>
+      <div class="text-gray-400 text-sm">AI Assisted</div>
+    </div>
+  </div>
+
+  <!-- Volume Tabs -->
+  <div class="flex gap-1 mb-6 border-b border-slate-700">
+    <button onclick="setVolume('technical')" class="volume-tab px-6 py-3 text-gray-400 hover:text-white active" data-volume="technical">
+      Technical
+    </button>
+    <button onclick="setVolume('management')" class="volume-tab px-6 py-3 text-gray-400 hover:text-white" data-volume="management">
+      Management
+    </button>
+    <button onclick="setVolume('past_performance')" class="volume-tab px-6 py-3 text-gray-400 hover:text-white" data-volume="past_performance">
+      Past Performance
+    </button>
+    <button onclick="setVolume('cost')" class="volume-tab px-6 py-3 text-gray-400 hover:text-white" data-volume="cost">
+      Cost/Price
+    </button>
+    <button onclick="setVolume('executive_summary')" class="volume-tab px-6 py-3 text-gray-400 hover:text-white" data-volume="executive_summary">
+      Executive Summary
+    </button>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="grid grid-cols-3 gap-6">
+    <!-- Section List -->
+    <div class="col-span-1">
+      <div class="card p-4 mb-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Sections</h3>
+          <button onclick="openAddModal()" class="text-cyan-400 hover:text-cyan-300 text-sm">+ Add Section</button>
+        </div>
+        <div id="sectionsList" class="space-y-2">
+          <div class="text-gray-500 text-sm animate-pulse">Loading sections...</div>
+        </div>
+      </div>
+
+      <!-- AI Assistant Panel -->
+      <div class="card p-4">
+        <h3 class="font-semibold mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+          AI Writer Assistant
+        </h3>
+        <div class="space-y-3">
+          <button onclick="aiGenerate('expand')" class="w-full text-left px-3 py-2 bg-slate-800 rounded hover:bg-slate-700 text-sm">
+            ✨ Expand Content
+          </button>
+          <button onclick="aiGenerate('compliance')" class="w-full text-left px-3 py-2 bg-slate-800 rounded hover:bg-slate-700 text-sm">
+            🛡️ Add Compliance Language
+          </button>
+          <button onclick="aiGenerate('discriminator')" class="w-full text-left px-3 py-2 bg-slate-800 rounded hover:bg-slate-700 text-sm">
+            🎯 Insert Win Theme
+          </button>
+          <button onclick="aiGenerate('citation')" class="w-full text-left px-3 py-2 bg-slate-800 rounded hover:bg-slate-700 text-sm">
+            📎 Add Past Performance Ref
+          </button>
+          <button onclick="aiGenerate('shorten')" class="w-full text-left px-3 py-2 bg-slate-800 rounded hover:bg-slate-700 text-sm">
+            ✂️ Shorten & Tighten
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Editor Panel -->
+    <div class="col-span-2">
+      <div class="card p-6" id="editorCard">
+        <div id="noSectionSelected" class="text-center py-12 text-gray-500">
+          <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <p class="mb-2">Select a section to begin writing</p>
+          <p class="text-sm">or create a new section from the sidebar</p>
+        </div>
+
+        <div id="editorContent" class="hidden">
+          <!-- Section Header -->
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <span id="editorCUI" class="cui-badge bg-amber-500/20 text-amber-400">CUI//PROPIN</span>
+              <h2 id="editorTitle" class="text-xl font-bold mt-2">Section Title</h2>
+              <p id="editorSubsection" class="text-sm text-gray-400">Subsection info</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <select id="editorStatus" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm" onchange="updateSectionStatus()">
+                <option value="draft">Draft</option>
+                <option value="in_progress">In Progress</option>
+                <option value="review">In Review</option>
+                <option value="complete">Complete</option>
+                <option value="locked">Locked</option>
+              </select>
+              <button onclick="saveSection()" class="btn-primary px-4 py-2 rounded-lg text-sm">Save</button>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="mb-4">
+            <div class="flex items-center justify-between text-sm mb-1">
+              <span class="text-gray-400">Word Count: <span id="editorWordCount">0</span> / <span id="editorWordLimit">2000</span></span>
+              <span class="text-gray-400">AI Assisted: <span id="editorAIPercent">0</span>%</span>
+            </div>
+            <div class="w-full bg-slate-700 rounded-full h-2">
+              <div id="editorProgress" class="bg-cyan-400 h-2 rounded-full transition-all" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Editor -->
+          <div class="mb-4">
+            <textarea id="sectionContent" 
+                      class="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 prose-editor text-gray-200 focus:border-cyan-400 focus:outline-none"
+                      placeholder="Begin writing your proposal section here..."
+                      oninput="updateWordCount()"></textarea>
+          </div>
+
+          <!-- Section Meta -->
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <span class="text-gray-400">Assigned To:</span>
+              <span id="editorAssignee" class="ml-2">-</span>
+            </div>
+            <div>
+              <span class="text-gray-400">Last Updated:</span>
+              <span id="editorUpdated" class="ml-2">-</span>
+            </div>
+            <div>
+              <span class="text-gray-400">Citations:</span>
+              <span id="editorCitations" class="ml-2">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Section Modal -->
+  <div id="sectionModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Section</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="sectionForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="sectionId">
+        
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Section Number *</label>
+          <input type="text" id="sectionNumber" required placeholder="1.0, 2.1.3, etc."
+                 class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Section Title *</label>
+          <input type="text" id="sectionTitle" required placeholder="Executive Summary"
+                 class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Volume *</label>
+            <select id="sectionVolume" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="technical">Technical</option>
+              <option value="management">Management</option>
+              <option value="past_performance">Past Performance</option>
+              <option value="cost">Cost/Price</option>
+              <option value="executive_summary">Executive Summary</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Word Limit</label>
+            <input type="number" id="wordLimit" placeholder="2000"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Assigned To</label>
+          <input type="text" id="assignedTo" placeholder="Team member name"
+                 class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Section</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- AI Generation Modal -->
+  <div id="aiModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-md text-center">
+      <div class="mb-4">
+        <div class="w-16 h-16 mx-auto rounded-full bg-purple-500/20 flex items-center justify-center">
+          <svg class="w-8 h-8 text-purple-400 animate-typing" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+        </div>
+      </div>
+      <h3 class="text-lg font-bold text-purple-400 mb-2">AI Writing Assistant</h3>
+      <p id="aiStatus" class="text-gray-400 text-sm mb-4">Generating content...</p>
+      <div class="w-full bg-slate-700 rounded-full h-1">
+        <div id="aiProgress" class="bg-purple-400 h-1 rounded-full animate-pulse" style="width: 60%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">
+    AI GENERATED - REQUIRES HUMAN REVIEW | Shield & Pulse UX v8.0 | MissionPulse © 2026
+  </div>
+
+  <script src="supabase-client-v2.1.js"></script>
+  <script>
+    // ========== STATE ==========
+    let allSections = [];
+    let opportunities = [];
+    let currentVolume = 'technical';
+    let currentSectionId = null;
+    let editingId = null;
+
+    // ========== SUPABASE CONFIG ==========
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5MjI4NzQsImV4cCI6MjA1MzQ5ODg3NH0.xV3_Dlcj1PZUkEa4cJzJqv0PdCbHfwVoVEpmr1tRvo0';
+    
+    let supabase;
+    
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    // ========== CONNECTION STATUS ==========
+    function updateConnectionStatus(connected) {
+      const status = document.getElementById('connectionStatus');
+      if (connected) {
+        status.innerHTML = `
+          <span class="w-2 h-2 rounded-full bg-green-400"></span>
+          <span class="text-green-400">Connected</span>
+        `;
+      } else {
+        status.innerHTML = `
+          <span class="w-2 h-2 rounded-full bg-red-400"></span>
+          <span class="text-red-400">Disconnected</span>
+        `;
+      }
+    }
+
+    // ========== DATA LOADING ==========
+    async function loadOpportunities() {
+      try {
+        const { data, error } = await supabase.from('opportunities').select('id, title').order('title');
+        if (error) throw error;
+        opportunities = data || [];
+        
+        const select = document.getElementById('opportunityFilter');
+        select.innerHTML = `<option value="">Select Opportunity</option>` + 
+          opportunities.map(o => `<option value="${o.id}">${o.title}</option>`).join('');
+      } catch (err) {
+        console.error('Failed to load opportunities:', err);
+      }
+    }
+
+    async function loadSections() {
+      try {
+        const oppId = document.getElementById('opportunityFilter').value;
+        let query = supabase.from('proposal_sections')
+          .select('*')
+          .eq('volume', currentVolume)
+          .order('section_number');
+        
+        if (oppId) {
+          query = query.eq('opportunity_id', oppId);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allSections = data || [];
+        renderSections();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load sections:', err);
+        document.getElementById('sectionsList').innerHTML = '<div class="text-red-400 text-sm">Failed to load sections</div>';
+      }
+    }
+
+    // ========== VOLUME TABS ==========
+    function setVolume(volume) {
+      currentVolume = volume;
+      currentSectionId = null;
+      
+      document.querySelectorAll('.volume-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.volume === volume);
+      });
+      
+      document.getElementById('editorContent').classList.add('hidden');
+      document.getElementById('noSectionSelected').classList.remove('hidden');
+      
+      loadSections();
+    }
+
+    // ========== RENDERING ==========
+    function renderSections() {
+      const container = document.getElementById('sectionsList');
+      
+      if (allSections.length === 0) {
+        container.innerHTML = `
+          <div class="text-center text-gray-500 py-4">
+            <p class="text-sm mb-2">No sections in this volume</p>
+            <button onclick="openAddModal()" class="text-cyan-400 hover:text-cyan-300 text-sm">+ Add Section</button>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = allSections.map(s => `
+        <div class="p-3 rounded-lg cursor-pointer transition-colors ${currentSectionId === s.id ? 'bg-cyan-500/20 border border-cyan-400/50' : 'bg-slate-800 hover:bg-slate-700'}"
+             onclick="selectSection('${s.id}')">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-mono text-sm text-cyan-400">${s.section_number || '?'}</span>
+            <span class="text-xs px-2 py-0.5 rounded ${getStatusClass(s.status)}">${formatStatus(s.status)}</span>
+          </div>
+          <div class="font-medium text-sm truncate">${s.title || 'Untitled'}</div>
+          <div class="flex items-center justify-between mt-1 text-xs text-gray-500">
+            <span>${s.word_count || 0} words</span>
+            <span>${s.ai_percent || 0}% AI</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function getStatusClass(status) {
+      const classes = {
+        draft: 'bg-gray-500/20 text-gray-400',
+        in_progress: 'bg-amber-500/20 text-amber-400',
+        review: 'bg-blue-500/20 text-blue-400',
+        complete: 'bg-green-500/20 text-green-400',
+        locked: 'bg-purple-500/20 text-purple-400'
+      };
+      return classes[status] || classes.draft;
+    }
+
+    function formatStatus(status) {
+      const labels = {
+        draft: 'Draft',
+        in_progress: 'In Progress',
+        review: 'Review',
+        complete: 'Complete',
+        locked: '🔒 Locked'
+      };
+      return labels[status] || 'Draft';
+    }
+
+    function updateStats() {
+      const complete = allSections.filter(s => s.status === 'complete').length;
+      const inProgress = allSections.filter(s => s.status === 'in_progress').length;
+      const totalWords = allSections.reduce((sum, s) => sum + (s.word_count || 0), 0);
+      const avgAI = allSections.length > 0 
+        ? Math.round(allSections.reduce((sum, s) => sum + (s.ai_percent || 0), 0) / allSections.length)
+        : 0;
+      
+      document.getElementById('statSections').textContent = allSections.length;
+      document.getElementById('statComplete').textContent = complete;
+      document.getElementById('statInProgress').textContent = inProgress;
+      document.getElementById('statWordCount').textContent = totalWords.toLocaleString();
+      document.getElementById('statAIPercent').textContent = avgAI + '%';
+    }
+
+    // ========== SECTION SELECTION ==========
+    function selectSection(id) {
+      currentSectionId = id;
+      const section = allSections.find(s => s.id === id);
+      if (!section) return;
+      
+      document.getElementById('noSectionSelected').classList.add('hidden');
+      document.getElementById('editorContent').classList.remove('hidden');
+      
+      const cui = document.getElementById('cuiMarking').value;
+      document.getElementById('editorCUI').textContent = cui;
+      document.getElementById('editorTitle').textContent = section.title || 'Untitled';
+      document.getElementById('editorSubsection').textContent = `Section ${section.section_number} | ${formatVolume(section.volume)}`;
+      document.getElementById('editorStatus').value = section.status || 'draft';
+      document.getElementById('sectionContent').value = section.content || '';
+      document.getElementById('editorWordLimit').textContent = section.word_limit || 2000;
+      document.getElementById('editorAssignee').textContent = section.assigned_to || '-';
+      document.getElementById('editorUpdated').textContent = formatDate(section.updated_at);
+      document.getElementById('editorCitations').textContent = section.citation_count || 0;
+      
+      updateWordCount();
+      renderSections();
+      
+      // Lock editor if section is locked
+      const textarea = document.getElementById('sectionContent');
+      if (section.status === 'locked') {
+        textarea.disabled = true;
+        textarea.classList.add('opacity-50');
+      } else {
+        textarea.disabled = false;
+        textarea.classList.remove('opacity-50');
+      }
+    }
+
+    function formatVolume(volume) {
+      const labels = {
+        technical: 'Technical Volume',
+        management: 'Management Volume',
+        past_performance: 'Past Performance',
+        cost: 'Cost/Price Volume',
+        executive_summary: 'Executive Summary'
+      };
+      return labels[volume] || volume;
+    }
+
+    function formatDate(date) {
+      if (!date) return '-';
+      return new Date(date).toLocaleString('en-US', { 
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+      });
+    }
+
+    // ========== WORD COUNT ==========
+    function updateWordCount() {
+      const content = document.getElementById('sectionContent').value;
+      const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+      const limit = parseInt(document.getElementById('editorWordLimit').textContent) || 2000;
+      const percent = Math.min(100, Math.round((words / limit) * 100));
+      
+      document.getElementById('editorWordCount').textContent = words;
+      document.getElementById('editorProgress').style.width = percent + '%';
+      
+      // Color based on proximity to limit
+      const progressBar = document.getElementById('editorProgress');
+      if (words > limit) {
+        progressBar.classList.remove('bg-cyan-400', 'bg-amber-400');
+        progressBar.classList.add('bg-red-400');
+      } else if (percent > 80) {
+        progressBar.classList.remove('bg-cyan-400', 'bg-red-400');
+        progressBar.classList.add('bg-amber-400');
+      } else {
+        progressBar.classList.remove('bg-amber-400', 'bg-red-400');
+        progressBar.classList.add('bg-cyan-400');
+      }
+    }
+
+    // ========== SAVE SECTION ==========
+    async function saveSection() {
+      if (!currentSectionId) return;
+      
+      const content = document.getElementById('sectionContent').value;
+      const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+      
+      try {
+        const { error } = await supabase.from('proposal_sections')
+          .update({
+            content: content,
+            word_count: wordCount,
+            status: document.getElementById('editorStatus').value,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentSectionId);
+        
+        if (error) throw error;
+        
+        // Update local state
+        const idx = allSections.findIndex(s => s.id === currentSectionId);
+        if (idx !== -1) {
+          allSections[idx].content = content;
+          allSections[idx].word_count = wordCount;
+          allSections[idx].status = document.getElementById('editorStatus').value;
+          allSections[idx].updated_at = new Date().toISOString();
+        }
+        
+        document.getElementById('editorUpdated').textContent = formatDate(new Date());
+        renderSections();
+        updateStats();
+        
+        // Visual feedback
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Saved';
+        setTimeout(() => btn.textContent = originalText, 1500);
+      } catch (err) {
+        console.error('Failed to save section:', err);
+        alert('Failed to save: ' + err.message);
+      }
+    }
+
+    function updateSectionStatus() {
+      saveSection();
+    }
+
+    // ========== MODAL HANDLERS ==========
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'Add Section';
+      document.getElementById('sectionForm').reset();
+      document.getElementById('sectionVolume').value = currentVolume;
+      document.getElementById('sectionModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('sectionModal').classList.add('hidden');
+      editingId = null;
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      const sectionData = {
+        section_number: document.getElementById('sectionNumber').value,
+        title: document.getElementById('sectionTitle').value,
+        volume: document.getElementById('sectionVolume').value,
+        word_limit: parseInt(document.getElementById('wordLimit').value) || 2000,
+        assigned_to: document.getElementById('assignedTo').value || null,
+        opportunity_id: document.getElementById('opportunityFilter').value || null,
+        status: 'draft',
+        content: '',
+        word_count: 0,
+        ai_percent: 0,
+        citation_count: 0,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          const { error } = await supabase.from('proposal_sections').update(sectionData).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          sectionData.created_at = new Date().toISOString();
+          const { error } = await supabase.from('proposal_sections').insert([sectionData]);
+          if (error) throw error;
+        }
+        
+        closeModal();
+        await loadSections();
+      } catch (err) {
+        console.error('Failed to save section:', err);
+        alert('Failed to save section: ' + err.message);
+      }
+    }
+
+    // ========== AI GENERATION ==========
+    function aiGenerate(type) {
+      if (!currentSectionId) {
+        alert('Please select a section first');
+        return;
+      }
+      
+      const section = allSections.find(s => s.id === currentSectionId);
+      if (section?.status === 'locked') {
+        alert('Cannot edit locked section');
+        return;
+      }
+      
+      document.getElementById('aiModal').classList.remove('hidden');
+      
+      const messages = {
+        expand: 'Expanding content with relevant details...',
+        compliance: 'Adding FAR/DFARS compliance language...',
+        discriminator: 'Inserting win theme discriminator...',
+        citation: 'Adding past performance reference...',
+        shorten: 'Tightening and reducing word count...'
+      };
+      document.getElementById('aiStatus').textContent = messages[type] || 'Generating...';
+      
+      // Simulate AI generation
+      setTimeout(() => {
+        document.getElementById('aiModal').classList.add('hidden');
+        
+        const textarea = document.getElementById('sectionContent');
+        const samples = {
+          expand: '\n\nOur approach leverages industry-leading practices validated through 47+ successful federal healthcare IT implementations. The proposed solution architecture ensures seamless interoperability through FHIR R4 APIs, enabling real-time data exchange across disparate EHR systems while maintaining HIPAA compliance.',
+          compliance: '\n\n[Compliance Note: Per FAR 52.227-14, all technical data produced under this contract shall be delivered with unlimited rights. Our team maintains NIST 800-171 compliance across all 110 controls, verified through annual third-party assessments.]',
+          discriminator: '\n\n**KEY DIFFERENTIATOR:** Unlike competitors, our proprietary HealthSync middleware reduces integration timelines by 60%, validated through VA and DHA implementations. This translates to $2.3M in cost savings and 8-month schedule acceleration for the Government.',
+          citation: '\n\n[Reference: DHA Contract FA8773-21-C-0045 "Healthcare Data Analytics Platform" - Performance Rating: EXCEPTIONAL. POC: Dr. James Mitchell, DHA CIO, (703) 555-0142]',
+          shorten: '' // Would actually shorten content
+        };
+        
+        if (type === 'shorten') {
+          // Simple word reduction simulation
+          const content = textarea.value;
+          const shortened = content.split(/\s+/).slice(0, -20).join(' ');
+          textarea.value = shortened;
+        } else {
+          textarea.value += samples[type] || '';
+        }
+        
+        updateWordCount();
+        
+        // Update AI percent
+        const section = allSections.find(s => s.id === currentSectionId);
+        if (section) {
+          section.ai_percent = Math.min(100, (section.ai_percent || 0) + 15);
+          document.getElementById('editorAIPercent').textContent = section.ai_percent;
+        }
+      }, 2000);
+    }
+
+    // ========== REAL-TIME SUBSCRIPTION ==========
+    function subscribeToChanges() {
+      supabase
+        .channel('proposal_sections_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'proposal_sections' }, () => {
+          console.log('Real-time update received');
+          loadSections();
+        })
+        .subscribe();
+    }
+
+    // ========== EVENT LISTENERS ==========
+    document.getElementById('opportunityFilter').addEventListener('change', loadSections);
+
+    // ========== INIT ==========
+    async function init() {
+      if (!initSupabase()) {
+        updateConnectionStatus(false);
+        return;
+      }
+      
+      await loadOpportunities();
+      await loadSections();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>

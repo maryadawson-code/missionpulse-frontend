@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - RFP Shredder</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    @keyframes shred { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100px) rotate(45deg); opacity: 0; } }
+    .shred-line { animation: shred 0.5s ease-out forwards; }
+    .priority-critical { border-left: 4px solid #EF4444; }
+    .priority-high { border-left: 4px solid #F59E0B; }
+    .priority-medium { border-left: 4px solid #3B82F6; }
+    .priority-low { border-left: 4px solid #10B981; }
+    .requirement-type { font-size: 10px; padding: 2px 8px; border-radius: 12px; }
+    .drop-zone { border: 2px dashed rgba(0, 229, 250, 0.3); transition: all 0.3s; }
+    .drop-zone.active { border-color: #00E5FA; background: rgba(0, 229, 250, 0.05); }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold">
+        <span class="text-cyan-400 glow-text">RFP</span> Shredder
+      </h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">Select Opportunity</option>
+      </select>
+      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ Add Requirement</button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-6 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Total Requirements</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statCritical" class="text-3xl font-bold text-red-400">0</div>
+      <div class="text-gray-400 text-sm">Critical</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statHigh" class="text-3xl font-bold text-amber-400">0</div>
+      <div class="text-gray-400 text-sm">High</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statMapped" class="text-3xl font-bold text-green-400">0%</div>
+      <div class="text-gray-400 text-sm">Mapped</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statCompliant" class="text-3xl font-bold text-blue-400">0%</div>
+      <div class="text-gray-400 text-sm">Compliant</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statRisk" class="text-3xl font-bold text-purple-400">0</div>
+      <div class="text-gray-400 text-sm">Risk Items</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid grid-cols-3 gap-6">
+    <!-- Upload & Analysis Panel -->
+    <div class="col-span-1">
+      <!-- Upload Zone -->
+      <div class="card p-6 mb-4">
+        <h3 class="font-semibold mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          Upload RFP Document
+        </h3>
+        <div id="dropZone" class="drop-zone rounded-lg p-8 text-center cursor-pointer hover:border-cyan-400"
+             onclick="document.getElementById('fileInput').click()"
+             ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+          <svg class="w-12 h-12 mx-auto mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <p class="text-gray-400 mb-2">Drag & drop RFP document</p>
+          <p class="text-xs text-gray-500">PDF, DOCX, or TXT (Max 50MB)</p>
+        </div>
+        <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.txt" onchange="handleFileSelect(event)">
+        
+        <button onclick="runAIShred()" class="w-full mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-semibold">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          AI Shred Document
+        </button>
+      </div>
+
+      <!-- Quick Filters -->
+      <div class="card p-4 mb-4">
+        <h3 class="font-semibold mb-3">Filters</h3>
+        <div class="space-y-2">
+          <select id="typeFilter" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm" onchange="filterRequirements()">
+            <option value="">All Types</option>
+            <option value="shall">SHALL (Mandatory)</option>
+            <option value="should">SHOULD (Desired)</option>
+            <option value="may">MAY (Optional)</option>
+            <option value="will">WILL (Statement)</option>
+          </select>
+          <select id="priorityFilter" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm" onchange="filterRequirements()">
+            <option value="">All Priorities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <select id="sectionFilter" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm" onchange="filterRequirements()">
+            <option value="">All Sections</option>
+            <option value="L">Section L - Instructions</option>
+            <option value="M">Section M - Evaluation</option>
+            <option value="C">Section C - SOW/PWS</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Extraction Summary -->
+      <div class="card p-4">
+        <h3 class="font-semibold mb-3">AI Extraction Summary</h3>
+        <div id="extractionSummary" class="text-sm text-gray-400 space-y-2">
+          <p>Upload an RFP to begin AI analysis</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Requirements List -->
+    <div class="col-span-2">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <h3 class="font-semibold">Extracted Requirements</h3>
+            <input type="text" id="searchInput" placeholder="Search requirements..."
+                   class="bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-sm w-64"
+                   oninput="filterRequirements()">
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="exportRequirements('csv')" class="text-gray-400 hover:text-cyan-400 text-sm px-3 py-1 rounded border border-slate-600">
+              Export CSV
+            </button>
+            <button onclick="exportRequirements('matrix')" class="text-gray-400 hover:text-cyan-400 text-sm px-3 py-1 rounded border border-slate-600">
+              Compliance Matrix
+            </button>
+          </div>
+        </div>
+        
+        <div id="requirementsContainer" class="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+          <div class="text-gray-500 text-center py-8 animate-pulse">Loading requirements...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Requirement Modal -->
+  <div id="requirementModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Requirement</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="requirementForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="requirementId">
+        
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Requirement ID *</label>
+            <input type="text" id="reqId" required placeholder="L-001"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Section *</label>
+            <select id="reqSection" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="L">Section L</option>
+              <option value="M">Section M</option>
+              <option value="C">Section C</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Type *</label>
+            <select id="reqType" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="shall">SHALL</option>
+              <option value="should">SHOULD</option>
+              <option value="may">MAY</option>
+              <option value="will">WILL</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Requirement Text *</label>
+          <textarea id="reqText" required rows="3" placeholder="The contractor shall..."
+                    class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Priority</label>
+            <select id="reqPriority" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Source Page</label>
+            <input type="text" id="reqPage" placeholder="Page 15"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Compliance Response</label>
+          <textarea id="reqResponse" rows="2" placeholder="Our approach to meeting this requirement..."
+                    class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Proposal Section</label>
+            <input type="text" id="reqProposalSection" placeholder="Volume I, Section 3.2"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Assigned To</label>
+            <input type="text" id="reqAssignee" placeholder="Team member"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-6">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="reqIsMapped" class="rounded">
+            <span class="text-sm text-gray-400">Mapped</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="reqIsCompliant" class="rounded">
+            <span class="text-sm text-gray-400">Compliant</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="reqIsRisk" class="rounded">
+            <span class="text-sm text-gray-400">Risk Item</span>
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Requirement</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- AI Shred Modal -->
+  <div id="shredModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-md text-center">
+      <div class="mb-6">
+        <div id="shredAnimation" class="relative h-32 flex items-center justify-center overflow-hidden">
+          <svg class="w-20 h-20 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+      </div>
+      <h3 class="text-xl font-bold text-cyan-400 mb-2">AI Document Analysis</h3>
+      <p id="shredStatus" class="text-gray-400 mb-4">Extracting requirements...</p>
+      <div class="w-full bg-slate-700 rounded-full h-2 mb-2">
+        <div id="shredProgress" class="bg-gradient-to-r from-cyan-400 to-purple-400 h-2 rounded-full transition-all" style="width: 0%"></div>
+      </div>
+      <p id="shredCount" class="text-sm text-gray-500">0 requirements found</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">
+    AI GENERATED - REQUIRES HUMAN REVIEW | Shield & Pulse UX v8.0 | MissionPulse © 2026
+  </div>
+
+  <script src="supabase-client-v2.1.js"></script>
+  <script>
+    // ========== STATE ==========
+    let allRequirements = [];
+    let opportunities = [];
+    let editingId = null;
+
+    // ========== SUPABASE CONFIG ==========
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5MjI4NzQsImV4cCI6MjA1MzQ5ODg3NH0.xV3_Dlcj1PZUkEa4cJzJqv0PdCbHfwVoVEpmr1tRvo0';
+    
+    let supabase;
+    
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      const status = document.getElementById('connectionStatus');
+      status.innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    // ========== DATA LOADING ==========
+    async function loadOpportunities() {
+      try {
+        const { data, error } = await supabase.from('opportunities').select('id, title').order('title');
+        if (error) throw error;
+        opportunities = data || [];
+        
+        const select = document.getElementById('opportunityFilter');
+        select.innerHTML = `<option value="">Select Opportunity</option>` + 
+          opportunities.map(o => `<option value="${o.id}">${o.title}</option>`).join('');
+      } catch (err) {
+        console.error('Failed to load opportunities:', err);
+      }
+    }
+
+    async function loadRequirements() {
+      try {
+        const oppId = document.getElementById('opportunityFilter').value;
+        let query = supabase.from('rfp_requirements').select('*').order('requirement_id');
+        
+        if (oppId) {
+          query = query.eq('opportunity_id', oppId);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allRequirements = data || [];
+        filterRequirements();
+        updateStats();
+        updateExtractionSummary();
+      } catch (err) {
+        console.error('Failed to load requirements:', err);
+        showEmptyState('Failed to load requirements');
+      }
+    }
+
+    // ========== FILTERING ==========
+    function filterRequirements() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const typeFilter = document.getElementById('typeFilter').value;
+      const priorityFilter = document.getElementById('priorityFilter').value;
+      const sectionFilter = document.getElementById('sectionFilter').value;
+      
+      const filtered = allRequirements.filter(r => {
+        const matchesSearch = !search || 
+          r.requirement_id?.toLowerCase().includes(search) ||
+          r.requirement_text?.toLowerCase().includes(search);
+        const matchesType = !typeFilter || r.requirement_type === typeFilter;
+        const matchesPriority = !priorityFilter || r.priority === priorityFilter;
+        const matchesSection = !sectionFilter || r.rfp_section === sectionFilter;
+        return matchesSearch && matchesType && matchesPriority && matchesSection;
+      });
+      
+      renderRequirements(filtered);
+    }
+
+    // ========== RENDERING ==========
+    function renderRequirements(requirements) {
+      const container = document.getElementById('requirementsContainer');
+      
+      if (requirements.length === 0) {
+        showEmptyState('No requirements found');
+        return;
+      }
+      
+      container.innerHTML = requirements.map(r => `
+        <div class="p-4 bg-slate-800/50 rounded-lg priority-${r.priority || 'medium'} hover:bg-slate-800 transition-colors cursor-pointer"
+             onclick="openEditModal('${r.id}')">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-cyan-400 text-sm">${r.requirement_id || 'N/A'}</span>
+              <span class="requirement-type ${getTypeClass(r.requirement_type)}">${(r.requirement_type || 'shall').toUpperCase()}</span>
+              <span class="text-xs text-gray-500">${r.rfp_section ? 'Section ' + r.rfp_section : ''}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              ${r.is_mapped ? '<span class="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Mapped</span>' : ''}
+              ${r.is_compliant ? '<span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">Compliant</span>' : ''}
+              ${r.is_risk ? '<span class="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">⚠ Risk</span>' : ''}
+            </div>
+          </div>
+          <p class="text-sm text-gray-300 mb-2 line-clamp-2">${r.requirement_text || 'No text'}</p>
+          ${r.compliance_response ? `<p class="text-xs text-gray-500 italic line-clamp-1">Response: ${r.compliance_response}</p>` : ''}
+          <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+            <span>${r.source_page || ''}</span>
+            <span>${r.assigned_to ? 'Assigned: ' + r.assigned_to : ''}</span>
+            <button onclick="event.stopPropagation(); deleteRequirement('${r.id}')" class="text-red-400 hover:text-red-300">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showEmptyState(message) {
+      document.getElementById('requirementsContainer').innerHTML = `
+        <div class="text-center py-12 text-gray-500">
+          <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <p class="mb-2">${message}</p>
+          <button onclick="runAIShred()" class="text-cyan-400 hover:text-cyan-300">Run AI Shred to extract requirements</button>
+        </div>
+      `;
+    }
+
+    function getTypeClass(type) {
+      const classes = {
+        shall: 'bg-red-500/20 text-red-400',
+        should: 'bg-amber-500/20 text-amber-400',
+        may: 'bg-green-500/20 text-green-400',
+        will: 'bg-blue-500/20 text-blue-400'
+      };
+      return classes[type] || classes.shall;
+    }
+
+    function updateStats() {
+      const critical = allRequirements.filter(r => r.priority === 'critical').length;
+      const high = allRequirements.filter(r => r.priority === 'high').length;
+      const mapped = allRequirements.filter(r => r.is_mapped).length;
+      const compliant = allRequirements.filter(r => r.is_compliant).length;
+      const risk = allRequirements.filter(r => r.is_risk).length;
+      
+      const mappedPct = allRequirements.length > 0 ? Math.round((mapped / allRequirements.length) * 100) : 0;
+      const compliantPct = allRequirements.length > 0 ? Math.round((compliant / allRequirements.length) * 100) : 0;
+      
+      document.getElementById('statTotal').textContent = allRequirements.length;
+      document.getElementById('statCritical').textContent = critical;
+      document.getElementById('statHigh').textContent = high;
+      document.getElementById('statMapped').textContent = mappedPct + '%';
+      document.getElementById('statCompliant').textContent = compliantPct + '%';
+      document.getElementById('statRisk').textContent = risk;
+    }
+
+    function updateExtractionSummary() {
+      const shalls = allRequirements.filter(r => r.requirement_type === 'shall').length;
+      const shoulds = allRequirements.filter(r => r.requirement_type === 'should').length;
+      const mays = allRequirements.filter(r => r.requirement_type === 'may').length;
+      
+      document.getElementById('extractionSummary').innerHTML = allRequirements.length > 0 ? `
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-2 bg-slate-800 rounded">
+            <span class="text-red-400 font-bold">${shalls}</span>
+            <span class="text-gray-500"> SHALL</span>
+          </div>
+          <div class="p-2 bg-slate-800 rounded">
+            <span class="text-amber-400 font-bold">${shoulds}</span>
+            <span class="text-gray-500"> SHOULD</span>
+          </div>
+          <div class="p-2 bg-slate-800 rounded">
+            <span class="text-green-400 font-bold">${mays}</span>
+            <span class="text-gray-500"> MAY</span>
+          </div>
+          <div class="p-2 bg-slate-800 rounded">
+            <span class="text-cyan-400 font-bold">${allRequirements.length}</span>
+            <span class="text-gray-500"> Total</span>
+          </div>
+        </div>
+        <p class="mt-3 text-xs">Last analysis: ${new Date().toLocaleDateString()}</p>
+      ` : '<p>Upload an RFP to begin AI analysis</p>';
+    }
+
+    // ========== FILE HANDLING ==========
+    function handleDragOver(e) {
+      e.preventDefault();
+      document.getElementById('dropZone').classList.add('active');
+    }
+
+    function handleDragLeave(e) {
+      document.getElementById('dropZone').classList.remove('active');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      document.getElementById('dropZone').classList.remove('active');
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    }
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) processFile(file);
+    }
+
+    function processFile(file) {
+      console.log('Processing file:', file.name);
+      // In production, would upload to Supabase storage and trigger AI analysis
+      runAIShred();
+    }
+
+    // ========== AI SHRED ==========
+    function runAIShred() {
+      const oppId = document.getElementById('opportunityFilter').value;
+      if (!oppId) {
+        alert('Please select an opportunity first');
+        return;
+      }
+      
+      document.getElementById('shredModal').classList.remove('hidden');
+      let progress = 0;
+      let count = 0;
+      
+      const interval = setInterval(() => {
+        progress += Math.random() * 8;
+        count = Math.floor(progress / 5);
+        
+        if (progress >= 100) {
+          progress = 100;
+          clearInterval(interval);
+          setTimeout(() => {
+            document.getElementById('shredModal').classList.add('hidden');
+            addSampleRequirements(oppId);
+          }, 500);
+        }
+        
+        document.getElementById('shredProgress').style.width = progress + '%';
+        document.getElementById('shredCount').textContent = count + ' requirements found';
+        
+        if (progress < 20) {
+          document.getElementById('shredStatus').textContent = 'Parsing document structure...';
+        } else if (progress < 40) {
+          document.getElementById('shredStatus').textContent = 'Identifying SHALL statements...';
+        } else if (progress < 60) {
+          document.getElementById('shredStatus').textContent = 'Extracting evaluation criteria...';
+        } else if (progress < 80) {
+          document.getElementById('shredStatus').textContent = 'Analyzing compliance requirements...';
+        } else {
+          document.getElementById('shredStatus').textContent = 'Finalizing extraction...';
+        }
+      }, 150);
+    }
+
+    async function addSampleRequirements(oppId) {
+      const samples = [
+        { requirement_id: 'L-001', rfp_section: 'L', requirement_type: 'shall', requirement_text: 'The contractor shall provide a Technical Approach that demonstrates understanding of the healthcare IT modernization requirements.', priority: 'critical', source_page: 'Page 23' },
+        { requirement_id: 'L-002', rfp_section: 'L', requirement_type: 'shall', requirement_text: 'The contractor shall submit Past Performance information for at least three (3) contracts of similar size and scope completed within the past five years.', priority: 'critical', source_page: 'Page 25' },
+        { requirement_id: 'L-003', rfp_section: 'L', requirement_type: 'shall', requirement_text: 'The contractor shall provide resumes for all Key Personnel demonstrating required qualifications and certifications.', priority: 'high', source_page: 'Page 27' },
+        { requirement_id: 'M-001', rfp_section: 'M', requirement_type: 'shall', requirement_text: 'Technical Approach will be evaluated based on soundness, feasibility, and innovation of the proposed solution.', priority: 'critical', source_page: 'Page 45' },
+        { requirement_id: 'M-002', rfp_section: 'M', requirement_type: 'should', requirement_text: 'Offerors should demonstrate experience with FHIR R4 APIs and interoperability standards.', priority: 'high', source_page: 'Page 46' },
+        { requirement_id: 'C-001', rfp_section: 'C', requirement_type: 'shall', requirement_text: 'The contractor shall maintain NIST 800-171 compliance throughout the period of performance.', priority: 'critical', source_page: 'Page 12', is_risk: true },
+        { requirement_id: 'C-002', rfp_section: 'C', requirement_type: 'shall', requirement_text: 'The contractor shall provide 24/7 technical support with a maximum 4-hour response time for critical incidents.', priority: 'high', source_page: 'Page 15' },
+        { requirement_id: 'C-003', rfp_section: 'C', requirement_type: 'may', requirement_text: 'The contractor may propose optional cloud migration services as a separate CLIN.', priority: 'low', source_page: 'Page 18' }
+      ];
+
+      try {
+        for (const req of samples) {
+          req.opportunity_id = oppId;
+          req.created_at = new Date().toISOString();
+          req.updated_at = new Date().toISOString();
+          await supabase.from('rfp_requirements').insert([req]);
+        }
+        await loadRequirements();
+        alert('AI Shred complete! Extracted ' + samples.length + ' requirements.');
+      } catch (err) {
+        console.error('Failed to add sample requirements:', err);
+      }
+    }
+
+    // ========== MODAL HANDLERS ==========
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'Add Requirement';
+      document.getElementById('requirementForm').reset();
+      document.getElementById('requirementModal').classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      const req = allRequirements.find(r => r.id === id);
+      if (!req) return;
+      
+      editingId = id;
+      document.getElementById('modalTitle').textContent = 'Edit Requirement';
+      document.getElementById('requirementId').value = id;
+      document.getElementById('reqId').value = req.requirement_id || '';
+      document.getElementById('reqSection').value = req.rfp_section || 'L';
+      document.getElementById('reqType').value = req.requirement_type || 'shall';
+      document.getElementById('reqText').value = req.requirement_text || '';
+      document.getElementById('reqPriority').value = req.priority || 'medium';
+      document.getElementById('reqPage').value = req.source_page || '';
+      document.getElementById('reqResponse').value = req.compliance_response || '';
+      document.getElementById('reqProposalSection').value = req.proposal_section || '';
+      document.getElementById('reqAssignee').value = req.assigned_to || '';
+      document.getElementById('reqIsMapped').checked = req.is_mapped || false;
+      document.getElementById('reqIsCompliant').checked = req.is_compliant || false;
+      document.getElementById('reqIsRisk').checked = req.is_risk || false;
+      
+      document.getElementById('requirementModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('requirementModal').classList.add('hidden');
+      editingId = null;
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      const reqData = {
+        requirement_id: document.getElementById('reqId').value,
+        rfp_section: document.getElementById('reqSection').value,
+        requirement_type: document.getElementById('reqType').value,
+        requirement_text: document.getElementById('reqText').value,
+        priority: document.getElementById('reqPriority').value,
+        source_page: document.getElementById('reqPage').value,
+        compliance_response: document.getElementById('reqResponse').value,
+        proposal_section: document.getElementById('reqProposalSection').value,
+        assigned_to: document.getElementById('reqAssignee').value,
+        is_mapped: document.getElementById('reqIsMapped').checked,
+        is_compliant: document.getElementById('reqIsCompliant').checked,
+        is_risk: document.getElementById('reqIsRisk').checked,
+        opportunity_id: document.getElementById('opportunityFilter').value || null,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          const { error } = await supabase.from('rfp_requirements').update(reqData).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          reqData.created_at = new Date().toISOString();
+          const { error } = await supabase.from('rfp_requirements').insert([reqData]);
+          if (error) throw error;
+        }
+        
+        closeModal();
+        await loadRequirements();
+      } catch (err) {
+        console.error('Failed to save requirement:', err);
+        alert('Failed to save: ' + err.message);
+      }
+    }
+
+    async function deleteRequirement(id) {
+      if (!confirm('Delete this requirement?')) return;
+      try {
+        const { error } = await supabase.from('rfp_requirements').delete().eq('id', id);
+        if (error) throw error;
+        await loadRequirements();
+      } catch (err) {
+        console.error('Failed to delete:', err);
+      }
+    }
+
+    // ========== EXPORT ==========
+    function exportRequirements(format) {
+      if (format === 'csv') {
+        const headers = ['ID', 'Section', 'Type', 'Text', 'Priority', 'Mapped', 'Compliant'];
+        const rows = allRequirements.map(r => [
+          r.requirement_id, r.rfp_section, r.requirement_type, 
+          `"${(r.requirement_text || '').replace(/"/g, '""')}"`,
+          r.priority, r.is_mapped, r.is_compliant
+        ]);
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        downloadFile(csv, 'requirements.csv', 'text/csv');
+      } else if (format === 'matrix') {
+        alert('Compliance Matrix export coming soon!');
+      }
+    }
+
+    function downloadFile(content, filename, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ========== REAL-TIME ==========
+    function subscribeToChanges() {
+      supabase
+        .channel('rfp_requirements_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rfp_requirements' }, () => {
+          loadRequirements();
+        })
+        .subscribe();
+    }
+
+    // ========== EVENT LISTENERS ==========
+    document.getElementById('opportunityFilter').addEventListener('change', loadRequirements);
+
+    // ========== INIT ==========
+    async function init() {
+      if (!initSupabase()) {
+        updateConnectionStatus(false);
+        return;
+      }
+      await loadOpportunities();
+      await loadRequirements();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Contracts Scanner</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .risk-high { border-left: 4px solid #EF4444; }
+    .risk-medium { border-left: 4px solid #F59E0B; }
+    .risk-low { border-left: 4px solid #10B981; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    @keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+    .scan-line { animation: scan 2s linear infinite; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold">
+        <span class="text-cyan-400 glow-text">Contracts</span> Scanner
+      </h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">All Opportunities</option>
+      </select>
+      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ Add Clause</button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-5 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Total Clauses</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statHigh" class="text-3xl font-bold text-red-400">0</div>
+      <div class="text-gray-400 text-sm">High Risk</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statMedium" class="text-3xl font-bold text-amber-400">0</div>
+      <div class="text-gray-400 text-sm">Medium Risk</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statLow" class="text-3xl font-bold text-green-400">0</div>
+      <div class="text-gray-400 text-sm">Low Risk</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statReviewed" class="text-3xl font-bold text-purple-400">0%</div>
+      <div class="text-gray-400 text-sm">Reviewed</div>
+    </div>
+  </div>
+
+  <!-- Search & Filters -->
+  <div class="card p-4 mb-6">
+    <div class="flex gap-4">
+      <input type="text" id="searchInput" placeholder="Search clauses (e.g., 52.227-14, IP Rights)..."
+             class="flex-1 bg-slate-800 border border-slate-600 rounded px-4 py-2"
+             oninput="filterClauses()">
+      <select id="riskFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2" onchange="filterClauses()">
+        <option value="">All Risk Levels</option>
+        <option value="high">High Risk</option>
+        <option value="medium">Medium Risk</option>
+        <option value="low">Low Risk</option>
+      </select>
+      <select id="categoryFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2" onchange="filterClauses()">
+        <option value="">All Categories</option>
+        <option value="far">FAR</option>
+        <option value="dfars">DFARS</option>
+        <option value="custom">Custom</option>
+      </select>
+      <button onclick="runAIScan()" class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+        </svg>
+        AI Scan
+      </button>
+    </div>
+  </div>
+
+  <!-- Clauses Grid -->
+  <div id="clausesContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card p-8 text-center text-gray-500 col-span-2">
+      <div class="animate-pulse">Loading clauses...</div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="clauseModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Clause</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="clauseForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="clauseId">
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Clause Number *</label>
+            <input type="text" id="clauseNumber" required placeholder="52.227-14"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Category *</label>
+            <select id="clauseCategory" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="far">FAR</option>
+              <option value="dfars">DFARS</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Clause Title *</label>
+          <input type="text" id="clauseTitle" required placeholder="Rights in Data—General"
+                 class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Risk Level</label>
+            <select id="riskLevel" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Financial Impact ($)</label>
+            <input type="number" id="financialImpact" placeholder="0"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Description</label>
+          <textarea id="clauseDescription" rows="3" placeholder="Brief description of clause requirements..."
+                    class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">AI Analysis</label>
+          <textarea id="aiAnalysis" rows="3" placeholder="AI-generated risk analysis..."
+                    class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Mitigation Strategy</label>
+          <textarea id="mitigationStrategy" rows="2" placeholder="Recommended compliance approach..."
+                    class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-6">
+          <div>
+            <label class="flex items-center gap-2">
+              <input type="checkbox" id="isReviewed" class="rounded">
+              <span class="text-sm text-gray-400">Reviewed</span>
+            </label>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Reviewed By</label>
+            <input type="text" id="reviewedBy" placeholder="Name"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Opportunity</label>
+            <select id="clauseOpportunity" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="">None</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Clause</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- AI Scan Modal -->
+  <div id="scanModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-lg text-center">
+      <div class="relative h-32 mb-6 overflow-hidden rounded-lg bg-slate-900">
+        <div class="scan-line absolute w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent"></div>
+        <div class="flex items-center justify-center h-full">
+          <svg class="w-16 h-16 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+      </div>
+      <h3 class="text-xl font-bold text-cyan-400 mb-2">AI Clause Analysis</h3>
+      <p id="scanStatus" class="text-gray-400 mb-4">Analyzing FAR/DFARS clauses for risk factors...</p>
+      <div class="w-full bg-slate-700 rounded-full h-2 mb-4">
+        <div id="scanProgress" class="bg-cyan-400 h-2 rounded-full transition-all" style="width: 0%"></div>
+      </div>
+      <button onclick="closeScanModal()" class="text-gray-400 hover:text-white text-sm">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">
+    AI GENERATED - REQUIRES HUMAN REVIEW | Shield & Pulse UX v8.0 | MissionPulse © 2026
+  </div>
+
+  <script src="supabase-client-v2.1.js"></script>
+  <script>
+    // ========== STATE ==========
+    let allClauses = [];
+    let opportunities = [];
+    let editingId = null;
+
+    // ========== SUPABASE CONFIG ==========
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5MjI4NzQsImV4cCI6MjA1MzQ5ODg3NH0.xV3_Dlcj1PZUkEa4cJzJqv0PdCbHfwVoVEpmr1tRvo0';
+    
+    let supabase;
+    
+    // Initialize Supabase client
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    // ========== CONNECTION STATUS ==========
+    function updateConnectionStatus(connected) {
+      const status = document.getElementById('connectionStatus');
+      if (connected) {
+        status.innerHTML = `
+          <span class="w-2 h-2 rounded-full bg-green-400"></span>
+          <span class="text-green-400">Connected</span>
+        `;
+      } else {
+        status.innerHTML = `
+          <span class="w-2 h-2 rounded-full bg-red-400"></span>
+          <span class="text-red-400">Disconnected</span>
+        `;
+      }
+    }
+
+    // ========== DATA LOADING ==========
+    async function loadOpportunities() {
+      try {
+        const { data, error } = await supabase.from('opportunities').select('id, title').order('title');
+        if (error) throw error;
+        opportunities = data || [];
+        
+        const filterSelect = document.getElementById('opportunityFilter');
+        const formSelect = document.getElementById('clauseOpportunity');
+        
+        const optionsHtml = opportunities.map(o => 
+          `<option value="${o.id}">${o.title}</option>`
+        ).join('');
+        
+        filterSelect.innerHTML = `<option value="">All Opportunities</option>${optionsHtml}`;
+        formSelect.innerHTML = `<option value="">None</option>${optionsHtml}`;
+      } catch (err) {
+        console.error('Failed to load opportunities:', err);
+      }
+    }
+
+    async function loadClauses() {
+      try {
+        const oppFilter = document.getElementById('opportunityFilter').value;
+        let query = supabase.from('contract_clauses').select('*').order('created_at', { ascending: false });
+        
+        if (oppFilter) {
+          query = query.eq('opportunity_id', oppFilter);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allClauses = data || [];
+        filterClauses();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load clauses:', err);
+        showEmptyState('Failed to load clauses');
+      }
+    }
+
+    // ========== FILTERING ==========
+    function filterClauses() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const riskFilter = document.getElementById('riskFilter').value;
+      const categoryFilter = document.getElementById('categoryFilter').value;
+      
+      const filtered = allClauses.filter(c => {
+        const matchesSearch = !search || 
+          c.clause_number?.toLowerCase().includes(search) ||
+          c.title?.toLowerCase().includes(search) ||
+          c.description?.toLowerCase().includes(search);
+        const matchesRisk = !riskFilter || c.risk_level === riskFilter;
+        const matchesCategory = !categoryFilter || c.category === categoryFilter;
+        return matchesSearch && matchesRisk && matchesCategory;
+      });
+      
+      renderClauses(filtered);
+    }
+
+    // ========== RENDERING ==========
+    function renderClauses(clauses) {
+      const container = document.getElementById('clausesContainer');
+      
+      if (clauses.length === 0) {
+        showEmptyState('No clauses found');
+        return;
+      }
+      
+      container.innerHTML = clauses.map(c => `
+        <div class="card p-4 risk-${c.risk_level || 'low'} hover:border-cyan-400/50 transition-colors cursor-pointer"
+             onclick="openEditModal('${c.id}')">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <span class="text-xs font-mono px-2 py-1 rounded ${getCategoryClass(c.category)}">${(c.category || 'FAR').toUpperCase()}</span>
+              <span class="ml-2 text-cyan-400 font-mono">${c.clause_number || 'N/A'}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              ${c.is_reviewed ? '<span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">✓ Reviewed</span>' : ''}
+              <span class="text-xs px-2 py-1 rounded ${getRiskClass(c.risk_level)}">${(c.risk_level || 'low').toUpperCase()}</span>
+            </div>
+          </div>
+          <h3 class="font-semibold mb-2">${c.title || 'Untitled Clause'}</h3>
+          <p class="text-sm text-gray-400 mb-3 line-clamp-2">${c.description || 'No description'}</p>
+          ${c.financial_impact ? `<div class="text-sm text-amber-400">💰 Financial Impact: $${Number(c.financial_impact).toLocaleString()}</div>` : ''}
+          ${c.ai_analysis ? `<div class="mt-2 text-xs text-purple-400 bg-purple-500/10 p-2 rounded">🤖 ${truncate(c.ai_analysis, 100)}</div>` : ''}
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
+            <span class="text-xs text-gray-500">${formatDate(c.created_at)}</span>
+            <button onclick="event.stopPropagation(); deleteClause('${c.id}')" 
+                    class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showEmptyState(message) {
+      document.getElementById('clausesContainer').innerHTML = `
+        <div class="card p-8 text-center text-gray-500 col-span-2">
+          <svg class="w-12 h-12 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <p>${message}</p>
+          <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Add First Clause</button>
+        </div>
+      `;
+    }
+
+    function updateStats() {
+      const high = allClauses.filter(c => c.risk_level === 'high').length;
+      const medium = allClauses.filter(c => c.risk_level === 'medium').length;
+      const low = allClauses.filter(c => c.risk_level === 'low').length;
+      const reviewed = allClauses.filter(c => c.is_reviewed).length;
+      const reviewedPct = allClauses.length > 0 ? Math.round((reviewed / allClauses.length) * 100) : 0;
+      
+      document.getElementById('statTotal').textContent = allClauses.length;
+      document.getElementById('statHigh').textContent = high;
+      document.getElementById('statMedium').textContent = medium;
+      document.getElementById('statLow').textContent = low;
+      document.getElementById('statReviewed').textContent = reviewedPct + '%';
+    }
+
+    // ========== HELPERS ==========
+    function getCategoryClass(category) {
+      const classes = {
+        far: 'bg-blue-500/20 text-blue-400',
+        dfars: 'bg-purple-500/20 text-purple-400',
+        custom: 'bg-amber-500/20 text-amber-400'
+      };
+      return classes[category] || classes.far;
+    }
+
+    function getRiskClass(level) {
+      const classes = {
+        high: 'bg-red-500/20 text-red-400',
+        medium: 'bg-amber-500/20 text-amber-400',
+        low: 'bg-green-500/20 text-green-400'
+      };
+      return classes[level] || classes.low;
+    }
+
+    function truncate(str, len) {
+      if (!str) return '';
+      return str.length > len ? str.substring(0, len) + '...' : str;
+    }
+
+    function formatDate(date) {
+      if (!date) return 'N/A';
+      return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // ========== MODAL HANDLERS ==========
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'Add Clause';
+      document.getElementById('clauseForm').reset();
+      document.getElementById('clauseModal').classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      const clause = allClauses.find(c => c.id === id);
+      if (!clause) return;
+      
+      editingId = id;
+      document.getElementById('modalTitle').textContent = 'Edit Clause';
+      document.getElementById('clauseId').value = id;
+      document.getElementById('clauseNumber').value = clause.clause_number || '';
+      document.getElementById('clauseCategory').value = clause.category || 'far';
+      document.getElementById('clauseTitle').value = clause.title || '';
+      document.getElementById('riskLevel').value = clause.risk_level || 'low';
+      document.getElementById('financialImpact').value = clause.financial_impact || '';
+      document.getElementById('clauseDescription').value = clause.description || '';
+      document.getElementById('aiAnalysis').value = clause.ai_analysis || '';
+      document.getElementById('mitigationStrategy').value = clause.mitigation_strategy || '';
+      document.getElementById('isReviewed').checked = clause.is_reviewed || false;
+      document.getElementById('reviewedBy').value = clause.reviewed_by || '';
+      document.getElementById('clauseOpportunity').value = clause.opportunity_id || '';
+      
+      document.getElementById('clauseModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('clauseModal').classList.add('hidden');
+      editingId = null;
+    }
+
+    // ========== CRUD OPERATIONS ==========
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      const clauseData = {
+        clause_number: document.getElementById('clauseNumber').value,
+        category: document.getElementById('clauseCategory').value,
+        title: document.getElementById('clauseTitle').value,
+        risk_level: document.getElementById('riskLevel').value,
+        financial_impact: parseInt(document.getElementById('financialImpact').value) || null,
+        description: document.getElementById('clauseDescription').value,
+        ai_analysis: document.getElementById('aiAnalysis').value,
+        mitigation_strategy: document.getElementById('mitigationStrategy').value,
+        is_reviewed: document.getElementById('isReviewed').checked,
+        reviewed_by: document.getElementById('reviewedBy').value || null,
+        reviewed_at: document.getElementById('isReviewed').checked ? new Date().toISOString() : null,
+        opportunity_id: document.getElementById('clauseOpportunity').value || null,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          const { error } = await supabase.from('contract_clauses').update(clauseData).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          clauseData.created_at = new Date().toISOString();
+          const { error } = await supabase.from('contract_clauses').insert([clauseData]);
+          if (error) throw error;
+        }
+        
+        closeModal();
+        await loadClauses();
+      } catch (err) {
+        console.error('Failed to save clause:', err);
+        alert('Failed to save clause: ' + err.message);
+      }
+    }
+
+    async function deleteClause(id) {
+      if (!confirm('Delete this clause?')) return;
+      
+      try {
+        const { error } = await supabase.from('contract_clauses').delete().eq('id', id);
+        if (error) throw error;
+        await loadClauses();
+      } catch (err) {
+        console.error('Failed to delete clause:', err);
+        alert('Failed to delete clause');
+      }
+    }
+
+    // ========== AI SCAN ==========
+    function runAIScan() {
+      document.getElementById('scanModal').classList.remove('hidden');
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress >= 100) {
+          progress = 100;
+          clearInterval(interval);
+          setTimeout(() => {
+            closeScanModal();
+            addSampleAIAnalysis();
+          }, 500);
+        }
+        document.getElementById('scanProgress').style.width = progress + '%';
+        
+        if (progress < 30) {
+          document.getElementById('scanStatus').textContent = 'Parsing FAR/DFARS clause library...';
+        } else if (progress < 60) {
+          document.getElementById('scanStatus').textContent = 'Identifying risk patterns...';
+        } else if (progress < 90) {
+          document.getElementById('scanStatus').textContent = 'Generating mitigation strategies...';
+        } else {
+          document.getElementById('scanStatus').textContent = 'Finalizing analysis...';
+        }
+      }, 200);
+    }
+
+    function closeScanModal() {
+      document.getElementById('scanModal').classList.add('hidden');
+    }
+
+    async function addSampleAIAnalysis() {
+      // Add sample high-risk FAR clauses for demo
+      const sampleClauses = [
+        {
+          clause_number: '52.227-14',
+          category: 'far',
+          title: 'Rights in Data—General',
+          risk_level: 'high',
+          financial_impact: 500000,
+          description: 'Government obtains unlimited rights in data first produced in performance of contract.',
+          ai_analysis: 'HIGH RISK: This clause grants government unlimited rights to all technical data and software developed. Recommend negotiating Alternative II or III for limited rights in background IP.',
+          mitigation_strategy: 'Identify pre-existing IP before contract start. Document all proprietary data with Limited Rights legends. Negotiate for restricted computer software rights.'
+        },
+        {
+          clause_number: '252.204-7012',
+          category: 'dfars',
+          title: 'Safeguarding Covered Defense Information',
+          risk_level: 'high',
+          financial_impact: 250000,
+          description: 'Requires NIST 800-171 compliance for handling CDI.',
+          ai_analysis: 'HIGH RISK: Requires full NIST 800-171 implementation (110 controls) and 72-hour cyber incident reporting. Non-compliance can result in False Claims Act liability.',
+          mitigation_strategy: 'Conduct NIST 800-171 gap assessment. Implement SIEM for incident detection. Establish 24/7 incident response capability.'
+        },
+        {
+          clause_number: '52.219-14',
+          category: 'far',
+          title: 'Limitations on Subcontracting',
+          risk_level: 'medium',
+          financial_impact: 100000,
+          description: 'Small business prime must perform specified percentage of work.',
+          ai_analysis: 'MEDIUM RISK: Requires 50% of services to be performed by prime contractor employees. Monitor labor mix carefully to maintain compliance.',
+          mitigation_strategy: 'Track labor hours by prime vs. sub monthly. Implement workshare dashboard. Plan staffing ramp-up accordingly.'
+        }
+      ];
+
+      try {
+        for (const clause of sampleClauses) {
+          clause.created_at = new Date().toISOString();
+          clause.updated_at = new Date().toISOString();
+          await supabase.from('contract_clauses').insert([clause]);
+        }
+        await loadClauses();
+        alert('AI Scan complete! Added ' + sampleClauses.length + ' high-priority clauses.');
+      } catch (err) {
+        console.error('Failed to add sample clauses:', err);
+      }
+    }
+
+    // ========== REAL-TIME SUBSCRIPTION ==========
+    function subscribeToChanges() {
+      supabase
+        .channel('contract_clauses_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'contract_clauses' }, () => {
+          console.log('Real-time update received');
+          loadClauses();
+        })
+        .subscribe();
+    }
+
+    // ========== EVENT LISTENERS ==========
+    document.getElementById('opportunityFilter').addEventListener('change', loadClauses);
+
+    // ========== INIT ==========
+    async function init() {
+      if (!initSupabase()) {
+        updateConnectionStatus(false);
+        showEmptyState('Failed to connect to database');
+        return;
+      }
+      
+      await loadOpportunities();
+      await loadClauses();
+      subscribeToChanges();
+    }
+
+    // Start when DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
