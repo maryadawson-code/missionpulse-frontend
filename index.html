@@ -34,8 +34,8 @@
  * FILE: index.html
  * ROLE: System
  * SECURITY: Supabase credentials verified
- * SPRINT: 50 - Data Wiring Batch 2
- * MODULES: M1-M6 LIVE (Pipeline, War Room, Swimlane, Compliance, Contracts, Iron Dome)
+ * SPRINT: 52 - Data Wiring Batch 4
+ * MODULES: M1-M12 LIVE (+ Orals, Playbook, Frenemy)
  */
 const{useState,useEffect,useRef,useCallback}=React;
 
@@ -237,6 +237,251 @@ const MissionPulse = {
       medium: clauses.filter(c => c.risk_level === 'medium').length,
       low: clauses.filter(c => c.risk_level === 'low').length
     };
+  },
+
+  // COMPETITORS (Sprint 51 - Black Hat)
+  async getCompetitors(opportunityId) {
+    try {
+      let query = supabase.from('competitors').select('*').order('threat_level', { ascending: false });
+      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getCompetitors error:', err); return []; }
+  },
+
+  async createCompetitor(competitor) {
+    try {
+      const { data, error } = await supabase.from('competitors')
+        .insert([{ ...competitor, created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] createCompetitor error:', err); throw err; }
+  },
+
+  async updateCompetitor(id, updates) {
+    try {
+      const { data, error } = await supabase.from('competitors')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] updateCompetitor error:', err); throw err; }
+  },
+
+  async deleteCompetitor(id) {
+    try {
+      const { error } = await supabase.from('competitors').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) { console.error('[MissionPulse] deleteCompetitor error:', err); throw err; }
+  },
+
+  // PRICING ITEMS (Sprint 51 - BOE)
+  async getPricingItems(opportunityId) {
+    try {
+      let query = supabase.from('pricing_items').select('*').order('year', { ascending: true });
+      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getPricingItems error:', err); return []; }
+  },
+
+  async createPricingItem(item) {
+    try {
+      const { data, error } = await supabase.from('pricing_items')
+        .insert([{ ...item, created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] createPricingItem error:', err); throw err; }
+  },
+
+  async updatePricingItem(id, updates) {
+    try {
+      const { data, error } = await supabase.from('pricing_items')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] updatePricingItem error:', err); throw err; }
+  },
+
+  async deletePricingItem(id) {
+    try {
+      const { error } = await supabase.from('pricing_items').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) { console.error('[MissionPulse] deletePricingItem error:', err); throw err; }
+  },
+
+  async calculateBOE(opportunityId, wrapRate = 1.85) {
+    const items = await this.getPricingItems(opportunityId);
+    const directLabor = items.reduce((sum, i) => sum + ((i.hours || 0) * (parseFloat(i.rate) || 0)), 0);
+    const wrapped = directLabor * wrapRate;
+    return { directLabor, wrapped, items: items.length, wrapRate };
+  },
+
+  // AI APPROVALS (Sprint 51 - HITL Queue)
+  async getAIApprovals(status = null) {
+    try {
+      let query = supabase.from('ai_approvals')
+        .select('*, opportunity:opportunities(name, nickname)')
+        .order('created_at', { ascending: false });
+      if (status) query = query.eq('status', status);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getAIApprovals error:', err); return []; }
+  },
+
+  async createAIApproval(approval) {
+    try {
+      const { data, error } = await supabase.from('ai_approvals')
+        .insert([{ ...approval, created_at: new Date().toISOString(), status: 'pending' }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] createAIApproval error:', err); throw err; }
+  },
+
+  async approveContent(id, notes = null) {
+    try {
+      const { data, error } = await supabase.from('ai_approvals')
+        .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewer_notes: notes })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] approveContent error:', err); throw err; }
+  },
+
+  async rejectContent(id, notes) {
+    try {
+      const { data, error } = await supabase.from('ai_approvals')
+        .update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewer_notes: notes })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] rejectContent error:', err); throw err; }
+  },
+
+  // ORALS DECKS (Sprint 52)
+  async getOralsDeck(opportunityId) {
+    try {
+      const { data, error } = await supabase.from('orals_decks')
+        .select('*')
+        .eq('opportunity_id', opportunityId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] getOralsDeck error:', err); return null; }
+  },
+
+  async saveOralsDeck(opportunityId, slides, title = 'Orals Deck') {
+    try {
+      const existing = await this.getOralsDeck(opportunityId);
+      if (existing) {
+        const { data, error } = await supabase.from('orals_decks')
+          .update({ slides: JSON.stringify(slides), updated_at: new Date().toISOString() })
+          .eq('id', existing.id).select().single();
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase.from('orals_decks')
+          .insert([{ opportunity_id: opportunityId, title, slides: JSON.stringify(slides), status: 'draft' }])
+          .select().single();
+        if (error) throw error;
+        return data;
+      }
+    } catch (err) { console.error('[MissionPulse] saveOralsDeck error:', err); throw err; }
+  },
+
+  // PLAYBOOK ITEMS (Sprint 52)
+  async getPlaybookItems(category = null) {
+    try {
+      let query = supabase.from('playbook_items').select('*').order('score', { ascending: false });
+      if (category) query = query.eq('category', category);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getPlaybookItems error:', err); return []; }
+  },
+
+  async createPlaybookItem(item) {
+    try {
+      const { data, error } = await supabase.from('playbook_items')
+        .insert([{ ...item, created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] createPlaybookItem error:', err); throw err; }
+  },
+
+  async incrementPlaybookUse(id) {
+    try {
+      const { data: current } = await supabase.from('playbook_items').select('uses').eq('id', id).single();
+      const { data, error } = await supabase.from('playbook_items')
+        .update({ uses: (current?.uses || 0) + 1 })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] incrementPlaybookUse error:', err); throw err; }
+  },
+
+  async deletePlaybookItem(id) {
+    try {
+      const { error } = await supabase.from('playbook_items').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) { console.error('[MissionPulse] deletePlaybookItem error:', err); throw err; }
+  },
+
+  // PARTNER ACCESS (Sprint 52 - Frenemy Protocol)
+  async getPartnerAccess(opportunityId) {
+    try {
+      let query = supabase.from('partner_access').select('*').order('created_at', { ascending: false });
+      if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (err) { console.error('[MissionPulse] getPartnerAccess error:', err); return []; }
+  },
+
+  async invitePartner(partner) {
+    try {
+      const { data, error } = await supabase.from('partner_access')
+        .insert([{ ...partner, status: 'pending', created_at: new Date().toISOString() }])
+        .select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] invitePartner error:', err); throw err; }
+  },
+
+  async updatePartnerStatus(id, status) {
+    try {
+      const updates = { status };
+      if (status === 'revoked') updates.revoked_at = new Date().toISOString();
+      const { data, error } = await supabase.from('partner_access')
+        .update(updates).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err) { console.error('[MissionPulse] updatePartnerStatus error:', err); throw err; }
+  },
+
+  async revokeAllPartners(opportunityId) {
+    try {
+      const { data, error } = await supabase.from('partner_access')
+        .update({ status: 'revoked', revoked_at: new Date().toISOString() })
+        .eq('opportunity_id', opportunityId)
+        .eq('auto_revoke_on_submit', true)
+        .neq('status', 'revoked');
+      if (error) throw error;
+      return true;
+    } catch (err) { console.error('[MissionPulse] revokeAllPartners error:', err); throw err; }
   },
 
   // HELPERS
@@ -1194,32 +1439,779 @@ function ModuleIronDome({opps,isLive}){
   );
 }
 
-function ModuleHITL(){
-  const[items,setItems]=useState(DEMO_HITL);const[editing,setEditing]=useState(null);const[editContent,setEditContent]=useState('');
-  const handleAction=(id,status)=>{setItems(items.map(i=>i.id===id?{...i,status}:i))};const handleEdit=(item)=>{setEditing(item);setEditContent(`AI-generated content for: ${item.title}\n\nThis is the draft content requiring human review.`)};const handleSave=()=>{handleAction(editing.id,'approved');setEditing(null)};
-  const pending=items.filter(i=>i.status==='pending');
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">HITL Review Queue</h2><p className="text-slate-400 text-sm">Human-in-the-Loop approval workflow</p></div><div className="flex gap-2"><span className="px-3 py-1.5 bg-amber-500/20 text-amber-400 rounded-lg text-sm font-medium">{pending.length} Pending</span><span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium">{items.filter(i=>i.status==='approved').length} Approved</span></div></div><div className="grid grid-cols-2 gap-4"><div><h3 className="font-semibold text-white mb-3">Pending Review</h3><div className="space-y-3">{pending.map(item=>(<div key={item.id} className="glass p-4 hover-lift"><div className="flex justify-between items-start mb-2"><span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{item.type}</span><span className="text-xs text-slate-500">{item.created}</span></div><h4 className="font-medium text-white mb-1">{item.title}</h4><p className="text-xs text-slate-400 mb-3">Agent: {item.agent}</p><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-20 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${item.confidence>=85?'bg-emerald-500':item.confidence>=70?'bg-amber-500':'bg-red-500'}`} style={{width:`${item.confidence}%`}}/></div><span className={`text-xs ${item.confidence>=85?'text-emerald-400':item.confidence>=70?'text-amber-400':'text-red-400'}`}>{item.confidence}%</span></div><div className="flex gap-1"><button onClick={()=>handleEdit(item)} className="px-2 py-1 bg-slate-700 text-white rounded text-xs">Review</button><button onClick={()=>handleAction(item.id,'approved')} className="px-2 py-1 bg-emerald-500 text-white rounded text-xs">✓</button><button onClick={()=>handleAction(item.id,'rejected')} className="px-2 py-1 bg-red-500 text-white rounded text-xs">✗</button></div></div></div>))}</div></div><div><h3 className="font-semibold text-white mb-3">Recently Reviewed</h3><div className="space-y-2">{items.filter(i=>i.status!=='pending').map(item=>(<div key={item.id} className="glass p-3 opacity-60"><div className="flex justify-between items-center"><span className="text-sm text-white">{item.title}</span><span className={`px-2 py-0.5 rounded text-xs ${item.status==='approved'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'}`}>{item.status}</span></div></div>))}</div></div></div>{editing&&<div className="glass p-6 animate-fadeIn"><h3 className="font-semibold text-white mb-4">Review: {editing.title}</h3><textarea value={editContent} onChange={e=>setEditContent(e.target.value)} className="w-full h-48 bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm text-white resize-none"/><div className="flex justify-end gap-2 mt-4"><button onClick={()=>setEditing(null)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm">Save & Approve</button></div></div>}</div>);
+// ============================================================
+// MODULE: BLACK HAT (M7) - COMPETITOR INTEL - LIVE DATA
+// ============================================================
+function ModuleBlackHat({opps,isLive,role}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[competitors,setCompetitors]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[showForm,setShowForm]=useState(false);
+  const[form,setForm]=useState({company_name:'',threat_level:'medium',incumbent:false,strengths:'',weaknesses:'',ghost_strategy:''});
+
+  // RBAC: Only CEO, COO, CAP can access
+  const allowed=['CEO','COO','CAP'];
+  if(!allowed.includes(role?.id)){
+    return(<div className="glass p-12 text-center animate-fadeIn"><div className="text-6xl mb-4">🔒</div><h2 className="text-xl font-bold text-red-400 mb-2">Access Restricted</h2><p className="text-slate-400">Black Hat module is restricted to CEO, COO, and Capture leads</p><p className="text-xs text-slate-500 mt-2">Current role: {role?.name||'Unknown'}</p></div>);
+  }
+
+  const threatColors={high:'bg-red-500/20 text-red-400 border-red-500/30',medium:'bg-amber-500/20 text-amber-400 border-amber-500/30',low:'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'};
+
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getCompetitors(selectedOpp.id);
+      setCompetitors(data.length>0?data:[
+        {id:'demo-1',company_name:'Leidos',threat_level:'high',incumbent:true,strengths:['Incumbent advantage','Deep agency relationships'],weaknesses:['Higher rates','Slow to innovate'],ghost_strategy:'Highlight innovation velocity'},
+        {id:'demo-2',company_name:'Booz Allen',threat_level:'medium',incumbent:false,strengths:['Strong past performance','Technical depth'],weaknesses:['Premium pricing'],ghost_strategy:'Compete on value and agility'}
+      ]);
+      setLoading(false);
+    };
+    load();
+  },[selectedOpp]);
+
+  const handleAdd=async()=>{
+    if(!selectedOpp||!form.company_name)return;
+    try{
+      const competitor=await MissionPulse.createCompetitor({
+        ...form,
+        opportunity_id:selectedOpp.id,
+        strengths:form.strengths.split(',').map(s=>s.trim()).filter(Boolean),
+        weaknesses:form.weaknesses.split(',').map(s=>s.trim()).filter(Boolean)
+      });
+      setCompetitors([...competitors,competitor]);
+      setShowForm(false);
+      setForm({company_name:'',threat_level:'medium',incumbent:false,strengths:'',weaknesses:'',ghost_strategy:''});
+    }catch(err){console.error(err)}
+  };
+
+  const handleThreatChange=async(id,newLevel)=>{
+    try{
+      await MissionPulse.updateCompetitor(id,{threat_level:newLevel});
+      setCompetitors(competitors.map(c=>c.id===id?{...c,threat_level:newLevel}:c));
+    }catch(err){console.error(err)}
+  };
+
+  const handleDelete=async(id)=>{
+    if(!confirm('Delete competitor?'))return;
+    try{
+      await MissionPulse.deleteCompetitor(id);
+      setCompetitors(competitors.filter(c=>c.id!==id));
+    }catch(err){console.error(err)}
+  };
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Black Hat Analysis</h2>
+            <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-bold">PRIVATE</span>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">Competitor intelligence and ghost strategies</p>
+        </div>
+        {selectedOpp&&<button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Competitor</button>}
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>setSelectedOpp(opps.find(o=>o.id===e.target.value)||null)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {/* Add Form */}
+      {showForm&&(
+        <div className="glass p-4 animate-fadeIn">
+          <h3 className="font-semibold text-white mb-3">Add Competitor</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <input placeholder="Company Name" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <select value={form.threat_level} onChange={e=>setForm({...form,threat_level:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white">
+              <option value="low">Low Threat</option><option value="medium">Medium Threat</option><option value="high">High Threat</option>
+            </select>
+            <label className="flex items-center gap-2 text-sm text-white"><input type="checkbox" checked={form.incumbent} onChange={e=>setForm({...form,incumbent:e.target.checked})} className="rounded"/>Incumbent</label>
+            <input placeholder="Strengths (comma-separated)" value={form.strengths} onChange={e=>setForm({...form,strengths:e.target.value})} className="col-span-3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <input placeholder="Weaknesses (comma-separated)" value={form.weaknesses} onChange={e=>setForm({...form,weaknesses:e.target.value})} className="col-span-3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <textarea placeholder="Ghost Strategy" value={form.ghost_strategy} onChange={e=>setForm({...form,ghost_strategy:e.target.value})} className="col-span-3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white h-16"/>
+          </div>
+          <div className="flex justify-end gap-2 mt-3">
+            <button onClick={()=>setShowForm(false)} className="px-3 py-1 bg-slate-700 text-white rounded text-sm">Cancel</button>
+            <button onClick={handleAdd} className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">Add</button>
+          </div>
+        </div>
+      )}
+
+      {/* Competitors Grid */}
+      {selectedOpp&&(
+        <div className="space-y-4">
+          {loading?<div className="glass p-8 flex justify-center"><Spinner/></div>:(
+            <div className="grid grid-cols-2 gap-4">
+              {competitors.map(c=>(
+                <div key={c.id} className={`glass p-4 border ${threatColors[c.threat_level]}`}>
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className="font-semibold text-white flex items-center gap-2">{c.company_name}{c.incumbent&&<span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">INCUMBENT</span>}</h4>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select value={c.threat_level} onChange={e=>handleThreatChange(c.id,e.target.value)} className={`px-2 py-1 rounded text-xs border-0 ${threatColors[c.threat_level]} bg-transparent cursor-pointer`}>
+                        <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+                      </select>
+                      <button onClick={()=>handleDelete(c.id)} className="p-1 text-red-400 hover:text-red-300"><Icon name="trash" className="w-4 h-4"/></button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><p className="text-xs text-emerald-400 mb-1">Strengths</p><ul className="text-slate-300 text-xs space-y-0.5">{(c.strengths||[]).map((s,i)=><li key={i}>• {s}</li>)}</ul></div>
+                    <div><p className="text-xs text-red-400 mb-1">Weaknesses</p><ul className="text-slate-300 text-xs space-y-0.5">{(c.weaknesses||[]).map((w,i)=><li key={i}>• {w}</li>)}</ul></div>
+                  </div>
+                  {c.ghost_strategy&&<div className="mt-3 p-2 bg-slate-800/50 rounded"><p className="text-xs text-cyan-400 mb-1">👻 Ghost Strategy</p><p className="text-sm text-white">{c.ghost_strategy}</p></div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🎭</div><p className="text-white text-lg mb-2">Select an opportunity for competitor analysis</p><p className="text-slate-400">Analyze competitors and develop ghost strategies</p></div>}
+    </div>
+  );
 }
 
-function ModuleOrals(){
-  const[generating,setGenerating]=useState(false);const[slides,setSlides]=useState([]);const[current,setCurrent]=useState(0);const[timer,setTimer]=useState(0);const[practicing,setPracticing]=useState(false);
-  const generateDeck=()=>{setGenerating(true);setSlides([]);let i=0;const interval=setInterval(()=>{if(i<ORALS_SLIDES.length){setSlides(prev=>[...prev,{id:i+1,title:ORALS_SLIDES[i],bullets:['Key point 1','Key point 2','Key point 3'],talkingPoints:['Emphasize value','Reference past performance','Address concerns']}]);i++}else{clearInterval(interval);setGenerating(false)}},400)};
+// ============================================================
+// MODULE: HITL REVIEW QUEUE (M9) - LIVE DATA
+// ============================================================
+function ModuleHITL({opps,isLive}){
+  const[items,setItems]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[editing,setEditing]=useState(null);
+  const[editContent,setEditContent]=useState('');
+  const[reviewNotes,setReviewNotes]=useState('');
+
+  useEffect(()=>{
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getAIApprovals();
+      setItems(data.length>0?data:DEMO_HITL);
+      setLoading(false);
+    };
+    load();
+  },[]);
+
+  const handleApprove=async(id)=>{
+    try{
+      await MissionPulse.approveContent(id,reviewNotes||null);
+      setItems(items.map(i=>i.id===id?{...i,status:'approved'}:i));
+      setEditing(null);
+      setReviewNotes('');
+    }catch(err){console.error(err);setItems(items.map(i=>i.id===id?{...i,status:'approved'}:i))}
+  };
+
+  const handleReject=async(id)=>{
+    if(!reviewNotes){alert('Please provide rejection notes');return}
+    try{
+      await MissionPulse.rejectContent(id,reviewNotes);
+      setItems(items.map(i=>i.id===id?{...i,status:'rejected'}:i));
+      setEditing(null);
+      setReviewNotes('');
+    }catch(err){console.error(err);setItems(items.map(i=>i.id===id?{...i,status:'rejected'}:i))}
+  };
+
+  const handleEdit=(item)=>{
+    setEditing(item);
+    setEditContent(item.content||`AI-generated content for: ${item.title}\n\nThis is the draft content requiring human review.`);
+  };
+
+  const pending=items.filter(i=>i.status==='pending');
+  const reviewed=items.filter(i=>i.status!=='pending');
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">HITL Review Queue</h2>
+            <DataBadge live={isLive}/>
+          </div>
+          <p className="text-slate-400 text-sm">Human-in-the-Loop approval workflow</p>
+        </div>
+        <div className="flex gap-2">
+          <span className="px-3 py-1.5 bg-amber-500/20 text-amber-400 rounded-lg text-sm font-medium">{pending.length} Pending</span>
+          <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium">{reviewed.filter(i=>i.status==='approved').length} Approved</span>
+        </div>
+      </div>
+
+      {loading?<div className="glass p-8 flex justify-center"><Spinner/></div>:(
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h3 className="font-semibold text-white mb-3">Pending Review</h3>
+            <div className="space-y-3">
+              {pending.map(item=>(
+                <div key={item.id} className="glass p-4 hover-lift">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{item.content_type||item.type}</span>
+                    <span className="text-xs text-slate-500">{new Date(item.created_at||item.created).toLocaleDateString()}</span>
+                  </div>
+                  <h4 className="font-medium text-white mb-1">{item.title}</h4>
+                  <p className="text-xs text-slate-400 mb-3">Agent: {item.agent_type||item.agent}</p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-1.5 bg-slate-700 rounded-full">
+                        <div className={`h-full rounded-full ${item.confidence>=85?'bg-emerald-500':item.confidence>=70?'bg-amber-500':'bg-red-500'}`} style={{width:`${item.confidence}%`}}/>
+                      </div>
+                      <span className={`text-xs ${item.confidence>=85?'text-emerald-400':item.confidence>=70?'text-amber-400':'text-red-400'}`}>{item.confidence}%</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={()=>handleEdit(item)} className="px-2 py-1 bg-slate-700 text-white rounded text-xs">Review</button>
+                      <button onClick={()=>handleApprove(item.id)} className="px-2 py-1 bg-emerald-500 text-white rounded text-xs">✓</button>
+                      <button onClick={()=>{setEditing(item);setReviewNotes('Rejected: ')}} className="px-2 py-1 bg-red-500 text-white rounded text-xs">✗</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {pending.length===0&&<div className="glass p-6 text-center text-slate-400">No pending items</div>}
+            </div>
+          </div>
+          <div>
+            <h3 className="font-semibold text-white mb-3">Recently Reviewed</h3>
+            <div className="space-y-2">
+              {reviewed.slice(0,10).map(item=>(
+                <div key={item.id} className="glass p-3 opacity-60">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-white">{item.title}</span>
+                    <span className={`px-2 py-0.5 rounded text-xs ${item.status==='approved'?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'}`}>{item.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editing&&(
+        <div className="glass p-6 animate-fadeIn">
+          <h3 className="font-semibold text-white mb-4">Review: {editing.title}</h3>
+          <textarea value={editContent} onChange={e=>setEditContent(e.target.value)} className="w-full h-48 bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm text-white resize-none mb-3"/>
+          <textarea placeholder="Reviewer notes (required for rejection)" value={reviewNotes} onChange={e=>setReviewNotes(e.target.value)} className="w-full h-16 bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm text-white resize-none"/>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={()=>{setEditing(null);setReviewNotes('')}} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button>
+            <button onClick={()=>handleReject(editing.id)} className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm">Reject</button>
+            <button onClick={()=>handleApprove(editing.id)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm">Approve</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// MODULE: ORALS STUDIO (M10) - LIVE DATA
+// ============================================================
+function ModuleOrals({opps,isLive}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[generating,setGenerating]=useState(false);
+  const[slides,setSlides]=useState([]);
+  const[current,setCurrent]=useState(0);
+  const[timer,setTimer]=useState(0);
+  const[practicing,setPracticing]=useState(false);
+  const[saving,setSaving]=useState(false);
+
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      const deck=await MissionPulse.getOralsDeck(selectedOpp.id);
+      if(deck&&deck.slides){
+        try{
+          const parsed=typeof deck.slides==='string'?JSON.parse(deck.slides):deck.slides;
+          if(Array.isArray(parsed)&&parsed.length>0)setSlides(parsed);
+        }catch(e){console.error(e)}
+      }
+    };
+    load();
+  },[selectedOpp]);
+
+  const generateDeck=()=>{
+    setGenerating(true);setSlides([]);let i=0;
+    const interval=setInterval(()=>{
+      if(i<ORALS_SLIDES.length){
+        setSlides(prev=>[...prev,{id:i+1,title:ORALS_SLIDES[i],bullets:['Key point 1','Key point 2','Key point 3'],talkingPoints:['Emphasize value','Reference past performance','Address concerns']}]);
+        i++;
+      }else{
+        clearInterval(interval);setGenerating(false);
+      }
+    },400);
+  };
+
+  const saveDeck=async()=>{
+    if(!selectedOpp||slides.length===0)return;
+    setSaving(true);
+    try{await MissionPulse.saveOralsDeck(selectedOpp.id,slides)}catch(e){console.error(e)}
+    setSaving(false);
+  };
+
   useEffect(()=>{let interval;if(practicing){interval=setInterval(()=>setTimer(t=>t+1),1000)}return()=>clearInterval(interval)},[practicing]);
   const formatTime=(s)=>`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Orals Studio</h2><p className="text-slate-400 text-sm">AI-powered presentation deck generator</p></div>{slides.length===0&&!generating&&<button onClick={generateDeck} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-medium">🎤 Generate 10-Slide Deck</button>}{slides.length>0&&<div className="flex gap-2"><button onClick={()=>{setPracticing(!practicing);if(practicing)setTimer(0)}} className={`px-4 py-2 rounded-lg font-medium ${practicing?'bg-red-500 text-white':'bg-emerald-500 text-white'}`}>{practicing?'⏹ Stop':'▶️ Practice'}</button><button className="px-4 py-2 bg-slate-700 text-white rounded-lg font-medium flex items-center gap-2"><Icon name="download" className="w-4 h-4"/>Export PPT</button></div>}</div>{generating&&<div className="glass p-8 text-center"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"/><p className="text-white">Generating slides... {slides.length}/{ORALS_SLIDES.length}</p></div>}{slides.length>0&&!generating&&(<div className="grid grid-cols-4 gap-4"><div className="col-span-1 space-y-2"><div className="text-sm font-semibold text-white mb-2">Slides ({slides.length})</div><div className="space-y-1 max-h-96 overflow-y-auto">{slides.map((s,i)=><button key={s.id} onClick={()=>setCurrent(i)} className={`w-full text-left p-2 rounded-lg text-sm ${current===i?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{i+1}. {s.title}</button>)}</div></div><div className="col-span-3">{practicing&&<div className="glass p-4 mb-4 flex items-center justify-between"><span className="text-white font-medium">Practice Timer</span><span className="text-2xl font-mono text-cyan-400">{formatTime(timer)}</span><span className="text-sm text-slate-400">Target: 02:00/slide</span></div>}<div className="glass p-6"><div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-8 mb-4 border border-slate-700"><div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-teal-500 rounded mb-4"/><h3 className="text-2xl font-bold text-white mb-4">{slides[current]?.title}</h3><ul className="space-y-2">{slides[current]?.bullets.map((b,i)=><li key={i} className="text-slate-300 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-400"/>• {b}</li>)}</ul></div><div><div className="text-sm font-semibold text-white mb-2">💡 Talking Points:</div><ul className="space-y-1">{slides[current]?.talkingPoints.map((t,i)=><li key={i} className="text-sm text-slate-400">• {t}</li>)}</ul></div></div><div className="flex justify-between mt-4"><button disabled={current===0} onClick={()=>setCurrent(c=>c-1)} className="px-4 py-2 bg-slate-700 text-white rounded-lg disabled:opacity-50">← Previous</button><span className="text-slate-400 self-center">{current+1} / {slides.length}</span><button disabled={current===slides.length-1} onClick={()=>setCurrent(c=>c+1)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg disabled:opacity-50">Next →</button></div></div></div>)}{slides.length===0&&!generating&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🎤</div><p className="text-white text-lg mb-2">Ready to generate your presentation</p><p className="text-slate-400">AI will create 10 branded slides with talking points</p></div>}</div>);
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Orals Studio</h2>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">AI-powered presentation deck generator</p>
+        </div>
+        <div className="flex gap-2">
+          {slides.length>0&&selectedOpp&&<button onClick={saveDeck} disabled={saving} className="px-4 py-2 bg-emerald-500 text-white rounded-lg font-medium flex items-center gap-2">{saving?<Spinner size="sm"/>:<Icon name="save" className="w-4 h-4"/>}Save Deck</button>}
+          {slides.length>0&&<button onClick={()=>{setPracticing(!practicing);if(practicing)setTimer(0)}} className={`px-4 py-2 rounded-lg font-medium ${practicing?'bg-red-500 text-white':'bg-emerald-500 text-white'}`}>{practicing?'⏹ Stop':'▶️ Practice'}</button>}
+        </div>
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>{setSelectedOpp(opps.find(o=>o.id===e.target.value)||null);setSlides([])}} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {selectedOpp&&slides.length===0&&!generating&&(
+        <div className="glass p-6 text-center">
+          <button onClick={generateDeck} className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-medium text-lg">🎤 Generate 10-Slide Deck</button>
+          <p className="text-slate-400 text-sm mt-3">AI will create branded slides with talking points for {selectedOpp.nickname||selectedOpp.name}</p>
+        </div>
+      )}
+
+      {generating&&<div className="glass p-8 text-center"><Spinner/><p className="text-white mt-4">Generating slides... {slides.length}/{ORALS_SLIDES.length}</p></div>}
+
+      {slides.length>0&&!generating&&(
+        <div className="grid grid-cols-4 gap-4">
+          <div className="col-span-1 space-y-2">
+            <div className="text-sm font-semibold text-white mb-2">Slides ({slides.length})</div>
+            <div className="space-y-1 max-h-96 overflow-y-auto">
+              {slides.map((s,i)=><button key={s.id} onClick={()=>setCurrent(i)} className={`w-full text-left p-2 rounded-lg text-sm ${current===i?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{i+1}. {s.title}</button>)}
+            </div>
+          </div>
+          <div className="col-span-3">
+            {practicing&&<div className="glass p-4 mb-4 flex items-center justify-between"><span className="text-white font-medium">Practice Timer</span><span className="text-2xl font-mono text-cyan-400">{formatTime(timer)}</span><span className="text-sm text-slate-400">Target: 02:00/slide</span></div>}
+            <div className="glass p-6">
+              <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-8 mb-4 border border-slate-700">
+                <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-teal-500 rounded mb-4"/>
+                <h3 className="text-2xl font-bold text-white mb-4">{slides[current]?.title}</h3>
+                <ul className="space-y-2">{slides[current]?.bullets.map((b,i)=><li key={i} className="text-slate-300 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-400"/>• {b}</li>)}</ul>
+              </div>
+              <div><div className="text-sm font-semibold text-white mb-2">💡 Talking Points:</div><ul className="space-y-1">{slides[current]?.talkingPoints.map((t,i)=><li key={i} className="text-sm text-slate-400">• {t}</li>)}</ul></div>
+            </div>
+            <div className="flex justify-between mt-4">
+              <button disabled={current===0} onClick={()=>setCurrent(c=>c-1)} className="px-4 py-2 bg-slate-700 text-white rounded-lg disabled:opacity-50">← Previous</button>
+              <span className="text-slate-400 self-center">{current+1} / {slides.length}</span>
+              <button disabled={current===slides.length-1} onClick={()=>setCurrent(c=>c+1)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg disabled:opacity-50">Next →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🎤</div><p className="text-white text-lg mb-2">Select an opportunity to create presentation</p><p className="text-slate-400">AI will generate branded slides with talking points</p></div>}
+    </div>
+  );
 }
 
-function ModulePricing(){
-  const[lcats,setLcats]=useState(DEMO_LCATS);const[wrapRate,setWrapRate]=useState(1.85);
-  const totalDirect=lcats.reduce((s,l)=>s+(l.rate*l.hours),0);const totalWrapped=totalDirect*wrapRate;
-  const updateLcat=(id,field,value)=>{setLcats(lcats.map(l=>l.id===id?{...l,[field]:parseFloat(value)||0}:l))};const addLcat=()=>{setLcats([...lcats,{id:Date.now(),title:'New LCAT',rate:100,hours:2080,wrap:wrapRate}])};const removeLcat=(id)=>{setLcats(lcats.filter(l=>l.id!==id))};
-  const exportBOE=()=>{const csv='LCAT,Rate,Hours,Extended,Wrapped\n'+lcats.map(l=>`${l.title},${l.rate},${l.hours},${l.rate*l.hours},${l.rate*l.hours*wrapRate}`).join('\n');const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='boe_pricing.csv';a.click()};
-  return(<div className="space-y-4 animate-fadeIn"><div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Pricing Engine</h2><span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-bold">CUI</span></div><p className="text-slate-400 text-sm">LCAT mapping and BOE builder</p><div className="grid grid-cols-4 gap-4"><div className="glass p-4"><p className="text-slate-400 text-xs">Direct Labor</p><p className="text-2xl font-bold text-white">{fmt(totalDirect)}</p></div><div className="glass p-4"><p className="text-slate-400 text-xs">Wrap Rate</p><p className="text-2xl font-bold text-cyan-400">{wrapRate}x</p></div><div className="glass p-4"><p className="text-slate-400 text-xs">Total Wrapped</p><p className="text-2xl font-bold text-emerald-400">{fmt(totalWrapped)}</p></div><div className="glass p-4"><p className="text-slate-400 text-xs">LCATs</p><p className="text-2xl font-bold text-purple-400">{lcats.length}</p></div></div><div className="glass overflow-hidden"><div className="p-4 border-b border-slate-700/50 flex justify-between items-center"><h3 className="font-semibold text-white">Labor Categories</h3><div className="flex gap-2"><button onClick={addLcat} className="px-3 py-1.5 bg-cyan-500 text-white rounded-lg text-sm flex items-center gap-1"><Icon name="plus" className="w-4 h-4"/>Add LCAT</button><button onClick={exportBOE} className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-1"><Icon name="download" className="w-4 h-4"/>Export</button></div></div><table className="w-full"><thead className="bg-slate-800/50"><tr>{['LCAT','Rate','Hours','Extended','Wrapped',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-700/50">{lcats.map(l=><tr key={l.id} className="hover:bg-slate-800/30"><td className="p-3"><input value={l.title} onChange={e=>updateLcat(l.id,'title',e.target.value)} className="bg-transparent text-sm text-white w-full focus:outline-none"/></td><td className="p-3"><input type="number" value={l.rate} onChange={e=>updateLcat(l.id,'rate',e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-emerald-400 w-20"/></td><td className="p-3"><input type="number" value={l.hours} onChange={e=>updateLcat(l.id,'hours',e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white w-20"/></td><td className="p-3 text-sm text-white">{fmt(l.rate*l.hours)}</td><td className="p-3 text-sm text-cyan-400 font-medium">{fmt(l.rate*l.hours*wrapRate)}</td><td className="p-3"><button onClick={()=>removeLcat(l.id)} className="p-1 text-red-400 hover:text-red-300"><Icon name="trash" className="w-4 h-4"/></button></td></tr>)}</tbody></table></div></div>);
+// ============================================================
+// MODULE: PRICING ENGINE (M8) - LIVE DATA
+// ============================================================
+function ModulePricing({opps,isLive}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[lcats,setLcats]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[wrapRate,setWrapRate]=useState(1.85);
+
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getPricingItems(selectedOpp.id);
+      setLcats(data.length>0?data.map(d=>({...d,title:d.labor_category,rate:parseFloat(d.rate)||0,hours:d.hours||0})):DEMO_LCATS);
+      setLoading(false);
+    };
+    load();
+  },[selectedOpp]);
+
+  const totalDirect=lcats.reduce((s,l)=>s+((parseFloat(l.rate)||0)*(l.hours||0)),0);
+  const totalWrapped=totalDirect*wrapRate;
+
+  const updateLcat=async(id,field,value)=>{
+    const numVal=field==='title'?value:(parseFloat(value)||0);
+    setLcats(lcats.map(l=>l.id===id?{...l,[field]:numVal}:l));
+    try{
+      await MissionPulse.updatePricingItem(id,{[field==='title'?'labor_category':field]:numVal});
+    }catch(err){console.error(err)}
+  };
+
+  const addLcat=async()=>{
+    if(!selectedOpp)return;
+    try{
+      const item=await MissionPulse.createPricingItem({opportunity_id:selectedOpp.id,labor_category:'New LCAT',rate:100,hours:2080});
+      setLcats([...lcats,{...item,title:item.labor_category,rate:parseFloat(item.rate),hours:item.hours}]);
+    }catch(err){console.error(err);setLcats([...lcats,{id:Date.now(),title:'New LCAT',rate:100,hours:2080}])}
+  };
+
+  const removeLcat=async(id)=>{
+    try{
+      await MissionPulse.deletePricingItem(id);
+      setLcats(lcats.filter(l=>l.id!==id));
+    }catch(err){console.error(err);setLcats(lcats.filter(l=>l.id!==id))}
+  };
+
+  const exportBOE=()=>{
+    const csv='LCAT,Rate,Hours,Extended,Wrapped\n'+lcats.map(l=>`${l.title||l.labor_category},${l.rate},${l.hours},${(l.rate||0)*(l.hours||0)},${(l.rate||0)*(l.hours||0)*wrapRate}`).join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='boe_pricing.csv';a.click();
+  };
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Pricing Engine</h2>
+            <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-bold">CUI</span>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">LCAT mapping and BOE builder</p>
+        </div>
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>setSelectedOpp(opps.find(o=>o.id===e.target.value)||null)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {selectedOpp&&(
+        <>
+          <div className="grid grid-cols-4 gap-4">
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Direct Labor</p><p className="text-2xl font-bold text-white">{MissionPulse.fmt(totalDirect)}</p></div>
+            <div className="glass p-4">
+              <p className="text-slate-400 text-xs">Wrap Rate</p>
+              <input type="number" step="0.01" value={wrapRate} onChange={e=>setWrapRate(parseFloat(e.target.value)||1.85)} className="text-2xl font-bold text-cyan-400 bg-transparent w-20 focus:outline-none"/>
+            </div>
+            <div className="glass p-4"><p className="text-slate-400 text-xs">Total Wrapped</p><p className="text-2xl font-bold text-emerald-400">{MissionPulse.fmt(totalWrapped)}</p></div>
+            <div className="glass p-4"><p className="text-slate-400 text-xs">LCATs</p><p className="text-2xl font-bold text-purple-400">{lcats.length}</p></div>
+          </div>
+
+          <div className="glass overflow-hidden">
+            <div className="p-4 border-b border-slate-700/50 flex justify-between items-center">
+              <h3 className="font-semibold text-white">Labor Categories: {selectedOpp.nickname||selectedOpp.name}</h3>
+              <div className="flex gap-2">
+                <button onClick={addLcat} className="px-3 py-1.5 bg-cyan-500 text-white rounded-lg text-sm flex items-center gap-1"><Icon name="plus" className="w-4 h-4"/>Add LCAT</button>
+                <button onClick={exportBOE} className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-1"><Icon name="download" className="w-4 h-4"/>Export</button>
+              </div>
+            </div>
+            {loading?<div className="p-8 flex justify-center"><Spinner/></div>:(
+              <table className="w-full">
+                <thead className="bg-slate-800/50"><tr>{['LCAT','Rate','Hours','Extended','Wrapped',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {lcats.map(l=>(
+                    <tr key={l.id} className="hover:bg-slate-800/30">
+                      <td className="p-3"><input value={l.title||l.labor_category||''} onChange={e=>updateLcat(l.id,'title',e.target.value)} className="bg-transparent text-sm text-white w-full focus:outline-none"/></td>
+                      <td className="p-3"><input type="number" value={l.rate||0} onChange={e=>updateLcat(l.id,'rate',e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-emerald-400 w-20"/></td>
+                      <td className="p-3"><input type="number" value={l.hours||0} onChange={e=>updateLcat(l.id,'hours',e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white w-20"/></td>
+                      <td className="p-3 text-sm text-white">{MissionPulse.fmt((l.rate||0)*(l.hours||0))}</td>
+                      <td className="p-3 text-sm text-cyan-400 font-medium">{MissionPulse.fmt((l.rate||0)*(l.hours||0)*wrapRate)}</td>
+                      <td className="p-3"><button onClick={()=>removeLcat(l.id)} className="p-1 text-red-400 hover:text-red-300"><Icon name="trash" className="w-4 h-4"/></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">💰</div><p className="text-white text-lg mb-2">Select an opportunity to build pricing</p><p className="text-slate-400">Create BOE with labor categories and wrap rates</p></div>}
+    </div>
+  );
 }
 
-function ModulePlaybook(){
-  const[items]=useState(DEMO_PLAYBOOK);
-  return(<div className="space-y-4 animate-fadeIn"><div><h2 className="text-xl font-bold text-white">Winning Playbook</h2><p className="text-slate-400 text-sm">Golden examples and lessons learned</p></div><div className="grid grid-cols-3 gap-4">{items.map(i=>(<div key={i.id} className="glass p-4 hover-lift"><div className="flex items-start justify-between mb-2"><span className="text-2xl">⭐</span><span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-xs">{i.category}</span></div><h4 className="font-medium text-white mb-2">{i.title}</h4><div className="flex justify-between text-xs text-slate-400"><span>Score: {i.score}%</span><span>{i.uses} uses</span></div></div>))}</div></div>);
+// ============================================================
+// MODULE: PLAYBOOK (M11) - LIVE DATA
+// ============================================================
+function ModulePlaybook({isLive}){
+  const[items,setItems]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[showForm,setShowForm]=useState(false);
+  const[form,setForm]=useState({category:'Capture',title:'',content:'',score:80});
+  const[filter,setFilter]=useState('all');
+
+  const categories=['Capture','Pricing','Compliance','Technical','Management','Past Performance'];
+
+  useEffect(()=>{
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getPlaybookItems();
+      setItems(data.length>0?data:DEMO_PLAYBOOK);
+      setLoading(false);
+    };
+    load();
+  },[]);
+
+  const handleAdd=async()=>{
+    if(!form.title)return;
+    try{
+      const item=await MissionPulse.createPlaybookItem(form);
+      setItems([item,...items]);
+      setShowForm(false);
+      setForm({category:'Capture',title:'',content:'',score:80});
+    }catch(err){console.error(err)}
+  };
+
+  const handleUse=async(id)=>{
+    try{
+      const updated=await MissionPulse.incrementPlaybookUse(id);
+      setItems(items.map(i=>i.id===id?{...i,uses:(i.uses||0)+1}:i));
+    }catch(err){console.error(err)}
+  };
+
+  const handleDelete=async(id)=>{
+    if(!confirm('Delete this playbook item?'))return;
+    try{
+      await MissionPulse.deletePlaybookItem(id);
+      setItems(items.filter(i=>i.id!==id));
+    }catch(err){console.error(err)}
+  };
+
+  const filtered=filter==='all'?items:items.filter(i=>i.category===filter);
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Winning Playbook</h2>
+            <DataBadge live={isLive}/>
+          </div>
+          <p className="text-slate-400 text-sm">Golden examples and lessons learned</p>
+        </div>
+        <button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add to Playbook</button>
+      </div>
+
+      {/* Category Filter */}
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={()=>setFilter('all')} className={`px-3 py-1.5 rounded-lg text-sm ${filter==='all'?'bg-cyan-500 text-white':'bg-slate-700 text-slate-300'}`}>All ({items.length})</button>
+        {categories.map(c=>{
+          const count=items.filter(i=>i.category===c).length;
+          return<button key={c} onClick={()=>setFilter(c)} className={`px-3 py-1.5 rounded-lg text-sm ${filter===c?'bg-cyan-500 text-white':'bg-slate-700 text-slate-300'}`}>{c} ({count})</button>
+        })}
+      </div>
+
+      {/* Add Form */}
+      {showForm&&(
+        <div className="glass p-4 animate-fadeIn">
+          <h3 className="font-semibold text-white mb-3">Add Playbook Item</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white">
+              {categories.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+            <input placeholder="Title" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className="col-span-2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <textarea placeholder="Content / Example" value={form.content} onChange={e=>setForm({...form,content:e.target.value})} className="col-span-3 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white h-20"/>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400">Score:</span>
+              <input type="number" min="0" max="100" value={form.score} onChange={e=>setForm({...form,score:parseInt(e.target.value)||0})} className="w-16 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-3">
+            <button onClick={()=>setShowForm(false)} className="px-3 py-1 bg-slate-700 text-white rounded text-sm">Cancel</button>
+            <button onClick={handleAdd} className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">Add</button>
+          </div>
+        </div>
+      )}
+
+      {/* Playbook Grid */}
+      {loading?<div className="glass p-8 flex justify-center"><Spinner/></div>:(
+        <div className="grid grid-cols-3 gap-4">
+          {filtered.map(i=>(
+            <div key={i.id} className="glass p-4 hover-lift">
+              <div className="flex items-start justify-between mb-2">
+                <span className="text-2xl">⭐</span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-xs">{i.category}</span>
+                  <button onClick={()=>handleDelete(i.id)} className="p-1 text-red-400 hover:text-red-300"><Icon name="trash" className="w-3 h-3"/></button>
+                </div>
+              </div>
+              <h4 className="font-medium text-white mb-2">{i.title}</h4>
+              {i.content&&<p className="text-xs text-slate-400 mb-2 line-clamp-2">{i.content}</p>}
+              <div className="flex justify-between items-center text-xs text-slate-400">
+                <span>Score: {i.score}%</span>
+                <button onClick={()=>handleUse(i.id)} className="px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600">{i.uses||0} uses ↗</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// MODULE: FRENEMY PROTOCOL (M12) - PARTNER ACCESS
+// ============================================================
+function ModuleFrenemy({opps,isLive}){
+  const[selectedOpp,setSelectedOpp]=useState(null);
+  const[partners,setPartners]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[showForm,setShowForm]=useState(false);
+  const[form,setForm]=useState({partner_company:'',partner_email:'',access_level:'read',sections:[],nda_signed:false,auto_revoke_on_submit:true});
+
+  const sections=['Technical Volume','Management Volume','Past Performance','Pricing','Compliance Matrix'];
+  const statusColors={pending:'bg-amber-500/20 text-amber-400',active:'bg-emerald-500/20 text-emerald-400',revoked:'bg-red-500/20 text-red-400',expired:'bg-slate-500/20 text-slate-400'};
+
+  useEffect(()=>{
+    if(!selectedOpp)return;
+    const load=async()=>{
+      setLoading(true);
+      const data=await MissionPulse.getPartnerAccess(selectedOpp.id);
+      setPartners(data.length>0?data:[
+        {id:'demo-1',partner_company:'Acme Solutions',partner_email:'partner@acme.com',access_level:'read',sections:['Technical Volume'],nda_signed:true,status:'active',auto_revoke_on_submit:true},
+        {id:'demo-2',partner_company:'Beta Corp',partner_email:'team@beta.io',access_level:'write',sections:['Past Performance','Management Volume'],nda_signed:true,status:'pending',auto_revoke_on_submit:true}
+      ]);
+      setLoading(false);
+    };
+    load();
+  },[selectedOpp]);
+
+  const handleInvite=async()=>{
+    if(!selectedOpp||!form.partner_company||!form.partner_email)return;
+    try{
+      const partner=await MissionPulse.invitePartner({...form,opportunity_id:selectedOpp.id});
+      setPartners([partner,...partners]);
+      setShowForm(false);
+      setForm({partner_company:'',partner_email:'',access_level:'read',sections:[],nda_signed:false,auto_revoke_on_submit:true});
+    }catch(err){console.error(err)}
+  };
+
+  const handleStatusChange=async(id,newStatus)=>{
+    try{
+      await MissionPulse.updatePartnerStatus(id,newStatus);
+      setPartners(partners.map(p=>p.id===id?{...p,status:newStatus}:p));
+    }catch(err){console.error(err)}
+  };
+
+  const handleRevokeAll=async()=>{
+    if(!selectedOpp||!confirm('Revoke ALL partner access for this opportunity?'))return;
+    try{
+      await MissionPulse.revokeAllPartners(selectedOpp.id);
+      setPartners(partners.map(p=>p.auto_revoke_on_submit?{...p,status:'revoked'}:p));
+    }catch(err){console.error(err)}
+  };
+
+  const toggleSection=(section)=>{
+    setForm(f=>({...f,sections:f.sections.includes(section)?f.sections.filter(s=>s!==section):[...f.sections,section]}));
+  };
+
+  const activeCount=partners.filter(p=>p.status==='active').length;
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white">Frenemy Protocol</h2>
+            <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-bold">PRIVATE</span>
+            <DataBadge live={isLive&&selectedOpp}/>
+          </div>
+          <p className="text-slate-400 text-sm">Teaming partner access control with auto-revoke</p>
+        </div>
+        <div className="flex gap-2">
+          {selectedOpp&&activeCount>0&&<button onClick={handleRevokeAll} className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm font-medium">⚠️ Revoke All</button>}
+          {selectedOpp&&<button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Invite Partner</button>}
+        </div>
+      </div>
+
+      {/* Opportunity Selector */}
+      <div className="glass p-4">
+        <label className="text-sm text-slate-400 mb-2 block">Select Opportunity</label>
+        <select value={selectedOpp?.id||''} onChange={e=>setSelectedOpp(opps.find(o=>o.id===e.target.value)||null)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          <option value="">-- Select Opportunity --</option>
+          {opps.map(o=><option key={o.id} value={o.id}>{o.nickname||o.name} ({o.agency})</option>)}
+        </select>
+      </div>
+
+      {/* Stats */}
+      {selectedOpp&&(
+        <div className="grid grid-cols-4 gap-4">
+          <div className="glass p-4"><p className="text-slate-400 text-xs">Total Partners</p><p className="text-2xl font-bold text-white">{partners.length}</p></div>
+          <div className="glass p-4"><p className="text-slate-400 text-xs">Active</p><p className="text-2xl font-bold text-emerald-400">{activeCount}</p></div>
+          <div className="glass p-4"><p className="text-slate-400 text-xs">Pending NDA</p><p className="text-2xl font-bold text-amber-400">{partners.filter(p=>!p.nda_signed).length}</p></div>
+          <div className="glass p-4"><p className="text-slate-400 text-xs">Auto-Revoke</p><p className="text-2xl font-bold text-cyan-400">{partners.filter(p=>p.auto_revoke_on_submit&&p.status!=='revoked').length}</p></div>
+        </div>
+      )}
+
+      {/* Invite Form */}
+      {showForm&&(
+        <div className="glass p-4 animate-fadeIn">
+          <h3 className="font-semibold text-white mb-3">Invite Teaming Partner</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <input placeholder="Company Name" value={form.partner_company} onChange={e=>setForm({...form,partner_company:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <input placeholder="Email Address" type="email" value={form.partner_email} onChange={e=>setForm({...form,partner_email:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"/>
+            <select value={form.access_level} onChange={e=>setForm({...form,access_level:e.target.value})} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white">
+              <option value="read">Read Only</option><option value="write">Read/Write</option><option value="admin">Admin</option>
+            </select>
+          </div>
+          <div className="mt-3">
+            <p className="text-xs text-slate-400 mb-2">Section Access:</p>
+            <div className="flex flex-wrap gap-2">
+              {sections.map(s=><button key={s} onClick={()=>toggleSection(s)} className={`px-2 py-1 rounded text-xs ${form.sections.includes(s)?'bg-cyan-500 text-white':'bg-slate-700 text-slate-300'}`}>{s}</button>)}
+            </div>
+          </div>
+          <div className="flex items-center gap-4 mt-3">
+            <label className="flex items-center gap-2 text-sm text-white"><input type="checkbox" checked={form.nda_signed} onChange={e=>setForm({...form,nda_signed:e.target.checked})} className="rounded"/>NDA Signed</label>
+            <label className="flex items-center gap-2 text-sm text-white"><input type="checkbox" checked={form.auto_revoke_on_submit} onChange={e=>setForm({...form,auto_revoke_on_submit:e.target.checked})} className="rounded"/>Auto-revoke on submit</label>
+          </div>
+          <div className="flex justify-end gap-2 mt-3">
+            <button onClick={()=>setShowForm(false)} className="px-3 py-1 bg-slate-700 text-white rounded text-sm">Cancel</button>
+            <button onClick={handleInvite} className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">Send Invite</button>
+          </div>
+        </div>
+      )}
+
+      {/* Partners Table */}
+      {selectedOpp&&(
+        <div className="glass overflow-hidden">
+          <div className="p-4 border-b border-slate-700/50"><h3 className="font-semibold text-white">Partner Access: {selectedOpp.nickname||selectedOpp.name}</h3></div>
+          {loading?<div className="p-8 flex justify-center"><Spinner/></div>:(
+            <table className="w-full">
+              <thead className="bg-slate-800/50"><tr>{['Company','Email','Access','Sections','NDA','Status',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {partners.map(p=>(
+                  <tr key={p.id} className={`hover:bg-slate-800/30 ${p.status==='revoked'?'opacity-50':''}`}>
+                    <td className="p-3 text-sm text-white font-medium">{p.partner_company}</td>
+                    <td className="p-3 text-sm text-slate-400">{p.partner_email}</td>
+                    <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs ${p.access_level==='admin'?'bg-purple-500/20 text-purple-400':p.access_level==='write'?'bg-cyan-500/20 text-cyan-400':'bg-slate-500/20 text-slate-400'}`}>{p.access_level}</span></td>
+                    <td className="p-3 text-xs text-slate-400">{(p.sections||[]).join(', ')||'—'}</td>
+                    <td className="p-3">{p.nda_signed?<span className="text-emerald-400">✓</span>:<span className="text-red-400">✗</span>}</td>
+                    <td className="p-3">
+                      <select value={p.status} onChange={e=>handleStatusChange(p.id,e.target.value)} disabled={p.status==='revoked'} className={`px-2 py-1 rounded text-xs border-0 ${statusColors[p.status]} bg-transparent cursor-pointer disabled:cursor-not-allowed`}>
+                        <option value="pending">Pending</option><option value="active">Active</option><option value="revoked">Revoked</option>
+                      </select>
+                    </td>
+                    <td className="p-3">{p.auto_revoke_on_submit&&p.status!=='revoked'&&<span className="text-xs text-amber-400" title="Auto-revokes on proposal submission">⏱️</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {!selectedOpp&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🤝</div><p className="text-white text-lg mb-2">Select an opportunity to manage partners</p><p className="text-slate-400">Control teaming partner access with auto-revoke on submission</p></div>}
+    </div>
+  );
 }
 
 function ModuleAudit(){
@@ -1247,7 +2239,7 @@ function AIChatWidget(){
 function Sidebar({role,setRole,active,setActive,user}){
   const[collapsed,setCollapsed]=useState(false);const[showRoles,setShowRoles]=useState(false);
   const accessible=MODULES.filter(m=>role.access.includes(m.id));
-  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Sprint 50</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>)})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
+  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Sprint 52</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>)})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
 }
 
 // ============================================================
@@ -1303,10 +2295,12 @@ function App(){
       case 'compliance':return<ModuleCompliance opps={opps} isLive={isLive}/>;
       case 'contracts':return<ModuleContracts opps={opps} isLive={isLive}/>;
       case 'writer':return<ModuleIronDome opps={opps} isLive={isLive}/>;
-      case 'hitl':return<ModuleHITL/>;
-      case 'orals':return<ModuleOrals/>;
-      case 'pricing':return<ModulePricing/>;
-      case 'playbook':return<ModulePlaybook/>;
+      case 'blackhat':return<ModuleBlackHat opps={opps} isLive={isLive} role={role}/>;
+      case 'hitl':return<ModuleHITL opps={opps} isLive={isLive}/>;
+      case 'orals':return<ModuleOrals opps={opps} isLive={isLive}/>;
+      case 'pricing':return<ModulePricing opps={opps} isLive={isLive}/>;
+      case 'frenemy':return<ModuleFrenemy opps={opps} isLive={isLive}/>;
+      case 'playbook':return<ModulePlaybook isLive={isLive}/>;
       case 'audit':return<ModuleAudit/>;
       case 'admin':return<ModuleAdmin tokenUsage={tokenUsage} setTokenUsage={setTokenUsage}/>;
       default:return<ModuleGeneric mod={active}/>;
@@ -1322,7 +2316,7 @@ function App(){
         {active&&<header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3"><div className="flex items-center gap-3"><span className="text-xl">{active.icon}</span><div><h1 className="font-semibold text-white">{active.name}</h1></div>{active.badge&&<span className={`px-2 py-0.5 rounded text-xs font-bold ${active.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':active.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{active.badge}</span>}</div></header>}
         <main className="flex-1 overflow-y-auto p-6">{renderModule()}</main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 50 • © 2026 Mission Meets Tech</span></div>
+      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 52 • © 2026 Mission Meets Tech</span></div>
       <AIChatWidget/>
     </div>
   );
