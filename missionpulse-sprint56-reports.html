@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12.0 - Reports Center</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    
+    /* Print Styles */
+    @media print {
+      body { background: white !important; }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      .report-content { 
+        background: white !important; 
+        color: black !important;
+        padding: 20px !important;
+      }
+      .report-content * { color: black !important; border-color: #ccc !important; }
+      .report-content .bg-slate-800\/50, .report-content .bg-slate-700 { background: #f5f5f5 !important; }
+    }
+    
+    .print-only { display: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // ============================================
+    // SUPABASE CLIENT
+    // ============================================
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNjUsImV4cCI6MjA1MzE0MzI2NX0.gVAHNpfDJjQdXy1E9AAKX_xJDJX8cKbKcsM6v0';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================
+    // MISSIONPULSE API
+    // ============================================
+    const MissionPulseAPI = {
+      async getOpportunities() {
+        const { data, error } = await supabase.from('opportunities').select('*').order('created_at', { ascending: false });
+        return error ? [] : data;
+      },
+      async getCompetitors(opportunityId) {
+        let query = supabase.from('competitors').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      async getPricingItems(opportunityId) {
+        let query = supabase.from('pricing_items').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      async getComplianceItems(opportunityId) {
+        let query = supabase.from('compliance_items').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      async getTeamAssignments(opportunityId) {
+        let query = supabase.from('team_assignments').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      async getAuditLogs(limit = 50) {
+        const { data, error } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(limit);
+        return error ? [] : data;
+      },
+      async getAgentOutputs() {
+        const { data, error } = await supabase.from('agent_outputs').select('*').order('created_at', { ascending: false });
+        return error ? [] : data;
+      },
+      async logAudit(action, details) {
+        await supabase.from('audit_logs').insert({ action, details, module: 'reports' });
+      }
+    };
+
+    // ============================================
+    // ICONS
+    // ============================================
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      printer: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>,
+      chartBar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+      calculator: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      loader: () => <svg className="w-full h-full animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      arrowLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+      calendar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+      trendingUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+      dollarSign: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      alertTriangle: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================
+    // UI COMPONENTS
+    // ============================================
+    const Card = ({ children, className = '', glow = false }) => (
+      <div className={`bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl ${glow ? 'shadow-lg shadow-cyan-500/10' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Button = ({ children, onClick, variant = 'primary', size = 'md', icon, disabled, className = '' }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400',
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50',
+        danger: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/50',
+        success: 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/50',
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+          {icon && <Icon name={icon} className={size === 'xs' ? 'w-3 h-3' : 'w-4 h-4'} />}
+          {children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm', icon }) => {
+      const variants = {
+        default: 'bg-slate-700 text-slate-300',
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return (
+        <span className={`inline-flex items-center gap-1 rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>
+          {icon && <Icon name={icon} className="w-3 h-3" />}
+          {children}
+        </span>
+      );
+    };
+
+    // Toast System
+    const ToastContext = React.createContext();
+    const ToastProvider = ({ children }) => {
+      const [toasts, setToasts] = useState([]);
+      const addToast = useCallback((message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+      }, []);
+      return (
+        <ToastContext.Provider value={{ addToast }}>
+          {children}
+          <div className="fixed bottom-4 right-4 z-50 space-y-2 no-print">
+            {toasts.map(toast => (
+              <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg border backdrop-blur ${
+                toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
+                toast.type === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
+                'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+              }`}>
+                {toast.message}
+              </div>
+            ))}
+          </div>
+        </ToastContext.Provider>
+      );
+    };
+    const useToast = () => React.useContext(ToastContext);
+
+    // ============================================
+    // REPORT TYPES
+    // ============================================
+    const REPORT_TYPES = [
+      { id: 'executive', name: 'Executive Summary', icon: 'fileText', color: '#00E5FA', description: 'High-level overview of pipeline health and key metrics' },
+      { id: 'pipeline', name: 'Pipeline Report', icon: 'chartBar', color: '#8B5CF6', description: 'Detailed analysis of all opportunities by stage' },
+      { id: 'compliance', name: 'Compliance Matrix', icon: 'clipboard', color: '#10B981', description: 'Requirements compliance status across opportunities' },
+      { id: 'pricing', name: 'Pricing Summary', icon: 'calculator', color: '#F59E0B', description: 'Cost analysis and pricing breakdown' },
+      { id: 'competitive', name: 'Competitive Analysis', icon: 'eye', color: '#EF4444', description: 'Competitor intelligence and threat assessment' },
+      { id: 'team', name: 'Team Assignments', icon: 'users', color: '#EC4899', description: 'Resource allocation and role assignments' },
+    ];
+
+    // ============================================
+    // REPORT GENERATOR
+    // ============================================
+    const ReportsCenter = () => {
+      const { addToast } = useToast();
+      const [loading, setLoading] = useState(true);
+      const [generating, setGenerating] = useState(false);
+      const [selectedReport, setSelectedReport] = useState(null);
+      const [reportData, setReportData] = useState(null);
+      const [dbConnected, setDbConnected] = useState(false);
+      const reportRef = useRef(null);
+
+      // Data State
+      const [opportunities, setOpportunities] = useState([]);
+      const [competitors, setCompetitors] = useState([]);
+      const [pricing, setPricing] = useState([]);
+      const [compliance, setCompliance] = useState([]);
+      const [team, setTeam] = useState([]);
+
+      // Load all data on mount
+      useEffect(() => {
+        const loadData = async () => {
+          try {
+            const [opps, comps, price, comp, tm] = await Promise.all([
+              MissionPulseAPI.getOpportunities(),
+              MissionPulseAPI.getCompetitors(),
+              MissionPulseAPI.getPricingItems(),
+              MissionPulseAPI.getComplianceItems(),
+              MissionPulseAPI.getTeamAssignments(),
+            ]);
+            setOpportunities(opps);
+            setCompetitors(comps);
+            setPricing(price);
+            setCompliance(comp);
+            setTeam(tm);
+            setDbConnected(opps.length > 0);
+          } catch (err) {
+            console.error('Failed to load data:', err);
+          } finally {
+            setLoading(false);
+          }
+        };
+        loadData();
+      }, []);
+
+      // Generate Report
+      const generateReport = async (reportType) => {
+        setGenerating(true);
+        setSelectedReport(reportType);
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const data = {
+          generatedAt: new Date().toISOString(),
+          reportType: reportType.id,
+          opportunities,
+          competitors,
+          pricing,
+          compliance,
+          team,
+        };
+
+        // Calculate metrics based on report type
+        switch (reportType.id) {
+          case 'executive':
+            data.metrics = {
+              totalPipeline: opportunities.reduce((sum, o) => sum + (o.value || 0), 0),
+              activeOpportunities: opportunities.filter(o => o.status !== 'won' && o.status !== 'lost').length,
+              avgPwin: opportunities.length > 0 ? Math.round(opportunities.reduce((sum, o) => sum + (o.pwin || o.win_probability || 0), 0) / opportunities.length) : 0,
+              upcomingDeadlines: opportunities.filter(o => {
+                const due = new Date(o.due_date);
+                const now = new Date();
+                const diff = (due - now) / (1000 * 60 * 60 * 24);
+                return diff > 0 && diff <= 30;
+              }).length,
+              highPriorityItems: compliance.filter(c => c.priority === 'critical' || c.risk === 'high').length,
+            };
+            break;
+          case 'pipeline':
+            const stages = ['identification', 'qualification', 'capture', 'proposal', 'submitted', 'won', 'lost'];
+            data.byStage = stages.map(stage => ({
+              stage,
+              count: opportunities.filter(o => (o.status || '').toLowerCase() === stage).length,
+              value: opportunities.filter(o => (o.status || '').toLowerCase() === stage).reduce((sum, o) => sum + (o.value || 0), 0),
+            }));
+            break;
+          case 'compliance':
+            data.complianceStats = {
+              total: compliance.length,
+              compliant: compliance.filter(c => c.status === 'compliant' || c.status === 'complete').length,
+              inProgress: compliance.filter(c => c.status === 'in_progress' || c.status === 'pending').length,
+              atRisk: compliance.filter(c => c.status === 'at_risk' || c.risk === 'high').length,
+            };
+            break;
+          case 'pricing':
+            data.pricingStats = {
+              totalEstimate: pricing.reduce((sum, p) => sum + (p.total || p.amount || 0), 0),
+              laborCost: pricing.filter(p => p.type === 'labor').reduce((sum, p) => sum + (p.total || p.amount || 0), 0),
+              odcCost: pricing.filter(p => p.type === 'odc' || p.type === 'other').reduce((sum, p) => sum + (p.total || p.amount || 0), 0),
+              itemCount: pricing.length,
+            };
+            break;
+          case 'competitive':
+            data.competitorStats = {
+              total: competitors.length,
+              highThreat: competitors.filter(c => c.threat_level === 'high').length,
+              mediumThreat: competitors.filter(c => c.threat_level === 'medium').length,
+              lowThreat: competitors.filter(c => c.threat_level === 'low' || !c.threat_level).length,
+            };
+            break;
+          case 'team':
+            data.teamStats = {
+              totalAssignments: team.length,
+              uniqueMembers: [...new Set(team.map(t => t.user_id || t.member_name))].length,
+              byRole: team.reduce((acc, t) => {
+                const role = t.role || 'Unassigned';
+                acc[role] = (acc[role] || 0) + 1;
+                return acc;
+              }, {}),
+            };
+            break;
+        }
+
+        setReportData(data);
+        setGenerating(false);
+        
+        await MissionPulseAPI.logAudit('report_generated', { reportType: reportType.id });
+        addToast(`${reportType.name} generated`, 'success');
+      };
+
+      // Export to PDF
+      const exportPDF = async () => {
+        if (!reportRef.current) return;
+        
+        addToast('Generating PDF...', 'info');
+        
+        const opt = {
+          margin: 10,
+          filename: `MissionPulse_${selectedReport.id}_${new Date().toISOString().split('T')[0]}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        try {
+          await html2pdf().set(opt).from(reportRef.current).save();
+          await MissionPulseAPI.logAudit('report_exported_pdf', { reportType: selectedReport.id });
+          addToast('PDF downloaded', 'success');
+        } catch (err) {
+          console.error('PDF export error:', err);
+          addToast('PDF export failed', 'error');
+        }
+      };
+
+      // Print Report
+      const printReport = () => {
+        window.print();
+        MissionPulseAPI.logAudit('report_printed', { reportType: selectedReport.id });
+      };
+
+      // Format currency
+      const formatCurrency = (value) => {
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+        return `$${value.toLocaleString()}`;
+      };
+
+      // Format date
+      const formatDate = (dateStr) => {
+        if (!dateStr) return 'N/A';
+        return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      };
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
+            <div className="text-center">
+              <Icon name="loader" className="w-12 h-12 text-cyan-400 mx-auto mb-4" />
+              <p className="text-slate-400">Loading report data...</p>
+            </div>
+          </div>
+        );
+      }
+
+      // Report Selection View
+      if (!selectedReport) {
+        return (
+          <div className="min-h-screen bg-[#00050F] p-6">
+            <div className="max-w-6xl mx-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                    <Icon name="fileText" className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">Reports Center</h1>
+                    <p className="text-slate-400">Generate comprehensive reports from live Supabase data</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant={dbConnected ? 'success' : 'danger'} icon="database">
+                    {dbConnected ? 'Connected' : 'Offline'}
+                  </Badge>
+                  <Badge variant="primary">{opportunities.length} Opportunities</Badge>
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-4 gap-4 mb-8">
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                      <Icon name="dollarSign" className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-white">{formatCurrency(opportunities.reduce((sum, o) => sum + (o.value || 0), 0))}</p>
+                      <p className="text-xs text-slate-400">Total Pipeline</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                      <Icon name="target" className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-white">{opportunities.length}</p>
+                      <p className="text-xs text-slate-400">Opportunities</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                      <Icon name="eye" className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-white">{competitors.length}</p>
+                      <p className="text-xs text-slate-400">Competitors Tracked</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                      <Icon name="clipboard" className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-white">{compliance.length}</p>
+                      <p className="text-xs text-slate-400">Compliance Items</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Report Types Grid */}
+              <h2 className="text-lg font-semibold text-white mb-4">Available Reports</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {REPORT_TYPES.map(report => (
+                  <Card 
+                    key={report.id}
+                    className="p-5 cursor-pointer hover:border-cyan-500/50 transition-all group"
+                    onClick={() => generateReport(report)}
+                  >
+                    <div 
+                      className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
+                      style={{ backgroundColor: `${report.color}20` }}
+                    >
+                      <div style={{ color: report.color }}>
+                        <Icon name={report.icon} className="w-6 h-6" />
+                      </div>
+                    </div>
+                    <h3 className="font-semibold text-white mb-1">{report.name}</h3>
+                    <p className="text-slate-400 text-xs">{report.description}</p>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="mt-8 text-center">
+                <p className="text-slate-500 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Report View
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Header - No Print */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-4 py-3 no-print">
+            <div className="flex items-center justify-between max-w-6xl mx-auto">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="sm" icon="arrowLeft" onClick={() => { setSelectedReport(null); setReportData(null); }}>
+                  Back
+                </Button>
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: `${selectedReport.color}20` }}
+                  >
+                    <div style={{ color: selectedReport.color }}>
+                      <Icon name={selectedReport.icon} className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-white">{selectedReport.name}</h2>
+                    <p className="text-slate-400 text-xs">Generated: {formatDate(reportData?.generatedAt)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" icon="printer" onClick={printReport}>
+                  Print
+                </Button>
+                <Button variant="primary" size="sm" icon="download" onClick={exportPDF}>
+                  Export PDF
+                </Button>
+              </div>
+            </div>
+          </header>
+
+          {/* Report Content */}
+          {generating ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <Icon name="loader" className="w-12 h-12 text-cyan-400 mx-auto mb-4" />
+                <p className="text-slate-400">Generating report...</p>
+              </div>
+            </div>
+          ) : (
+            <div ref={reportRef} className="report-content p-6">
+              <div className="max-w-4xl mx-auto bg-slate-900/50 rounded-xl p-8 border border-slate-700/50">
+                {/* Report Header */}
+                <div className="border-b border-slate-700 pb-6 mb-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                      <Icon name="shield" className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-2xl font-bold text-white">MissionPulse</h1>
+                      <p className="text-cyan-400 text-sm">Mission. Technology. Transformation.</p>
+                    </div>
+                  </div>
+                  <h2 className="text-xl font-semibold text-white">{selectedReport.name}</h2>
+                  <p className="text-slate-400 text-sm">Generated: {new Date(reportData?.generatedAt).toLocaleString()}</p>
+                </div>
+
+                {/* Executive Summary Report */}
+                {selectedReport.id === 'executive' && reportData?.metrics && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-800/50 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Total Pipeline Value</p>
+                        <p className="text-3xl font-bold text-cyan-400">{formatCurrency(reportData.metrics.totalPipeline)}</p>
+                      </div>
+                      <div className="bg-slate-800/50 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Active Opportunities</p>
+                        <p className="text-3xl font-bold text-white">{reportData.metrics.activeOpportunities}</p>
+                      </div>
+                      <div className="bg-slate-800/50 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Average Win Probability</p>
+                        <p className="text-3xl font-bold text-emerald-400">{reportData.metrics.avgPwin}%</p>
+                      </div>
+                      <div className="bg-slate-800/50 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Deadlines (30 days)</p>
+                        <p className="text-3xl font-bold text-amber-400">{reportData.metrics.upcomingDeadlines}</p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Top Opportunities</h3>
+                      <div className="space-y-2">
+                        {opportunities.slice(0, 5).map((opp, i) => (
+                          <div key={opp.id || i} className="flex items-center justify-between bg-slate-800/30 rounded-lg p-3">
+                            <div>
+                              <p className="text-white font-medium">{opp.title || opp.name}</p>
+                              <p className="text-slate-400 text-xs">{opp.agency}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-cyan-400 font-semibold">{formatCurrency(opp.value || 0)}</p>
+                              <Badge variant={opp.pwin > 60 ? 'success' : opp.pwin > 30 ? 'warning' : 'danger'} size="xs">
+                                {opp.pwin || opp.win_probability || 0}% pWin
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pipeline Report */}
+                {selectedReport.id === 'pipeline' && reportData?.byStage && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Opportunities by Stage</h3>
+                      <div className="space-y-3">
+                        {reportData.byStage.map(stage => (
+                          <div key={stage.stage} className="bg-slate-800/30 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-white font-medium capitalize">{stage.stage}</span>
+                              <div className="flex items-center gap-4">
+                                <Badge variant="primary">{stage.count} opps</Badge>
+                                <span className="text-cyan-400 font-semibold">{formatCurrency(stage.value)}</span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-slate-700 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-cyan-500 to-teal-500 h-2 rounded-full"
+                                style={{ width: `${Math.min((stage.count / Math.max(...reportData.byStage.map(s => s.count), 1)) * 100, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">All Opportunities</h3>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-left text-slate-400 text-sm border-b border-slate-700">
+                            <th className="pb-2">Opportunity</th>
+                            <th className="pb-2">Agency</th>
+                            <th className="pb-2">Value</th>
+                            <th className="pb-2">Status</th>
+                            <th className="pb-2">Due Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {opportunities.map((opp, i) => (
+                            <tr key={opp.id || i} className="border-b border-slate-800">
+                              <td className="py-2 text-white">{opp.title || opp.name}</td>
+                              <td className="py-2 text-slate-400">{opp.agency}</td>
+                              <td className="py-2 text-cyan-400">{formatCurrency(opp.value || 0)}</td>
+                              <td className="py-2"><Badge variant="default" size="xs">{opp.status}</Badge></td>
+                              <td className="py-2 text-slate-400">{formatDate(opp.due_date)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Compliance Report */}
+                {selectedReport.id === 'compliance' && reportData?.complianceStats && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="bg-slate-800/50 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-white">{reportData.complianceStats.total}</p>
+                        <p className="text-slate-400 text-sm">Total Items</p>
+                      </div>
+                      <div className="bg-emerald-500/10 rounded-lg p-4 text-center border border-emerald-500/30">
+                        <p className="text-3xl font-bold text-emerald-400">{reportData.complianceStats.compliant}</p>
+                        <p className="text-slate-400 text-sm">Compliant</p>
+                      </div>
+                      <div className="bg-amber-500/10 rounded-lg p-4 text-center border border-amber-500/30">
+                        <p className="text-3xl font-bold text-amber-400">{reportData.complianceStats.inProgress}</p>
+                        <p className="text-slate-400 text-sm">In Progress</p>
+                      </div>
+                      <div className="bg-red-500/10 rounded-lg p-4 text-center border border-red-500/30">
+                        <p className="text-3xl font-bold text-red-400">{reportData.complianceStats.atRisk}</p>
+                        <p className="text-slate-400 text-sm">At Risk</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Compliance Items</h3>
+                      <div className="space-y-2">
+                        {compliance.map((item, i) => (
+                          <div key={item.id || i} className="flex items-center justify-between bg-slate-800/30 rounded-lg p-3">
+                            <div>
+                              <p className="text-white">{item.requirement || item.title || `Requirement ${i + 1}`}</p>
+                              <p className="text-slate-400 text-xs">{item.section || 'General'}</p>
+                            </div>
+                            <Badge 
+                              variant={item.status === 'compliant' || item.status === 'complete' ? 'success' : item.status === 'at_risk' ? 'danger' : 'warning'}
+                              size="sm"
+                            >
+                              {item.status || 'Pending'}
+                            </Badge>
+                          </div>
+                        ))}
+                        {compliance.length === 0 && (
+                          <p className="text-slate-500 text-center py-4">No compliance items found</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pricing Report */}
+                {selectedReport.id === 'pricing' && reportData?.pricingStats && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-800/50 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Total Estimate</p>
+                        <p className="text-3xl font-bold text-cyan-400">{formatCurrency(reportData.pricingStats.totalEstimate)}</p>
+                      </div>
+                      <div className="bg-slate-800/50 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Line Items</p>
+                        <p className="text-3xl font-bold text-white">{reportData.pricingStats.itemCount}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Pricing Breakdown</h3>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-left text-slate-400 text-sm border-b border-slate-700">
+                            <th className="pb-2">Item</th>
+                            <th className="pb-2">Type</th>
+                            <th className="pb-2">Quantity</th>
+                            <th className="pb-2 text-right">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pricing.map((item, i) => (
+                            <tr key={item.id || i} className="border-b border-slate-800">
+                              <td className="py-2 text-white">{item.description || item.name || `Item ${i + 1}`}</td>
+                              <td className="py-2"><Badge variant="default" size="xs">{item.type || 'labor'}</Badge></td>
+                              <td className="py-2 text-slate-400">{item.quantity || item.hours || '-'}</td>
+                              <td className="py-2 text-cyan-400 text-right">{formatCurrency(item.total || item.amount || 0)}</td>
+                            </tr>
+                          ))}
+                          {pricing.length === 0 && (
+                            <tr>
+                              <td colSpan="4" className="py-4 text-center text-slate-500">No pricing items found</td>
+                            </tr>
+                          )}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-slate-600">
+                            <td colSpan="3" className="py-3 text-white font-semibold">Total</td>
+                            <td className="py-3 text-cyan-400 font-bold text-right">{formatCurrency(reportData.pricingStats.totalEstimate)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Competitive Analysis Report */}
+                {selectedReport.id === 'competitive' && reportData?.competitorStats && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="bg-slate-800/50 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-white">{reportData.competitorStats.total}</p>
+                        <p className="text-slate-400 text-sm">Total Tracked</p>
+                      </div>
+                      <div className="bg-red-500/10 rounded-lg p-4 text-center border border-red-500/30">
+                        <p className="text-3xl font-bold text-red-400">{reportData.competitorStats.highThreat}</p>
+                        <p className="text-slate-400 text-sm">High Threat</p>
+                      </div>
+                      <div className="bg-amber-500/10 rounded-lg p-4 text-center border border-amber-500/30">
+                        <p className="text-3xl font-bold text-amber-400">{reportData.competitorStats.mediumThreat}</p>
+                        <p className="text-slate-400 text-sm">Medium Threat</p>
+                      </div>
+                      <div className="bg-emerald-500/10 rounded-lg p-4 text-center border border-emerald-500/30">
+                        <p className="text-3xl font-bold text-emerald-400">{reportData.competitorStats.lowThreat}</p>
+                        <p className="text-slate-400 text-sm">Low Threat</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Competitor Intelligence</h3>
+                      <div className="space-y-3">
+                        {competitors.map((comp, i) => (
+                          <div key={comp.id || i} className="bg-slate-800/30 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-white font-semibold">{comp.name}</h4>
+                              <Badge 
+                                variant={comp.threat_level === 'high' ? 'danger' : comp.threat_level === 'medium' ? 'warning' : 'success'}
+                                size="sm"
+                              >
+                                {comp.threat_level || 'Unknown'} Threat
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-slate-400">Strengths</p>
+                                <p className="text-white">{comp.strengths || 'Not assessed'}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-400">Weaknesses</p>
+                                <p className="text-white">{comp.weaknesses || 'Not assessed'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {competitors.length === 0 && (
+                          <p className="text-slate-500 text-center py-4">No competitors tracked</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Team Assignments Report */}
+                {selectedReport.id === 'team' && reportData?.teamStats && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-800/50 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Total Assignments</p>
+                        <p className="text-3xl font-bold text-white">{reportData.teamStats.totalAssignments}</p>
+                      </div>
+                      <div className="bg-slate-800/50 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Unique Members</p>
+                        <p className="text-3xl font-bold text-cyan-400">{reportData.teamStats.uniqueMembers}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Assignments by Role</h3>
+                      <div className="space-y-2">
+                        {Object.entries(reportData.teamStats.byRole).map(([role, count]) => (
+                          <div key={role} className="flex items-center justify-between bg-slate-800/30 rounded-lg p-3">
+                            <span className="text-white">{role}</span>
+                            <Badge variant="primary">{count} assigned</Badge>
+                          </div>
+                        ))}
+                        {Object.keys(reportData.teamStats.byRole).length === 0 && (
+                          <p className="text-slate-500 text-center py-4">No team assignments found</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">All Assignments</h3>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-left text-slate-400 text-sm border-b border-slate-700">
+                            <th className="pb-2">Member</th>
+                            <th className="pb-2">Role</th>
+                            <th className="pb-2">Opportunity</th>
+                            <th className="pb-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {team.map((assignment, i) => (
+                            <tr key={assignment.id || i} className="border-b border-slate-800">
+                              <td className="py-2 text-white">{assignment.member_name || assignment.user_id || 'Unassigned'}</td>
+                              <td className="py-2"><Badge variant="default" size="xs">{assignment.role || 'Team Member'}</Badge></td>
+                              <td className="py-2 text-slate-400">{assignment.opportunity_name || '-'}</td>
+                              <td className="py-2"><Badge variant="success" size="xs">{assignment.status || 'Active'}</Badge></td>
+                            </tr>
+                          ))}
+                          {team.length === 0 && (
+                            <tr>
+                              <td colSpan="4" className="py-4 text-center text-slate-500">No team assignments found</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Report Footer */}
+                <div className="mt-8 pt-6 border-t border-slate-700 text-center">
+                  <p className="text-slate-500 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+                  <p className="text-slate-600 text-xs mt-1">MissionPulse v12.0 • Mission Meets Tech • {formatDate(new Date())}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ============================================
+    // MAIN APP
+    // ============================================
+    function App() {
+      return (
+        <ToastProvider>
+          <ReportsCenter />
+        </ToastProvider>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

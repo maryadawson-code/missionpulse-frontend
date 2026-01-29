@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Library | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="icon" type="image/png" href="MMT_icon_transparent.png">
+    <style>
+        body { background: #00050F; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); border-radius: 12px; }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .primary-btn { background: #00E5FA; color: #00050F; font-weight: 600; }
+        .primary-btn:hover { background: #00c4d4; }
+        .primary-btn:disabled { background: #4a5568; color: #718096; cursor: not-allowed; }
+        .secondary-btn { background: rgba(0, 229, 250, 0.1); border: 1px solid rgba(0, 229, 250, 0.3); color: #00E5FA; }
+        .secondary-btn:hover { background: rgba(0, 229, 250, 0.2); }
+        .input-field { background: rgba(0, 229, 250, 0.05); border: 1px solid rgba(0, 229, 250, 0.3); color: white; }
+        .input-field:focus { border-color: #00E5FA; outline: none; box-shadow: 0 0 0 2px rgba(0, 229, 250, 0.2); }
+        select.input-field { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2300E5FA'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1.5em; padding-right: 2.5rem; }
+        .drop-zone { border: 2px dashed rgba(0, 229, 250, 0.3); transition: all 0.3s; }
+        .drop-zone.dragover { border-color: #00E5FA; background: rgba(0, 229, 250, 0.1); }
+        .file-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 20px; }
+        .file-pdf { background: rgba(239, 68, 68, 0.2); }
+        .file-doc { background: rgba(59, 130, 246, 0.2); }
+        .file-xls { background: rgba(34, 197, 94, 0.2); }
+        .file-img { background: rgba(168, 85, 247, 0.2); }
+        .file-other { background: rgba(107, 114, 128, 0.2); }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; font-weight: 500; }
+        .badge-draft { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+        .badge-review { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .badge-approved { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .badge-final { background: rgba(0, 229, 250, 0.2); color: #00E5FA; }
+        .badge-archived { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+        .modal-backdrop { background: rgba(0, 5, 15, 0.9); }
+        .progress-bar { height: 4px; background: rgba(0, 229, 250, 0.2); border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #00E5FA; transition: width 0.3s; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="missionpulse-sidebar" data-current-page="documents"></div>
+    <script src="missionpulse-nav.js"></script>
+
+    <div class="ml-64 p-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <span class="text-3xl">📁</span>
+                    Document Library
+                </h1>
+                <p class="text-gray-400 mt-1">Manage proposal documents, RFPs, and attachments</p>
+            </div>
+            <button onclick="openUploadModal()" class="primary-btn px-4 py-2 rounded-lg flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Upload Documents
+            </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="glass-card p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Opportunity</label>
+                    <select id="filterOpportunity" onchange="loadDocuments()" class="w-full px-3 py-2 rounded-lg input-field">
+                        <option value="">All Opportunities</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Document Type</label>
+                    <select id="filterType" onchange="loadDocuments()" class="w-full px-3 py-2 rounded-lg input-field">
+                        <option value="">All Types</option>
+                        <option value="rfp">📋 RFP</option>
+                        <option value="amendment">📝 Amendment</option>
+                        <option value="qa">❓ Q&A</option>
+                        <option value="proposal_draft">✏️ Proposal Draft</option>
+                        <option value="proposal_final">✅ Proposal Final</option>
+                        <option value="technical">⚙️ Technical</option>
+                        <option value="management">👔 Management</option>
+                        <option value="past_performance">📈 Past Performance</option>
+                        <option value="pricing">💰 Pricing</option>
+                        <option value="teaming">🤝 Teaming</option>
+                        <option value="resume">👤 Resume</option>
+                        <option value="graphic">🎨 Graphic</option>
+                        <option value="compliance">✓ Compliance</option>
+                        <option value="other">📄 Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Status</label>
+                    <select id="filterStatus" onchange="loadDocuments()" class="w-full px-3 py-2 rounded-lg input-field">
+                        <option value="">All Statuses</option>
+                        <option value="draft">Draft</option>
+                        <option value="review">In Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="final">Final</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Search</label>
+                    <input type="text" id="filterSearch" onkeyup="debounceSearch()" placeholder="Search files..." class="w-full px-3 py-2 rounded-lg input-field">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="clearFilters()" class="secondary-btn px-4 py-2 rounded-lg w-full">Clear</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="glass-card p-4">
+                <div class="text-gray-400 text-sm">Total Documents</div>
+                <div class="text-2xl font-bold text-white" id="statTotal">0</div>
+            </div>
+            <div class="glass-card p-4">
+                <div class="text-gray-400 text-sm">Total Size</div>
+                <div class="text-2xl font-bold text-cyan-400" id="statSize">0 MB</div>
+            </div>
+            <div class="glass-card p-4">
+                <div class="text-gray-400 text-sm">In Review</div>
+                <div class="text-2xl font-bold text-yellow-400" id="statReview">0</div>
+            </div>
+            <div class="glass-card p-4">
+                <div class="text-gray-400 text-sm">Finalized</div>
+                <div class="text-2xl font-bold text-green-400" id="statFinal">0</div>
+            </div>
+        </div>
+
+        <!-- Document Grid -->
+        <div class="glass-card p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-white">Documents</h2>
+                <div class="flex gap-2">
+                    <button onclick="setView('grid')" id="viewGrid" class="p-2 rounded-lg secondary-btn">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    </button>
+                    <button onclick="setView('list')" id="viewList" class="p-2 rounded-lg bg-transparent text-gray-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div id="documentContainer">
+                <div class="text-gray-500 text-center py-12">Loading documents...</div>
+            </div>
+        </div>
+
+        <div class="mt-8 text-center text-gray-500 text-sm">
+            AI GENERATED CONTENT - REQUIRES HUMAN REVIEW
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-2xl">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-white">Upload Documents</h3>
+                <button onclick="closeUploadModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Opportunity *</label>
+                        <select id="uploadOpportunity" class="w-full px-3 py-2 rounded-lg input-field" required>
+                            <option value="">Select opportunity...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Document Type *</label>
+                        <select id="uploadType" class="w-full px-3 py-2 rounded-lg input-field" required>
+                            <option value="">Select type...</option>
+                            <option value="rfp">📋 RFP</option>
+                            <option value="amendment">📝 Amendment</option>
+                            <option value="qa">❓ Q&A</option>
+                            <option value="proposal_draft">✏️ Proposal Draft</option>
+                            <option value="proposal_final">✅ Proposal Final</option>
+                            <option value="technical">⚙️ Technical</option>
+                            <option value="management">👔 Management</option>
+                            <option value="past_performance">📈 Past Performance</option>
+                            <option value="pricing">💰 Pricing</option>
+                            <option value="teaming">🤝 Teaming</option>
+                            <option value="resume">👤 Resume</option>
+                            <option value="graphic">🎨 Graphic</option>
+                            <option value="compliance">✓ Compliance</option>
+                            <option value="other">📄 Other</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Drop Zone -->
+                <div id="dropZone" class="drop-zone rounded-xl p-8 text-center cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                    <svg class="w-12 h-12 mx-auto mb-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p class="text-gray-300 mb-2">Drag & drop files here or click to browse</p>
+                    <p class="text-gray-500 text-sm">Supports PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, PNG, JPG</p>
+                    <input type="file" id="fileInput" multiple class="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif">
+                </div>
+
+                <!-- File Queue -->
+                <div id="fileQueue" class="space-y-2 hidden">
+                    <div class="text-sm text-gray-400 mb-2">Selected Files:</div>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Description</label>
+                    <textarea id="uploadDescription" class="w-full px-3 py-2 rounded-lg input-field" rows="2" placeholder="Optional description..."></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Volume</label>
+                        <input type="text" id="uploadVolume" class="w-full px-3 py-2 rounded-lg input-field" placeholder="e.g., Volume I">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Section</label>
+                        <input type="text" id="uploadSection" class="w-full px-3 py-2 rounded-lg input-field" placeholder="e.g., Section L">
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-700 flex justify-end gap-3">
+                <button onclick="closeUploadModal()" class="secondary-btn px-4 py-2 rounded-lg">Cancel</button>
+                <button onclick="uploadFiles()" id="uploadBtn" class="primary-btn px-4 py-2 rounded-lg" disabled>Upload Files</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Details Modal -->
+    <div id="detailModal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-xl">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-white" id="detailTitle">Document Details</h3>
+                <button onclick="closeDetailModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6" id="detailContent"></div>
+            <div class="p-6 border-t border-gray-700 flex justify-between">
+                <button onclick="deleteDocument()" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                <div class="flex gap-2">
+                    <button onclick="downloadDocument()" class="secondary-btn px-4 py-2 rounded-lg text-sm">Download</button>
+                    <button onclick="closeDetailModal()" class="primary-btn px-4 py-2 rounded-lg text-sm">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =============================================================================
+        // CONFIGURATION
+        // =============================================================================
+        var SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzI3NjQsImV4cCI6MjA1MzQwODc2NH0.rFKJKvOHOvtwz9HY5cCgnD2sO4N4z2lgXvvzaYGAsoc';
+        
+        var sbClient = null;
+        var currentUser = null;
+        var documents = [];
+        var opportunities = [];
+        var selectedFiles = [];
+        var selectedDocId = null;
+        var currentView = 'grid';
+        var searchTimeout = null;
+
+        function initSupabase() {
+            if (!sbClient && window.supabase) {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            }
+            return sbClient;
+        }
+
+        // =============================================================================
+        // INITIALIZATION
+        // =============================================================================
+        document.addEventListener('DOMContentLoaded', async function() {
+            initSupabase();
+            
+            var session = localStorage.getItem('missionpulse_session');
+            if (!session && sbClient) {
+                var authResult = await sbClient.auth.getSession();
+                if (!authResult.data.session) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                currentUser = authResult.data.session.user;
+            } else if (session) {
+                currentUser = JSON.parse(localStorage.getItem('missionpulse_user'));
+            }
+
+            setupDragDrop();
+            await loadOpportunities();
+            await loadDocuments();
+        });
+
+        function setupDragDrop() {
+            var dropZone = document.getElementById('dropZone');
+            var fileInput = document.getElementById('fileInput');
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(eventName) {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(function(eventName) {
+                dropZone.addEventListener(eventName, function() {
+                    dropZone.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(function(eventName) {
+                dropZone.addEventListener(eventName, function() {
+                    dropZone.classList.remove('dragover');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', function(e) {
+                var files = e.dataTransfer.files;
+                handleFiles(files);
+            }, false);
+
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+        }
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            renderFileQueue();
+            document.getElementById('uploadBtn').disabled = selectedFiles.length === 0;
+        }
+
+        function renderFileQueue() {
+            var container = document.getElementById('fileQueue');
+            if (selectedFiles.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden');
+            
+            var html = '<div class="text-sm text-gray-400 mb-2">Selected Files (' + selectedFiles.length + '):</div>';
+            selectedFiles.forEach(function(file, index) {
+                html += '<div class="flex items-center justify-between p-2 bg-white/5 rounded-lg">';
+                html += '  <div class="flex items-center gap-2">';
+                html += '    <span>' + getFileIcon(file.name) + '</span>';
+                html += '    <span class="text-white text-sm">' + escapeHtml(file.name) + '</span>';
+                html += '    <span class="text-gray-500 text-xs">(' + formatFileSize(file.size) + ')</span>';
+                html += '  </div>';
+                html += '  <button onclick="removeFile(' + index + ')" class="text-red-400 hover:text-red-300">';
+                html += '    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                html += '  </button>';
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            renderFileQueue();
+            document.getElementById('uploadBtn').disabled = selectedFiles.length === 0;
+        }
+
+        // =============================================================================
+        // DATA LOADING
+        // =============================================================================
+        async function loadOpportunities() {
+            try {
+                var client = initSupabase();
+                var { data, error } = await client.from('opportunities').select('id, title').order('title');
+                if (error) throw error;
+                opportunities = data || [];
+                
+                var filterHtml = '<option value="">All Opportunities</option>';
+                var uploadHtml = '<option value="">Select opportunity...</option>';
+                opportunities.forEach(function(opp) {
+                    filterHtml += '<option value="' + opp.id + '">' + escapeHtml(opp.title) + '</option>';
+                    uploadHtml += '<option value="' + opp.id + '">' + escapeHtml(opp.title) + '</option>';
+                });
+                document.getElementById('filterOpportunity').innerHTML = filterHtml;
+                document.getElementById('uploadOpportunity').innerHTML = uploadHtml;
+            } catch (err) {
+                console.error('Error loading opportunities:', err);
+            }
+        }
+
+        async function loadDocuments() {
+            try {
+                var client = initSupabase();
+                var oppId = document.getElementById('filterOpportunity').value;
+                var docType = document.getElementById('filterType').value;
+                var status = document.getElementById('filterStatus').value;
+                var search = document.getElementById('filterSearch').value.trim().toLowerCase();
+
+                var query = client.from('proposal_documents')
+                    .select('*, opportunities(title), profiles(full_name)')
+                    .eq('is_current', true)
+                    .order('uploaded_at', { ascending: false });
+
+                if (oppId) query = query.eq('opportunity_id', oppId);
+                if (docType) query = query.eq('document_type', docType);
+                if (status) query = query.eq('status', status);
+
+                var { data, error } = await query;
+                if (error) throw error;
+                
+                documents = data || [];
+                
+                // Client-side search
+                if (search) {
+                    documents = documents.filter(function(doc) {
+                        return doc.file_name.toLowerCase().includes(search) ||
+                               (doc.description && doc.description.toLowerCase().includes(search));
+                    });
+                }
+
+                renderDocuments();
+                renderStats();
+            } catch (err) {
+                console.error('Error loading documents:', err);
+                document.getElementById('documentContainer').innerHTML = '<div class="text-red-400 text-center py-8">Error: ' + err.message + '</div>';
+            }
+        }
+
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(loadDocuments, 300);
+        }
+
+        function clearFilters() {
+            document.getElementById('filterOpportunity').value = '';
+            document.getElementById('filterType').value = '';
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterSearch').value = '';
+            loadDocuments();
+        }
+
+        // =============================================================================
+        // RENDERING
+        // =============================================================================
+        function renderDocuments() {
+            var container = document.getElementById('documentContainer');
+            
+            if (documents.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-12">No documents found. Upload your first document to get started.</div>';
+                return;
+            }
+
+            var html = '';
+            if (currentView === 'grid') {
+                html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">';
+                documents.forEach(function(doc) {
+                    html += renderDocumentCard(doc);
+                });
+                html += '</div>';
+            } else {
+                html = '<div class="space-y-2">';
+                documents.forEach(function(doc) {
+                    html += renderDocumentRow(doc);
+                });
+                html += '</div>';
+            }
+            container.innerHTML = html;
+        }
+
+        function renderDocumentCard(doc) {
+            var oppTitle = doc.opportunities ? doc.opportunities.title : 'Unknown';
+            var icon = getFileIcon(doc.file_name);
+            var iconClass = getFileIconClass(doc.file_name);
+            
+            var html = '<div class="glass-card p-4 cursor-pointer hover:border-cyan-400" onclick="viewDocument(\'' + doc.id + '\')">';
+            html += '  <div class="flex items-start gap-3 mb-3">';
+            html += '    <div class="file-icon ' + iconClass + '">' + icon + '</div>';
+            html += '    <div class="flex-1 min-w-0">';
+            html += '      <div class="text-white font-medium truncate" title="' + escapeHtml(doc.file_name) + '">' + escapeHtml(doc.file_name) + '</div>';
+            html += '      <div class="text-gray-400 text-xs truncate">' + escapeHtml(oppTitle) + '</div>';
+            html += '    </div>';
+            html += '  </div>';
+            html += '  <div class="flex justify-between items-center">';
+            html += '    <span class="badge badge-' + doc.status + '">' + doc.status + '</span>';
+            html += '    <span class="text-gray-500 text-xs">' + formatFileSize(doc.file_size) + '</span>';
+            html += '  </div>';
+            if (doc.version > 1) {
+                html += '  <div class="text-cyan-400 text-xs mt-2">v' + doc.version + '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function renderDocumentRow(doc) {
+            var oppTitle = doc.opportunities ? doc.opportunities.title : 'Unknown';
+            var uploader = doc.profiles ? doc.profiles.full_name : 'Unknown';
+            var icon = getFileIcon(doc.file_name);
+            var iconClass = getFileIconClass(doc.file_name);
+            
+            var html = '<div class="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 cursor-pointer" onclick="viewDocument(\'' + doc.id + '\')">';
+            html += '  <div class="file-icon ' + iconClass + ' flex-shrink-0">' + icon + '</div>';
+            html += '  <div class="flex-1 min-w-0">';
+            html += '    <div class="text-white truncate">' + escapeHtml(doc.file_name) + '</div>';
+            html += '    <div class="text-gray-500 text-xs">' + escapeHtml(oppTitle) + '</div>';
+            html += '  </div>';
+            html += '  <div class="text-gray-400 text-sm hidden md:block">' + escapeHtml(doc.document_type) + '</div>';
+            html += '  <div class="text-gray-400 text-sm hidden lg:block">' + formatFileSize(doc.file_size) + '</div>';
+            html += '  <span class="badge badge-' + doc.status + '">' + doc.status + '</span>';
+            html += '  <div class="text-gray-500 text-xs hidden xl:block">' + new Date(doc.uploaded_at).toLocaleDateString() + '</div>';
+            html += '</div>';
+            return html;
+        }
+
+        function renderStats() {
+            document.getElementById('statTotal').textContent = documents.length;
+            
+            var totalSize = documents.reduce(function(sum, d) { return sum + (d.file_size || 0); }, 0);
+            document.getElementById('statSize').textContent = formatFileSize(totalSize);
+            
+            var inReview = documents.filter(function(d) { return d.status === 'review'; }).length;
+            document.getElementById('statReview').textContent = inReview;
+            
+            var final = documents.filter(function(d) { return d.status === 'final' || d.status === 'approved'; }).length;
+            document.getElementById('statFinal').textContent = final;
+        }
+
+        function setView(view) {
+            currentView = view;
+            document.getElementById('viewGrid').className = view === 'grid' ? 'p-2 rounded-lg secondary-btn' : 'p-2 rounded-lg bg-transparent text-gray-400 hover:text-white';
+            document.getElementById('viewList').className = view === 'list' ? 'p-2 rounded-lg secondary-btn' : 'p-2 rounded-lg bg-transparent text-gray-400 hover:text-white';
+            renderDocuments();
+        }
+
+        // =============================================================================
+        // MODALS
+        // =============================================================================
+        function openUploadModal() {
+            document.getElementById('uploadModal').classList.remove('hidden');
+            document.getElementById('uploadOpportunity').value = document.getElementById('filterOpportunity').value || '';
+            document.getElementById('uploadType').value = '';
+            document.getElementById('uploadDescription').value = '';
+            document.getElementById('uploadVolume').value = '';
+            document.getElementById('uploadSection').value = '';
+            selectedFiles = [];
+            renderFileQueue();
+            document.getElementById('uploadBtn').disabled = true;
+        }
+
+        function closeUploadModal() {
+            document.getElementById('uploadModal').classList.add('hidden');
+            selectedFiles = [];
+        }
+
+        function viewDocument(id) {
+            selectedDocId = id;
+            var doc = documents.find(function(d) { return d.id === id; });
+            if (!doc) return;
+
+            document.getElementById('detailTitle').textContent = doc.file_name;
+            
+            var html = '<div class="space-y-4">';
+            html += '<div class="flex items-center gap-3">';
+            html += '  <div class="file-icon ' + getFileIconClass(doc.file_name) + ' text-2xl">' + getFileIcon(doc.file_name) + '</div>';
+            html += '  <div>';
+            html += '    <div class="text-white font-medium">' + escapeHtml(doc.file_name) + '</div>';
+            html += '    <div class="text-gray-400 text-sm">' + formatFileSize(doc.file_size) + ' • v' + doc.version + '</div>';
+            html += '  </div>';
+            html += '</div>';
+
+            html += '<div class="grid grid-cols-2 gap-4">';
+            html += '  <div><div class="text-gray-400 text-sm">Opportunity</div><div class="text-white">' + escapeHtml(doc.opportunities ? doc.opportunities.title : 'Unknown') + '</div></div>';
+            html += '  <div><div class="text-gray-400 text-sm">Type</div><div class="text-white">' + escapeHtml(doc.document_type) + '</div></div>';
+            html += '  <div><div class="text-gray-400 text-sm">Status</div><div><span class="badge badge-' + doc.status + '">' + doc.status + '</span></div></div>';
+            html += '  <div><div class="text-gray-400 text-sm">Uploaded</div><div class="text-white">' + new Date(doc.uploaded_at).toLocaleString() + '</div></div>';
+            if (doc.volume) html += '  <div><div class="text-gray-400 text-sm">Volume</div><div class="text-white">' + escapeHtml(doc.volume) + '</div></div>';
+            if (doc.section) html += '  <div><div class="text-gray-400 text-sm">Section</div><div class="text-white">' + escapeHtml(doc.section) + '</div></div>';
+            html += '</div>';
+
+            if (doc.description) {
+                html += '<div><div class="text-gray-400 text-sm mb-1">Description</div><div class="text-white">' + escapeHtml(doc.description) + '</div></div>';
+            }
+
+            html += '<div class="text-gray-500 text-xs">Uploaded by: ' + escapeHtml(doc.profiles ? doc.profiles.full_name : 'Unknown') + '</div>';
+            html += '</div>';
+
+            document.getElementById('detailContent').innerHTML = html;
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+            selectedDocId = null;
+        }
+
+        // =============================================================================
+        // FILE OPERATIONS
+        // =============================================================================
+        async function uploadFiles() {
+            var oppId = document.getElementById('uploadOpportunity').value;
+            var docType = document.getElementById('uploadType').value;
+            var description = document.getElementById('uploadDescription').value.trim();
+            var volume = document.getElementById('uploadVolume').value.trim();
+            var section = document.getElementById('uploadSection').value.trim();
+
+            if (!oppId || !docType || selectedFiles.length === 0) {
+                alert('Please select opportunity, document type, and files');
+                return;
+            }
+
+            var btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.textContent = 'Uploading...';
+
+            try {
+                var client = initSupabase();
+                
+                for (var i = 0; i < selectedFiles.length; i++) {
+                    var file = selectedFiles[i];
+                    var filePath = oppId + '/' + Date.now() + '_' + file.name;
+
+                    // Upload to Supabase Storage
+                    var { error: uploadError } = await client.storage
+                        .from('proposal-documents')
+                        .upload(filePath, file);
+
+                    if (uploadError) {
+                        console.warn('Storage upload failed, saving metadata only:', uploadError);
+                    }
+
+                    // Save metadata
+                    var { error: dbError } = await client.from('proposal_documents').insert([{
+                        opportunity_id: oppId,
+                        file_name: file.name,
+                        file_path: filePath,
+                        file_size: file.size,
+                        mime_type: file.type,
+                        document_type: docType,
+                        description: description || null,
+                        volume: volume || null,
+                        section: section || null,
+                        uploaded_by: currentUser ? currentUser.id : null
+                    }]);
+
+                    if (dbError) throw dbError;
+                }
+
+                closeUploadModal();
+                await loadDocuments();
+            } catch (err) {
+                console.error('Upload error:', err);
+                alert('Upload failed: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Upload Files';
+            }
+        }
+
+        async function downloadDocument() {
+            if (!selectedDocId) return;
+            var doc = documents.find(function(d) { return d.id === selectedDocId; });
+            if (!doc) return;
+
+            try {
+                var client = initSupabase();
+                var { data, error } = await client.storage
+                    .from('proposal-documents')
+                    .download(doc.file_path);
+
+                if (error) throw error;
+
+                var url = URL.createObjectURL(data);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = doc.file_name;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                console.error('Download error:', err);
+                alert('Download failed: ' + err.message);
+            }
+        }
+
+        async function deleteDocument() {
+            if (!selectedDocId) return;
+            if (!confirm('Delete this document?')) return;
+
+            try {
+                var client = initSupabase();
+                var doc = documents.find(function(d) { return d.id === selectedDocId; });
+                
+                // Delete from storage
+                if (doc && doc.file_path) {
+                    await client.storage.from('proposal-documents').remove([doc.file_path]);
+                }
+
+                // Delete metadata
+                var { error } = await client.from('proposal_documents').delete().eq('id', selectedDocId);
+                if (error) throw error;
+
+                closeDetailModal();
+                await loadDocuments();
+            } catch (err) {
+                console.error('Delete error:', err);
+                alert('Delete failed: ' + err.message);
+            }
+        }
+
+        // =============================================================================
+        // UTILITIES
+        // =============================================================================
+        function getFileIcon(filename) {
+            var ext = filename.split('.').pop().toLowerCase();
+            var icons = {
+                pdf: '📕', doc: '📘', docx: '📘', xls: '📗', xlsx: '📗',
+                ppt: '📙', pptx: '📙', png: '🖼️', jpg: '🖼️', jpeg: '🖼️',
+                gif: '🖼️', txt: '📄', csv: '📊', zip: '📦'
+            };
+            return icons[ext] || '📄';
+        }
+
+        function getFileIconClass(filename) {
+            var ext = filename.split('.').pop().toLowerCase();
+            if (ext === 'pdf') return 'file-pdf';
+            if (['doc', 'docx'].includes(ext)) return 'file-doc';
+            if (['xls', 'xlsx', 'csv'].includes(ext)) return 'file-xls';
+            if (['png', 'jpg', 'jpeg', 'gif'].includes(ext)) return 'file-img';
+            return 'file-other';
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            var sizes = ['B', 'KB', 'MB', 'GB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

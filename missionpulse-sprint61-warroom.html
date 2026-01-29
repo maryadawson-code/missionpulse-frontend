@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#00050F">
+  <title>MissionPulse War Room - Command Center</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; overflow-x: hidden; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* Animations */
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); } 50% { box-shadow: 0 0 40px rgba(0, 229, 250, 0.6); } }
+    @keyframes countdownPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+    @keyframes alertFlash { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes progressFill { from { width: 0; } }
+    @keyframes radar { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+    .animate-slideUp { animation: slideUp 0.4s ease-out; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .animate-glow { animation: glow 2s ease-in-out infinite; }
+    .animate-countdown { animation: countdownPulse 1s ease-in-out infinite; }
+    .animate-alert { animation: alertFlash 1s ease-in-out infinite; }
+    .animate-progress { animation: progressFill 1s ease-out; }
+    .animate-radar { animation: radar 4s linear infinite; }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    /* Grid pattern background */
+    .grid-bg {
+      background-image: 
+        linear-gradient(rgba(0, 229, 250, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 250, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
+    
+    /* Kanban drag styles */
+    .kanban-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .kanban-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+    .kanban-card.dragging { opacity: 0.5; transform: rotate(3deg); }
+    
+    /* Progress ring */
+    .progress-ring { transform: rotate(-90deg); }
+    .progress-ring-circle { transition: stroke-dashoffset 0.5s ease; }
+  </style>
+</head>
+<body class="grid-bg">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, createContext, useContext, useRef, useMemo } = React;
+
+    // ============================================
+    // SUPABASE CLIENT
+    // ============================================
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNjUsImV4cCI6MjA1MzE0MzI2NX0.gVAHNpfDJjQdXy1E9AAKX_xJDJX8cKbKcsM6v0';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================
+    // DEMO DATA
+    // ============================================
+    const DEMO_OPPORTUNITY = {
+      id: 'dha-2025-001',
+      title: 'DHA Healthcare Modernization Platform',
+      agency: 'Defense Health Agency',
+      solicitation: 'HT0011-25-R-0042',
+      value: 47500000,
+      pwin: 72,
+      status: 'proposal',
+      due_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000), // 12 days from now
+      submission_time: '14:00 EST',
+      naics: '541512',
+      set_aside: 'Full & Open',
+      contract_type: 'FFP/T&M Hybrid',
+    };
+
+    const DEMO_TEAM = [
+      { id: 't1', name: 'Mary Womack', role: 'Capture Executive', avatar: 'MW', color: '#00E5FA', workload: 85, tasks: 12, status: 'active' },
+      { id: 't2', name: 'Daniel Chen', role: 'Technical Lead', avatar: 'DC', color: '#8B5CF6', workload: 92, tasks: 18, status: 'active' },
+      { id: 't3', name: 'Sarah Martinez', role: 'Proposal Manager', avatar: 'SM', color: '#10B981', workload: 78, tasks: 15, status: 'active' },
+      { id: 't4', name: 'James Wilson', role: 'Pricing Lead', avatar: 'JW', color: '#F59E0B', workload: 65, tasks: 8, status: 'active' },
+      { id: 't5', name: 'Emily Park', role: 'Compliance SME', avatar: 'EP', color: '#EC4899', workload: 45, tasks: 6, status: 'away' },
+      { id: 't6', name: 'Michael Brown', role: 'Contracts', avatar: 'MB', color: '#6366F1', workload: 70, tasks: 9, status: 'active' },
+    ];
+
+    const DEMO_VOLUMES = [
+      { id: 'v1', name: 'Volume I - Technical', progress: 78, status: 'on-track', owner: 'Daniel Chen', pages: 45, limit: 50 },
+      { id: 'v2', name: 'Volume II - Management', progress: 65, status: 'at-risk', owner: 'Sarah Martinez', pages: 28, limit: 30 },
+      { id: 'v3', name: 'Volume III - Past Performance', progress: 92, status: 'complete', owner: 'Mary Womack', pages: 18, limit: 20 },
+      { id: 'v4', name: 'Volume IV - Cost/Price', progress: 55, status: 'behind', owner: 'James Wilson', pages: 35, limit: 40 },
+    ];
+
+    const DEMO_COMPLIANCE = [
+      { id: 'c1', section: 'L.5.1', requirement: 'Technical Approach', status: 'compliant', reference: 'Vol I, Sec 3.1' },
+      { id: 'c2', section: 'L.5.2', requirement: 'Staffing Plan', status: 'partial', reference: 'Vol II, Sec 2.4' },
+      { id: 'c3', section: 'L.5.3', requirement: 'Key Personnel', status: 'compliant', reference: 'Vol II, Sec 2.5' },
+      { id: 'c4', section: 'L.5.4', requirement: 'Quality Control', status: 'missing', reference: 'Not addressed' },
+      { id: 'c5', section: 'M.1', requirement: 'Technical Evaluation', status: 'compliant', reference: 'Vol I, Sec 4' },
+      { id: 'c6', section: 'M.2', requirement: 'Past Performance', status: 'compliant', reference: 'Vol III' },
+      { id: 'c7', section: 'M.3', requirement: 'Price Reasonableness', status: 'partial', reference: 'Vol IV, pending' },
+    ];
+
+    const DEMO_RISKS = [
+      { id: 'r1', title: 'Key Personnel availability', severity: 'high', status: 'open', mitigation: 'Backup candidates identified', owner: 'Sarah Martinez' },
+      { id: 'r2', title: 'Pricing below ICE', severity: 'medium', status: 'mitigating', mitigation: 'BOE revision in progress', owner: 'James Wilson' },
+      { id: 'r3', title: 'Past performance gap', severity: 'low', status: 'closed', mitigation: 'Teaming partner covers gap', owner: 'Mary Womack' },
+      { id: 'r4', title: 'Page count exceeds limit', severity: 'high', status: 'open', mitigation: 'Content reduction review', owner: 'Sarah Martinez' },
+    ];
+
+    const DEMO_TASKS = [
+      { id: 'k1', title: 'Finalize Executive Summary', column: 'in-progress', priority: 'high', assignee: 'Mary Womack', due: '2 days' },
+      { id: 'k2', title: 'Complete labor rate analysis', column: 'in-progress', priority: 'high', assignee: 'James Wilson', due: '1 day' },
+      { id: 'k3', title: 'Update org chart', column: 'todo', priority: 'medium', assignee: 'Sarah Martinez', due: '3 days' },
+      { id: 'k4', title: 'Draft QC plan section', column: 'todo', priority: 'high', assignee: 'Emily Park', due: '2 days' },
+      { id: 'k5', title: 'Technical review - Vol I', column: 'review', priority: 'medium', assignee: 'Daniel Chen', due: '4 days' },
+      { id: 'k6', title: 'Past performance narratives', column: 'done', priority: 'low', assignee: 'Mary Womack', due: 'Complete' },
+      { id: 'k7', title: 'Subcontractor LOCs', column: 'done', priority: 'medium', assignee: 'Michael Brown', due: 'Complete' },
+      { id: 'k8', title: 'Security clearance verification', column: 'review', priority: 'high', assignee: 'Emily Park', due: '5 days' },
+    ];
+
+    // ============================================
+    // ICONS
+    // ============================================
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      alertTriangle: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      trendingUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      activity: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>,
+      dollarSign: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      loader: () => <svg className="w-full h-full animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      flag: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" /></svg>,
+      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================
+    // UI COMPONENTS
+    // ============================================
+    const Card = ({ children, className = '', glow = false, alert = false }) => (
+      <div className={`bg-slate-900/80 backdrop-blur border rounded-xl ${
+        alert ? 'border-red-500/50 shadow-lg shadow-red-500/10' :
+        glow ? 'border-cyan-500/30 shadow-lg shadow-cyan-500/10' : 
+        'border-slate-700/50'
+      } ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Badge = ({ children, variant = 'default', size = 'sm', pulse = false }) => {
+      const variants = {
+        default: 'bg-slate-700 text-slate-300',
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return <span className={`inline-flex items-center rounded-full font-medium ${variants[variant]} ${sizes[size]} ${pulse ? 'animate-pulse' : ''}`}>{children}</span>;
+    };
+
+    const Avatar = ({ user, size = 'md', showStatus = true }) => {
+      const sizes = { xs: 'w-6 h-6 text-xs', sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' };
+      const statusColors = { active: 'bg-emerald-500', away: 'bg-amber-500', offline: 'bg-slate-500' };
+      return (
+        <div className="relative inline-block">
+          <div className={`${sizes[size]} rounded-full flex items-center justify-center font-bold text-white`} style={{ backgroundColor: user.color }}>
+            {user.avatar}
+          </div>
+          {showStatus && <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${statusColors[user.status]}`} />}
+        </div>
+      );
+    };
+
+    // Progress Ring Component
+    const ProgressRing = ({ progress, size = 80, strokeWidth = 8, color = '#00E5FA' }) => {
+      const radius = (size - strokeWidth) / 2;
+      const circumference = radius * 2 * Math.PI;
+      const offset = circumference - (progress / 100) * circumference;
+      
+      return (
+        <svg width={size} height={size} className="progress-ring">
+          <circle
+            stroke="#1e293b"
+            fill="transparent"
+            strokeWidth={strokeWidth}
+            r={radius}
+            cx={size / 2}
+            cy={size / 2}
+          />
+          <circle
+            className="progress-ring-circle"
+            stroke={color}
+            fill="transparent"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            r={radius}
+            cx={size / 2}
+            cy={size / 2}
+            style={{ strokeDasharray: circumference, strokeDashoffset: offset }}
+          />
+        </svg>
+      );
+    };
+
+    // Toast System
+    const ToastContext = createContext();
+    const ToastProvider = ({ children }) => {
+      const [toasts, setToasts] = useState([]);
+      const addToast = useCallback((message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+      }, []);
+      return (
+        <ToastContext.Provider value={{ addToast }}>
+          {children}
+          <div className="fixed bottom-4 right-4 z-50 space-y-2">
+            {toasts.map(toast => (
+              <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg border backdrop-blur animate-slideUp ${
+                toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
+                toast.type === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
+                toast.type === 'warning' ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' :
+                'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+              }`}>
+                {toast.message}
+              </div>
+            ))}
+          </div>
+        </ToastContext.Provider>
+      );
+    };
+    const useToast = () => useContext(ToastContext);
+
+    // ============================================
+    // COUNTDOWN TIMER
+    // ============================================
+    const CountdownTimer = ({ dueDate, submissionTime }) => {
+      const [timeLeft, setTimeLeft] = useState({});
+      const [urgency, setUrgency] = useState('normal');
+
+      useEffect(() => {
+        const calculateTime = () => {
+          const now = new Date();
+          const diff = dueDate - now;
+          
+          if (diff <= 0) {
+            setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+            setUrgency('critical');
+            return;
+          }
+
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+          setTimeLeft({ days, hours, minutes, seconds });
+          
+          if (days <= 3) setUrgency('critical');
+          else if (days <= 7) setUrgency('warning');
+          else setUrgency('normal');
+        };
+
+        calculateTime();
+        const interval = setInterval(calculateTime, 1000);
+        return () => clearInterval(interval);
+      }, [dueDate]);
+
+      const urgencyColors = {
+        normal: { bg: 'from-cyan-500/20 to-teal-500/20', border: 'border-cyan-500/30', text: 'text-cyan-400', glow: 'shadow-cyan-500/20' },
+        warning: { bg: 'from-amber-500/20 to-orange-500/20', border: 'border-amber-500/30', text: 'text-amber-400', glow: 'shadow-amber-500/20' },
+        critical: { bg: 'from-red-500/20 to-rose-500/20', border: 'border-red-500/30', text: 'text-red-400', glow: 'shadow-red-500/20' },
+      };
+
+      const colors = urgencyColors[urgency];
+
+      return (
+        <Card className={`p-6 bg-gradient-to-br ${colors.bg} ${colors.border} shadow-lg ${colors.glow} ${urgency === 'critical' ? 'animate-countdown' : ''}`} glow>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Icon name="clock" className={`w-5 h-5 ${colors.text}`} />
+              <span className="font-semibold text-white">Submission Deadline</span>
+            </div>
+            {urgency === 'critical' && (
+              <Badge variant="danger" pulse>URGENT</Badge>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-4 gap-3 mb-4">
+            {[
+              { label: 'Days', value: timeLeft.days },
+              { label: 'Hours', value: timeLeft.hours },
+              { label: 'Minutes', value: timeLeft.minutes },
+              { label: 'Seconds', value: timeLeft.seconds },
+            ].map((unit, i) => (
+              <div key={unit.label} className="text-center">
+                <div className={`font-mono text-3xl font-black ${colors.text} ${i === 3 ? 'animate-pulse' : ''}`}>
+                  {String(unit.value).padStart(2, '0')}
+                </div>
+                <div className="text-xs text-slate-400 uppercase tracking-wider">{unit.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-400">
+              {dueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
+            <span className={`font-semibold ${colors.text}`}>{submissionTime}</span>
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================
+    // VOLUME PROGRESS TRACKER
+    // ============================================
+    const VolumeProgress = ({ volumes }) => {
+      const statusColors = {
+        'on-track': { bar: 'bg-emerald-500', text: 'text-emerald-400' },
+        'at-risk': { bar: 'bg-amber-500', text: 'text-amber-400' },
+        'behind': { bar: 'bg-red-500', text: 'text-red-400' },
+        'complete': { bar: 'bg-cyan-500', text: 'text-cyan-400' },
+      };
+
+      return (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Icon name="fileText" className="w-4 h-4 text-cyan-400" />
+              Volume Status
+            </h3>
+            <Badge variant="primary" size="xs">{volumes.filter(v => v.status === 'complete').length}/{volumes.length} Complete</Badge>
+          </div>
+          <div className="space-y-4">
+            {volumes.map((vol, i) => {
+              const colors = statusColors[vol.status];
+              return (
+                <div key={vol.id} className="animate-slideIn" style={{ animationDelay: `${i * 100}ms` }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-white">{vol.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">{vol.pages}/{vol.limit} pg</span>
+                      <span className={`text-xs font-semibold ${colors.text}`}>{vol.progress}%</span>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${colors.bar} rounded-full animate-progress`}
+                      style={{ width: `${vol.progress}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-slate-500">{vol.owner}</span>
+                    <Badge variant={vol.status === 'complete' ? 'success' : vol.status === 'behind' ? 'danger' : vol.status === 'at-risk' ? 'warning' : 'primary'} size="xs">
+                      {vol.status.replace('-', ' ')}
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================
+    // COMPLIANCE MATRIX
+    // ============================================
+    const ComplianceMatrix = ({ items }) => {
+      const stats = {
+        compliant: items.filter(i => i.status === 'compliant').length,
+        partial: items.filter(i => i.status === 'partial').length,
+        missing: items.filter(i => i.status === 'missing').length,
+      };
+
+      const statusConfig = {
+        compliant: { icon: 'check', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+        partial: { icon: 'alertTriangle', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+        missing: { icon: 'x', color: 'text-red-400', bg: 'bg-red-500/20' },
+      };
+
+      return (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Icon name="clipboard" className="w-4 h-4 text-cyan-400" />
+              Compliance Matrix
+            </h3>
+            <div className="flex gap-2">
+              <Badge variant="success" size="xs">{stats.compliant} ✓</Badge>
+              <Badge variant="warning" size="xs">{stats.partial} !</Badge>
+              <Badge variant="danger" size="xs">{stats.missing} ✗</Badge>
+            </div>
+          </div>
+          
+          <div className="overflow-hidden rounded-lg border border-slate-700/50">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-800/50">
+                <tr className="text-left text-slate-400">
+                  <th className="px-3 py-2">Section</th>
+                  <th className="px-3 py-2">Requirement</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {items.map((item, i) => {
+                  const config = statusConfig[item.status];
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-3 py-2 font-mono text-cyan-400">{item.section}</td>
+                      <td className="px-3 py-2 text-white">{item.requirement}</td>
+                      <td className="px-3 py-2">
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded ${config.bg}`}>
+                          <Icon name={config.icon} className={`w-3 h-3 ${config.color}`} />
+                          <span className={`text-xs font-medium ${config.color} capitalize`}>{item.status}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================
+    // RISK TRACKER
+    // ============================================
+    const RiskTracker = ({ risks }) => {
+      const severityConfig = {
+        high: { color: 'text-red-400', bg: 'bg-red-500/20', border: 'border-red-500/30' },
+        medium: { color: 'text-amber-400', bg: 'bg-amber-500/20', border: 'border-amber-500/30' },
+        low: { color: 'text-emerald-400', bg: 'bg-emerald-500/20', border: 'border-emerald-500/30' },
+      };
+
+      const statusConfig = {
+        open: { text: 'Open', variant: 'danger' },
+        mitigating: { text: 'Mitigating', variant: 'warning' },
+        closed: { text: 'Closed', variant: 'success' },
+      };
+
+      const openRisks = risks.filter(r => r.status !== 'closed').length;
+
+      return (
+        <Card className={`p-5 ${openRisks > 0 ? '' : ''}`} alert={risks.some(r => r.severity === 'high' && r.status === 'open')}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Icon name="alertTriangle" className="w-4 h-4 text-amber-400" />
+              Risk Tracker
+            </h3>
+            <Badge variant={openRisks > 2 ? 'danger' : openRisks > 0 ? 'warning' : 'success'} size="xs">
+              {openRisks} Open
+            </Badge>
+          </div>
+          <div className="space-y-3">
+            {risks.map((risk, i) => {
+              const sev = severityConfig[risk.severity];
+              const status = statusConfig[risk.status];
+              return (
+                <div 
+                  key={risk.id} 
+                  className={`p-3 rounded-lg border ${sev.border} ${sev.bg} animate-slideIn`}
+                  style={{ animationDelay: `${i * 80}ms` }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Icon name="flag" className={`w-4 h-4 ${sev.color}`} />
+                      <span className="text-white font-medium text-sm">{risk.title}</span>
+                    </div>
+                    <Badge variant={status.variant} size="xs">{status.text}</Badge>
+                  </div>
+                  <p className="text-slate-400 text-xs mb-2">{risk.mitigation}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Owner: {risk.owner}</span>
+                    <span className={`text-xs font-semibold ${sev.color} uppercase`}>{risk.severity}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================
+    // TEAM WORKLOAD
+    // ============================================
+    const TeamWorkload = ({ team }) => {
+      return (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Icon name="users" className="w-4 h-4 text-cyan-400" />
+              Team Workload
+            </h3>
+            <Badge variant="primary" size="xs">{team.filter(t => t.status === 'active').length} Active</Badge>
+          </div>
+          <div className="space-y-3">
+            {team.map((member, i) => {
+              const workloadColor = member.workload >= 90 ? 'bg-red-500' : member.workload >= 75 ? 'bg-amber-500' : 'bg-emerald-500';
+              return (
+                <div key={member.id} className="flex items-center gap-3 animate-slideIn" style={{ animationDelay: `${i * 60}ms` }}>
+                  <Avatar user={member} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-white truncate">{member.name}</span>
+                      <span className="text-xs text-slate-400">{member.tasks} tasks</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className={`h-full ${workloadColor} rounded-full`} style={{ width: `${member.workload}%` }} />
+                      </div>
+                      <span className={`text-xs font-medium ${member.workload >= 90 ? 'text-red-400' : member.workload >= 75 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {member.workload}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================
+    // KANBAN BOARD
+    // ============================================
+    const KanbanBoard = ({ tasks: initialTasks }) => {
+      const [tasks, setTasks] = useState(initialTasks);
+      const { addToast } = useToast();
+
+      const columns = [
+        { id: 'todo', title: 'To Do', color: 'border-slate-500' },
+        { id: 'in-progress', title: 'In Progress', color: 'border-cyan-500' },
+        { id: 'review', title: 'Review', color: 'border-amber-500' },
+        { id: 'done', title: 'Done', color: 'border-emerald-500' },
+      ];
+
+      const priorityConfig = {
+        high: { color: 'text-red-400', bg: 'bg-red-500/20' },
+        medium: { color: 'text-amber-400', bg: 'bg-amber-500/20' },
+        low: { color: 'text-slate-400', bg: 'bg-slate-500/20' },
+      };
+
+      const moveTask = (taskId, newColumn) => {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, column: newColumn } : t));
+        addToast(`Task moved to ${columns.find(c => c.id === newColumn)?.title}`, 'success');
+      };
+
+      return (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Icon name="activity" className="w-4 h-4 text-cyan-400" />
+              Task Board
+            </h3>
+            <button className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm font-medium hover:bg-cyan-500/30 transition-colors">
+              <Icon name="plus" className="w-4 h-4" />
+              Add Task
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-4">
+            {columns.map(column => {
+              const columnTasks = tasks.filter(t => t.column === column.id);
+              return (
+                <div key={column.id} className={`border-t-2 ${column.color} pt-3`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-slate-300">{column.title}</span>
+                    <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{columnTasks.length}</span>
+                  </div>
+                  <div className="space-y-2 min-h-[200px]">
+                    {columnTasks.map((task, i) => {
+                      const priority = priorityConfig[task.priority];
+                      return (
+                        <div 
+                          key={task.id}
+                          className="kanban-card p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 cursor-pointer animate-slideUp"
+                          style={{ animationDelay: `${i * 50}ms` }}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="text-sm text-white font-medium leading-tight">{task.title}</span>
+                            <div className={`w-2 h-2 rounded-full ${priority.bg.replace('/20', '')}`} title={task.priority} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-500">{task.assignee.split(' ')[0]}</span>
+                            <span className={`text-xs ${task.due === 'Complete' ? 'text-emerald-400' : task.due.includes('1') ? 'text-red-400' : 'text-slate-400'}`}>
+                              {task.due}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      );
+    };
+
+    // ============================================
+    // OPPORTUNITY HEADER
+    // ============================================
+    const OpportunityHeader = ({ opportunity }) => {
+      const formatCurrency = (value) => {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+      };
+
+      return (
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/30 animate-glow">
+              <Icon name="target" className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-white">{opportunity.title}</h1>
+                <Badge variant="warning" size="md">PROPOSAL PHASE</Badge>
+              </div>
+              <div className="flex items-center gap-4 mt-1 text-sm">
+                <span className="text-slate-400">{opportunity.agency}</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-cyan-400 font-mono">{opportunity.solicitation}</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-emerald-400 font-semibold">{formatCurrency(opportunity.value)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            {/* pWin Gauge */}
+            <div className="relative">
+              <ProgressRing progress={opportunity.pwin} size={70} strokeWidth={6} color="#00E5FA" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <span className="text-xl font-bold text-white">{opportunity.pwin}</span>
+                  <span className="text-xs text-slate-400 block">pWin</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Quick Actions */}
+            <div className="flex gap-2">
+              <button className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                <Icon name="cpu" className="w-5 h-5" />
+              </button>
+              <button className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                <Icon name="eye" className="w-5 h-5" />
+              </button>
+              <button className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                <Icon name="refresh" className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // STATUS BANNER
+    // ============================================
+    const StatusBanner = () => {
+      const [time, setTime] = useState(new Date());
+      
+      useEffect(() => {
+        const interval = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(interval);
+      }, []);
+
+      return (
+        <div className="flex items-center justify-between px-4 py-2 bg-slate-900/50 border-b border-slate-800 text-sm">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-emerald-400 font-medium">WAR ROOM ACTIVE</span>
+            </div>
+            <span className="text-slate-500">|</span>
+            <span className="text-slate-400">
+              <Icon name="shield" className="w-4 h-4 inline mr-1" />
+              MissionPulse v12.0
+            </span>
+          </div>
+          <div className="flex items-center gap-6">
+            <span className="text-slate-400">
+              <Icon name="users" className="w-4 h-4 inline mr-1" />
+              6 Team Members Online
+            </span>
+            <span className="text-slate-500">|</span>
+            <span className="font-mono text-cyan-400">
+              {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // MAIN WAR ROOM
+    // ============================================
+    const WarRoom = () => {
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        const timer = setTimeout(() => setLoading(false), 800);
+        return () => clearTimeout(timer);
+      }, []);
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center mx-auto mb-4 animate-glow">
+                <Icon name="target" className="w-10 h-10 text-white" />
+              </div>
+              <Icon name="loader" className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
+              <p className="text-slate-400">Initializing War Room...</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          <StatusBanner />
+          
+          <div className="p-6 max-w-[1800px] mx-auto animate-fadeIn">
+            <OpportunityHeader opportunity={DEMO_OPPORTUNITY} />
+            
+            {/* Main Grid */}
+            <div className="grid grid-cols-12 gap-5">
+              {/* Left Column - Countdown & Volumes */}
+              <div className="col-span-12 lg:col-span-4 space-y-5">
+                <CountdownTimer dueDate={DEMO_OPPORTUNITY.due_date} submissionTime={DEMO_OPPORTUNITY.submission_time} />
+                <VolumeProgress volumes={DEMO_VOLUMES} />
+                <TeamWorkload team={DEMO_TEAM} />
+              </div>
+
+              {/* Center Column - Kanban */}
+              <div className="col-span-12 lg:col-span-5">
+                <KanbanBoard tasks={DEMO_TASKS} />
+              </div>
+
+              {/* Right Column - Compliance & Risks */}
+              <div className="col-span-12 lg:col-span-3 space-y-5">
+                <ComplianceMatrix items={DEMO_COMPLIANCE} />
+                <RiskTracker risks={DEMO_RISKS} />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-6 text-center">
+              <p className="text-slate-600 text-xs">
+                AI GENERATED - REQUIRES HUMAN REVIEW • Mission Meets Tech • MissionPulse War Room
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // APP
+    // ============================================
+    function App() {
+      return (
+        <ToastProvider>
+          <WarRoom />
+        </ToastProvider>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

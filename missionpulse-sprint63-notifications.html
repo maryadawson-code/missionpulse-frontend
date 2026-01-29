@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse | Notifications</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mp-navy': '#00050F',
+                        'mp-cyan': '#00E5FA',
+                        'mp-cyan-dark': '#00B8C8',
+                        'mp-slate': '#0A1628',
+                        'mp-card': '#111827',
+                        'mp-border': '#1E3A5F'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glow-cyan { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #0A1628; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #1E3A5F; border-radius: 2px; }
+        .notification-enter { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .toast-enter { animation: toastIn 0.4s ease-out; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-mp-navy text-white min-h-screen">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Notification Types & Data
+        const NOTIFICATION_TYPES = {
+            deadline: { icon: '⏰', color: 'red', label: 'Deadline' },
+            approval: { icon: '✅', color: 'orange', label: 'Approval Required' },
+            mention: { icon: '@', color: 'cyan', label: 'Mention' },
+            ai_complete: { icon: '🤖', color: 'purple', label: 'AI Complete' },
+            system: { icon: '⚙️', color: 'gray', label: 'System' },
+            win: { icon: '🏆', color: 'green', label: 'Win Alert' },
+            risk: { icon: '⚠️', color: 'yellow', label: 'Risk Alert' },
+            team: { icon: '👥', color: 'blue', label: 'Team Update' }
+        };
+
+        const DEMO_NOTIFICATIONS = [
+            {
+                id: 1,
+                type: 'deadline',
+                title: 'Proposal Due in 3 Days',
+                message: 'DHA Telehealth Platform final submission deadline approaching',
+                opportunity: 'DHA Telehealth Platform',
+                time: '2 min ago',
+                read: false,
+                priority: 'critical',
+                actionUrl: 'missionpulse-sprint61-warroom.html',
+                actionLabel: 'Open War Room'
+            },
+            {
+                id: 2,
+                type: 'approval',
+                title: 'Pricing BOE Needs Your Review',
+                message: 'Daniel Torres submitted pricing model for VA EHR Modernization',
+                opportunity: 'VA EHR Modernization',
+                time: '15 min ago',
+                read: false,
+                priority: 'high',
+                actionUrl: 'missionpulse-m9-hitl-enhanced.html',
+                actionLabel: 'Review Now'
+            },
+            {
+                id: 3,
+                type: 'ai_complete',
+                title: 'Black Hat Analysis Ready',
+                message: 'AI Agent completed competitor analysis for IHS Cloud Migration',
+                opportunity: 'IHS Cloud Migration',
+                time: '32 min ago',
+                read: false,
+                priority: 'medium',
+                actionUrl: 'missionpulse-m7-blackhat-enhanced.html',
+                actionLabel: 'View Analysis'
+            },
+            {
+                id: 4,
+                type: 'mention',
+                title: 'Sarah Chen mentioned you',
+                message: '"@Mary can you review the compliance matrix before EOD?"',
+                opportunity: 'CMS Data Analytics',
+                time: '1 hour ago',
+                read: false,
+                priority: 'medium',
+                actionUrl: 'missionpulse-m6-iron-dome.html',
+                actionLabel: 'View Thread'
+            },
+            {
+                id: 5,
+                type: 'risk',
+                title: 'Compliance Risk Detected',
+                message: 'Iron Dome flagged potential FAR 52.219-14 violation in teaming agreement',
+                opportunity: 'VA EHR Modernization',
+                time: '2 hours ago',
+                read: true,
+                priority: 'high',
+                actionUrl: 'missionpulse-m6-iron-dome.html',
+                actionLabel: 'Review Risk'
+            },
+            {
+                id: 6,
+                type: 'team',
+                title: 'Mike Johnson joined the team',
+                message: 'Added as Technical Writer for DoD Health Records opportunity',
+                opportunity: 'DoD Health Records',
+                time: '3 hours ago',
+                read: true,
+                priority: 'low'
+            },
+            {
+                id: 7,
+                type: 'win',
+                title: 'Go/No-Go Decision: GO',
+                message: 'Leadership approved pursuit of CMS Analytics opportunity',
+                opportunity: 'CMS Data Analytics',
+                time: '4 hours ago',
+                read: true,
+                priority: 'medium'
+            },
+            {
+                id: 8,
+                type: 'system',
+                title: 'Scheduled Maintenance Complete',
+                message: 'Supabase database maintenance window completed successfully',
+                time: '6 hours ago',
+                read: true,
+                priority: 'low'
+            },
+            {
+                id: 9,
+                type: 'deadline',
+                title: 'Questions Due Tomorrow',
+                message: 'VA EHR Modernization RFP questions submission deadline',
+                opportunity: 'VA EHR Modernization',
+                time: 'Yesterday',
+                read: true,
+                priority: 'high',
+                actionUrl: 'index__13_.html',
+                actionLabel: 'View RFP'
+            },
+            {
+                id: 10,
+                type: 'ai_complete',
+                title: 'Executive Summary Generated',
+                message: 'AI Writer completed first draft for DHA Telehealth proposal',
+                opportunity: 'DHA Telehealth Platform',
+                time: 'Yesterday',
+                read: true,
+                priority: 'medium',
+                actionUrl: 'missionpulse-sprint55-agenthub.html',
+                actionLabel: 'View Draft'
+            }
+        ];
+
+        const NOTIFICATION_PREFERENCES = [
+            { id: 'deadlines', label: 'Deadline Reminders', description: '3 days, 1 day, and same-day alerts', enabled: true },
+            { id: 'approvals', label: 'Approval Requests', description: 'When items need your review', enabled: true },
+            { id: 'mentions', label: 'Mentions & Tags', description: 'When someone @mentions you', enabled: true },
+            { id: 'ai_complete', label: 'AI Task Completion', description: 'When AI agents finish tasks', enabled: true },
+            { id: 'risks', label: 'Risk Alerts', description: 'Compliance and security warnings', enabled: true },
+            { id: 'team', label: 'Team Updates', description: 'Member joins, role changes', enabled: false },
+            { id: 'system', label: 'System Notifications', description: 'Maintenance, updates', enabled: false },
+            { id: 'wins', label: 'Win/Loss Alerts', description: 'Award decisions and Go/No-Go', enabled: true }
+        ];
+
+        // Components
+        const Header = ({ unreadCount, onMarkAllRead }) => (
+            <header className="bg-mp-slate border-b border-mp-border px-6 py-4">
+                <div className="max-w-5xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <a href="missionpulse-sprint62-dashboard.html" className="text-gray-400 hover:text-white transition-colors">
+                            ← Back to Dashboard
+                        </a>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                            🔔 Notifications
+                            {unreadCount > 0 && (
+                                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                    {unreadCount}
+                                </span>
+                            )}
+                        </h1>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {unreadCount > 0 && (
+                            <button 
+                                onClick={onMarkAllRead}
+                                className="text-sm text-mp-cyan hover:text-white transition-colors"
+                            >
+                                Mark all as read
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </header>
+        );
+
+        const Toast = ({ notification, onDismiss }) => {
+            const type = NOTIFICATION_TYPES[notification.type];
+            
+            useEffect(() => {
+                const timer = setTimeout(() => onDismiss(notification.id), 5000);
+                return () => clearTimeout(timer);
+            }, []);
+
+            const colorClasses = {
+                red: 'border-red-500 bg-red-500/10',
+                orange: 'border-orange-500 bg-orange-500/10',
+                cyan: 'border-mp-cyan bg-mp-cyan/10',
+                purple: 'border-purple-500 bg-purple-500/10',
+                green: 'border-green-500 bg-green-500/10',
+                yellow: 'border-yellow-500 bg-yellow-500/10',
+                blue: 'border-blue-500 bg-blue-500/10',
+                gray: 'border-gray-500 bg-gray-500/10'
+            };
+
+            return (
+                <div className={`toast-enter border-l-4 ${colorClasses[type.color]} rounded-r-lg p-4 shadow-lg max-w-md`}>
+                    <div className="flex items-start gap-3">
+                        <span className="text-xl">{type.icon}</span>
+                        <div className="flex-1">
+                            <p className="text-sm font-medium text-white">{notification.title}</p>
+                            <p className="text-xs text-gray-400 mt-1">{notification.message}</p>
+                        </div>
+                        <button 
+                            onClick={() => onDismiss(notification.id)}
+                            className="text-gray-400 hover:text-white"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const ToastContainer = ({ toasts, onDismiss }) => (
+            <div className="fixed top-4 right-4 z-50 space-y-2">
+                {toasts.map(toast => (
+                    <Toast key={toast.id} notification={toast} onDismiss={onDismiss} />
+                ))}
+            </div>
+        );
+
+        const NotificationCard = ({ notification, onRead, onAction }) => {
+            const type = NOTIFICATION_TYPES[notification.type];
+            
+            const priorityBadge = {
+                critical: 'bg-red-500/20 text-red-400 border-red-500/30',
+                high: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+                medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                low: 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+            };
+
+            const colorClasses = {
+                red: 'border-red-500',
+                orange: 'border-orange-500',
+                cyan: 'border-mp-cyan',
+                purple: 'border-purple-500',
+                green: 'border-green-500',
+                yellow: 'border-yellow-500',
+                blue: 'border-blue-500',
+                gray: 'border-gray-500'
+            };
+
+            return (
+                <div 
+                    className={`notification-enter border-l-4 ${colorClasses[type.color]} bg-mp-card rounded-r-lg p-4 ${
+                        !notification.read ? 'bg-opacity-100' : 'bg-opacity-50'
+                    }`}
+                    onClick={() => !notification.read && onRead(notification.id)}
+                >
+                    <div className="flex items-start gap-4">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${
+                            !notification.read ? 'bg-mp-slate' : 'bg-mp-navy'
+                        }`}>
+                            {type.icon}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                                <div>
+                                    <p className={`text-sm font-medium ${!notification.read ? 'text-white' : 'text-gray-300'}`}>
+                                        {notification.title}
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-1">{notification.message}</p>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className="text-xs text-gray-500 whitespace-nowrap">{notification.time}</span>
+                                    {!notification.read && (
+                                        <span className="w-2 h-2 bg-mp-cyan rounded-full"></span>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 mt-3">
+                                {notification.opportunity && (
+                                    <span className="text-xs text-mp-cyan">{notification.opportunity}</span>
+                                )}
+                                {notification.priority && (
+                                    <span className={`text-xs px-2 py-0.5 rounded border ${priorityBadge[notification.priority]}`}>
+                                        {notification.priority}
+                                    </span>
+                                )}
+                                {notification.actionUrl && (
+                                    <a 
+                                        href={notification.actionUrl}
+                                        className="text-xs bg-mp-slate hover:bg-mp-cyan/20 text-mp-cyan px-3 py-1 rounded transition-colors ml-auto"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {notification.actionLabel} →
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const FilterTabs = ({ activeFilter, onFilterChange, counts }) => {
+            const filters = [
+                { id: 'all', label: 'All', count: counts.all },
+                { id: 'unread', label: 'Unread', count: counts.unread },
+                { id: 'deadline', label: 'Deadlines', count: counts.deadline },
+                { id: 'approval', label: 'Approvals', count: counts.approval },
+                { id: 'ai_complete', label: 'AI Tasks', count: counts.ai_complete },
+                { id: 'mention', label: 'Mentions', count: counts.mention }
+            ];
+
+            return (
+                <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    {filters.map(filter => (
+                        <button
+                            key={filter.id}
+                            onClick={() => onFilterChange(filter.id)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
+                                activeFilter === filter.id
+                                    ? 'bg-mp-cyan text-mp-navy font-medium'
+                                    : 'bg-mp-slate text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            {filter.label}
+                            {filter.count > 0 && (
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                    activeFilter === filter.id
+                                        ? 'bg-mp-navy/30 text-mp-navy'
+                                        : 'bg-mp-border text-gray-400'
+                                }`}>
+                                    {filter.count}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            );
+        };
+
+        const PreferencesPanel = ({ preferences, onToggle }) => (
+            <div className="bg-mp-card border border-mp-border rounded-xl p-6 glow-cyan">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    ⚙️ Notification Preferences
+                </h3>
+                <div className="space-y-4">
+                    {preferences.map(pref => (
+                        <div key={pref.id} className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-white">{pref.label}</p>
+                                <p className="text-xs text-gray-400">{pref.description}</p>
+                            </div>
+                            <button
+                                onClick={() => onToggle(pref.id)}
+                                className={`relative w-12 h-6 rounded-full transition-colors ${
+                                    pref.enabled ? 'bg-mp-cyan' : 'bg-mp-slate'
+                                }`}
+                            >
+                                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                                    pref.enabled ? 'left-7' : 'left-1'
+                                }`}></span>
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        const QuickStats = ({ notifications }) => {
+            const today = notifications.filter(n => n.time.includes('min') || n.time.includes('hour')).length;
+            const critical = notifications.filter(n => n.priority === 'critical' && !n.read).length;
+            const pending = notifications.filter(n => n.type === 'approval' && !n.read).length;
+
+            return (
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="bg-mp-card border border-mp-border rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-white">{today}</p>
+                        <p className="text-xs text-gray-400">Today</p>
+                    </div>
+                    <div className="bg-mp-card border border-red-500/30 rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-red-400">{critical}</p>
+                        <p className="text-xs text-gray-400">Critical</p>
+                    </div>
+                    <div className="bg-mp-card border border-orange-500/30 rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-orange-400">{pending}</p>
+                        <p className="text-xs text-gray-400">Pending Approval</p>
+                    </div>
+                </div>
+            );
+        };
+
+        // Main App
+        const App = () => {
+            const [notifications, setNotifications] = useState(DEMO_NOTIFICATIONS);
+            const [preferences, setPreferences] = useState(NOTIFICATION_PREFERENCES);
+            const [activeFilter, setActiveFilter] = useState('all');
+            const [showPreferences, setShowPreferences] = useState(false);
+            const [toasts, setToasts] = useState([]);
+
+            const unreadCount = notifications.filter(n => !n.read).length;
+
+            const counts = {
+                all: notifications.length,
+                unread: unreadCount,
+                deadline: notifications.filter(n => n.type === 'deadline').length,
+                approval: notifications.filter(n => n.type === 'approval').length,
+                ai_complete: notifications.filter(n => n.type === 'ai_complete').length,
+                mention: notifications.filter(n => n.type === 'mention').length
+            };
+
+            const filteredNotifications = notifications.filter(n => {
+                if (activeFilter === 'all') return true;
+                if (activeFilter === 'unread') return !n.read;
+                return n.type === activeFilter;
+            });
+
+            const markAsRead = (id) => {
+                setNotifications(prev => prev.map(n => 
+                    n.id === id ? { ...n, read: true } : n
+                ));
+            };
+
+            const markAllAsRead = () => {
+                setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            };
+
+            const togglePreference = (id) => {
+                setPreferences(prev => prev.map(p =>
+                    p.id === id ? { ...p, enabled: !p.enabled } : p
+                ));
+            };
+
+            const dismissToast = (id) => {
+                setToasts(prev => prev.filter(t => t.id !== id));
+            };
+
+            // Simulate incoming notification
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    const newNotification = {
+                        id: Date.now(),
+                        type: 'ai_complete',
+                        title: 'Win Theme Analysis Complete',
+                        message: 'AI Strategy Agent finished competitive positioning analysis',
+                        opportunity: 'VA EHR Modernization',
+                        time: 'Just now',
+                        read: false,
+                        priority: 'medium'
+                    };
+                    setToasts(prev => [...prev, newNotification]);
+                    setNotifications(prev => [newNotification, ...prev]);
+                }, 8000);
+                return () => clearTimeout(timer);
+            }, []);
+
+            return (
+                <div className="min-h-screen bg-mp-navy">
+                    <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+                    <Header unreadCount={unreadCount} onMarkAllRead={markAllAsRead} />
+                    
+                    <main className="max-w-5xl mx-auto px-6 py-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Main Notifications */}
+                            <div className="lg:col-span-2 space-y-4">
+                                <QuickStats notifications={notifications} />
+                                
+                                <div className="flex items-center justify-between">
+                                    <FilterTabs 
+                                        activeFilter={activeFilter} 
+                                        onFilterChange={setActiveFilter}
+                                        counts={counts}
+                                    />
+                                    <button
+                                        onClick={() => setShowPreferences(!showPreferences)}
+                                        className="lg:hidden text-sm text-gray-400 hover:text-white"
+                                    >
+                                        ⚙️ Settings
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3 max-h-[calc(100vh-320px)] overflow-y-auto scrollbar-thin">
+                                    {filteredNotifications.length > 0 ? (
+                                        filteredNotifications.map(notification => (
+                                            <NotificationCard
+                                                key={notification.id}
+                                                notification={notification}
+                                                onRead={markAsRead}
+                                            />
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-12 text-gray-400">
+                                            <p className="text-4xl mb-2">📭</p>
+                                            <p>No notifications in this category</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Preferences Sidebar */}
+                            <div className={`${showPreferences ? 'block' : 'hidden lg:block'}`}>
+                                <PreferencesPanel 
+                                    preferences={preferences} 
+                                    onToggle={togglePreference} 
+                                />
+                                
+                                <div className="mt-4 bg-mp-card border border-mp-border rounded-xl p-4">
+                                    <h4 className="text-sm font-medium text-white mb-3">Quick Actions</h4>
+                                    <div className="space-y-2">
+                                        <button className="w-full text-left text-sm text-gray-400 hover:text-white py-2 px-3 rounded hover:bg-mp-slate transition-colors">
+                                            🗑️ Clear all read notifications
+                                        </button>
+                                        <button className="w-full text-left text-sm text-gray-400 hover:text-white py-2 px-3 rounded hover:bg-mp-slate transition-colors">
+                                            📧 Email digest settings
+                                        </button>
+                                        <button className="w-full text-left text-sm text-gray-400 hover:text-white py-2 px-3 rounded hover:bg-mp-slate transition-colors">
+                                            🔕 Snooze all for 1 hour
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-mp-border py-4 mt-8">
+                        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between text-xs text-gray-500">
+                            <p>AI GENERATED - REQUIRES HUMAN REVIEW</p>
+                            <p>MissionPulse v12 • Sprint 63</p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

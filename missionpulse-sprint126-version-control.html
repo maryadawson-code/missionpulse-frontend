@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- FILE: missionpulse-sprint126-version-control.html -->
+    <!-- ROLE: Admin | User -->
+    <!-- SECURITY: env vars verified, no hardcoded keys -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Version Control | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mp-navy': '#00050F',
+                        'mp-cyan': '#00E5FA',
+                        'mp-slate': '#0A1628',
+                        'mp-dark': '#010510'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-border { background: linear-gradient(135deg, #00E5FA 0%, #0066FF 100%); padding: 1px; }
+        .glass-card { background: rgba(10, 22, 40, 0.8); backdrop-filter: blur(10px); }
+        .diff-add { background: rgba(34, 197, 94, 0.15); border-left: 3px solid #22c55e; }
+        .diff-remove { background: rgba(239, 68, 68, 0.15); border-left: 3px solid #ef4444; }
+        .diff-context { background: transparent; border-left: 3px solid #374151; }
+        .version-line::before { content: ''; position: absolute; left: 15px; top: 40px; bottom: -20px; width: 2px; background: #374151; }
+        .version-line:last-child::before { display: none; }
+    </style>
+</head>
+<body class="bg-mp-navy min-h-screen text-white">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // Demo Data - Document Versions
+        const documents = [
+            { 
+                id: 'DOC-001', 
+                name: 'Technical Approach Vol I', 
+                section: 'Section L.5.1',
+                currentVersion: 'v2.4',
+                status: 'in-review',
+                lastModified: '2025-01-29 10:45',
+                modifiedBy: 'Sarah Chen',
+                versions: 12
+            },
+            { 
+                id: 'DOC-002', 
+                name: 'Management Approach', 
+                section: 'Section L.5.2',
+                currentVersion: 'v1.8',
+                status: 'approved',
+                lastModified: '2025-01-28 16:30',
+                modifiedBy: 'James Wilson',
+                versions: 8
+            },
+            { 
+                id: 'DOC-003', 
+                name: 'Past Performance Vol III', 
+                section: 'Section L.5.3',
+                currentVersion: 'v3.1',
+                status: 'draft',
+                lastModified: '2025-01-29 09:15',
+                modifiedBy: 'Maria Rodriguez',
+                versions: 15
+            },
+            { 
+                id: 'DOC-004', 
+                name: 'Staffing Plan', 
+                section: 'Section L.5.4',
+                currentVersion: 'v2.0',
+                status: 'in-review',
+                lastModified: '2025-01-28 14:20',
+                modifiedBy: 'David Park',
+                versions: 9
+            },
+            { 
+                id: 'DOC-005', 
+                name: 'Quality Control Plan', 
+                section: 'Section L.5.5',
+                currentVersion: 'v1.3',
+                status: 'approved',
+                lastModified: '2025-01-27 11:00',
+                modifiedBy: 'Lisa Thompson',
+                versions: 6
+            }
+        ];
+
+        const versionHistory = [
+            { version: 'v2.4', date: '2025-01-29 10:45', author: 'Sarah Chen', changes: 'Updated FHIR integration architecture diagram', status: 'current', size: '2.4 MB', reviewStatus: 'pending' },
+            { version: 'v2.3', date: '2025-01-28 15:30', author: 'James Wilson', changes: 'Added HL7 compliance section per RFP amendment', status: 'archived', size: '2.3 MB', reviewStatus: 'approved' },
+            { version: 'v2.2', date: '2025-01-27 09:15', author: 'Sarah Chen', changes: 'Incorporated Red Team feedback on Section 3.2', status: 'archived', size: '2.2 MB', reviewStatus: 'approved' },
+            { version: 'v2.1', date: '2025-01-26 14:00', author: 'Maria Rodriguez', changes: 'Added risk mitigation strategies', status: 'archived', size: '2.1 MB', reviewStatus: 'approved' },
+            { version: 'v2.0', date: '2025-01-25 11:30', author: 'David Park', changes: 'Major restructure after Pink Team review', status: 'milestone', size: '2.0 MB', reviewStatus: 'approved' },
+            { version: 'v1.9', date: '2025-01-24 16:45', author: 'Sarah Chen', changes: 'Updated transition plan timeline', status: 'archived', size: '1.9 MB', reviewStatus: 'rejected' },
+            { version: 'v1.8', date: '2025-01-23 10:00', author: 'Lisa Thompson', changes: 'Added cybersecurity approach section', status: 'archived', size: '1.8 MB', reviewStatus: 'approved' }
+        ];
+
+        const diffContent = {
+            oldVersion: 'v2.3',
+            newVersion: 'v2.4',
+            changes: [
+                { type: 'context', lineOld: 45, lineNew: 45, content: 'The proposed FHIR R4 implementation will leverage industry-standard' },
+                { type: 'context', lineOld: 46, lineNew: 46, content: 'APIs to ensure seamless data exchange between disparate systems.' },
+                { type: 'remove', lineOld: 47, lineNew: null, content: 'Our team will utilize basic REST endpoints for data transfer.' },
+                { type: 'add', lineOld: null, lineNew: 47, content: 'Our team will implement a comprehensive SMART on FHIR architecture' },
+                { type: 'add', lineOld: null, lineNew: 48, content: 'with OAuth 2.0 authentication and granular access controls.' },
+                { type: 'context', lineOld: 48, lineNew: 49, content: '' },
+                { type: 'context', lineOld: 49, lineNew: 50, content: '3.2.1 Integration Architecture' },
+                { type: 'remove', lineOld: 50, lineNew: null, content: 'The integration will follow a standard hub-and-spoke model.' },
+                { type: 'add', lineOld: null, lineNew: 51, content: 'The integration will implement an event-driven microservices architecture' },
+                { type: 'add', lineOld: null, lineNew: 52, content: 'with Apache Kafka for real-time data streaming and CDC capabilities.' },
+                { type: 'context', lineOld: 51, lineNew: 53, content: 'Figure 3.1 illustrates the proposed architecture.' }
+            ],
+            stats: { additions: 4, deletions: 2, files: 1 }
+        };
+
+        // Document Card Component
+        function DocumentCard({ doc, onSelect, isSelected }) {
+            const statusColors = {
+                'draft': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+                'in-review': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                'approved': 'bg-green-500/20 text-green-400 border-green-500/30'
+            };
+
+            return (
+                <div 
+                    onClick={() => onSelect(doc)}
+                    className={`glass-card rounded-lg border p-4 cursor-pointer transition-all ${
+                        isSelected 
+                            ? 'border-mp-cyan bg-mp-cyan/5' 
+                            : 'border-gray-800 hover:border-gray-600'
+                    }`}
+                >
+                    <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl">📄</span>
+                            <div>
+                                <h4 className="font-medium">{doc.name}</h4>
+                                <p className="text-gray-500 text-xs">{doc.section}</p>
+                            </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs border ${statusColors[doc.status]}`}>
+                            {doc.status.replace('-', ' ')}
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                        <div className="text-gray-400">
+                            <span className="text-mp-cyan font-mono">{doc.currentVersion}</span>
+                            <span className="mx-2">•</span>
+                            <span>{doc.versions} versions</span>
+                        </div>
+                        <div className="text-gray-500 text-xs">
+                            {doc.modifiedBy}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Version History Item
+        function VersionItem({ version, onCompare, onRestore, compareVersion }) {
+            const isSelected = compareVersion === version.version;
+            const statusIcons = {
+                'current': '🔵',
+                'milestone': '⭐',
+                'archived': '📁'
+            };
+            const reviewColors = {
+                'pending': 'text-yellow-400',
+                'approved': 'text-green-400',
+                'rejected': 'text-red-400'
+            };
+
+            return (
+                <div className={`relative version-line pl-10 pb-6 ${isSelected ? 'bg-mp-cyan/5 -mx-4 px-14 rounded-lg' : ''}`}>
+                    <div className="absolute left-3 top-1 w-6 h-6 rounded-full bg-mp-slate border-2 border-gray-600 flex items-center justify-center text-xs">
+                        {statusIcons[version.status]}
+                    </div>
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <div className="flex items-center gap-3 mb-1">
+                                <span className="font-mono text-mp-cyan font-medium">{version.version}</span>
+                                {version.status === 'current' && (
+                                    <span className="px-2 py-0.5 bg-mp-cyan/20 text-mp-cyan rounded text-xs">Current</span>
+                                )}
+                                {version.status === 'milestone' && (
+                                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">Milestone</span>
+                                )}
+                            </div>
+                            <p className="text-gray-300 text-sm mb-1">{version.changes}</p>
+                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                                <span>{version.author}</span>
+                                <span>{version.date}</span>
+                                <span>{version.size}</span>
+                                <span className={reviewColors[version.reviewStatus]}>
+                                    {version.reviewStatus === 'approved' ? '✓' : version.reviewStatus === 'rejected' ? '✗' : '○'} {version.reviewStatus}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => onCompare(version.version)}
+                                className={`px-3 py-1 rounded text-xs transition-colors ${
+                                    isSelected 
+                                        ? 'bg-mp-cyan text-mp-navy' 
+                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                }`}
+                            >
+                                Compare
+                            </button>
+                            {version.status !== 'current' && (
+                                <button 
+                                    onClick={() => onRestore(version.version)}
+                                    className="px-3 py-1 bg-yellow-600/20 text-yellow-400 rounded text-xs hover:bg-yellow-600/30 transition-colors"
+                                >
+                                    Restore
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Diff Viewer Component
+        function DiffViewer({ diff }) {
+            return (
+                <div className="font-mono text-sm">
+                    <div className="flex items-center justify-between mb-4 p-3 bg-mp-slate rounded-lg">
+                        <div className="flex items-center gap-4">
+                            <span className="text-gray-400">Comparing:</span>
+                            <span className="text-red-400">{diff.oldVersion}</span>
+                            <span className="text-gray-500">→</span>
+                            <span className="text-green-400">{diff.newVersion}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs">
+                            <span className="text-green-400">+{diff.stats.additions} additions</span>
+                            <span className="text-red-400">-{diff.stats.deletions} deletions</span>
+                        </div>
+                    </div>
+                    <div className="border border-gray-800 rounded-lg overflow-hidden">
+                        {diff.changes.map((line, idx) => (
+                            <div 
+                                key={idx}
+                                className={`flex ${
+                                    line.type === 'add' ? 'diff-add' : 
+                                    line.type === 'remove' ? 'diff-remove' : 
+                                    'diff-context'
+                                }`}
+                            >
+                                <div className="w-12 text-center py-1 text-gray-600 border-r border-gray-800 bg-mp-navy/50">
+                                    {line.lineOld || ''}
+                                </div>
+                                <div className="w-12 text-center py-1 text-gray-600 border-r border-gray-800 bg-mp-navy/50">
+                                    {line.lineNew || ''}
+                                </div>
+                                <div className="flex-1 py-1 px-3">
+                                    <span className={`mr-2 ${
+                                        line.type === 'add' ? 'text-green-400' : 
+                                        line.type === 'remove' ? 'text-red-400' : 
+                                        'text-gray-600'
+                                    }`}>
+                                        {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                                    </span>
+                                    <span className={
+                                        line.type === 'add' ? 'text-green-300' : 
+                                        line.type === 'remove' ? 'text-red-300' : 
+                                        'text-gray-400'
+                                    }>
+                                        {line.content || '\u00A0'}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [selectedDoc, setSelectedDoc] = useState(documents[0]);
+            const [compareVersion, setCompareVersion] = useState(null);
+            const [activeTab, setActiveTab] = useState('history');
+            const [showRestoreModal, setShowRestoreModal] = useState(false);
+            const [restoreTarget, setRestoreTarget] = useState(null);
+
+            const handleCompare = (version) => {
+                setCompareVersion(version === compareVersion ? null : version);
+                if (version !== compareVersion) {
+                    setActiveTab('diff');
+                }
+            };
+
+            const handleRestore = (version) => {
+                setRestoreTarget(version);
+                setShowRestoreModal(true);
+            };
+
+            const confirmRestore = () => {
+                alert(`Restoring to ${restoreTarget}... This would create a new version v2.5`);
+                setShowRestoreModal(false);
+                setRestoreTarget(null);
+            };
+
+            return (
+                <div className="min-h-screen bg-mp-navy">
+                    {/* Header */}
+                    <header className="bg-mp-slate/50 border-b border-gray-800 px-6 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-gradient-to-br from-mp-cyan to-blue-600 rounded-lg flex items-center justify-center">
+                                    <span className="text-xl">📚</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold">Document Version Control</h1>
+                                    <p className="text-gray-400 text-sm">Version History, Diff Viewer & Rollback</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
+                                    Export History
+                                </button>
+                                <button className="px-4 py-2 bg-mp-cyan text-mp-navy font-semibold rounded-lg hover:bg-mp-cyan/80 transition-colors">
+                                    + New Version
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="p-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Document List */}
+                            <div className="lg:col-span-1">
+                                <h3 className="text-lg font-semibold mb-4">Proposal Documents</h3>
+                                <div className="space-y-3">
+                                    {documents.map(doc => (
+                                        <DocumentCard 
+                                            key={doc.id}
+                                            doc={doc}
+                                            onSelect={setSelectedDoc}
+                                            isSelected={selectedDoc?.id === doc.id}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Version History / Diff View */}
+                            <div className="lg:col-span-2">
+                                <div className="glass-card rounded-lg border border-gray-800">
+                                    {/* Document Header */}
+                                    <div className="p-4 border-b border-gray-800">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="text-lg font-semibold">{selectedDoc?.name}</h3>
+                                                <p className="text-gray-400 text-sm">{selectedDoc?.section} • {selectedDoc?.versions} versions</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setActiveTab('history')}
+                                                    className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                                                        activeTab === 'history' 
+                                                            ? 'bg-mp-cyan text-mp-navy' 
+                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    }`}
+                                                >
+                                                    📜 History
+                                                </button>
+                                                <button
+                                                    onClick={() => setActiveTab('diff')}
+                                                    className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                                                        activeTab === 'diff' 
+                                                            ? 'bg-mp-cyan text-mp-navy' 
+                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    }`}
+                                                >
+                                                    🔍 Diff View
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="p-4 max-h-[600px] overflow-y-auto">
+                                        {activeTab === 'history' && (
+                                            <div>
+                                                {versionHistory.map(version => (
+                                                    <VersionItem 
+                                                        key={version.version}
+                                                        version={version}
+                                                        onCompare={handleCompare}
+                                                        onRestore={handleRestore}
+                                                        compareVersion={compareVersion}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {activeTab === 'diff' && (
+                                            compareVersion ? (
+                                                <DiffViewer diff={diffContent} />
+                                            ) : (
+                                                <div className="text-center py-12 text-gray-500">
+                                                    <div className="text-4xl mb-4">🔍</div>
+                                                    <p>Select a version from the History tab to compare</p>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Quick Stats */}
+                                <div className="grid grid-cols-4 gap-4 mt-4">
+                                    <div className="glass-card rounded-lg border border-gray-800 p-4 text-center">
+                                        <div className="text-2xl font-bold text-mp-cyan">12</div>
+                                        <div className="text-gray-400 text-xs">Total Versions</div>
+                                    </div>
+                                    <div className="glass-card rounded-lg border border-gray-800 p-4 text-center">
+                                        <div className="text-2xl font-bold text-green-400">9</div>
+                                        <div className="text-gray-400 text-xs">Approved</div>
+                                    </div>
+                                    <div className="glass-card rounded-lg border border-gray-800 p-4 text-center">
+                                        <div className="text-2xl font-bold text-yellow-400">2</div>
+                                        <div className="text-gray-400 text-xs">Milestones</div>
+                                    </div>
+                                    <div className="glass-card rounded-lg border border-gray-800 p-4 text-center">
+                                        <div className="text-2xl font-bold text-gray-400">5</div>
+                                        <div className="text-gray-400 text-xs">Contributors</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Restore Modal */}
+                    {showRestoreModal && (
+                        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                            <div className="glass-card rounded-lg border border-gray-800 p-6 max-w-md w-full mx-4">
+                                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                    <span>⚠️</span> Restore Version
+                                </h3>
+                                <p className="text-gray-300 mb-4">
+                                    Are you sure you want to restore <span className="text-mp-cyan font-mono">{restoreTarget}</span>?
+                                </p>
+                                <p className="text-gray-500 text-sm mb-6">
+                                    This will create a new version (v2.5) with the content from {restoreTarget}. 
+                                    The current version will remain in history.
+                                </p>
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={() => setShowRestoreModal(false)}
+                                        className="flex-1 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={confirmRestore}
+                                        className="flex-1 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 transition-colors"
+                                    >
+                                        Restore
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <footer className="border-t border-gray-800 px-6 py-4 mt-8">
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>MissionPulse v12 • Sprint 126</span>
+                            <span className="text-yellow-500/70">⚠️ AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                            <span>© 2025 Mission Meets Tech</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- FILE: missionpulse-sprint125-proposal-metrics.html -->
+    <!-- ROLE: Admin | User -->
+    <!-- SECURITY: env vars verified, no hardcoded keys -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposal Metrics Dashboard | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mp-navy': '#00050F',
+                        'mp-cyan': '#00E5FA',
+                        'mp-slate': '#0A1628',
+                        'mp-dark': '#010510'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-border { background: linear-gradient(135deg, #00E5FA 0%, #0066FF 100%); padding: 1px; }
+        .glass-card { background: rgba(10, 22, 40, 0.8); backdrop-filter: blur(10px); }
+        .chart-bar { transition: height 0.5s ease-out; }
+    </style>
+</head>
+<body class="bg-mp-navy min-h-screen text-white">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // Demo Data - Proposal Performance Metrics
+        const proposalData = {
+            summary: {
+                totalProposals: 47,
+                wins: 19,
+                losses: 24,
+                pending: 4,
+                totalValue: 847000000,
+                winValue: 312000000,
+                avgProposalTime: 42,
+                avgWinProbability: 68
+            },
+            byAgency: [
+                { agency: 'DHA', proposals: 12, wins: 6, winRate: 50.0, value: 245000000 },
+                { agency: 'VA', proposals: 9, wins: 4, winRate: 44.4, value: 187000000 },
+                { agency: 'CMS', proposals: 8, wins: 3, winRate: 37.5, value: 156000000 },
+                { agency: 'IHS', proposals: 6, wins: 3, winRate: 50.0, value: 89000000 },
+                { agency: 'DoD Other', proposals: 7, wins: 2, winRate: 28.6, value: 112000000 },
+                { agency: 'HHS', proposals: 5, wins: 1, winRate: 20.0, value: 58000000 }
+            ],
+            byContractType: [
+                { type: 'IDIQ Task Order', proposals: 18, wins: 9, winRate: 50.0 },
+                { type: 'Full & Open', proposals: 12, wins: 4, winRate: 33.3 },
+                { type: 'SDVOSB Set-Aside', proposals: 8, wins: 4, winRate: 50.0 },
+                { type: '8(a) Set-Aside', proposals: 5, wins: 1, winRate: 20.0 },
+                { type: 'BPA Call', proposals: 4, wins: 1, winRate: 25.0 }
+            ],
+            bySize: [
+                { range: '$0-$5M', proposals: 8, wins: 5, winRate: 62.5 },
+                { range: '$5M-$25M', proposals: 15, wins: 7, winRate: 46.7 },
+                { range: '$25M-$50M', proposals: 12, wins: 4, winRate: 33.3 },
+                { range: '$50M-$100M', proposals: 7, wins: 2, winRate: 28.6 },
+                { range: '$100M+', proposals: 5, wins: 1, winRate: 20.0 }
+            ],
+            monthlyTrend: [
+                { month: 'Aug 24', submitted: 4, wins: 2, losses: 1 },
+                { month: 'Sep 24', submitted: 5, wins: 2, losses: 2 },
+                { month: 'Oct 24', submitted: 6, wins: 3, losses: 2 },
+                { month: 'Nov 24', submitted: 4, wins: 1, losses: 3 },
+                { month: 'Dec 24', submitted: 3, wins: 2, losses: 1 },
+                { month: 'Jan 25', submitted: 5, wins: 2, losses: 0 }
+            ],
+            recentProposals: [
+                { id: 'P-2025-012', name: 'DHA EHRM Modernization', agency: 'DHA', value: 47500000, status: 'won', pWin: 72, submitDate: '2025-01-15' },
+                { id: 'P-2025-011', name: 'VA Claims Processing AI', agency: 'VA', value: 28900000, status: 'pending', pWin: 65, submitDate: '2025-01-10' },
+                { id: 'P-2025-010', name: 'CMS Data Analytics Platform', agency: 'CMS', value: 35200000, status: 'lost', pWin: 58, submitDate: '2025-01-08' },
+                { id: 'P-2025-009', name: 'IHS Telehealth Expansion', agency: 'IHS', value: 12400000, status: 'won', pWin: 78, submitDate: '2024-12-20' },
+                { id: 'P-2025-008', name: 'DoD Health Records Migration', agency: 'DoD', value: 89000000, status: 'lost', pWin: 45, submitDate: '2024-12-15' }
+            ]
+        };
+
+        // KPI Card Component
+        function KPICard({ title, value, subtitle, trend, trendLabel, icon, color = 'cyan' }) {
+            const colorClasses = {
+                cyan: 'from-mp-cyan to-blue-500',
+                green: 'from-green-400 to-emerald-500',
+                yellow: 'from-yellow-400 to-orange-500',
+                red: 'from-red-400 to-pink-500'
+            };
+            
+            return (
+                <div className="gradient-border rounded-lg">
+                    <div className="glass-card rounded-lg p-5">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-gray-400 text-sm mb-1">{title}</p>
+                                <p className={`text-3xl font-bold bg-gradient-to-r ${colorClasses[color]} bg-clip-text text-transparent`}>
+                                    {value}
+                                </p>
+                                <p className="text-gray-500 text-xs mt-1">{subtitle}</p>
+                            </div>
+                            <div className="text-3xl">{icon}</div>
+                        </div>
+                        {trend && (
+                            <div className="mt-3 pt-3 border-t border-gray-700 flex items-center gap-2">
+                                <span className={`text-sm font-medium ${trend > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
+                                </span>
+                                <span className="text-gray-500 text-xs">{trendLabel}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Bar Chart Component
+        function BarChart({ data, labelKey, valueKey, maxValue }) {
+            const max = maxValue || Math.max(...data.map(d => d[valueKey]));
+            
+            return (
+                <div className="space-y-3">
+                    {data.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-3">
+                            <div className="w-24 text-sm text-gray-400 truncate">{item[labelKey]}</div>
+                            <div className="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                                <div 
+                                    className="chart-bar h-full bg-gradient-to-r from-mp-cyan to-blue-600 rounded-full flex items-center justify-end pr-2"
+                                    style={{ width: `${(item[valueKey] / max) * 100}%` }}
+                                >
+                                    <span className="text-xs font-mono text-white">{item[valueKey]}%</span>
+                                </div>
+                            </div>
+                            <div className="w-16 text-right text-sm text-gray-500">
+                                {item.wins}/{item.proposals}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        // Trend Chart Component
+        function TrendChart({ data }) {
+            const maxSubmitted = Math.max(...data.map(d => d.submitted));
+            
+            return (
+                <div className="flex items-end justify-between gap-2 h-40">
+                    {data.map((month, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col items-center">
+                            <div className="flex-1 w-full flex flex-col justify-end gap-1">
+                                <div 
+                                    className="w-full bg-green-500/60 rounded-t transition-all duration-500"
+                                    style={{ height: `${(month.wins / maxSubmitted) * 100}%` }}
+                                    title={`Wins: ${month.wins}`}
+                                ></div>
+                                <div 
+                                    className="w-full bg-red-500/60 rounded-b transition-all duration-500"
+                                    style={{ height: `${(month.losses / maxSubmitted) * 100}%` }}
+                                    title={`Losses: ${month.losses}`}
+                                ></div>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-500">{month.month}</div>
+                            <div className="text-xs text-gray-400">{month.submitted}</div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        // Proposal Row Component
+        function ProposalRow({ proposal }) {
+            const statusColors = {
+                won: 'bg-green-500/20 text-green-400 border-green-500/30',
+                lost: 'bg-red-500/20 text-red-400 border-red-500/30',
+                pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+            };
+
+            return (
+                <tr className="border-b border-gray-800 hover:bg-mp-slate/50 transition-colors">
+                    <td className="py-3 px-4 font-mono text-mp-cyan text-sm">{proposal.id}</td>
+                    <td className="py-3 px-4">
+                        <div className="font-medium text-sm">{proposal.name}</div>
+                        <div className="text-gray-500 text-xs">{proposal.agency}</div>
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono text-sm">
+                        ${(proposal.value / 1000000).toFixed(1)}M
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <div className="w-12 bg-gray-700 rounded-full h-1.5">
+                                <div 
+                                    className="h-1.5 rounded-full bg-mp-cyan"
+                                    style={{ width: `${proposal.pWin}%` }}
+                                ></div>
+                            </div>
+                            <span className="text-xs font-mono">{proposal.pWin}%</span>
+                        </div>
+                    </td>
+                    <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs border ${statusColors[proposal.status]}`}>
+                            {proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
+                        </span>
+                    </td>
+                    <td className="py-3 px-4 text-gray-400 text-sm">{proposal.submitDate}</td>
+                </tr>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [timeRange, setTimeRange] = useState('12m');
+            const [viewMode, setViewMode] = useState('all');
+            
+            const { summary, byAgency, byContractType, bySize, monthlyTrend, recentProposals } = proposalData;
+            
+            const winRate = ((summary.wins / (summary.wins + summary.losses)) * 100).toFixed(1);
+            
+            return (
+                <div className="min-h-screen bg-mp-navy">
+                    {/* Header */}
+                    <header className="bg-mp-slate/50 border-b border-gray-800 px-6 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-gradient-to-br from-mp-cyan to-blue-600 rounded-lg flex items-center justify-center">
+                                    <span className="text-xl">📊</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold">Proposal Metrics Dashboard</h1>
+                                    <p className="text-gray-400 text-sm">Win Rate Analytics & Performance Trends</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <select 
+                                    value={timeRange}
+                                    onChange={(e) => setTimeRange(e.target.value)}
+                                    className="bg-mp-slate border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-mp-cyan focus:outline-none"
+                                >
+                                    <option value="3m">Last 3 Months</option>
+                                    <option value="6m">Last 6 Months</option>
+                                    <option value="12m">Last 12 Months</option>
+                                    <option value="all">All Time</option>
+                                </select>
+                                <button className="px-4 py-2 bg-mp-cyan text-mp-navy font-semibold rounded-lg hover:bg-mp-cyan/80 transition-colors">
+                                    Export Report
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="p-6">
+                        {/* KPI Row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <KPICard 
+                                title="Win Rate" 
+                                value={`${winRate}%`}
+                                subtitle={`${summary.wins} wins / ${summary.wins + summary.losses} decided`}
+                                trend={5.2}
+                                trendLabel="vs last quarter"
+                                icon="🏆"
+                                color="green"
+                            />
+                            <KPICard 
+                                title="Pipeline Value" 
+                                value={`$${(summary.totalValue / 1000000).toFixed(0)}M`}
+                                subtitle={`${summary.totalProposals} proposals`}
+                                trend={12.8}
+                                trendLabel="vs last quarter"
+                                icon="💰"
+                                color="cyan"
+                            />
+                            <KPICard 
+                                title="Value Won" 
+                                value={`$${(summary.winValue / 1000000).toFixed(0)}M`}
+                                subtitle="Contract value secured"
+                                trend={18.4}
+                                trendLabel="vs last quarter"
+                                icon="✅"
+                                color="green"
+                            />
+                            <KPICard 
+                                title="Avg Win Probability" 
+                                value={`${summary.avgWinProbability}%`}
+                                subtitle="Across active pursuits"
+                                trend={3.1}
+                                trendLabel="vs last quarter"
+                                icon="📈"
+                                color="cyan"
+                            />
+                        </div>
+
+                        {/* Charts Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            {/* Win Rate by Agency */}
+                            <div className="glass-card rounded-lg border border-gray-800 p-5">
+                                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <span>🏛️</span> Win Rate by Agency
+                                </h3>
+                                <BarChart 
+                                    data={byAgency} 
+                                    labelKey="agency" 
+                                    valueKey="winRate"
+                                    maxValue={100}
+                                />
+                            </div>
+
+                            {/* Win Rate by Contract Type */}
+                            <div className="glass-card rounded-lg border border-gray-800 p-5">
+                                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <span>📋</span> Win Rate by Contract Type
+                                </h3>
+                                <BarChart 
+                                    data={byContractType} 
+                                    labelKey="type" 
+                                    valueKey="winRate"
+                                    maxValue={100}
+                                />
+                            </div>
+
+                            {/* Win Rate by Size */}
+                            <div className="glass-card rounded-lg border border-gray-800 p-5">
+                                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <span>📊</span> Win Rate by Contract Size
+                                </h3>
+                                <BarChart 
+                                    data={bySize} 
+                                    labelKey="range" 
+                                    valueKey="winRate"
+                                    maxValue={100}
+                                />
+                            </div>
+
+                            {/* Monthly Trend */}
+                            <div className="glass-card rounded-lg border border-gray-800 p-5">
+                                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <span>📅</span> Monthly Win/Loss Trend
+                                </h3>
+                                <div className="flex items-center gap-4 mb-4 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 bg-green-500/60 rounded"></div>
+                                        <span className="text-gray-400">Wins</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 bg-red-500/60 rounded"></div>
+                                        <span className="text-gray-400">Losses</span>
+                                    </div>
+                                </div>
+                                <TrendChart data={monthlyTrend} />
+                            </div>
+                        </div>
+
+                        {/* Recent Proposals Table */}
+                        <div className="glass-card rounded-lg border border-gray-800 overflow-hidden">
+                            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+                                <h3 className="text-lg font-semibold">Recent Proposals</h3>
+                                <div className="flex gap-2">
+                                    {['all', 'won', 'lost', 'pending'].map(mode => (
+                                        <button
+                                            key={mode}
+                                            onClick={() => setViewMode(mode)}
+                                            className={`px-3 py-1 rounded text-xs transition-colors ${
+                                                viewMode === mode 
+                                                    ? 'bg-mp-cyan text-mp-navy' 
+                                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                            }`}
+                                        >
+                                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <table className="w-full">
+                                <thead className="bg-mp-slate/50">
+                                    <tr className="text-left text-gray-400 text-sm">
+                                        <th className="py-3 px-4 font-medium">ID</th>
+                                        <th className="py-3 px-4 font-medium">Proposal</th>
+                                        <th className="py-3 px-4 font-medium text-right">Value</th>
+                                        <th className="py-3 px-4 font-medium text-center">pWin</th>
+                                        <th className="py-3 px-4 font-medium">Status</th>
+                                        <th className="py-3 px-4 font-medium">Submitted</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentProposals
+                                        .filter(p => viewMode === 'all' || p.status === viewMode)
+                                        .map(proposal => (
+                                            <ProposalRow key={proposal.id} proposal={proposal} />
+                                        ))
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Insights Panel */}
+                        <div className="mt-6 glass-card rounded-lg border border-gray-800 p-5">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <span>💡</span> AI-Generated Insights
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                                    <div className="text-green-400 font-medium mb-2">Strength</div>
+                                    <p className="text-gray-300 text-sm">IDIQ Task Orders show your highest win rate at 50%. Consider pursuing more IDIQ vehicles.</p>
+                                </div>
+                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                                    <div className="text-yellow-400 font-medium mb-2">Opportunity</div>
+                                    <p className="text-gray-300 text-sm">Smaller contracts ($0-$5M) have 62.5% win rate. Build pipeline with more small wins.</p>
+                                </div>
+                                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                                    <div className="text-red-400 font-medium mb-2">Risk Area</div>
+                                    <p className="text-gray-300 text-sm">8(a) Set-Asides show only 20% win rate. Review teaming strategy for these pursuits.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-gray-800 px-6 py-4 mt-8">
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>MissionPulse v12 • Sprint 125</span>
+                            <span className="text-yellow-500/70">⚠️ AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                            <span>© 2025 Mission Meets Tech</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

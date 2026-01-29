@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- FILE: missionpulse-sprint131-contract-mods.html -->
+    <!-- ROLE: Admin | CON -->
+    <!-- SECURITY: env vars verified, no hardcoded keys -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract Modification Tracker | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mp-navy': '#00050F',
+                        'mp-cyan': '#00E5FA',
+                        'mp-slate': '#0A1628',
+                        'mp-dark': '#010510'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-border { background: linear-gradient(135deg, #00E5FA 0%, #0066FF 100%); padding: 1px; }
+        .glass-card { background: rgba(10, 22, 40, 0.8); backdrop-filter: blur(10px); }
+        .timeline-line { position: absolute; left: 15px; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, #00E5FA, #374151); }
+    </style>
+</head>
+<body class="bg-mp-navy min-h-screen text-white">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // Demo Data - Active Contracts
+        const contracts = [
+            {
+                id: 'HC1028-24-F-0042',
+                name: 'DHA EHRM Technical Support Services',
+                agency: 'DHA',
+                type: 'IDIQ Task Order',
+                baseCeiling: 45000000,
+                currentCeiling: 52500000,
+                obligated: 38750000,
+                startDate: '2024-03-01',
+                endDate: '2027-02-28',
+                pop: 'Base + 2 Options',
+                status: 'active',
+                options: [
+                    { id: 'OPT-1', name: 'Option Year 1', value: 15500000, status: 'exercised', exerciseDate: '2025-01-15' },
+                    { id: 'OPT-2', name: 'Option Year 2', value: 16200000, status: 'pending', dueDate: '2026-01-01' }
+                ],
+                mods: 7
+            },
+            {
+                id: 'VA118-23-C-0156',
+                name: 'VA Claims Processing Modernization',
+                agency: 'VA',
+                type: 'FFP',
+                baseCeiling: 28900000,
+                currentCeiling: 34200000,
+                obligated: 22100000,
+                startDate: '2023-09-15',
+                endDate: '2026-09-14',
+                pop: 'Base + 2 Options',
+                status: 'active',
+                options: [
+                    { id: 'OPT-1', name: 'Option Year 1', value: 9800000, status: 'exercised', exerciseDate: '2024-08-20' },
+                    { id: 'OPT-2', name: 'Option Year 2', value: 10400000, status: 'upcoming', dueDate: '2025-08-15' }
+                ],
+                mods: 4
+            },
+            {
+                id: 'CMS-24-D-0089',
+                name: 'Healthcare.gov Analytics Platform',
+                agency: 'CMS',
+                type: 'T&M',
+                baseCeiling: 18500000,
+                currentCeiling: 21200000,
+                obligated: 14800000,
+                startDate: '2024-01-10',
+                endDate: '2025-12-31',
+                pop: 'Base + 1 Option',
+                status: 'active',
+                options: [
+                    { id: 'OPT-1', name: 'Option Year 1', value: 8500000, status: 'pending', dueDate: '2025-11-01' }
+                ],
+                mods: 3
+            }
+        ];
+
+        const modifications = [
+            { id: 'MOD-007', contract: 'HC1028-24-F-0042', type: 'Funding', description: 'Incremental funding - Q1 FY25', value: 3250000, status: 'executed', date: '2025-01-20', signedBy: 'Jennifer Santos' },
+            { id: 'MOD-006', contract: 'HC1028-24-F-0042', type: 'Administrative', description: 'Update COR designation', value: 0, status: 'executed', date: '2025-01-10', signedBy: 'Michael Richardson' },
+            { id: 'MOD-005', contract: 'HC1028-24-F-0042', type: 'Scope', description: 'Add FHIR R4 interoperability requirements', value: 4500000, status: 'executed', date: '2024-11-15', signedBy: 'Jennifer Santos' },
+            { id: 'MOD-004', contract: 'HC1028-24-F-0042', type: 'Option', description: 'Exercise Option Year 1', value: 15500000, status: 'executed', date: '2025-01-15', signedBy: 'Andrea Fletcher' },
+            { id: 'MOD-003', contract: 'VA118-23-C-0156', type: 'Funding', description: 'Incremental funding - FY25', value: 5200000, status: 'executed', date: '2024-12-05', signedBy: 'Neil Evans' },
+            { id: 'MOD-002', contract: 'VA118-23-C-0156', type: 'Scope', description: 'Add AI/ML claims adjudication pilot', value: 2100000, status: 'pending', date: '2025-01-25', signedBy: null },
+            { id: 'MOD-001', contract: 'CMS-24-D-0089', type: 'Funding', description: 'Incremental funding - Q2 FY25', value: 1850000, status: 'draft', date: '2025-01-28', signedBy: null }
+        ];
+
+        // Format currency
+        const formatCurrency = (value) => {
+            if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+            if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+            return `$${value.toLocaleString()}`;
+        };
+
+        // Calculate days until
+        const daysUntil = (date) => {
+            const today = new Date();
+            const target = new Date(date);
+            const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+            return diff;
+        };
+
+        // Contract Card Component
+        function ContractCard({ contract, isSelected, onSelect }) {
+            const utilizationPct = (contract.obligated / contract.currentCeiling) * 100;
+            const utilizationColor = utilizationPct >= 90 ? 'text-red-400' : utilizationPct >= 75 ? 'text-yellow-400' : 'text-green-400';
+            
+            const pendingOptions = contract.options.filter(o => o.status === 'pending' || o.status === 'upcoming');
+            const nextOption = pendingOptions[0];
+            const daysToOption = nextOption ? daysUntil(nextOption.dueDate) : null;
+
+            return (
+                <div 
+                    onClick={() => onSelect(contract)}
+                    className={`glass-card rounded-lg border p-4 cursor-pointer transition-all ${
+                        isSelected ? 'border-mp-cyan bg-mp-cyan/5' : 'border-gray-800 hover:border-gray-600'
+                    }`}
+                >
+                    <div className="flex items-start justify-between mb-3">
+                        <div>
+                            <h4 className="font-mono text-mp-cyan text-sm">{contract.id}</h4>
+                            <h3 className="font-semibold mt-1">{contract.name}</h3>
+                            <p className="text-gray-500 text-sm">{contract.agency} • {contract.type}</p>
+                        </div>
+                        <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">
+                            {contract.status}
+                        </span>
+                    </div>
+
+                    <div className="mb-4">
+                        <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-400">Ceiling Utilization</span>
+                            <span className={utilizationColor}>{utilizationPct.toFixed(1)}%</span>
+                        </div>
+                        <div className="bg-gray-700 rounded-full h-2">
+                            <div 
+                                className={`h-2 rounded-full ${utilizationPct >= 90 ? 'bg-red-500' : utilizationPct >= 75 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                style={{ width: `${Math.min(100, utilizationPct)}%` }}
+                            ></div>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Obligated: {formatCurrency(contract.obligated)}</span>
+                            <span>Ceiling: {formatCurrency(contract.currentCeiling)}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-800">
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-400 text-xs">📝 {contract.mods} mods</span>
+                        </div>
+                        {daysToOption !== null && (
+                            <div className={`text-xs ${daysToOption <= 30 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                                ⏰ Option in {daysToOption} days
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Modification Timeline Item
+        function ModificationItem({ mod }) {
+            const typeColors = {
+                'Funding': 'bg-green-500/20 text-green-400 border-green-500/30',
+                'Scope': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                'Option': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+                'Administrative': 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+            };
+
+            const statusColors = {
+                'executed': 'text-green-400',
+                'pending': 'text-yellow-400',
+                'draft': 'text-gray-400'
+            };
+
+            const statusIcons = {
+                'executed': '✓',
+                'pending': '○',
+                'draft': '◌'
+            };
+
+            return (
+                <div className="relative pl-10 pb-6">
+                    <div className={`absolute left-2 top-1 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs ${
+                        mod.status === 'executed' ? 'bg-green-500/20 border-green-500' : 
+                        mod.status === 'pending' ? 'bg-yellow-500/20 border-yellow-500' : 
+                        'bg-gray-500/20 border-gray-500'
+                    }`}>
+                        {statusIcons[mod.status]}
+                    </div>
+                    <div className="glass-card rounded-lg border border-gray-800 p-4">
+                        <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono text-mp-cyan">{mod.id}</span>
+                                <span className={`px-2 py-0.5 rounded text-xs border ${typeColors[mod.type]}`}>
+                                    {mod.type}
+                                </span>
+                            </div>
+                            <span className={`text-sm ${statusColors[mod.status]}`}>
+                                {mod.status.charAt(0).toUpperCase() + mod.status.slice(1)}
+                            </span>
+                        </div>
+                        <p className="text-gray-300 mb-2">{mod.description}</p>
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="text-gray-500">
+                                {mod.date}
+                                {mod.signedBy && <span className="ml-2">• Signed by {mod.signedBy}</span>}
+                            </div>
+                            {mod.value > 0 && (
+                                <span className="font-mono text-green-400">+{formatCurrency(mod.value)}</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Option Card Component
+        function OptionCard({ option, onExercise }) {
+            const statusColors = {
+                'exercised': 'bg-green-500/20 text-green-400 border-green-500/30',
+                'pending': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                'upcoming': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                'expired': 'bg-red-500/20 text-red-400 border-red-500/30'
+            };
+
+            const daysLeft = option.dueDate ? daysUntil(option.dueDate) : null;
+
+            return (
+                <div className={`rounded-lg border p-4 ${statusColors[option.status]}`}>
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">{option.name}</h4>
+                        <span className="text-xs uppercase">{option.status}</span>
+                    </div>
+                    <div className="text-2xl font-bold mb-2">{formatCurrency(option.value)}</div>
+                    {option.status === 'exercised' ? (
+                        <div className="text-xs text-gray-400">
+                            Exercised on {option.exerciseDate}
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <div className="text-xs">
+                                {daysLeft !== null && (
+                                    <span className={daysLeft <= 30 ? 'text-yellow-400' : ''}>
+                                        Due: {option.dueDate} ({daysLeft} days)
+                                    </span>
+                                )}
+                            </div>
+                            {(option.status === 'pending' || option.status === 'upcoming') && (
+                                <button 
+                                    onClick={() => onExercise(option)}
+                                    className="px-3 py-1 bg-mp-cyan/20 text-mp-cyan rounded text-xs hover:bg-mp-cyan/30 transition-colors"
+                                >
+                                    Exercise
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [selectedContract, setSelectedContract] = useState(contracts[0]);
+            const [activeTab, setActiveTab] = useState('modifications');
+            const [showNewMod, setShowNewMod] = useState(false);
+
+            const contractMods = modifications.filter(m => m.contract === selectedContract?.id);
+
+            const totalObligated = contracts.reduce((sum, c) => sum + c.obligated, 0);
+            const totalCeiling = contracts.reduce((sum, c) => sum + c.currentCeiling, 0);
+            const pendingMods = modifications.filter(m => m.status === 'pending' || m.status === 'draft').length;
+            const upcomingOptions = contracts.reduce((sum, c) => 
+                sum + c.options.filter(o => o.status === 'pending' || o.status === 'upcoming').length, 0
+            );
+
+            const handleExercise = (option) => {
+                alert(`Initiating option exercise for ${option.name} - ${formatCurrency(option.value)}`);
+            };
+
+            return (
+                <div className="min-h-screen bg-mp-navy">
+                    {/* Header */}
+                    <header className="bg-mp-slate/50 border-b border-gray-800 px-6 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-gradient-to-br from-mp-cyan to-blue-600 rounded-lg flex items-center justify-center">
+                                    <span className="text-xl">📑</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold">Contract Modification Tracker</h1>
+                                    <p className="text-gray-400 text-sm">Mod History, Ceiling Tracking & Option Management</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
+                                    Export Report
+                                </button>
+                                <button 
+                                    onClick={() => setShowNewMod(true)}
+                                    className="px-4 py-2 bg-mp-cyan text-mp-navy font-semibold rounded-lg hover:bg-mp-cyan/80 transition-colors"
+                                >
+                                    + New Modification
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="p-6">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div className="gradient-border rounded-lg">
+                                <div className="glass-card rounded-lg p-4">
+                                    <div className="text-gray-400 text-sm mb-1">Active Contracts</div>
+                                    <div className="text-3xl font-bold text-mp-cyan">{contracts.length}</div>
+                                    <div className="text-gray-500 text-xs">Total portfolio</div>
+                                </div>
+                            </div>
+                            <div className="gradient-border rounded-lg">
+                                <div className="glass-card rounded-lg p-4">
+                                    <div className="text-gray-400 text-sm mb-1">Total Obligated</div>
+                                    <div className="text-3xl font-bold text-green-400">{formatCurrency(totalObligated)}</div>
+                                    <div className="text-gray-500 text-xs">of {formatCurrency(totalCeiling)} ceiling</div>
+                                </div>
+                            </div>
+                            <div className="gradient-border rounded-lg">
+                                <div className="glass-card rounded-lg p-4">
+                                    <div className="text-gray-400 text-sm mb-1">Pending Mods</div>
+                                    <div className="text-3xl font-bold text-yellow-400">{pendingMods}</div>
+                                    <div className="text-gray-500 text-xs">Awaiting execution</div>
+                                </div>
+                            </div>
+                            <div className="gradient-border rounded-lg">
+                                <div className="glass-card rounded-lg p-4">
+                                    <div className="text-gray-400 text-sm mb-1">Options Due</div>
+                                    <div className="text-3xl font-bold text-purple-400">{upcomingOptions}</div>
+                                    <div className="text-gray-500 text-xs">Within next 12 months</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Contract List */}
+                            <div className="lg:col-span-1 space-y-4">
+                                <h3 className="font-semibold">Active Contracts</h3>
+                                {contracts.map(contract => (
+                                    <ContractCard 
+                                        key={contract.id}
+                                        contract={contract}
+                                        isSelected={selectedContract?.id === contract.id}
+                                        onSelect={setSelectedContract}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Contract Detail */}
+                            <div className="lg:col-span-2">
+                                {selectedContract && (
+                                    <div className="glass-card rounded-lg border border-gray-800">
+                                        {/* Contract Header */}
+                                        <div className="p-6 border-b border-gray-800">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <h2 className="text-xl font-bold">{selectedContract.name}</h2>
+                                                    <p className="font-mono text-mp-cyan">{selectedContract.id}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-2xl font-bold">{formatCurrency(selectedContract.currentCeiling)}</div>
+                                                    <div className="text-gray-500 text-sm">Current Ceiling</div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-4 gap-4 mt-4">
+                                                <div>
+                                                    <div className="text-gray-500 text-xs">Agency</div>
+                                                    <div className="font-medium">{selectedContract.agency}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-gray-500 text-xs">Type</div>
+                                                    <div className="font-medium">{selectedContract.type}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-gray-500 text-xs">PoP</div>
+                                                    <div className="font-medium">{selectedContract.pop}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-gray-500 text-xs">End Date</div>
+                                                    <div className="font-medium">{selectedContract.endDate}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Tabs */}
+                                        <div className="flex gap-2 p-4 border-b border-gray-800">
+                                            {['modifications', 'options', 'financials'].map(tab => (
+                                                <button
+                                                    key={tab}
+                                                    onClick={() => setActiveTab(tab)}
+                                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                        activeTab === tab 
+                                                            ? 'bg-mp-cyan text-mp-navy' 
+                                                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                                    }`}
+                                                >
+                                                    {tab === 'modifications' && `📝 Modifications (${contractMods.length})`}
+                                                    {tab === 'options' && `🔄 Options (${selectedContract.options.length})`}
+                                                    {tab === 'financials' && '💰 Financials'}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Tab Content */}
+                                        <div className="p-6 max-h-[500px] overflow-y-auto">
+                                            {activeTab === 'modifications' && (
+                                                <div className="relative">
+                                                    <div className="timeline-line"></div>
+                                                    {contractMods.map(mod => (
+                                                        <ModificationItem key={mod.id} mod={mod} />
+                                                    ))}
+                                                    {contractMods.length === 0 && (
+                                                        <div className="text-center text-gray-500 py-8">
+                                                            No modifications recorded
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {activeTab === 'options' && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {selectedContract.options.map(option => (
+                                                        <OptionCard 
+                                                            key={option.id}
+                                                            option={option}
+                                                            onExercise={handleExercise}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {activeTab === 'financials' && (
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <h4 className="font-medium mb-3">Ceiling History</h4>
+                                                        <div className="space-y-2">
+                                                            <div className="flex justify-between items-center p-3 bg-mp-slate rounded-lg">
+                                                                <span>Base Award</span>
+                                                                <span className="font-mono">{formatCurrency(selectedContract.baseCeiling)}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center p-3 bg-mp-slate rounded-lg">
+                                                                <span>Modifications</span>
+                                                                <span className="font-mono text-green-400">+{formatCurrency(selectedContract.currentCeiling - selectedContract.baseCeiling)}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center p-3 bg-mp-cyan/10 border border-mp-cyan/30 rounded-lg font-semibold">
+                                                                <span>Current Ceiling</span>
+                                                                <span className="font-mono text-mp-cyan">{formatCurrency(selectedContract.currentCeiling)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div>
+                                                        <h4 className="font-medium mb-3">Burn Rate Analysis</h4>
+                                                        <div className="p-4 bg-mp-slate rounded-lg">
+                                                            <div className="flex justify-between mb-2">
+                                                                <span className="text-gray-400">Monthly Burn Rate</span>
+                                                                <span className="font-mono">{formatCurrency(selectedContract.obligated / 12)}/mo</span>
+                                                            </div>
+                                                            <div className="flex justify-between mb-2">
+                                                                <span className="text-gray-400">Remaining Ceiling</span>
+                                                                <span className="font-mono text-green-400">{formatCurrency(selectedContract.currentCeiling - selectedContract.obligated)}</span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className="text-gray-400">Est. Runway</span>
+                                                                <span className="font-mono text-mp-cyan">~14 months</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* New Mod Modal */}
+                    {showNewMod && (
+                        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                            <div className="glass-card rounded-lg border border-gray-800 p-6 max-w-lg w-full mx-4">
+                                <h3 className="text-xl font-bold mb-4">Create New Modification</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Contract</label>
+                                        <select className="w-full bg-mp-navy border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:border-mp-cyan">
+                                            {contracts.map(c => (
+                                                <option key={c.id} value={c.id}>{c.id} - {c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Modification Type</label>
+                                        <select className="w-full bg-mp-navy border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:border-mp-cyan">
+                                            <option>Funding</option>
+                                            <option>Scope</option>
+                                            <option>Option Exercise</option>
+                                            <option>Administrative</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Description</label>
+                                        <textarea className="w-full bg-mp-navy border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:border-mp-cyan h-24"></textarea>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Value ($)</label>
+                                        <input type="number" className="w-full bg-mp-navy border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:border-mp-cyan" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <button 
+                                        onClick={() => setShowNewMod(false)}
+                                        className="flex-1 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={() => { alert('Modification created as draft'); setShowNewMod(false); }}
+                                        className="flex-1 py-2 bg-mp-cyan text-mp-navy font-semibold rounded-lg hover:bg-mp-cyan/80 transition-colors"
+                                    >
+                                        Create Draft
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <footer className="border-t border-gray-800 px-6 py-4 mt-8">
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>MissionPulse v12 • Sprint 131</span>
+                            <span className="text-yellow-500/70">⚠️ AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                            <span>© 2025 Mission Meets Tech</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

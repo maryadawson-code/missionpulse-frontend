@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bid Decision Matrix - MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mp-navy': '#00050F',
+                        'mp-cyan': '#00E5FA',
+                        'mp-slate': '#0A1628',
+                        'mp-dark': '#020817'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .glow-cyan { box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); }
+        .score-cell { transition: all 0.2s ease; }
+        .score-cell:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body class="bg-mp-navy text-white min-h-screen">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // Bid Decision Categories with weights
+        const categories = [
+            {
+                id: 'strategic',
+                name: 'Strategic Fit',
+                weight: 20,
+                criteria: [
+                    { id: 'mission', name: 'Mission Alignment', description: 'Does this align with our strategic direction?' },
+                    { id: 'relationship', name: 'Customer Relationship', description: 'Strength of existing customer relationship' },
+                    { id: 'growth', name: 'Growth Potential', description: 'Follow-on and expansion opportunities' }
+                ]
+            },
+            {
+                id: 'technical',
+                name: 'Technical Capability',
+                weight: 25,
+                criteria: [
+                    { id: 'expertise', name: 'Technical Expertise', description: 'Do we have the required skills in-house?' },
+                    { id: 'solution', name: 'Solution Readiness', description: 'Maturity of our proposed solution' },
+                    { id: 'innovation', name: 'Differentiators', description: 'Unique technical advantages we bring' }
+                ]
+            },
+            {
+                id: 'competitive',
+                name: 'Competitive Position',
+                weight: 25,
+                criteria: [
+                    { id: 'incumbent', name: 'Incumbent Advantage', description: 'Our position relative to incumbent' },
+                    { id: 'competitors', name: 'Competitive Landscape', description: 'Strength of known competitors' },
+                    { id: 'pwin', name: 'Win Probability', description: 'Estimated probability of win' }
+                ]
+            },
+            {
+                id: 'resources',
+                name: 'Resource Availability',
+                weight: 15,
+                criteria: [
+                    { id: 'staff', name: 'Key Personnel', description: 'Availability of required key personnel' },
+                    { id: 'capacity', name: 'Proposal Capacity', description: 'Bandwidth to develop quality proposal' },
+                    { id: 'partners', name: 'Teaming Partners', description: 'Partner availability and commitment' }
+                ]
+            },
+            {
+                id: 'financial',
+                name: 'Financial Viability',
+                weight: 15,
+                criteria: [
+                    { id: 'value', name: 'Contract Value', description: 'Total contract value attractiveness' },
+                    { id: 'margin', name: 'Profit Margin', description: 'Expected profitability' },
+                    { id: 'risk', name: 'Financial Risk', description: 'Contract type and payment risk' }
+                ]
+            }
+        ];
+
+        // Score definitions
+        const scoreDefinitions = [
+            { value: 5, label: 'Strong', color: 'bg-green-500', description: 'Excellent - Major advantage' },
+            { value: 4, label: 'Good', color: 'bg-green-400', description: 'Above average' },
+            { value: 3, label: 'Neutral', color: 'bg-yellow-500', description: 'Average - Neither advantage nor disadvantage' },
+            { value: 2, label: 'Weak', color: 'bg-orange-500', description: 'Below average - Concern' },
+            { value: 1, label: 'Poor', color: 'bg-red-500', description: 'Significant disadvantage or risk' }
+        ];
+
+        // Demo opportunity data
+        const initialOpportunity = {
+            name: 'DHA EHR Modernization',
+            customer: 'Defense Health Agency',
+            value: 125000000,
+            dueDate: '2025-02-15',
+            scores: {
+                mission: 5,
+                relationship: 4,
+                growth: 5,
+                expertise: 5,
+                solution: 4,
+                innovation: 4,
+                incumbent: 3,
+                competitors: 3,
+                pwin: 4,
+                staff: 4,
+                capacity: 3,
+                partners: 5,
+                value: 5,
+                margin: 4,
+                risk: 3
+            },
+            notes: {
+                mission: 'Core healthcare IT focus - perfect alignment',
+                relationship: 'Strong relationship through T2 contract',
+                growth: 'MHS GENESIS roadmap shows 5+ years of follow-on',
+                expertise: '12 similar DHA projects completed',
+                solution: 'FedRAMP High platform ready, minor customization needed',
+                innovation: 'Patent-pending analytics differentiate us',
+                incumbent: 'Incumbent is Leidos - strong but not unbeatable',
+                competitors: 'Expect GDIT, Deloitte, Booz Allen to compete',
+                pwin: 'Estimated 65% based on capture intelligence',
+                staff: 'PM and Tech Lead identified and committed',
+                capacity: 'Will need to pause CMS pursuit if we proceed',
+                partners: 'TechVantage and CyberShield committed',
+                value: '$125M over 8 years - excellent size',
+                margin: 'T&M with cost ceiling - moderate risk',
+                risk: 'Need to monitor CMMC requirements closely'
+            },
+            decision: null,
+            decisionDate: null,
+            decisionBy: null
+        };
+
+        function BidDecisionMatrix() {
+            const [opportunity, setOpportunity] = useState(initialOpportunity);
+            const [showNotes, setShowNotes] = useState(null);
+            const [showDecisionModal, setShowDecisionModal] = useState(false);
+
+            const updateScore = (criteriaId, newScore) => {
+                setOpportunity({
+                    ...opportunity,
+                    scores: { ...opportunity.scores, [criteriaId]: newScore }
+                });
+            };
+
+            const updateNote = (criteriaId, newNote) => {
+                setOpportunity({
+                    ...opportunity,
+                    notes: { ...opportunity.notes, [criteriaId]: newNote }
+                });
+            };
+
+            const calculateCategoryScore = (category) => {
+                const criteriaScores = category.criteria.map(c => opportunity.scores[c.id] || 0);
+                const avg = criteriaScores.reduce((a, b) => a + b, 0) / criteriaScores.length;
+                return avg;
+            };
+
+            const calculateWeightedScore = () => {
+                let totalWeightedScore = 0;
+                categories.forEach(cat => {
+                    const catScore = calculateCategoryScore(cat);
+                    totalWeightedScore += (catScore * cat.weight) / 100;
+                });
+                return totalWeightedScore;
+            };
+
+            const totalScore = calculateWeightedScore();
+            const maxScore = 5;
+            const scorePercent = (totalScore / maxScore) * 100;
+
+            const getScoreColor = (score) => {
+                if (score >= 4) return 'bg-green-500';
+                if (score >= 3) return 'bg-yellow-500';
+                if (score >= 2) return 'bg-orange-500';
+                return 'bg-red-500';
+            };
+
+            const getRecommendation = (score) => {
+                if (score >= 4) return { text: 'Strong GO', color: 'text-green-400', bg: 'bg-green-500/20' };
+                if (score >= 3.5) return { text: 'Conditional GO', color: 'text-yellow-400', bg: 'bg-yellow-500/20' };
+                if (score >= 2.5) return { text: 'Review Required', color: 'text-orange-400', bg: 'bg-orange-500/20' };
+                return { text: 'NO-GO', color: 'text-red-400', bg: 'bg-red-500/20' };
+            };
+
+            const recommendation = getRecommendation(totalScore);
+
+            const makeDecision = (decision) => {
+                setOpportunity({
+                    ...opportunity,
+                    decision: decision,
+                    decisionDate: new Date().toISOString().split('T')[0],
+                    decisionBy: 'Mary Womack (CEO)'
+                });
+                setShowDecisionModal(false);
+            };
+
+            return (
+                <div className="min-h-screen bg-mp-navy">
+                    {/* Header */}
+                    <header className="bg-mp-slate/50 border-b border-mp-cyan/20 px-6 py-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-white">Bid Decision Matrix</h1>
+                                <p className="text-sm text-slate-400 mt-1">{opportunity.name}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-slate-400 text-sm">Due: {opportunity.dueDate}</span>
+                                <button 
+                                    onClick={() => setShowDecisionModal(true)}
+                                    className="bg-mp-cyan text-mp-navy font-semibold px-4 py-2 rounded-lg hover:bg-mp-cyan/90"
+                                >
+                                    Record Decision
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="p-6">
+                        {/* Score Summary */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div className="bg-mp-slate/50 border border-mp-cyan/20 rounded-xl p-5">
+                                <div className="text-xs text-slate-400 uppercase tracking-wide mb-2">Weighted Score</div>
+                                <div className="text-4xl font-bold text-white mb-2">{totalScore.toFixed(2)}</div>
+                                <div className="h-3 bg-mp-navy rounded-full overflow-hidden">
+                                    <div 
+                                        className={`h-full rounded-full transition-all duration-500 ${getScoreColor(totalScore)}`}
+                                        style={{ width: `${scorePercent}%` }}
+                                    />
+                                </div>
+                                <div className="text-xs text-slate-500 mt-2">out of 5.00</div>
+                            </div>
+                            <div className={`border border-mp-cyan/20 rounded-xl p-5 ${recommendation.bg}`}>
+                                <div className="text-xs text-slate-400 uppercase tracking-wide mb-2">AI Recommendation</div>
+                                <div className={`text-3xl font-bold ${recommendation.color}`}>{recommendation.text}</div>
+                                <p className="text-xs text-slate-400 mt-2">Based on weighted criteria analysis</p>
+                            </div>
+                            <div className="bg-mp-slate/50 border border-mp-cyan/20 rounded-xl p-5">
+                                <div className="text-xs text-slate-400 uppercase tracking-wide mb-2">Decision Status</div>
+                                {opportunity.decision ? (
+                                    <div>
+                                        <div className={`text-2xl font-bold ${opportunity.decision === 'GO' ? 'text-green-400' : 'text-red-400'}`}>
+                                            {opportunity.decision}
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-1">{opportunity.decisionDate}</p>
+                                        <p className="text-xs text-slate-500">{opportunity.decisionBy}</p>
+                                    </div>
+                                ) : (
+                                    <div className="text-2xl font-bold text-yellow-400">Pending</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Category Scores Overview */}
+                        <div className="bg-mp-slate/50 border border-mp-cyan/20 rounded-xl p-5 mb-6">
+                            <h3 className="text-lg font-semibold text-white mb-4">Category Scores</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                {categories.map(cat => {
+                                    const catScore = calculateCategoryScore(cat);
+                                    return (
+                                        <div key={cat.id} className="text-center">
+                                            <div className="text-sm text-slate-400 mb-2">{cat.name}</div>
+                                            <div className="relative w-20 h-20 mx-auto">
+                                                <svg className="w-full h-full transform -rotate-90">
+                                                    <circle
+                                                        cx="40" cy="40" r="35"
+                                                        className="fill-none stroke-mp-navy"
+                                                        strokeWidth="6"
+                                                    />
+                                                    <circle
+                                                        cx="40" cy="40" r="35"
+                                                        className={`fill-none ${catScore >= 4 ? 'stroke-green-500' : catScore >= 3 ? 'stroke-yellow-500' : 'stroke-red-500'}`}
+                                                        strokeWidth="6"
+                                                        strokeDasharray={`${(catScore / 5) * 220} 220`}
+                                                        strokeLinecap="round"
+                                                    />
+                                                </svg>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <span className="text-xl font-bold text-white">{catScore.toFixed(1)}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">Weight: {cat.weight}%</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Detailed Scoring Matrix */}
+                        {categories.map(category => (
+                            <div key={category.id} className="bg-mp-slate/50 border border-mp-cyan/20 rounded-xl p-5 mb-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                                        <p className="text-xs text-slate-400">Weight: {category.weight}%</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-2xl font-bold text-mp-cyan">{calculateCategoryScore(category).toFixed(1)}</span>
+                                        <span className="text-slate-500 text-sm"> / 5</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {category.criteria.map(criteria => (
+                                        <div key={criteria.id} className="border border-mp-cyan/10 rounded-lg p-3">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                                <div className="flex-1">
+                                                    <div className="text-white font-medium">{criteria.name}</div>
+                                                    <div className="text-xs text-slate-500">{criteria.description}</div>
+                                                </div>
+                                                
+                                                {/* Score Buttons */}
+                                                <div className="flex gap-1">
+                                                    {scoreDefinitions.map(score => (
+                                                        <button
+                                                            key={score.value}
+                                                            onClick={() => updateScore(criteria.id, score.value)}
+                                                            className={`w-10 h-10 rounded-lg text-sm font-bold transition-all score-cell ${
+                                                                opportunity.scores[criteria.id] === score.value
+                                                                    ? `${score.color} text-white ring-2 ring-white`
+                                                                    : 'bg-mp-navy text-slate-400 hover:bg-mp-cyan/20'
+                                                            }`}
+                                                            title={score.description}
+                                                        >
+                                                            {score.value}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {/* Notes Toggle */}
+                                                <button
+                                                    onClick={() => setShowNotes(showNotes === criteria.id ? null : criteria.id)}
+                                                    className={`text-sm px-3 py-1 rounded ${
+                                                        opportunity.notes[criteria.id] ? 'text-mp-cyan' : 'text-slate-500'
+                                                    }`}
+                                                >
+                                                    {opportunity.notes[criteria.id] ? '📝' : '➕'} Notes
+                                                </button>
+                                            </div>
+
+                                            {/* Notes Section */}
+                                            {showNotes === criteria.id && (
+                                                <div className="mt-3 pt-3 border-t border-mp-cyan/10">
+                                                    <textarea
+                                                        value={opportunity.notes[criteria.id] || ''}
+                                                        onChange={(e) => updateNote(criteria.id, e.target.value)}
+                                                        placeholder="Add supporting notes or rationale..."
+                                                        rows={2}
+                                                        className="w-full bg-mp-navy border border-mp-cyan/20 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-mp-cyan resize-none"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Score Legend */}
+                        <div className="bg-mp-slate/50 border border-mp-cyan/20 rounded-xl p-4">
+                            <h4 className="text-sm font-medium text-white mb-3">Scoring Guide</h4>
+                            <div className="flex flex-wrap gap-3">
+                                {scoreDefinitions.map(score => (
+                                    <div key={score.value} className="flex items-center gap-2">
+                                        <div className={`w-6 h-6 rounded ${score.color} flex items-center justify-center text-xs font-bold text-white`}>
+                                            {score.value}
+                                        </div>
+                                        <span className="text-sm text-slate-400">{score.label}: {score.description}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Decision Modal */}
+                    {showDecisionModal && (
+                        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowDecisionModal(false)}>
+                            <div className="bg-mp-slate border border-mp-cyan/30 rounded-xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-xl font-bold text-white mb-4">Record Bid Decision</h2>
+                                
+                                <div className="bg-mp-navy/50 rounded-lg p-4 mb-6">
+                                    <div className="text-sm text-slate-400 mb-2">Opportunity</div>
+                                    <div className="text-white font-medium">{opportunity.name}</div>
+                                    <div className="flex justify-between mt-3">
+                                        <div>
+                                            <div className="text-xs text-slate-500">Weighted Score</div>
+                                            <div className="text-lg font-bold text-white">{totalScore.toFixed(2)}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs text-slate-500">Recommendation</div>
+                                            <div className={`text-lg font-bold ${recommendation.color}`}>{recommendation.text}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => makeDecision('GO')}
+                                        className="w-full bg-green-500/20 border border-green-500/30 text-green-400 font-semibold py-3 rounded-lg hover:bg-green-500/30"
+                                    >
+                                        ✓ GO - Proceed with Proposal
+                                    </button>
+                                    <button
+                                        onClick={() => makeDecision('NO-GO')}
+                                        className="w-full bg-red-500/20 border border-red-500/30 text-red-400 font-semibold py-3 rounded-lg hover:bg-red-500/30"
+                                    >
+                                        ✗ NO-GO - Do Not Pursue
+                                    </button>
+                                    <button
+                                        onClick={() => setShowDecisionModal(false)}
+                                        className="w-full border border-slate-600 text-slate-300 py-3 rounded-lg hover:bg-mp-navy"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <footer className="bg-mp-slate/30 border-t border-mp-cyan/10 px-6 py-4 mt-8">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-2 text-xs text-slate-500">
+                            <span>AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                            <span>MissionPulse Bid Decision Matrix v1.0</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<BidDecisionMatrix />, document.getElementById('root'));
+    </script>
+</body>
+</html>

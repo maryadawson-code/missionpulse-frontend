@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitor Intel Tracker | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="icon" type="image/png" href="MMT_icon_transparent.png">
+    <style>
+        body { background: #00050F; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); border-radius: 12px; }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .primary-btn { background: #00E5FA; color: #00050F; font-weight: 600; }
+        .primary-btn:hover { background: #00c4d4; }
+        .primary-btn:disabled { background: #4a5568; color: #718096; }
+        .secondary-btn { background: rgba(0, 229, 250, 0.1); border: 1px solid rgba(0, 229, 250, 0.3); color: #00E5FA; }
+        .secondary-btn:hover { background: rgba(0, 229, 250, 0.2); }
+        .input-field { background: rgba(0, 229, 250, 0.05); border: 1px solid rgba(0, 229, 250, 0.3); color: white; }
+        .input-field:focus { border-color: #00E5FA; outline: none; box-shadow: 0 0 0 2px rgba(0, 229, 250, 0.2); }
+        .input-field::placeholder { color: rgba(255, 255, 255, 0.4); }
+        select.input-field { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2300E5FA'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+        .timeline-item { border-left: 2px solid rgba(0, 229, 250, 0.3); margin-left: 1rem; padding-left: 1.5rem; position: relative; }
+        .timeline-item::before { content: ''; position: absolute; left: -6px; top: 0; width: 10px; height: 10px; border-radius: 50%; background: #00E5FA; }
+        .timeline-item.pricing::before { background: #10b981; }
+        .timeline-item.teaming::before { background: #8b5cf6; }
+        .timeline-item.personnel::before { background: #f59e0b; }
+        .timeline-item.strategy::before { background: #3b82f6; }
+        .timeline-item.weakness::before { background: #ef4444; }
+        .timeline-item.strength::before { background: #22c55e; }
+        .timeline-item.rumor::before { background: #6b7280; }
+        .timeline-item.confirmed::before { background: #00E5FA; }
+        .confidence-low { color: #f87171; }
+        .confidence-medium { color: #fbbf24; }
+        .confidence-high { color: #4ade80; }
+        .confidence-verified { color: #00E5FA; }
+        .trend-up { color: #22c55e; }
+        .trend-down { color: #ef4444; }
+        .trend-neutral { color: #6b7280; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        .badge-pricing { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .badge-teaming { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; }
+        .badge-personnel { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .badge-strategy { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .badge-weakness { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .badge-strength { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .badge-rumor { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+        .badge-confirmed { background: rgba(0, 229, 250, 0.2); color: #00E5FA; }
+        .modal-backdrop { background: rgba(0, 5, 15, 0.9); }
+        .stat-card { background: linear-gradient(135deg, rgba(0, 229, 250, 0.1) 0%, rgba(0, 229, 250, 0.02) 100%); }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Sidebar placeholder -->
+    <div id="missionpulse-sidebar" data-current-page="intel"></div>
+    <script src="missionpulse-nav.js"></script>
+
+    <!-- Main Content -->
+    <div class="ml-64 p-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <span class="text-3xl">🔍</span>
+                    Competitor Intel Tracker
+                </h1>
+                <p class="text-gray-400 mt-1">Track and analyze competitor intelligence over time</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="openAddIntelModal()" class="primary-btn px-4 py-2 rounded-lg flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Add Intel
+                </button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="glass-card p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Opportunity</label>
+                    <select id="filterOpportunity" onchange="loadIntelData()" class="w-full px-3 py-2 rounded-lg input-field">
+                        <option value="">All Opportunities</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Competitor</label>
+                    <select id="filterCompetitor" onchange="loadIntelData()" class="w-full px-3 py-2 rounded-lg input-field">
+                        <option value="">All Competitors</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Intel Type</label>
+                    <select id="filterType" onchange="loadIntelData()" class="w-full px-3 py-2 rounded-lg input-field">
+                        <option value="">All Types</option>
+                        <option value="pricing">Pricing</option>
+                        <option value="teaming">Teaming</option>
+                        <option value="personnel">Personnel</option>
+                        <option value="strategy">Strategy</option>
+                        <option value="weakness">Weakness</option>
+                        <option value="strength">Strength</option>
+                        <option value="rumor">Rumor</option>
+                        <option value="confirmed">Confirmed</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Time Range</label>
+                    <select id="filterTimeRange" onchange="loadIntelData()" class="w-full px-3 py-2 rounded-lg input-field">
+                        <option value="30">Last 30 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="180">Last 6 Months</option>
+                        <option value="365">Last Year</option>
+                        <option value="">All Time</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="stat-card glass-card p-4">
+                <div class="text-gray-400 text-sm">Total Intel Records</div>
+                <div class="text-2xl font-bold text-white" id="statTotalIntel">0</div>
+            </div>
+            <div class="stat-card glass-card p-4">
+                <div class="text-gray-400 text-sm">Competitors Tracked</div>
+                <div class="text-2xl font-bold text-white" id="statCompetitors">0</div>
+            </div>
+            <div class="stat-card glass-card p-4">
+                <div class="text-gray-400 text-sm">Verified Intel</div>
+                <div class="text-2xl font-bold text-cyan-400" id="statVerified">0</div>
+            </div>
+            <div class="stat-card glass-card p-4">
+                <div class="text-gray-400 text-sm">Intel This Week</div>
+                <div class="text-2xl font-bold text-green-400" id="statThisWeek">0</div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Intel Timeline (2 cols) -->
+            <div class="lg:col-span-2">
+                <div class="glass-card p-6">
+                    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Intel Timeline
+                    </h2>
+                    <div id="intelTimeline" class="space-y-4">
+                        <div class="text-gray-500 text-center py-8">Loading intel data...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Competitor Summary (1 col) -->
+            <div class="space-y-6">
+                <!-- Top Competitors -->
+                <div class="glass-card p-6">
+                    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        Competitor Insights
+                    </h2>
+                    <div id="competitorInsights" class="space-y-3">
+                        <div class="text-gray-500 text-sm">No data available</div>
+                    </div>
+                </div>
+
+                <!-- Intel Type Distribution -->
+                <div class="glass-card p-6">
+                    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+                        Intel by Type
+                    </h2>
+                    <div id="intelTypeChart" class="space-y-2">
+                        <div class="text-gray-500 text-sm">No data available</div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="glass-card p-6">
+                    <h2 class="text-lg font-semibold text-white mb-4">Quick Actions</h2>
+                    <div class="space-y-2">
+                        <button onclick="exportIntel('csv')" class="w-full secondary-btn px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Export to CSV
+                        </button>
+                        <button onclick="generateReport()" class="w-full secondary-btn px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Generate Intel Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 text-center text-gray-500 text-sm">
+            AI GENERATED CONTENT - REQUIRES HUMAN REVIEW
+        </div>
+    </div>
+
+    <!-- Add Intel Modal -->
+    <div id="addIntelModal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-white">Add Competitor Intel</h3>
+                <button onclick="closeAddIntelModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Opportunity *</label>
+                        <select id="intelOpportunity" class="w-full px-3 py-2 rounded-lg input-field" required>
+                            <option value="">Select opportunity...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Competitor *</label>
+                        <select id="intelCompetitor" class="w-full px-3 py-2 rounded-lg input-field" required>
+                            <option value="">Select competitor...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Intel Type *</label>
+                        <select id="intelType" class="w-full px-3 py-2 rounded-lg input-field" required>
+                            <option value="">Select type...</option>
+                            <option value="pricing">💰 Pricing</option>
+                            <option value="teaming">🤝 Teaming</option>
+                            <option value="personnel">👤 Personnel</option>
+                            <option value="strategy">🎯 Strategy</option>
+                            <option value="weakness">⚠️ Weakness</option>
+                            <option value="strength">💪 Strength</option>
+                            <option value="rumor">💬 Rumor</option>
+                            <option value="confirmed">✓ Confirmed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Confidence Level *</label>
+                        <select id="intelConfidence" class="w-full px-3 py-2 rounded-lg input-field" required>
+                            <option value="">Select confidence...</option>
+                            <option value="low">Low - Unverified</option>
+                            <option value="medium">Medium - Partially Verified</option>
+                            <option value="high">High - Multiple Sources</option>
+                            <option value="verified">Verified - Confirmed</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Summary *</label>
+                    <input type="text" id="intelSummary" class="w-full px-3 py-2 rounded-lg input-field" placeholder="Brief summary of the intel..." required>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Details</label>
+                    <textarea id="intelDetails" class="w-full px-3 py-2 rounded-lg input-field" rows="3" placeholder="Additional details, context, implications..."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Estimated Price</label>
+                        <input type="number" id="intelPrice" class="w-full px-3 py-2 rounded-lg input-field" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">pWin Estimate (%)</label>
+                        <input type="number" id="intelPwin" class="w-full px-3 py-2 rounded-lg input-field" placeholder="0-100" min="0" max="100">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Intel Source</label>
+                    <input type="text" id="intelSource" class="w-full px-3 py-2 rounded-lg input-field" placeholder="e.g., Industry contact, Public filing, Conference...">
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-700 flex justify-end gap-3">
+                <button onclick="closeAddIntelModal()" class="secondary-btn px-4 py-2 rounded-lg">Cancel</button>
+                <button onclick="saveIntel()" class="primary-btn px-4 py-2 rounded-lg">Save Intel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Intel Modal -->
+    <div id="viewIntelModal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-xl">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-white" id="viewIntelTitle">Intel Details</h3>
+                <button onclick="closeViewIntelModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6" id="viewIntelContent">
+                <!-- Dynamic content -->
+            </div>
+            <div class="p-6 border-t border-gray-700 flex justify-between">
+                <button onclick="deleteIntel()" class="text-red-400 hover:text-red-300 text-sm">Delete Intel</button>
+                <button onclick="closeViewIntelModal()" class="secondary-btn px-4 py-2 rounded-lg">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =============================================================================
+        // SUPABASE CONFIGURATION
+        // =============================================================================
+        var SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzI3NjQsImV4cCI6MjA1MzQwODc2NH0.rFKJKvOHOvtwz9HY5cCgnD2sO4N4z2lgXvvzaYGAsoc';
+        
+        var sbClient = null;
+        var currentUser = null;
+        var opportunities = [];
+        var competitors = [];
+        var intelData = [];
+        var selectedIntelId = null;
+
+        function initSupabase() {
+            if (!sbClient && window.supabase) {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            }
+            return sbClient;
+        }
+
+        // =============================================================================
+        // INITIALIZATION
+        // =============================================================================
+        document.addEventListener('DOMContentLoaded', async function() {
+            initSupabase();
+            
+            // Check auth
+            var session = localStorage.getItem('missionpulse_session');
+            if (!session && sbClient) {
+                var authResult = await sbClient.auth.getSession();
+                if (!authResult.data.session) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                currentUser = authResult.data.session.user;
+            } else if (session) {
+                currentUser = JSON.parse(localStorage.getItem('missionpulse_user'));
+            }
+
+            await loadOpportunities();
+            await loadCompetitors();
+            await loadIntelData();
+        });
+
+        // =============================================================================
+        // DATA LOADING
+        // =============================================================================
+        async function loadOpportunities() {
+            try {
+                var client = initSupabase();
+                var { data, error } = await client.from('opportunities').select('id, title').order('title');
+                
+                if (error) throw error;
+                opportunities = data || [];
+                
+                // Populate dropdowns
+                var html = '<option value="">All Opportunities</option>';
+                var modalHtml = '<option value="">Select opportunity...</option>';
+                opportunities.forEach(function(opp) {
+                    html += '<option value="' + opp.id + '">' + escapeHtml(opp.title) + '</option>';
+                    modalHtml += '<option value="' + opp.id + '">' + escapeHtml(opp.title) + '</option>';
+                });
+                document.getElementById('filterOpportunity').innerHTML = html;
+                document.getElementById('intelOpportunity').innerHTML = modalHtml;
+            } catch (err) {
+                console.error('Error loading opportunities:', err);
+            }
+        }
+
+        async function loadCompetitors() {
+            try {
+                var client = initSupabase();
+                var { data, error } = await client.from('competitors').select('id, name').order('name');
+                
+                if (error) throw error;
+                competitors = data || [];
+                
+                // Populate dropdowns
+                var html = '<option value="">All Competitors</option>';
+                var modalHtml = '<option value="">Select competitor...</option>';
+                competitors.forEach(function(comp) {
+                    html += '<option value="' + comp.id + '">' + escapeHtml(comp.name) + '</option>';
+                    modalHtml += '<option value="' + comp.id + '">' + escapeHtml(comp.name) + '</option>';
+                });
+                document.getElementById('filterCompetitor').innerHTML = html;
+                document.getElementById('intelCompetitor').innerHTML = modalHtml;
+            } catch (err) {
+                console.error('Error loading competitors:', err);
+            }
+        }
+
+        async function loadIntelData() {
+            try {
+                var client = initSupabase();
+                var oppId = document.getElementById('filterOpportunity').value;
+                var compId = document.getElementById('filterCompetitor').value;
+                var intelType = document.getElementById('filterType').value;
+                var timeRange = document.getElementById('filterTimeRange').value;
+
+                var query = client.from('competitor_intel_history')
+                    .select('*, competitors(name), opportunities(title)')
+                    .order('intel_date', { ascending: false })
+                    .order('created_at', { ascending: false });
+
+                if (oppId) query = query.eq('opportunity_id', oppId);
+                if (compId) query = query.eq('competitor_id', compId);
+                if (intelType) query = query.eq('intel_type', intelType);
+                
+                if (timeRange) {
+                    var cutoffDate = new Date();
+                    cutoffDate.setDate(cutoffDate.getDate() - parseInt(timeRange));
+                    query = query.gte('intel_date', cutoffDate.toISOString().split('T')[0]);
+                }
+
+                var { data, error } = await query;
+                
+                if (error) throw error;
+                intelData = data || [];
+                
+                renderTimeline();
+                renderStats();
+                renderInsights();
+                renderTypeChart();
+            } catch (err) {
+                console.error('Error loading intel:', err);
+                document.getElementById('intelTimeline').innerHTML = '<div class="text-red-400 text-center py-8">Error loading data: ' + err.message + '</div>';
+            }
+        }
+
+        // =============================================================================
+        // RENDERING
+        // =============================================================================
+        function renderTimeline() {
+            var container = document.getElementById('intelTimeline');
+            
+            if (intelData.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-8">No intel records found. Click "Add Intel" to start tracking.</div>';
+                return;
+            }
+
+            var html = '';
+            var currentDate = '';
+            
+            intelData.forEach(function(intel) {
+                var dateStr = new Date(intel.intel_date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+                
+                if (dateStr !== currentDate) {
+                    currentDate = dateStr;
+                    html += '<div class="text-sm font-semibold text-cyan-400 mt-4 mb-2">' + dateStr + '</div>';
+                }
+                
+                var competitorName = intel.competitors ? intel.competitors.name : 'Unknown';
+                var oppTitle = intel.opportunities ? intel.opportunities.title : 'Unknown';
+                
+                html += '<div class="timeline-item ' + intel.intel_type + ' pb-4 cursor-pointer hover:opacity-80" onclick="viewIntel(\'' + intel.id + '\')">';
+                html += '  <div class="flex justify-between items-start">';
+                html += '    <div>';
+                html += '      <div class="font-medium text-white">' + escapeHtml(intel.summary) + '</div>';
+                html += '      <div class="text-sm text-gray-400 mt-1">';
+                html += '        <span class="text-cyan-400">' + escapeHtml(competitorName) + '</span>';
+                html += '        <span class="mx-2">•</span>';
+                html += '        <span>' + escapeHtml(oppTitle) + '</span>';
+                html += '      </div>';
+                html += '    </div>';
+                html += '    <div class="flex items-center gap-2">';
+                html += '      <span class="badge badge-' + intel.intel_type + '">' + intel.intel_type + '</span>';
+                html += '      <span class="text-xs confidence-' + intel.confidence_level + '">' + intel.confidence_level + '</span>';
+                html += '    </div>';
+                html += '  </div>';
+                if (intel.estimated_price || intel.pwin_estimate) {
+                    html += '  <div class="mt-2 flex gap-4 text-sm">';
+                    if (intel.estimated_price) {
+                        html += '    <span class="text-green-400">$' + Number(intel.estimated_price).toLocaleString() + '</span>';
+                    }
+                    if (intel.pwin_estimate) {
+                        html += '    <span class="text-yellow-400">pWin: ' + intel.pwin_estimate + '%</span>';
+                    }
+                    html += '  </div>';
+                }
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderStats() {
+            document.getElementById('statTotalIntel').textContent = intelData.length;
+            
+            var uniqueCompetitors = new Set(intelData.map(function(i) { return i.competitor_id; }));
+            document.getElementById('statCompetitors').textContent = uniqueCompetitors.size;
+            
+            var verified = intelData.filter(function(i) { return i.confidence_level === 'verified'; }).length;
+            document.getElementById('statVerified').textContent = verified;
+            
+            var weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            var thisWeek = intelData.filter(function(i) { return new Date(i.created_at) >= weekAgo; }).length;
+            document.getElementById('statThisWeek').textContent = thisWeek;
+        }
+
+        function renderInsights() {
+            var container = document.getElementById('competitorInsights');
+            
+            // Group by competitor
+            var byCompetitor = {};
+            intelData.forEach(function(intel) {
+                var compId = intel.competitor_id;
+                if (!byCompetitor[compId]) {
+                    byCompetitor[compId] = {
+                        name: intel.competitors ? intel.competitors.name : 'Unknown',
+                        count: 0,
+                        latestPwin: null
+                    };
+                }
+                byCompetitor[compId].count++;
+                if (intel.pwin_estimate && !byCompetitor[compId].latestPwin) {
+                    byCompetitor[compId].latestPwin = intel.pwin_estimate;
+                }
+            });
+
+            var sorted = Object.values(byCompetitor).sort(function(a, b) { return b.count - a.count; }).slice(0, 5);
+
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-sm">No competitor data</div>';
+                return;
+            }
+
+            var html = '';
+            sorted.forEach(function(comp) {
+                html += '<div class="flex justify-between items-center p-2 rounded-lg hover:bg-white/5">';
+                html += '  <span class="text-white">' + escapeHtml(comp.name) + '</span>';
+                html += '  <div class="flex items-center gap-3">';
+                html += '    <span class="text-gray-400 text-sm">' + comp.count + ' intel</span>';
+                if (comp.latestPwin) {
+                    var pwinColor = comp.latestPwin < 40 ? 'text-green-400' : comp.latestPwin < 60 ? 'text-yellow-400' : 'text-red-400';
+                    html += '    <span class="' + pwinColor + ' text-sm">' + comp.latestPwin + '%</span>';
+                }
+                html += '  </div>';
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderTypeChart() {
+            var container = document.getElementById('intelTypeChart');
+            
+            var byType = {};
+            intelData.forEach(function(intel) {
+                byType[intel.intel_type] = (byType[intel.intel_type] || 0) + 1;
+            });
+
+            if (Object.keys(byType).length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-sm">No data</div>';
+                return;
+            }
+
+            var total = intelData.length;
+            var html = '';
+            
+            Object.keys(byType).sort(function(a, b) { return byType[b] - byType[a]; }).forEach(function(type) {
+                var count = byType[type];
+                var pct = Math.round((count / total) * 100);
+                html += '<div class="mb-2">';
+                html += '  <div class="flex justify-between text-sm mb-1">';
+                html += '    <span class="badge badge-' + type + '">' + type + '</span>';
+                html += '    <span class="text-gray-400">' + count + ' (' + pct + '%)</span>';
+                html += '  </div>';
+                html += '  <div class="h-2 bg-gray-800 rounded-full overflow-hidden">';
+                html += '    <div class="h-full bg-cyan-500/50 rounded-full" style="width: ' + pct + '%"></div>';
+                html += '  </div>';
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        // =============================================================================
+        // MODAL HANDLERS
+        // =============================================================================
+        function openAddIntelModal() {
+            document.getElementById('addIntelModal').classList.remove('hidden');
+            // Reset form
+            document.getElementById('intelOpportunity').value = document.getElementById('filterOpportunity').value || '';
+            document.getElementById('intelCompetitor').value = document.getElementById('filterCompetitor').value || '';
+            document.getElementById('intelType').value = '';
+            document.getElementById('intelConfidence').value = '';
+            document.getElementById('intelSummary').value = '';
+            document.getElementById('intelDetails').value = '';
+            document.getElementById('intelPrice').value = '';
+            document.getElementById('intelPwin').value = '';
+            document.getElementById('intelSource').value = '';
+        }
+
+        function closeAddIntelModal() {
+            document.getElementById('addIntelModal').classList.add('hidden');
+        }
+
+        function viewIntel(id) {
+            selectedIntelId = id;
+            var intel = intelData.find(function(i) { return i.id === id; });
+            if (!intel) return;
+
+            document.getElementById('viewIntelTitle').textContent = intel.summary;
+            
+            var html = '<div class="space-y-4">';
+            html += '<div class="flex gap-2 flex-wrap">';
+            html += '  <span class="badge badge-' + intel.intel_type + '">' + intel.intel_type + '</span>';
+            html += '  <span class="badge" style="background: rgba(255,255,255,0.1); color: white;">Confidence: ' + intel.confidence_level + '</span>';
+            html += '</div>';
+            
+            if (intel.details) {
+                html += '<div>';
+                html += '  <div class="text-gray-400 text-sm mb-1">Details</div>';
+                html += '  <div class="text-white">' + escapeHtml(intel.details) + '</div>';
+                html += '</div>';
+            }
+            
+            html += '<div class="grid grid-cols-2 gap-4">';
+            if (intel.estimated_price) {
+                html += '<div>';
+                html += '  <div class="text-gray-400 text-sm">Estimated Price</div>';
+                html += '  <div class="text-green-400 font-semibold">$' + Number(intel.estimated_price).toLocaleString() + '</div>';
+                html += '</div>';
+            }
+            if (intel.pwin_estimate) {
+                html += '<div>';
+                html += '  <div class="text-gray-400 text-sm">pWin Estimate</div>';
+                html += '  <div class="text-yellow-400 font-semibold">' + intel.pwin_estimate + '%</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+            
+            if (intel.intel_source) {
+                html += '<div>';
+                html += '  <div class="text-gray-400 text-sm">Source</div>';
+                html += '  <div class="text-white">' + escapeHtml(intel.intel_source) + '</div>';
+                html += '</div>';
+            }
+            
+            html += '<div class="text-gray-500 text-xs mt-4">';
+            html += '  Added: ' + new Date(intel.created_at).toLocaleString();
+            html += '</div>';
+            html += '</div>';
+
+            document.getElementById('viewIntelContent').innerHTML = html;
+            document.getElementById('viewIntelModal').classList.remove('hidden');
+        }
+
+        function closeViewIntelModal() {
+            document.getElementById('viewIntelModal').classList.add('hidden');
+            selectedIntelId = null;
+        }
+
+        // =============================================================================
+        // DATA OPERATIONS
+        // =============================================================================
+        async function saveIntel() {
+            var oppId = document.getElementById('intelOpportunity').value;
+            var compId = document.getElementById('intelCompetitor').value;
+            var intelType = document.getElementById('intelType').value;
+            var confidence = document.getElementById('intelConfidence').value;
+            var summary = document.getElementById('intelSummary').value.trim();
+            var details = document.getElementById('intelDetails').value.trim();
+            var price = document.getElementById('intelPrice').value;
+            var pwin = document.getElementById('intelPwin').value;
+            var source = document.getElementById('intelSource').value.trim();
+
+            if (!oppId || !compId || !intelType || !confidence || !summary) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            try {
+                var client = initSupabase();
+                var { error } = await client.from('competitor_intel_history').insert([{
+                    opportunity_id: oppId,
+                    competitor_id: compId,
+                    intel_type: intelType,
+                    confidence_level: confidence,
+                    summary: summary,
+                    details: details || null,
+                    estimated_price: price ? parseFloat(price) : null,
+                    pwin_estimate: pwin ? parseInt(pwin) : null,
+                    intel_source: source || null,
+                    created_by: currentUser ? currentUser.id : null
+                }]);
+
+                if (error) throw error;
+
+                closeAddIntelModal();
+                await loadIntelData();
+            } catch (err) {
+                console.error('Error saving intel:', err);
+                alert('Failed to save: ' + err.message);
+            }
+        }
+
+        async function deleteIntel() {
+            if (!selectedIntelId) return;
+            if (!confirm('Delete this intel record?')) return;
+
+            try {
+                var client = initSupabase();
+                var { error } = await client.from('competitor_intel_history').delete().eq('id', selectedIntelId);
+                
+                if (error) throw error;
+
+                closeViewIntelModal();
+                await loadIntelData();
+            } catch (err) {
+                console.error('Error deleting:', err);
+                alert('Failed to delete: ' + err.message);
+            }
+        }
+
+        // =============================================================================
+        // EXPORT & REPORTING
+        // =============================================================================
+        function exportIntel(format) {
+            if (intelData.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            var csv = 'Date,Competitor,Opportunity,Type,Confidence,Summary,Price,pWin,Source\n';
+            intelData.forEach(function(intel) {
+                csv += '"' + intel.intel_date + '",';
+                csv += '"' + (intel.competitors ? intel.competitors.name : '') + '",';
+                csv += '"' + (intel.opportunities ? intel.opportunities.title : '') + '",';
+                csv += '"' + intel.intel_type + '",';
+                csv += '"' + intel.confidence_level + '",';
+                csv += '"' + (intel.summary || '').replace(/"/g, '""') + '",';
+                csv += '"' + (intel.estimated_price || '') + '",';
+                csv += '"' + (intel.pwin_estimate || '') + '",';
+                csv += '"' + (intel.intel_source || '').replace(/"/g, '""') + '"\n';
+            });
+
+            var blob = new Blob([csv], { type: 'text/csv' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'competitor-intel-' + new Date().toISOString().split('T')[0] + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function generateReport() {
+            alert('Intel report generation coming in Sprint 42');
+        }
+
+        // =============================================================================
+        // UTILITIES
+        // =============================================================================
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#00050F">
+  <title>MissionPulse v12.0 - Real-Time Collaboration</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes ripple { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+    @keyframes typing { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+    .animate-slideIn { animation: slideIn 0.3s ease-out; }
+    .animate-slideUp { animation: slideUp 0.3s ease-out; }
+    .animate-ripple { animation: ripple 1.5s ease-out infinite; }
+    .typing-dot { animation: typing 1.4s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    
+    /* Online indicator pulse */
+    .online-pulse::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      background: inherit;
+      animation: ripple 2s ease-out infinite;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, createContext, useContext, useRef } = React;
+
+    // ============================================
+    // SUPABASE CLIENT
+    // ============================================
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNjUsImV4cCI6MjA1MzE0MzI2NX0.gVAHNpfDJjQdXy1E9AAKX_xJDJX8cKbKcsM6v0';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================
+    // DEMO USERS (Simulated team)
+    // ============================================
+    const DEMO_USERS = [
+      { id: 'u1', name: 'Mary Womack', email: 'mary@missionmeetstech.com', role: 'CEO', avatar: 'MW', color: '#00E5FA', status: 'online' },
+      { id: 'u2', name: 'Daniel Chen', email: 'daniel@missionmeetstech.com', role: 'CTO', avatar: 'DC', color: '#8B5CF6', status: 'online' },
+      { id: 'u3', name: 'Sarah Martinez', email: 'sarah@missionmeetstech.com', role: 'Capture Manager', avatar: 'SM', color: '#10B981', status: 'away' },
+      { id: 'u4', name: 'James Wilson', email: 'james@missionmeetstech.com', role: 'Proposal Manager', avatar: 'JW', color: '#F59E0B', status: 'online' },
+      { id: 'u5', name: 'Emily Johnson', email: 'emily@missionmeetstech.com', role: 'Pricing Analyst', avatar: 'EJ', color: '#EC4899', status: 'offline' },
+      { id: 'u6', name: 'Michael Brown', email: 'michael@missionmeetstech.com', role: 'Contracts Lead', avatar: 'MB', color: '#6366F1', status: 'online' },
+    ];
+
+    const CURRENT_USER = DEMO_USERS[0]; // Mary Womack
+
+    // ============================================
+    // ICONS
+    // ============================================
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      user: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+      activity: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>,
+      bell: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
+      message: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      loader: () => <svg className="w-full h-full animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      send: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      upload: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+      comment: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      globe: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================
+    // UI COMPONENTS
+    // ============================================
+    const Card = ({ children, className = '', onClick, glow = false }) => (
+      <div 
+        onClick={onClick}
+        className={`bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl ${onClick ? 'cursor-pointer hover:border-cyan-500/30 transition-all' : ''} ${glow ? 'shadow-lg shadow-cyan-500/10 border-cyan-500/30' : ''} ${className}`}
+      >
+        {children}
+      </div>
+    );
+
+    const Button = ({ children, onClick, variant = 'primary', size = 'md', icon, disabled, loading, className = '' }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400',
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50',
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm' };
+      return (
+        <button 
+          onClick={onClick} 
+          disabled={disabled || loading}
+          className={`inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all ${variants[variant]} ${sizes[size]} ${disabled || loading ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+        >
+          {loading ? <Icon name="loader" className="w-4 h-4" /> : icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm' }) => {
+      const variants = {
+        default: 'bg-slate-700 text-slate-300',
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs' };
+      return <span className={`inline-flex items-center rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>{children}</span>;
+    };
+
+    // Avatar Component
+    const Avatar = ({ user, size = 'md', showStatus = true, showPulse = false }) => {
+      const sizes = { xs: 'w-6 h-6 text-xs', sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base', xl: 'w-16 h-16 text-lg' };
+      const statusColors = { online: 'bg-emerald-500', away: 'bg-amber-500', offline: 'bg-slate-500' };
+      const statusSizes = { xs: 'w-1.5 h-1.5', sm: 'w-2 h-2', md: 'w-2.5 h-2.5', lg: 'w-3 h-3', xl: 'w-4 h-4' };
+      
+      return (
+        <div className="relative inline-block">
+          <div 
+            className={`${sizes[size]} rounded-full flex items-center justify-center font-semibold text-white`}
+            style={{ backgroundColor: user.color }}
+          >
+            {user.avatar}
+          </div>
+          {showStatus && (
+            <div className={`absolute -bottom-0.5 -right-0.5 ${statusSizes[size]} ${statusColors[user.status]} rounded-full border-2 border-slate-900 ${showPulse && user.status === 'online' ? 'online-pulse' : ''}`} />
+          )}
+        </div>
+      );
+    };
+
+    // Avatar Stack Component
+    const AvatarStack = ({ users, max = 4, size = 'sm' }) => {
+      const visible = users.slice(0, max);
+      const remaining = users.length - max;
+      
+      return (
+        <div className="flex items-center -space-x-2">
+          {visible.map((user, i) => (
+            <div key={user.id} className="relative" style={{ zIndex: visible.length - i }}>
+              <Avatar user={user} size={size} showStatus={false} />
+            </div>
+          ))}
+          {remaining > 0 && (
+            <div className={`${size === 'sm' ? 'w-8 h-8 text-xs' : 'w-10 h-10 text-sm'} rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-slate-300 font-medium`}>
+              +{remaining}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // Toast System
+    const ToastContext = createContext();
+    const ToastProvider = ({ children }) => {
+      const [toasts, setToasts] = useState([]);
+      const addToast = useCallback((message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+      }, []);
+      return (
+        <ToastContext.Provider value={{ addToast }}>
+          {children}
+          <div className="fixed bottom-4 right-4 z-50 space-y-2">
+            {toasts.map(toast => (
+              <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg border backdrop-blur animate-slideIn ${
+                toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
+                toast.type === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
+                'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+              }`}>
+                {toast.message}
+              </div>
+            ))}
+          </div>
+        </ToastContext.Provider>
+      );
+    };
+    const useToast = () => useContext(ToastContext);
+
+    // ============================================
+    // PRESENCE CONTEXT
+    // ============================================
+    const PresenceContext = createContext();
+
+    const PresenceProvider = ({ children }) => {
+      const [onlineUsers, setOnlineUsers] = useState(DEMO_USERS.filter(u => u.status === 'online'));
+      const [activities, setActivities] = useState([]);
+      const [typing, setTyping] = useState({});
+
+      // Simulate real-time presence updates
+      useEffect(() => {
+        // Initial activities
+        const initialActivities = [
+          { id: 1, user: DEMO_USERS[1], action: 'updated', target: 'DHA-2025-001 pricing model', time: new Date(Date.now() - 120000), type: 'edit' },
+          { id: 2, user: DEMO_USERS[3], action: 'commented on', target: 'VA Healthcare RFP compliance matrix', time: new Date(Date.now() - 300000), type: 'comment' },
+          { id: 3, user: DEMO_USERS[5], action: 'uploaded', target: 'Contract modification template', time: new Date(Date.now() - 600000), type: 'upload' },
+          { id: 4, user: DEMO_USERS[2], action: 'viewed', target: 'CMS Data Analytics opportunity', time: new Date(Date.now() - 900000), type: 'view' },
+          { id: 5, user: DEMO_USERS[1], action: 'created', target: 'Black Hat analysis for IHS Portal', time: new Date(Date.now() - 1200000), type: 'create' },
+        ];
+        setActivities(initialActivities);
+
+        // Simulate user status changes
+        const statusInterval = setInterval(() => {
+          setOnlineUsers(prev => {
+            const updated = [...prev];
+            // Randomly toggle a user's status
+            const randomUser = DEMO_USERS[Math.floor(Math.random() * DEMO_USERS.length)];
+            const existingIndex = updated.findIndex(u => u.id === randomUser.id);
+            if (existingIndex > -1 && Math.random() > 0.7) {
+              updated.splice(existingIndex, 1);
+            } else if (existingIndex === -1 && Math.random() > 0.5) {
+              updated.push({ ...randomUser, status: 'online' });
+            }
+            return updated;
+          });
+        }, 15000);
+
+        // Simulate new activities
+        const activityInterval = setInterval(() => {
+          const actions = [
+            { action: 'updated', type: 'edit', targets: ['pricing model', 'technical approach', 'past performance section'] },
+            { action: 'commented on', type: 'comment', targets: ['compliance matrix', 'win strategy', 'competitor analysis'] },
+            { action: 'viewed', type: 'view', targets: ['executive summary', 'cost volume', 'staffing plan'] },
+            { action: 'uploaded', type: 'upload', targets: ['revised BOE', 'org chart', 'key personnel resumes'] },
+          ];
+          const randomAction = actions[Math.floor(Math.random() * actions.length)];
+          const randomTarget = randomAction.targets[Math.floor(Math.random() * randomAction.targets.length)];
+          const randomUser = DEMO_USERS.filter(u => u.status !== 'offline')[Math.floor(Math.random() * 4)];
+          
+          if (randomUser) {
+            const newActivity = {
+              id: Date.now(),
+              user: randomUser,
+              action: randomAction.action,
+              target: randomTarget,
+              time: new Date(),
+              type: randomAction.type,
+            };
+            setActivities(prev => [newActivity, ...prev.slice(0, 19)]);
+          }
+        }, 20000);
+
+        // Simulate typing indicators
+        const typingInterval = setInterval(() => {
+          const typingUsers = ['u2', 'u4', 'u6'];
+          const randomTyping = typingUsers[Math.floor(Math.random() * typingUsers.length)];
+          if (Math.random() > 0.6) {
+            setTyping(prev => ({ ...prev, [randomTyping]: true }));
+            setTimeout(() => {
+              setTyping(prev => {
+                const updated = { ...prev };
+                delete updated[randomTyping];
+                return updated;
+              });
+            }, 3000);
+          }
+        }, 8000);
+
+        return () => {
+          clearInterval(statusInterval);
+          clearInterval(activityInterval);
+          clearInterval(typingInterval);
+        };
+      }, []);
+
+      return (
+        <PresenceContext.Provider value={{ onlineUsers, activities, typing, setTyping }}>
+          {children}
+        </PresenceContext.Provider>
+      );
+    };
+
+    const usePresence = () => useContext(PresenceContext);
+
+    // ============================================
+    // COLLABORATION COMPONENTS
+    // ============================================
+
+    // Online Users Panel
+    const OnlineUsersPanel = () => {
+      const { onlineUsers, typing } = usePresence();
+
+      return (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Icon name="users" className="w-4 h-4 text-cyan-400" />
+              Team Online
+            </h3>
+            <Badge variant="success" size="xs">{onlineUsers.length} active</Badge>
+          </div>
+          <div className="space-y-3">
+            {DEMO_USERS.map(user => {
+              const isOnline = onlineUsers.find(u => u.id === user.id);
+              const isTyping = typing[user.id];
+              
+              return (
+                <div key={user.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar user={{ ...user, status: isOnline ? 'online' : user.status }} size="sm" showPulse={isOnline} />
+                    <div>
+                      <p className={`text-sm font-medium ${isOnline ? 'text-white' : 'text-slate-500'}`}>
+                        {user.name}
+                        {user.id === CURRENT_USER.id && <span className="text-cyan-400 text-xs ml-1">(you)</span>}
+                      </p>
+                      <p className="text-xs text-slate-500">{user.role}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isTyping && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-700/50">
+                        <span className="typing-dot w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                        <span className="typing-dot w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                        <span className="typing-dot w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                      </div>
+                    )}
+                    {!isTyping && isOnline && (
+                      <span className="text-xs text-emerald-400">Active now</span>
+                    )}
+                    {!isOnline && user.status === 'away' && (
+                      <span className="text-xs text-amber-400">Away</span>
+                    )}
+                    {!isOnline && user.status === 'offline' && (
+                      <span className="text-xs text-slate-500">Offline</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      );
+    };
+
+    // Activity Feed
+    const ActivityFeed = () => {
+      const { activities } = usePresence();
+
+      const getActionIcon = (type) => {
+        const icons = { edit: 'edit', comment: 'comment', view: 'eye', upload: 'upload', create: 'zap' };
+        return icons[type] || 'activity';
+      };
+
+      const getActionColor = (type) => {
+        const colors = { edit: 'text-cyan-400', comment: 'text-purple-400', view: 'text-slate-400', upload: 'text-emerald-400', create: 'text-amber-400' };
+        return colors[type] || 'text-slate-400';
+      };
+
+      const formatTime = (date) => {
+        const diff = (Date.now() - date.getTime()) / 1000;
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return date.toLocaleDateString();
+      };
+
+      return (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Icon name="activity" className="w-4 h-4 text-cyan-400" />
+              Live Activity
+            </h3>
+            <Button variant="ghost" size="xs" icon="refresh">Refresh</Button>
+          </div>
+          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+            {activities.map((activity, i) => (
+              <div key={activity.id} className={`flex gap-3 ${i === 0 ? 'animate-slideUp' : ''}`}>
+                <Avatar user={activity.user} size="sm" showStatus={false} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm">
+                    <span className="font-medium text-white">{activity.user.name}</span>
+                    <span className="text-slate-400"> {activity.action} </span>
+                    <span className="text-slate-300">{activity.target}</span>
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Icon name={getActionIcon(activity.type)} className={`w-3 h-3 ${getActionColor(activity.type)}`} />
+                    <span className="text-xs text-slate-500">{formatTime(activity.time)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      );
+    };
+
+    // Collaboration Indicator for Opportunities
+    const CollaborationIndicator = ({ opportunityId }) => {
+      const { onlineUsers } = usePresence();
+      // Simulate users viewing this opportunity
+      const viewingUsers = onlineUsers.filter(() => Math.random() > 0.5).slice(0, 3);
+
+      if (viewingUsers.length === 0) return null;
+
+      return (
+        <div className="flex items-center gap-2">
+          <AvatarStack users={viewingUsers} max={3} size="xs" />
+          <span className="text-xs text-slate-400">
+            {viewingUsers.length === 1 ? '1 person viewing' : `${viewingUsers.length} people viewing`}
+          </span>
+        </div>
+      );
+    };
+
+    // Real-time Comment Thread
+    const CommentThread = ({ opportunityId }) => {
+      const { addToast } = useToast();
+      const { typing, setTyping } = usePresence();
+      const [comments, setComments] = useState([
+        { id: 1, user: DEMO_USERS[1], text: 'Updated the pricing model with new labor rates. Please review.', time: new Date(Date.now() - 3600000) },
+        { id: 2, user: DEMO_USERS[3], text: 'Looks good! Should we include the optional CLINs?', time: new Date(Date.now() - 1800000) },
+        { id: 3, user: DEMO_USERS[0], text: 'Yes, include them. Client mentioned interest in Phase 2 options.', time: new Date(Date.now() - 900000) },
+      ]);
+      const [input, setInput] = useState('');
+      const inputRef = useRef(null);
+
+      const handleSend = () => {
+        if (!input.trim()) return;
+        
+        const newComment = {
+          id: Date.now(),
+          user: CURRENT_USER,
+          text: input,
+          time: new Date(),
+        };
+        setComments(prev => [...prev, newComment]);
+        setInput('');
+        addToast('Comment posted', 'success');
+      };
+
+      const handleTyping = (e) => {
+        setInput(e.target.value);
+        // Broadcast typing indicator (simulated)
+        setTyping(prev => ({ ...prev, [CURRENT_USER.id]: true }));
+        setTimeout(() => {
+          setTyping(prev => {
+            const updated = { ...prev };
+            delete updated[CURRENT_USER.id];
+            return updated;
+          });
+        }, 2000);
+      };
+
+      const formatTime = (date) => {
+        return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      };
+
+      return (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Icon name="message" className="w-4 h-4 text-cyan-400" />
+              Team Discussion
+            </h3>
+            <Badge variant="primary" size="xs">{comments.length} comments</Badge>
+          </div>
+          
+          <div className="space-y-4 max-h-[300px] overflow-y-auto mb-4">
+            {comments.map(comment => (
+              <div key={comment.id} className={`flex gap-3 ${comment.id === comments[comments.length - 1]?.id && comments.length > 3 ? 'animate-slideUp' : ''}`}>
+                <Avatar user={comment.user} size="sm" showStatus={false} />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-white text-sm">{comment.user.name}</span>
+                    <span className="text-xs text-slate-500">{formatTime(comment.time)}</span>
+                  </div>
+                  <p className="text-sm text-slate-300 mt-1">{comment.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Typing indicator */}
+          {Object.keys(typing).filter(id => id !== CURRENT_USER.id).length > 0 && (
+            <div className="flex items-center gap-2 mb-3 text-xs text-slate-400">
+              <div className="flex items-center gap-1">
+                <span className="typing-dot w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                <span className="typing-dot w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                <span className="typing-dot w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+              </div>
+              Someone is typing...
+            </div>
+          )}
+
+          {/* Input */}
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={handleTyping}
+              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Add a comment..."
+              className="flex-1 bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+            />
+            <Button size="sm" icon="send" onClick={handleSend} disabled={!input.trim()}>Send</Button>
+          </div>
+        </Card>
+      );
+    };
+
+    // Live Opportunity Card
+    const LiveOpportunityCard = ({ opportunity }) => {
+      const { onlineUsers } = usePresence();
+      const collaborators = onlineUsers.filter(() => Math.random() > 0.4).slice(0, 4);
+
+      const formatCurrency = (value) => {
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+        return `$${value?.toLocaleString() || 0}`;
+      };
+
+      return (
+        <Card className="p-5 hover:border-cyan-500/30 transition-all">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="font-semibold text-white">{opportunity.title}</h3>
+              <p className="text-slate-400 text-sm">{opportunity.agency}</p>
+            </div>
+            <Badge variant={opportunity.status === 'proposal' ? 'warning' : 'primary'}>{opportunity.status}</Badge>
+          </div>
+          
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-cyan-400 font-semibold">{formatCurrency(opportunity.value)}</span>
+            <span className="text-white">{opportunity.pwin}% pWin</span>
+          </div>
+
+          {/* Collaborators */}
+          {collaborators.length > 0 && (
+            <div className="flex items-center justify-between pt-3 border-t border-slate-700/50">
+              <div className="flex items-center gap-2">
+                <AvatarStack users={collaborators} max={3} size="xs" />
+                <span className="text-xs text-slate-400">
+                  {collaborators.length} {collaborators.length === 1 ? 'person' : 'people'} working
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span className="text-xs text-emerald-400">Live</span>
+              </div>
+            </div>
+          )}
+        </Card>
+      );
+    };
+
+    // ============================================
+    // MAIN COLLABORATION HUB
+    // ============================================
+    const CollaborationHub = () => {
+      const { addToast } = useToast();
+      const { onlineUsers } = usePresence();
+      const [opportunities, setOpportunities] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [selectedOpp, setSelectedOpp] = useState(null);
+
+      useEffect(() => {
+        const load = async () => {
+          const { data, error } = await supabase.from('opportunities').select('*').order('created_at', { ascending: false }).limit(6);
+          if (!error && data) {
+            setOpportunities(data);
+          } else {
+            // Demo data fallback
+            setOpportunities([
+              { id: '1', title: 'DHA Healthcare Platform', agency: 'Defense Health Agency', value: 12500000, pwin: 72, status: 'proposal' },
+              { id: '2', title: 'VA Claims Processing', agency: 'Veterans Affairs', value: 8200000, pwin: 65, status: 'capture' },
+              { id: '3', title: 'CMS Data Analytics', agency: 'CMS', value: 15000000, pwin: 45, status: 'qualification' },
+              { id: '4', title: 'IHS Telehealth Portal', agency: 'Indian Health Service', value: 4500000, pwin: 80, status: 'proposal' },
+            ]);
+          }
+          setLoading(false);
+        };
+        load();
+
+        // Subscribe to real-time updates
+        const subscription = supabase
+          .channel('opportunities-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, (payload) => {
+            addToast('Opportunity updated in real-time', 'info');
+            load();
+          })
+          .subscribe();
+
+        return () => subscription.unsubscribe();
+      }, []);
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
+            <Icon name="loader" className="w-8 h-8 text-cyan-400" />
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-[#00050F] p-6">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                  <Icon name="globe" className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">Collaboration Hub</h1>
+                  <p className="text-slate-400">Real-time team activity and presence</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                  <span className="text-emerald-400 text-sm font-medium">{onlineUsers.length} online</span>
+                </div>
+                <AvatarStack users={onlineUsers} max={5} size="sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Main Content */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Live Opportunities */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-white">Active Opportunities</h2>
+                    <Badge variant="success" size="sm">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-1 animate-pulse"></span>
+                      Live Updates
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {opportunities.map(opp => (
+                      <div key={opp.id} onClick={() => setSelectedOpp(opp)}>
+                        <LiveOpportunityCard opportunity={opp} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Comment Thread */}
+                <CommentThread opportunityId={selectedOpp?.id} />
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-6">
+                {/* Online Users */}
+                <OnlineUsersPanel />
+
+                {/* Activity Feed */}
+                <ActivityFeed />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-8 text-center">
+              <p className="text-slate-600 text-xs">
+                AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12.0 • Real-Time Collaboration
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // MAIN APP
+    // ============================================
+    function App() {
+      return (
+        <ToastProvider>
+          <PresenceProvider>
+            <CollaborationHub />
+          </PresenceProvider>
+        </ToastProvider>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
