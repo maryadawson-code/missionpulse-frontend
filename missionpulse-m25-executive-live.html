@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Dashboard | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #000A1A 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); border-radius: 0.75rem; }
+        .cyan-glow { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+        .alert-critical { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .stage-capture { background: rgba(59, 130, 246, 0.2); }
+        .stage-proposal { background: rgba(245, 158, 11, 0.2); }
+        .stage-submitted { background: rgba(168, 85, 247, 0.2); }
+        .stage-awarded { background: rgba(34, 197, 94, 0.2); }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <div id="missionpulse-sidebar" data-current-page="executive"></div>
+    <script src="missionpulse-nav.js"></script>
+
+    <div class="main-content" style="margin-left: 260px;">
+        <header class="border-b border-cyan-500/20 bg-black/40 backdrop-blur sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="text-3xl">📊</div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-cyan-400">Executive Dashboard</h1>
+                        <p class="text-white/50 text-sm">Portfolio overview and key metrics</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-white/50" id="lastUpdated">--</span>
+                    <button onclick="refreshData()" class="text-cyan-400 hover:text-cyan-300">🔄</button>
+                    <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+                        <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+                        <span class="text-white/50">Checking...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-6 py-8">
+            <div id="alertsSection" class="mb-8 hidden"><div id="alertsList" class="space-y-2"></div></div>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <div class="glass-card cyan-glow p-4 text-center">
+                    <div id="metricPipeline" class="text-2xl font-bold text-cyan-400">$0</div>
+                    <div class="text-xs text-white/50">Pipeline</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="metricActive" class="text-2xl font-bold text-white">0</div>
+                    <div class="text-xs text-white/50">Active</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="metricProposal" class="text-2xl font-bold text-yellow-400">0</div>
+                    <div class="text-xs text-white/50">In Proposal</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="metricWinRate" class="text-2xl font-bold text-green-400">0%</div>
+                    <div class="text-xs text-white/50">Avg pWin</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="metricOverdue" class="text-2xl font-bold text-red-400">0</div>
+                    <div class="text-xs text-white/50">Overdue</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="metricDue7" class="text-2xl font-bold text-orange-400">0</div>
+                    <div class="text-xs text-white/50">Due 7 Days</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="glass-card p-6">
+                    <h2 class="text-lg font-semibold text-cyan-400 mb-4">Pipeline by Stage</h2>
+                    <div id="stageBreakdown" class="space-y-3"></div>
+                </div>
+                <div class="glass-card p-6">
+                    <h2 class="text-lg font-semibold text-cyan-400 mb-4">Win Probability</h2>
+                    <div id="pwinDistribution" class="space-y-3"></div>
+                </div>
+                <div class="glass-card p-6">
+                    <h2 class="text-lg font-semibold text-cyan-400 mb-4">Upcoming Deadlines</h2>
+                    <div id="upcomingDeadlines" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6">
+                <h2 class="text-lg font-semibold text-cyan-400 mb-4">Active Opportunities</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-cyan-500/20">
+                                <th class="text-left py-3 text-white/50">Opportunity</th>
+                                <th class="text-left py-3 text-white/50">Agency</th>
+                                <th class="text-left py-3 text-white/50">Stage</th>
+                                <th class="text-right py-3 text-white/50">Value</th>
+                                <th class="text-right py-3 text-white/50">pWin</th>
+                            </tr>
+                        </thead>
+                        <tbody id="opportunitiesTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <footer class="border-t border-cyan-500/20 mt-12">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <p class="text-center text-white/30 text-xs">AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTMwNjIsImV4cCI6MjA1Mjk4OTA2Mn0.gwBTnfAtsxSFDz96fDPL7HAIYdA5s_9hiv_l0ECWvYc';
+        
+        let supabase, isLive = false, opportunities = [], milestones = [];
+
+        const demoData = {
+            opportunities: [
+                { id: 1, title: 'DHA DHMSM Support', nickname: 'DHMSM', agency: 'DHA', stage: 'proposal', ceiling: 125000000, pwin: 65 },
+                { id: 2, title: 'VA EHR Modernization', nickname: 'VA-EHR', agency: 'VA', stage: 'capture', ceiling: 89000000, pwin: 45 },
+                { id: 3, title: 'CMS Data Analytics', nickname: 'CMS-Analytics', agency: 'CMS', stage: 'proposal', ceiling: 67000000, pwin: 70 },
+                { id: 4, title: 'IHS Telehealth', nickname: 'IHS-TH', agency: 'IHS', stage: 'capture', ceiling: 45000000, pwin: 55 },
+                { id: 5, title: 'DoD Healthcare IT', nickname: 'DoD-HIT', agency: 'DoD', stage: 'submitted', ceiling: 156000000, pwin: 40 },
+                { id: 6, title: 'NIH Research Portal', nickname: 'NIH-Portal', agency: 'NIH', stage: 'awarded', ceiling: 78000000, pwin: 100 },
+                { id: 7, title: 'CDC Data Exchange', nickname: 'CDC-DEX', agency: 'CDC', stage: 'capture', ceiling: 52000000, pwin: 35 }
+            ],
+            milestones: [
+                { title: 'DHMSM Red Team', due_date: '2025-02-05', is_critical_path: true, opportunity: 'DHMSM' },
+                { title: 'VA-EHR Proposal Due', due_date: '2025-02-15', is_government_deadline: true, opportunity: 'VA-EHR' },
+                { title: 'CMS Pink Team', due_date: '2025-02-03', is_critical_path: true, opportunity: 'CMS-Analytics' },
+                { title: 'IHS Q&A Deadline', due_date: '2025-01-30', is_government_deadline: true, opportunity: 'IHS-TH' }
+            ]
+        };
+
+        async function init() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                const { data, error } = await supabase.from('opportunities').select('*').order('ceiling', { ascending: false });
+                if (!error && data?.length) {
+                    isLive = true; opportunities = data;
+                    const { data: ms } = await supabase.from('proposal_milestones').select('*').order('due_date').limit(6);
+                    milestones = ms || [];
+                } else { loadDemo(); return; }
+            } catch (e) { loadDemo(); return; }
+            updateStatus(true);
+            render();
+        }
+
+        function loadDemo() {
+            isLive = false; updateStatus(false);
+            opportunities = [...demoData.opportunities];
+            milestones = [...demoData.milestones];
+            render();
+        }
+
+        function updateStatus(live) {
+            document.getElementById('connectionStatus').innerHTML = live 
+                ? '<div class="w-2 h-2 rounded-full bg-green-500"></div><span class="text-green-400">Live</span>' 
+                : '<div class="w-2 h-2 rounded-full bg-yellow-500"></div><span class="text-yellow-400">Demo</span>';
+        }
+
+        function render() {
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+            
+            const total = opportunities.reduce((s, o) => s + (o.ceiling || 0), 0);
+            const active = opportunities.filter(o => ['capture', 'proposal', 'submitted'].includes(o.stage)).length;
+            const inProp = opportunities.filter(o => o.stage === 'proposal').length;
+            const avgPwin = opportunities.length ? Math.round(opportunities.reduce((s, o) => s + (o.pwin || 0), 0) / opportunities.length) : 0;
+            
+            document.getElementById('metricPipeline').textContent = '$' + (total / 1e6).toFixed(0) + 'M';
+            document.getElementById('metricActive').textContent = active;
+            document.getElementById('metricProposal').textContent = inProp;
+            document.getElementById('metricWinRate').textContent = avgPwin + '%';
+            document.getElementById('metricOverdue').textContent = '0';
+            document.getElementById('metricDue7').textContent = milestones.length;
+
+            const stages = { capture: 0, proposal: 0, submitted: 0, awarded: 0 };
+            opportunities.forEach(o => { if (stages[o.stage] !== undefined) stages[o.stage]++; });
+            const stageTotal = Object.values(stages).reduce((a, b) => a + b, 1);
+            document.getElementById('stageBreakdown').innerHTML = Object.entries(stages).map(([s, c]) => `
+                <div class="flex items-center justify-between">
+                    <span class="capitalize text-sm text-white/70">${s}</span>
+                    <div class="flex items-center gap-2">
+                        <div class="w-24 h-2 bg-white/10 rounded-full"><div class="h-full stage-${s} rounded-full" style="width:${c/stageTotal*100}%"></div></div>
+                        <span class="text-sm text-white/50 w-6 text-right">${c}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            const pw = { high: 0, medium: 0, low: 0 };
+            opportunities.forEach(o => { if (o.pwin >= 60) pw.high++; else if (o.pwin >= 40) pw.medium++; else pw.low++; });
+            const pwTotal = opportunities.length || 1;
+            document.getElementById('pwinDistribution').innerHTML = `
+                <div class="flex items-center justify-between"><span class="text-sm text-green-400">High (60%+)</span><div class="flex items-center gap-2"><div class="w-24 h-2 bg-white/10 rounded-full"><div class="h-full bg-green-500 rounded-full" style="width:${pw.high/pwTotal*100}%"></div></div><span class="text-sm text-white/50 w-6 text-right">${pw.high}</span></div></div>
+                <div class="flex items-center justify-between"><span class="text-sm text-yellow-400">Medium</span><div class="flex items-center gap-2"><div class="w-24 h-2 bg-white/10 rounded-full"><div class="h-full bg-yellow-500 rounded-full" style="width:${pw.medium/pwTotal*100}%"></div></div><span class="text-sm text-white/50 w-6 text-right">${pw.medium}</span></div></div>
+                <div class="flex items-center justify-between"><span class="text-sm text-red-400">Low (<40%)</span><div class="flex items-center gap-2"><div class="w-24 h-2 bg-white/10 rounded-full"><div class="h-full bg-red-500 rounded-full" style="width:${pw.low/pwTotal*100}%"></div></div><span class="text-sm text-white/50 w-6 text-right">${pw.low}</span></div></div>
+            `;
+
+            document.getElementById('upcomingDeadlines').innerHTML = milestones.slice(0, 5).map(m => `
+                <div class="flex items-center justify-between p-2 bg-white/5 rounded">
+                    <div><div class="text-sm text-white/80">${m.title}</div><div class="text-xs text-white/50">${m.opportunity || ''}</div></div>
+                    <div class="text-sm ${m.is_critical_path ? 'text-red-400' : 'text-white/70'}">${m.due_date} ${m.is_government_deadline ? '🏛️' : ''}</div>
+                </div>
+            `).join('') || '<div class="text-white/40 text-sm">No deadlines</div>';
+
+            document.getElementById('opportunitiesTable').innerHTML = opportunities.slice(0, 10).map(o => `
+                <tr class="border-b border-cyan-500/10 hover:bg-white/5">
+                    <td class="py-3"><div class="font-medium">${o.nickname || o.title}</div></td>
+                    <td class="py-3 text-white/70">${o.agency || '-'}</td>
+                    <td class="py-3"><span class="px-2 py-0.5 rounded text-xs stage-${o.stage} capitalize">${o.stage}</span></td>
+                    <td class="py-3 text-right text-white/70">$${((o.ceiling||0)/1e6).toFixed(1)}M</td>
+                    <td class="py-3 text-right ${o.pwin>=60?'text-green-400':o.pwin>=40?'text-yellow-400':'text-red-400'}">${o.pwin||0}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function refreshData() { isLive ? init() : render(); }
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

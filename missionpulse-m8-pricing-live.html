@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing & BOE Builder | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #000A1A 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.2); border-radius: 0.75rem; }
+        .glass-card:hover { border-color: rgba(0, 229, 250, 0.4); }
+        .cyan-glow { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #00B8D4 100%); color: #00050F; font-weight: 600; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-secondary { background: rgba(0, 229, 250, 0.1); border: 1px solid rgba(0, 229, 250, 0.3); color: #00E5FA; }
+        input:focus, select:focus { outline: none; border-color: #00E5FA; }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <div id="missionpulse-sidebar" data-current-page="pricing"></div>
+    <script src="missionpulse-nav.js"></script>
+
+    <div class="main-content" style="margin-left: 260px;">
+        <header class="border-b border-cyan-500/20 bg-black/40 backdrop-blur sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="text-3xl">💰</div>
+                        <div>
+                            <h1 class="text-2xl font-bold text-cyan-400">Pricing & BOE Builder</h1>
+                            <p class="text-white/50 text-sm">Labor rates, BOE, and Price-to-Win analysis</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <select id="opportunitySelect" onchange="loadPricing()" class="bg-black/40 border border-cyan-500/30 rounded-lg px-4 py-2 text-white">
+                            <option value="">Select Opportunity</option>
+                        </select>
+                        <button onclick="exportToCSV()" class="btn-secondary px-4 py-2 rounded-lg text-sm">📥 Export CSV</button>
+                        <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+                            <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+                            <span class="text-white/50">Checking...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-6 py-8">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="glass-card p-4 text-center">
+                    <div id="totalLabor" class="text-2xl font-bold text-cyan-400">$0</div>
+                    <div class="text-xs text-white/50">Total Labor</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="totalODC" class="text-2xl font-bold text-green-400">$0</div>
+                    <div class="text-xs text-white/50">Total ODCs</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="totalPrice" class="text-2xl font-bold text-purple-400">$0</div>
+                    <div class="text-xs text-white/50">Total Price</div>
+                </div>
+                <div class="glass-card p-4 text-center">
+                    <div id="ptwIndicator" class="text-2xl font-bold text-yellow-400">—</div>
+                    <div class="text-xs text-white/50">vs PTW Target</div>
+                </div>
+            </div>
+
+            <!-- Wrap Rates -->
+            <div class="glass-card p-6 mb-8">
+                <h2 class="text-lg font-semibold text-cyan-400 mb-4">Wrap Rates & Multipliers</h2>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div>
+                        <label class="text-xs text-white/50">Fringe %</label>
+                        <input type="number" id="wrapFringe" value="35" class="w-full bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-white" onchange="recalculate()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-white/50">Overhead %</label>
+                        <input type="number" id="wrapOverhead" value="45" class="w-full bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-white" onchange="recalculate()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-white/50">G&A %</label>
+                        <input type="number" id="wrapGA" value="12" class="w-full bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-white" onchange="recalculate()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-white/50">Fee %</label>
+                        <input type="number" id="wrapFee" value="8" class="w-full bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-white" onchange="recalculate()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-white/50">Total Multiplier</label>
+                        <div id="totalMultiplier" class="w-full bg-cyan-500/10 border border-cyan-500/30 rounded px-3 py-2 text-cyan-400 font-bold">2.18x</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Labor Categories -->
+            <div class="glass-card p-6 mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-cyan-400">Labor Categories</h2>
+                    <button onclick="addLaborCategory()" class="btn-primary px-4 py-2 rounded-lg text-sm">+ Add Labor Cat</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-cyan-500/20">
+                                <th class="text-left py-3 text-white/50 font-medium">Labor Category</th>
+                                <th class="text-right py-3 text-white/50 font-medium">Base Rate</th>
+                                <th class="text-right py-3 text-white/50 font-medium">Hours</th>
+                                <th class="text-right py-3 text-white/50 font-medium">FTEs</th>
+                                <th class="text-right py-3 text-white/50 font-medium">Direct Cost</th>
+                                <th class="text-right py-3 text-white/50 font-medium">Loaded Cost</th>
+                                <th class="text-center py-3 text-white/50 font-medium">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="laborTable"></tbody>
+                        <tfoot>
+                            <tr class="border-t border-cyan-500/30 bg-cyan-500/5">
+                                <td class="py-3 font-semibold text-cyan-400">TOTALS</td>
+                                <td></td>
+                                <td class="text-right py-3 font-semibold text-white" id="totalHours">0</td>
+                                <td class="text-right py-3 font-semibold text-white" id="totalFTEs">0.0</td>
+                                <td class="text-right py-3 font-semibold text-white" id="totalDirect">$0</td>
+                                <td class="text-right py-3 font-semibold text-cyan-400" id="totalLoaded">$0</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Price-to-Win -->
+            <div class="glass-card cyan-glow p-6">
+                <h2 class="text-lg font-semibold text-cyan-400 mb-4">Price-to-Win Analysis</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="text-xs text-white/50">PTW Target</label>
+                        <input type="number" id="ptwTarget" placeholder="e.g., 5000000" class="w-full bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-white" onchange="recalculate()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-white/50">Competitor Est.</label>
+                        <input type="number" id="competitorEst" placeholder="e.g., 5200000" class="w-full bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-white" onchange="recalculate()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-white/50">Our Position</label>
+                        <div id="ptwPosition" class="w-full bg-black/40 border border-cyan-500/30 rounded px-3 py-2 text-white">Enter values above</div>
+                    </div>
+                </div>
+                <div id="ptwAnalysis" class="mt-4 p-4 bg-black/20 rounded-lg text-sm text-white/70"></div>
+            </div>
+        </main>
+
+        <footer class="border-t border-cyan-500/20 mt-12">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <p class="text-center text-white/30 text-xs">AI GENERATED CONTENT - REQUIRES HUMAN REVIEW</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTMwNjIsImV4cCI6MjA1Mjk4OTA2Mn0.gwBTnfAtsxSFDz96fDPL7HAIYdA5s_9hiv_l0ECWvYc';
+        
+        let supabase, isLive = false, currentOpp = null;
+        let laborCategories = [];
+
+        const demoLabor = [
+            { id: 1, name: 'Program Manager', base_rate: 175, hours: 2080, fte: 1.0 },
+            { id: 2, name: 'Senior Systems Engineer', base_rate: 145, hours: 4160, fte: 2.0 },
+            { id: 3, name: 'Software Developer', base_rate: 125, hours: 6240, fte: 3.0 },
+            { id: 4, name: 'Business Analyst', base_rate: 115, hours: 2080, fte: 1.0 },
+            { id: 5, name: 'QA Engineer', base_rate: 105, hours: 2080, fte: 1.0 }
+        ];
+
+        async function init() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                const { data, error } = await supabase.from('opportunities').select('id, title, nickname');
+                if (!error && data?.length) {
+                    isLive = true;
+                    updateStatus(true);
+                    populateOpportunities(data);
+                } else {
+                    loadDemo();
+                }
+            } catch (e) {
+                loadDemo();
+            }
+        }
+
+        function loadDemo() {
+            isLive = false;
+            updateStatus(false);
+            populateOpportunities([{ id: 'demo', title: 'DHA DHMSM Support', nickname: 'DHMSM' }]);
+            laborCategories = [...demoLabor];
+            renderLabor();
+            recalculate();
+        }
+
+        function updateStatus(live) {
+            const el = document.getElementById('connectionStatus');
+            el.innerHTML = live ? '<div class="w-2 h-2 rounded-full bg-green-500"></div><span class="text-green-400">Live</span>' : '<div class="w-2 h-2 rounded-full bg-yellow-500"></div><span class="text-yellow-400">Demo</span>';
+        }
+
+        function populateOpportunities(opps) {
+            const sel = document.getElementById('opportunitySelect');
+            sel.innerHTML = '<option value="">Select Opportunity</option>' + opps.map(o => `<option value="${o.id}">${o.nickname || o.title}</option>`).join('');
+            if (opps.length === 1) { sel.value = opps[0].id; loadPricing(); }
+        }
+
+        async function loadPricing() {
+            currentOpp = document.getElementById('opportunitySelect').value;
+            if (!currentOpp) return;
+            if (isLive) {
+                const { data } = await supabase.from('labor_categories').select('*').eq('opportunity_id', currentOpp);
+                laborCategories = data || [];
+            }
+            if (!laborCategories.length) laborCategories = [...demoLabor];
+            renderLabor();
+            recalculate();
+        }
+
+        function renderLabor() {
+            const tbody = document.getElementById('laborTable');
+            tbody.innerHTML = laborCategories.map(lc => `
+                <tr class="border-b border-cyan-500/10 hover:bg-white/5">
+                    <td class="py-3">${lc.name}</td>
+                    <td class="text-right py-3">
+                        <input type="number" value="${lc.base_rate}" onchange="updateLabor(${lc.id}, 'base_rate', this.value)" class="w-20 bg-black/40 border border-cyan-500/30 rounded px-2 py-1 text-right text-white">
+                    </td>
+                    <td class="text-right py-3">
+                        <input type="number" value="${lc.hours}" onchange="updateLabor(${lc.id}, 'hours', this.value)" class="w-20 bg-black/40 border border-cyan-500/30 rounded px-2 py-1 text-right text-white">
+                    </td>
+                    <td class="text-right py-3 text-white/70">${(lc.hours / 2080).toFixed(1)}</td>
+                    <td class="text-right py-3 text-white/70">$${(lc.base_rate * lc.hours).toLocaleString()}</td>
+                    <td class="text-right py-3 text-cyan-400 font-medium" id="loaded-${lc.id}">$0</td>
+                    <td class="text-center py-3">
+                        <button onclick="deleteLabor(${lc.id})" class="text-red-400 hover:text-red-300">×</button>
+                    </td>
+                </tr>
+            `).join('');
+            recalculate();
+        }
+
+        function updateLabor(id, field, value) {
+            const lc = laborCategories.find(l => l.id === id);
+            if (lc) { lc[field] = parseFloat(value) || 0; recalculate(); }
+        }
+
+        function deleteLabor(id) {
+            laborCategories = laborCategories.filter(l => l.id !== id);
+            renderLabor();
+        }
+
+        function addLaborCategory() {
+            const name = prompt('Labor Category Name:');
+            if (!name) return;
+            const rate = parseFloat(prompt('Base Hourly Rate:', '100')) || 100;
+            const hours = parseInt(prompt('Total Hours:', '2080')) || 2080;
+            laborCategories.push({ id: Date.now(), name, base_rate: rate, hours, fte: hours / 2080 });
+            renderLabor();
+        }
+
+        function recalculate() {
+            const fringe = parseFloat(document.getElementById('wrapFringe').value) / 100 || 0;
+            const overhead = parseFloat(document.getElementById('wrapOverhead').value) / 100 || 0;
+            const ga = parseFloat(document.getElementById('wrapGA').value) / 100 || 0;
+            const fee = parseFloat(document.getElementById('wrapFee').value) / 100 || 0;
+            const multiplier = (1 + fringe) * (1 + overhead) * (1 + ga) * (1 + fee);
+            document.getElementById('totalMultiplier').textContent = multiplier.toFixed(2) + 'x';
+
+            let totalHours = 0, totalDirect = 0, totalLoaded = 0;
+            laborCategories.forEach(lc => {
+                const direct = lc.base_rate * lc.hours;
+                const loaded = direct * multiplier;
+                totalHours += lc.hours;
+                totalDirect += direct;
+                totalLoaded += loaded;
+                const el = document.getElementById(`loaded-${lc.id}`);
+                if (el) el.textContent = '$' + Math.round(loaded).toLocaleString();
+            });
+
+            document.getElementById('totalHours').textContent = totalHours.toLocaleString();
+            document.getElementById('totalFTEs').textContent = (totalHours / 2080).toFixed(1);
+            document.getElementById('totalDirect').textContent = '$' + Math.round(totalDirect).toLocaleString();
+            document.getElementById('totalLoaded').textContent = '$' + Math.round(totalLoaded).toLocaleString();
+            document.getElementById('totalLabor').textContent = '$' + (totalLoaded / 1000000).toFixed(2) + 'M';
+            document.getElementById('totalPrice').textContent = '$' + (totalLoaded / 1000000).toFixed(2) + 'M';
+
+            // PTW Analysis
+            const ptwTarget = parseFloat(document.getElementById('ptwTarget').value) || 0;
+            const compEst = parseFloat(document.getElementById('competitorEst').value) || 0;
+            
+            if (ptwTarget > 0) {
+                const diff = totalLoaded - ptwTarget;
+                const pct = ((totalLoaded / ptwTarget - 1) * 100).toFixed(1);
+                const indicator = diff > 0 ? `+${pct}%` : `${pct}%`;
+                const color = diff > 0 ? 'text-red-400' : 'text-green-400';
+                document.getElementById('ptwIndicator').className = `text-2xl font-bold ${color}`;
+                document.getElementById('ptwIndicator').textContent = indicator;
+                
+                let analysis = `<strong>Our Price:</strong> $${Math.round(totalLoaded).toLocaleString()}<br>`;
+                analysis += `<strong>PTW Target:</strong> $${ptwTarget.toLocaleString()}<br>`;
+                if (compEst > 0) analysis += `<strong>Competitor Est:</strong> $${compEst.toLocaleString()}<br>`;
+                analysis += diff > 0 ? `<span class="text-red-400">⚠️ ${Math.abs(pct)}% ABOVE target - consider reducing scope or rates</span>` : `<span class="text-green-400">✅ ${Math.abs(pct)}% BELOW target - competitive position</span>`;
+                document.getElementById('ptwAnalysis').innerHTML = analysis;
+                document.getElementById('ptwPosition').innerHTML = diff > 0 ? '<span class="text-red-400">Above Target</span>' : '<span class="text-green-400">Below Target</span>';
+            }
+        }
+
+        function exportToCSV() {
+            const multiplier = parseFloat(document.getElementById('totalMultiplier').textContent) || 2;
+            let csv = 'Labor Category,Base Rate,Hours,FTEs,Direct Cost,Loaded Cost\n';
+            laborCategories.forEach(lc => {
+                const direct = lc.base_rate * lc.hours;
+                const loaded = direct * multiplier;
+                csv += `"${lc.name}",${lc.base_rate},${lc.hours},${(lc.hours/2080).toFixed(1)},${Math.round(direct)},${Math.round(loaded)}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'boe-pricing.csv'; a.click();
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
