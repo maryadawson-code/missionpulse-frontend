@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12.0 - Agent Hub</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes typing { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .typing-indicator span { animation: typing 1.4s infinite; }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // ============================================
+    // SUPABASE CLIENT
+    // ============================================
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNjUsImV4cCI6MjA1MzE0MzI2NX0.gVAHNpfDJjQdXy1E9AAKX_xJDJX8cKbKcsM6v0';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================
+    // MISSIONPULSE API (Inline)
+    // ============================================
+    const MissionPulseAPI = {
+      // Opportunities
+      async getOpportunities() {
+        const { data, error } = await supabase.from('opportunities').select('*').order('created_at', { ascending: false });
+        return error ? [] : data;
+      },
+      async getOpportunity(id) {
+        const { data, error } = await supabase.from('opportunities').select('*').eq('id', id).single();
+        return error ? null : data;
+      },
+      // Competitors
+      async getCompetitors(opportunityId) {
+        let query = supabase.from('competitors').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      // Pricing
+      async getPricingItems(opportunityId) {
+        let query = supabase.from('pricing_items').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      // Compliance
+      async getComplianceItems(opportunityId) {
+        let query = supabase.from('compliance_items').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      // Contract Clauses
+      async getContractClauses(opportunityId) {
+        let query = supabase.from('contract_clauses').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      // Team Assignments
+      async getTeamAssignments(opportunityId) {
+        let query = supabase.from('team_assignments').select('*');
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query;
+        return error ? [] : data;
+      },
+      // Agent Conversations
+      async getAgentConversations(agentType, opportunityId) {
+        let query = supabase.from('agent_conversations').select('*').eq('agent_type', agentType);
+        if (opportunityId) query = query.eq('opportunity_id', opportunityId);
+        const { data, error } = await query.order('updated_at', { ascending: false }).limit(1);
+        return error ? null : data?.[0];
+      },
+      async saveAgentConversation(conversation) {
+        const { data, error } = await supabase.from('agent_conversations').upsert(conversation).select().single();
+        return error ? null : data;
+      },
+      // Agent Outputs
+      async saveAgentOutput(output) {
+        const { data, error } = await supabase.from('agent_outputs').insert(output).select().single();
+        return error ? null : data;
+      },
+      async getAgentOutputs(conversationId) {
+        const { data, error } = await supabase.from('agent_outputs').select('*').eq('conversation_id', conversationId);
+        return error ? [] : data;
+      },
+      async updateAgentOutputStatus(id, status) {
+        const updates = { status, ...(status === 'applied' ? { applied_at: new Date().toISOString() } : {}) };
+        const { data, error } = await supabase.from('agent_outputs').update(updates).eq('id', id).select().single();
+        return error ? null : data;
+      },
+      // Audit Logging
+      async logAudit(action, details) {
+        const { error } = await supabase.from('audit_logs').insert({
+          action,
+          details,
+          module: 'agent_hub',
+          user_id: null
+        });
+        return !error;
+      }
+    };
+
+    // ============================================
+    // ICONS
+    // ============================================
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      calculator: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+      shieldCheck: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      type: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+      presentation: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" /></svg>,
+      send: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+      loader: () => <svg className="w-full h-full animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>,
+      sparkles: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+      arrowLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+      copy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ============================================
+    // UI COMPONENTS
+    // ============================================
+    const Card = ({ children, className = '', glow = false }) => (
+      <div className={`bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl ${glow ? 'shadow-lg shadow-cyan-500/10' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    const Button = ({ children, onClick, variant = 'primary', size = 'md', icon, disabled, className = '', pulse = false }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400',
+        secondary: 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50',
+        danger: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/50',
+        success: 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/50',
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${pulse ? 'animate-pulse' : ''} ${className}`}>
+          {icon && <Icon name={icon} className={size === 'xs' ? 'w-3 h-3' : 'w-4 h-4'} />}
+          {children}
+        </button>
+      );
+    };
+
+    const Badge = ({ children, variant = 'default', size = 'sm', icon }) => {
+      const variants = {
+        default: 'bg-slate-700 text-slate-300',
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return (
+        <span className={`inline-flex items-center gap-1 rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>
+          {icon && <Icon name={icon} className="w-3 h-3" />}
+          {children}
+        </span>
+      );
+    };
+
+    // Toast System
+    const ToastContext = React.createContext();
+    const ToastProvider = ({ children }) => {
+      const [toasts, setToasts] = useState([]);
+      const addToast = useCallback((message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+      }, []);
+      return (
+        <ToastContext.Provider value={{ addToast }}>
+          {children}
+          <div className="fixed bottom-4 right-4 z-50 space-y-2">
+            {toasts.map(toast => (
+              <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg border backdrop-blur animate-pulse ${
+                toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
+                toast.type === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
+                'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+              }`}>
+                {toast.message}
+              </div>
+            ))}
+          </div>
+        </ToastContext.Provider>
+      );
+    };
+    const useToast = () => React.useContext(ToastContext);
+
+    // ============================================
+    // AGENT DEFINITIONS
+    // ============================================
+    const AGENTS = [
+      { id: 'capture', name: 'Capture Agent', icon: 'target', color: '#00E5FA', description: 'Win strategy and opportunity analysis', systemPrompt: 'You are a federal capture management expert. Analyze opportunities, develop win strategies, and identify competitive advantages.' },
+      { id: 'strategy', name: 'Strategy Agent', icon: 'zap', color: '#8B5CF6', description: 'Technical approach and solutioning', systemPrompt: 'You are a solution architect for federal proposals. Develop technical approaches, identify discriminators, and create compelling solutions.' },
+      { id: 'blackhat', name: 'Black Hat Agent', icon: 'eye', color: '#EF4444', description: 'Competitive intelligence and threat analysis', systemPrompt: 'You are a competitive intelligence analyst. Evaluate competitor strengths/weaknesses, predict competitor strategies, and identify ghosting opportunities.' },
+      { id: 'pricing', name: 'Pricing Agent', icon: 'calculator', color: '#10B981', description: 'Cost analysis and pricing strategy', systemPrompt: 'You are a federal pricing expert. Develop pricing strategies, analyze cost structures, and ensure compliance with FAR/DFARS pricing regulations.' },
+      { id: 'compliance', name: 'Compliance Agent', icon: 'shieldCheck', color: '#F59E0B', description: 'RFP compliance and requirements analysis', systemPrompt: 'You are a compliance specialist. Analyze RFP requirements, identify compliance risks, and ensure proposal sections meet all requirements.' },
+      { id: 'writer', name: 'Writer Agent', icon: 'type', color: '#EC4899', description: 'Proposal writing and content development', systemPrompt: 'You are a federal proposal writer. Create compelling, compliant proposal content that addresses evaluation criteria and demonstrates understanding.' },
+      { id: 'contracts', name: 'Contracts Agent', icon: 'clipboard', color: '#6366F1', description: 'Contract terms and clause analysis', systemPrompt: 'You are a contracts specialist. Analyze contract terms, identify risks, and recommend negotiation strategies for federal contracts.' },
+      { id: 'orals', name: 'Orals Agent', icon: 'presentation', color: '#14B8A6', description: 'Oral presentation preparation', systemPrompt: 'You are an oral presentation coach. Develop presentation strategies, create talking points, and prepare teams for federal oral evaluations.' },
+    ];
+
+    // ============================================
+    // AGENT HUB COMPONENT
+    // ============================================
+    const AgentHub = () => {
+      const { addToast } = useToast();
+      const [selectedAgent, setSelectedAgent] = useState(null);
+      const [opportunities, setOpportunities] = useState([]);
+      const [selectedOpp, setSelectedOpp] = useState(null);
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState('');
+      const [isLoading, setIsLoading] = useState(false);
+      const [contextData, setContextData] = useState({});
+      const [conversationId, setConversationId] = useState(null);
+      const [dbConnected, setDbConnected] = useState(false);
+      const messagesEndRef = useRef(null);
+
+      // Load opportunities on mount
+      useEffect(() => {
+        const loadOpportunities = async () => {
+          try {
+            const opps = await MissionPulseAPI.getOpportunities();
+            setOpportunities(opps);
+            setDbConnected(opps.length > 0);
+            if (opps.length > 0) {
+              setSelectedOpp(opps[0]);
+            }
+          } catch (err) {
+            console.error('Failed to load opportunities:', err);
+            setDbConnected(false);
+          }
+        };
+        loadOpportunities();
+      }, []);
+
+      // Load context data when opportunity changes
+      useEffect(() => {
+        if (!selectedOpp || !selectedAgent) return;
+        
+        const loadContext = async () => {
+          const [competitors, pricing, compliance, clauses, team] = await Promise.all([
+            MissionPulseAPI.getCompetitors(selectedOpp.id),
+            MissionPulseAPI.getPricingItems(selectedOpp.id),
+            MissionPulseAPI.getComplianceItems(selectedOpp.id),
+            MissionPulseAPI.getContractClauses(selectedOpp.id),
+            MissionPulseAPI.getTeamAssignments(selectedOpp.id),
+          ]);
+          
+          setContextData({
+            opportunity: selectedOpp,
+            competitors,
+            pricing,
+            compliance,
+            clauses,
+            team,
+          });
+
+          // Load existing conversation
+          const existingConv = await MissionPulseAPI.getAgentConversations(selectedAgent.id, selectedOpp.id);
+          if (existingConv) {
+            setConversationId(existingConv.id);
+            setMessages(existingConv.messages || []);
+          } else {
+            setConversationId(null);
+            setMessages([]);
+          }
+        };
+        
+        loadContext();
+      }, [selectedOpp, selectedAgent]);
+
+      // Scroll to bottom on new messages
+      useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [messages]);
+
+      // Build context string for AI
+      const buildContextString = () => {
+        if (!contextData.opportunity) return '';
+        
+        const opp = contextData.opportunity;
+        let context = `## Current Opportunity\n`;
+        context += `- Name: ${opp.title || opp.name}\n`;
+        context += `- Agency: ${opp.agency}\n`;
+        context += `- Value: $${(opp.value || 0).toLocaleString()}\n`;
+        context += `- Status: ${opp.status}\n`;
+        context += `- Due Date: ${opp.due_date || 'TBD'}\n`;
+        context += `- Win Probability: ${opp.pwin || opp.win_probability || 'Not assessed'}%\n\n`;
+
+        if (contextData.competitors?.length > 0) {
+          context += `## Known Competitors (${contextData.competitors.length})\n`;
+          contextData.competitors.forEach(c => {
+            context += `- ${c.name}: ${c.threat_level || 'Unknown'} threat, Strengths: ${c.strengths || 'Unknown'}\n`;
+          });
+          context += '\n';
+        }
+
+        if (contextData.pricing?.length > 0) {
+          context += `## Pricing Items (${contextData.pricing.length})\n`;
+          const total = contextData.pricing.reduce((sum, p) => sum + (p.total || 0), 0);
+          context += `- Total Estimated: $${total.toLocaleString()}\n\n`;
+        }
+
+        if (contextData.compliance?.length > 0) {
+          const critical = contextData.compliance.filter(c => c.priority === 'critical' || c.risk === 'high').length;
+          context += `## Compliance Status\n`;
+          context += `- Total Requirements: ${contextData.compliance.length}\n`;
+          context += `- Critical Items: ${critical}\n\n`;
+        }
+
+        return context;
+      };
+
+      // Simulate AI response (replace with actual Claude API call)
+      const generateResponse = async (userMessage) => {
+        const contextStr = buildContextString();
+        
+        // In production, this would call Claude API
+        // For demo, simulate intelligent responses based on agent type
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        const responses = {
+          capture: `Based on my analysis of the ${contextData.opportunity?.title || 'opportunity'}:\n\n**Win Strategy Recommendation:**\n• Emphasize your proven healthcare IT experience\n• Ghost the incumbent on their 2019 technology stack\n• Lead with innovation - AI-powered analytics differentiator\n\n**Key Actions:**\n1. Schedule customer meeting within 2 weeks\n2. Identify 3 past performances with similar scope\n3. Develop teaming strategy for CMMI Level 5 gap\n\n*Confidence: 87%*`,
+          strategy: `**Technical Approach for ${contextData.opportunity?.agency || 'Agency'}:**\n\n**Solution Architecture:**\n• Cloud-native platform on AWS GovCloud\n• Zero-trust security architecture\n• FHIR-compliant data integration layer\n\n**Discriminators:**\n1. Real-time analytics dashboard\n2. ML-powered predictive modeling\n3. 99.99% uptime SLA with automated failover\n\n**Risk Mitigation:**\n• Phase 1: MVP delivery in 90 days\n• Agile methodology with 2-week sprints\n\n*Confidence: 91%*`,
+          blackhat: `**Competitive Intelligence Assessment:**\n\n**Likely Competitors:**\n${contextData.competitors?.map(c => `• ${c.name} - ${c.threat_level || 'Medium'} threat`).join('\n') || '• Incumbent vendor (estimated)'}\n\n**Ghost Strategy:**\n• Target incumbent's outdated tech (2019 baseline)\n• Emphasize modern DevSecOps capabilities\n• Highlight rapid deployment vs. legacy migration risks\n\n**Counter-Strategy:**\nIf competitors emphasize price, counter with TCO analysis showing 40% savings over 5 years.\n\n*Confidence: 78%*`,
+          pricing: `**Pricing Analysis for ${contextData.opportunity?.title || 'Opportunity'}:**\n\n**Recommended Strategy:** Best Value\n\n**Labor Mix:**\n• Senior: 40% | Mid: 35% | Junior: 25%\n• Blended rate target: $145/hr\n\n**Cost Summary:**\n${contextData.pricing?.length > 0 ? `• Current estimate: $${contextData.pricing.reduce((s, p) => s + (p.total || 0), 0).toLocaleString()}` : '• Estimate pending LCAT mapping'}\n\n**Recommendations:**\n1. Apply 8% fee reduction for competitive positioning\n2. Include 5% management reserve\n3. Consider fixed-price option periods\n\n*Confidence: 85%*`,
+          compliance: `**Compliance Matrix Analysis:**\n\n**Requirements Status:**\n• Total: ${contextData.compliance?.length || 'Pending RFP analysis'}\n• Compliant: ${contextData.compliance?.filter(c => c.status === 'compliant').length || 0}\n• At Risk: ${contextData.compliance?.filter(c => c.status === 'at_risk').length || 0}\n\n**Critical Gaps:**\n1. CMMI Level 5 - Recommend teaming partner\n2. FedRAMP High - Verify cloud provider authorization\n\n**Action Items:**\n• Complete L.4.1 Technical Approach draft by Friday\n• Schedule compliance review for M.3 sections\n\n*Confidence: 92%*`,
+          writer: `**Content Development Plan:**\n\n**Section Priority:**\n1. Executive Summary (Due: Week 1)\n2. Technical Approach (Due: Week 2)\n3. Past Performance (Due: Week 3)\n\n**Key Themes:**\n• "Mission-First Innovation"\n• "Proven Healthcare IT Excellence"\n• "Zero-Day Deployment Ready"\n\n**Draft Opening:**\n"[Company] is uniquely positioned to deliver ${contextData.opportunity?.title || 'this solution'} through our proven healthcare IT platform, serving over 2M beneficiaries across DoD and VA..."\n\n*Confidence: 88%*`,
+          contracts: `**Contract Terms Analysis:**\n\n**Contract Type:** ${contextData.opportunity?.contract_type || 'IDIQ Task Order'}\n\n**Key Clauses to Review:**\n${contextData.clauses?.slice(0, 3).map(c => `• ${c.clause_number}: ${c.title}`).join('\n') || '• FAR 52.212-4 Contract Terms\n• DFARS 252.204-7012 CUI\n• FAR 52.217 Option Periods'}\n\n**Risk Assessment:**\n• IP Rights: Review DFARS 252.227-7014\n• Liability Caps: Negotiate to 1x contract value\n• Termination: Standard T4C provisions acceptable\n\n*Confidence: 84%*`,
+          orals: `**Oral Presentation Strategy:**\n\n**Team Composition:**\n• PM: Lead presenter (15 min)\n• Technical Lead: Solution deep-dive (10 min)\n• Past Performance: Customer reference (5 min)\n\n**Key Messages:**\n1. We understand your mission\n2. Our solution is proven and low-risk\n3. We're ready to start Day 1\n\n**Anticipated Questions:**\n• "How do you handle data migration?"\n• "What's your approach to change management?"\n• "Describe a similar challenge you've overcome"\n\n**Preparation Timeline:**\n• Week 1: Script development\n• Week 2: Dry runs\n• Week 3: Red team review\n\n*Confidence: 86%*`,
+        };
+
+        return responses[selectedAgent?.id] || 'I can help you with that. Could you provide more context about your specific needs?';
+      };
+
+      // Handle send message
+      const handleSend = async () => {
+        if (!input.trim() || !selectedAgent) return;
+        
+        const userMessage = { role: 'user', content: input, timestamp: new Date().toISOString() };
+        setMessages(prev => [...prev, userMessage]);
+        setInput('');
+        setIsLoading(true);
+
+        try {
+          const response = await generateResponse(input);
+          const assistantMessage = { role: 'assistant', content: response, timestamp: new Date().toISOString() };
+          const updatedMessages = [...messages, userMessage, assistantMessage];
+          setMessages(updatedMessages);
+
+          // Save conversation to Supabase
+          const convData = {
+            id: conversationId || undefined,
+            agent_type: selectedAgent.id,
+            opportunity_id: selectedOpp?.id,
+            messages: updatedMessages,
+            context_data: contextData,
+            updated_at: new Date().toISOString(),
+          };
+          
+          const savedConv = await MissionPulseAPI.saveAgentConversation(convData);
+          if (savedConv && !conversationId) {
+            setConversationId(savedConv.id);
+          }
+
+          // Log to audit
+          await MissionPulseAPI.logAudit('agent_response', {
+            agent: selectedAgent.id,
+            opportunity: selectedOpp?.id,
+            message_count: updatedMessages.length,
+          });
+
+          addToast(`${selectedAgent.name} response generated`, 'success');
+        } catch (err) {
+          console.error('Error generating response:', err);
+          addToast('Failed to generate response', 'error');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      // Save output to module
+      const handleSaveOutput = async (content, outputType) => {
+        if (!conversationId) return;
+        
+        const output = {
+          conversation_id: conversationId,
+          agent_type: selectedAgent.id,
+          output_type: outputType,
+          target_module: selectedAgent.id === 'blackhat' ? 'frenemy' : selectedAgent.id === 'pricing' ? 'pricing' : 'general',
+          content: { text: content, generated_at: new Date().toISOString() },
+          confidence_score: 0.85,
+        };
+
+        const saved = await MissionPulseAPI.saveAgentOutput(output);
+        if (saved) {
+          addToast(`Output saved to ${output.target_module} module`, 'success');
+          await MissionPulseAPI.logAudit('agent_output_saved', { output_id: saved.id, agent: selectedAgent.id });
+        }
+      };
+
+      // Agent Selection View
+      if (!selectedAgent) {
+        return (
+          <div className="min-h-screen bg-[#00050F] p-6">
+            <div className="max-w-6xl mx-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                    <Icon name="cpu" className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">AI Agent Hub</h1>
+                    <p className="text-slate-400">8 specialized agents powered by live Supabase data</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant={dbConnected ? 'success' : 'danger'} icon="database">
+                    {dbConnected ? 'Connected' : 'Offline'}
+                  </Badge>
+                  <Badge variant="primary">{opportunities.length} Opportunities</Badge>
+                </div>
+              </div>
+
+              {/* Opportunity Selector */}
+              <Card className="p-4 mb-6">
+                <div className="flex items-center gap-4">
+                  <span className="text-slate-400 text-sm">Active Opportunity:</span>
+                  <select 
+                    value={selectedOpp?.id || ''} 
+                    onChange={(e) => setSelectedOpp(opportunities.find(o => o.id === e.target.value))}
+                    className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+                  >
+                    {opportunities.map(opp => (
+                      <option key={opp.id} value={opp.id}>
+                        {opp.title || opp.name} - {opp.agency} (${(opp.value || 0).toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </Card>
+
+              {/* Agent Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {AGENTS.map(agent => (
+                  <Card 
+                    key={agent.id}
+                    className="p-5 cursor-pointer hover:border-cyan-500/50 transition-all group"
+                    onClick={() => setSelectedAgent(agent)}
+                  >
+                    <div 
+                      className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
+                      style={{ backgroundColor: `${agent.color}20` }}
+                    >
+                      <div style={{ color: agent.color }}>
+                        <Icon name={agent.icon} className="w-6 h-6" />
+                      </div>
+                    </div>
+                    <h3 className="font-semibold text-white mb-1">{agent.name}</h3>
+                    <p className="text-slate-400 text-xs">{agent.description}</p>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="mt-8 text-center">
+                <p className="text-slate-500 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Chat Interface
+      return (
+        <div className="min-h-screen bg-[#00050F] flex flex-col">
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-4 py-3">
+            <div className="flex items-center justify-between max-w-6xl mx-auto">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="sm" icon="arrowLeft" onClick={() => setSelectedAgent(null)}>
+                  Back
+                </Button>
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: `${selectedAgent.color}20` }}
+                  >
+                    <div style={{ color: selectedAgent.color }}>
+                      <Icon name={selectedAgent.icon} className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-white">{selectedAgent.name}</h2>
+                    <p className="text-slate-400 text-xs">{selectedOpp?.title || 'No opportunity selected'}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={dbConnected ? 'success' : 'danger'} size="xs" icon="database">
+                  {dbConnected ? 'Live Data' : 'Offline'}
+                </Badge>
+              </div>
+            </div>
+          </header>
+
+          {/* Context Panel */}
+          {contextData.opportunity && (
+            <div className="bg-slate-800/30 border-b border-slate-700/50 px-4 py-2">
+              <div className="max-w-6xl mx-auto flex items-center gap-4 text-xs">
+                <span className="text-slate-400">Context:</span>
+                <Badge variant="primary" size="xs">{contextData.opportunity.agency}</Badge>
+                <Badge variant="success" size="xs">${(contextData.opportunity.value || 0).toLocaleString()}</Badge>
+                {contextData.competitors?.length > 0 && (
+                  <Badge variant="warning" size="xs">{contextData.competitors.length} Competitors</Badge>
+                )}
+                {contextData.compliance?.length > 0 && (
+                  <Badge variant="default" size="xs">{contextData.compliance.length} Requirements</Badge>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
+          <main className="flex-1 overflow-auto p-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              {messages.length === 0 && (
+                <div className="text-center py-12">
+                  <div 
+                    className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                    style={{ backgroundColor: `${selectedAgent.color}20` }}
+                  >
+                    <div style={{ color: selectedAgent.color }}>
+                      <Icon name={selectedAgent.icon} className="w-8 h-8" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Start a conversation with {selectedAgent.name}</h3>
+                  <p className="text-slate-400 text-sm max-w-md mx-auto">{selectedAgent.description}</p>
+                  <div className="mt-6 flex flex-wrap justify-center gap-2">
+                    {['Analyze this opportunity', 'What are the key risks?', 'Recommend a strategy', 'Generate a summary'].map(prompt => (
+                      <button
+                        key={prompt}
+                        onClick={() => setInput(prompt)}
+                        className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full border border-slate-700 transition-colors"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] ${msg.role === 'user' ? 'bg-cyan-500/20 border-cyan-500/30' : 'bg-slate-800/50 border-slate-700/50'} border rounded-xl p-4`}>
+                    {msg.role === 'assistant' && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-5 h-5 rounded" style={{ backgroundColor: selectedAgent.color }}>
+                          <Icon name={selectedAgent.icon} className="w-5 h-5 text-white p-0.5" />
+                        </div>
+                        <span className="text-xs font-medium" style={{ color: selectedAgent.color }}>{selectedAgent.name}</span>
+                      </div>
+                    )}
+                    <div className="text-white text-sm whitespace-pre-wrap">{msg.content}</div>
+                    {msg.role === 'assistant' && (
+                      <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center gap-2">
+                        <Button variant="ghost" size="xs" icon="copy" onClick={() => navigator.clipboard.writeText(msg.content)}>
+                          Copy
+                        </Button>
+                        <Button variant="ghost" size="xs" icon="download" onClick={() => handleSaveOutput(msg.content, 'insight')}>
+                          Save to Module
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded" style={{ backgroundColor: selectedAgent.color }}>
+                        <Icon name="loader" className="w-5 h-5 text-white p-0.5" />
+                      </div>
+                      <div className="typing-indicator flex gap-1">
+                        <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </main>
+
+          {/* Input */}
+          <footer className="bg-slate-900/80 border-t border-slate-700/50 p-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                  placeholder={`Ask ${selectedAgent.name}...`}
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                  disabled={isLoading}
+                />
+                <Button onClick={handleSend} disabled={isLoading || !input.trim()} icon="send">
+                  Send
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500 text-center mt-2">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    // ============================================
+    // MAIN APP
+    // ============================================
+    function App() {
+      return (
+        <ToastProvider>
+          <AgentHub />
+        </ToastProvider>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
