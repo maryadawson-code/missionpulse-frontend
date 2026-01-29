@@ -34,10 +34,48 @@
  * FILE: index.html
  * ROLE: System
  * SECURITY: Supabase credentials verified
- * SPRINT: 53 - Data Wiring COMPLETE
+ * SPRINT: 54 - QA Gauntlet & Production Polish
  * MODULES: ALL 15 MODULES LIVE - Full Supabase Integration
+ * QA: Toast notifications, keyboard shortcuts, connection status
  */
-const{useState,useEffect,useRef,useCallback}=React;
+const{useState,useEffect,useRef,useCallback,createContext,useContext}=React;
+
+// TOAST CONTEXT
+const ToastContext=createContext();
+const useToast=()=>useContext(ToastContext);
+
+const ToastProvider=({children})=>{
+  const[toasts,setToasts]=useState([]);
+  const addToast=(message,type='info',duration=3000)=>{
+    const id=Date.now();
+    setToasts(t=>[...t,{id,message,type}]);
+    setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),duration);
+  };
+  const toast={
+    success:(msg)=>addToast(msg,'success'),
+    error:(msg)=>addToast(msg,'error',5000),
+    warning:(msg)=>addToast(msg,'warning'),
+    info:(msg)=>addToast(msg,'info')
+  };
+  return(
+    <ToastContext.Provider value={toast}>
+      {children}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map(t=>(
+          <div key={t.id} className={`px-4 py-3 rounded-lg shadow-lg animate-fadeIn flex items-center gap-2 min-w-[250px] ${
+            t.type==='success'?'bg-emerald-500/90 text-white':
+            t.type==='error'?'bg-red-500/90 text-white':
+            t.type==='warning'?'bg-amber-500/90 text-white':
+            'bg-slate-700/90 text-white'
+          }`}>
+            <span>{t.type==='success'?'✓':t.type==='error'?'✗':t.type==='warning'?'⚠':'ℹ'}</span>
+            <span className="text-sm">{t.message}</span>
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+};
 
 // CONFIG
 const CONFIG={
@@ -809,6 +847,7 @@ function ModulePipeline({opps,setOpps,loading,isLive,onRefresh}){
   const[editing,setEditing]=useState(null);
   const[form,setForm]=useState({nickname:'',name:'',agency:'',value:'',pwin:'',phase:'Qualify',response_date:''});
   const[saving,setSaving]=useState(false);
+  const toast=useToast();
 
   const resetForm=()=>setForm({nickname:'',name:'',agency:'',value:'',pwin:'',phase:'Qualify',response_date:''});
 
@@ -819,12 +858,14 @@ function ModulePipeline({opps,setOpps,loading,isLive,onRefresh}){
       if(editing){
         const updated=await MissionPulse.updateOpportunity(editing.id,data);
         setOpps(opps.map(o=>o.id===editing.id?{...o,...updated}:o));
+        toast?.success('Opportunity updated successfully');
       }else{
         const created=await MissionPulse.createOpportunity(data);
         setOpps([...opps,created]);
+        toast?.success('Opportunity created successfully');
       }
       setShowNew(false);setEditing(null);resetForm();
-    }catch(err){alert('Error saving: '+err.message)}
+    }catch(err){toast?.error('Error saving: '+err.message)}
     finally{setSaving(false)}
   };
 
@@ -833,7 +874,8 @@ function ModulePipeline({opps,setOpps,loading,isLive,onRefresh}){
     try{
       await MissionPulse.deleteOpportunity(id);
       setOpps(opps.filter(o=>o.id!==id));
-    }catch(err){alert('Error deleting: '+err.message)}
+      toast?.success('Opportunity deleted');
+    }catch(err){toast?.error('Error deleting: '+err.message)}
   };
 
   const openEdit=(opp)=>{
@@ -2761,7 +2803,7 @@ function AIChatWidget(){
 function Sidebar({role,setRole,active,setActive,user}){
   const[collapsed,setCollapsed]=useState(false);const[showRoles,setShowRoles]=useState(false);
   const accessible=MODULES.filter(m=>role.access.includes(m.id));
-  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Sprint 53</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>)})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
+  return(<aside className={`h-screen bg-slate-900/95 border-r border-slate-800 flex flex-col transition-all ${collapsed?'w-16':'w-64'}`}><div className="p-4 border-b border-slate-800 flex items-center justify-between">{!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Sprint 54</div></div></div>}<button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button></div><div className="p-3 border-b border-slate-800"><button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>{showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}</div><nav className="flex-1 overflow-y-auto p-2">{['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{const mods=accessible.filter(m=>m.cat===cat);if(!mods.length)return null;return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>)})}</nav>{!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}</aside>);
 }
 
 // ============================================================
@@ -2797,6 +2839,32 @@ function App(){
     }finally{
       setLoading(false);
     }
+  },[]);
+
+  // Keyboard shortcuts
+  useEffect(()=>{
+    const handleKeyDown=(e)=>{
+      if(e.ctrlKey||e.metaKey){
+        if(e.key==='r'||e.key==='R'){e.preventDefault();loadOpportunities()}
+        if(e.key==='d'||e.key==='D'){e.preventDefault();setActive(MODULES.find(m=>m.id==='dashboard'))}
+        if(e.key==='p'||e.key==='P'){e.preventDefault();setActive(MODULES.find(m=>m.id==='pipeline'))}
+      }
+      if(e.key==='Escape'){setActive(null)}
+    };
+    window.addEventListener('keydown',handleKeyDown);
+    return()=>window.removeEventListener('keydown',handleKeyDown);
+  },[loadOpportunities]);
+
+  // Connection health check (every 60s)
+  useEffect(()=>{
+    const checkConnection=async()=>{
+      try{
+        const{error}=await supabase?.from('opportunities').select('id').limit(1);
+        setIsLive(!error);
+      }catch{setIsLive(false)}
+    };
+    const interval=setInterval(checkConnection,60000);
+    return()=>clearInterval(interval);
   },[]);
 
   useEffect(()=>{
@@ -2840,13 +2908,29 @@ function App(){
         {active&&<header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3"><div className="flex items-center gap-3"><span className="text-xl">{active.icon}</span><div><h1 className="font-semibold text-white">{active.name}</h1></div>{active.badge&&<span className={`px-2 py-0.5 rounded text-xs font-bold ${active.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':active.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{active.badge}</span>}</div></header>}
         <main className="flex-1 overflow-y-auto p-6">{renderModule()}</main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 53 FINAL • © 2026 Mission Meets Tech</span></div>
+      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-between px-4 z-40">
+        <span className="text-[10px] text-slate-500 flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${isLive?'bg-emerald-400':'bg-amber-400'} animate-pulse`}/>
+          {isLive?'Connected':'Demo Mode'}
+        </span>
+        <span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Sprint 54 • © 2026 Mission Meets Tech</span>
+        <span className="text-[10px] text-slate-500">{new Date().toLocaleDateString()}</span>
+      </div>
       <AIChatWidget/>
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+// WRAPPED APP WITH TOAST PROVIDER
+function WrappedApp(){
+  return(
+    <ToastProvider>
+      <App/>
+    </ToastProvider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<WrappedApp/>);
 </script>
 </body>
 </html>
