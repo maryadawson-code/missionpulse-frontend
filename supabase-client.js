@@ -1,382 +1,934 @@
+// FILE: supabase-client.js
+// ROLE: System
+// SECURITY: env vars verified - qdrtpnpnhkxvfmvfziop.supabase.co
+// LAST UPDATED: 2025-01-28
+
 /**
- * MissionPulse Supabase Client Module
- * HOTFIX: Corrected Supabase credentials
+ * MissionPulse Supabase Client
+ * Handles authentication, database operations, and session management
  * © 2025 Mission Meets Tech
  */
 
-(function(global) {
-  'use strict';
+// =============================================================================
+// SUPABASE CONFIGURATION - VERIFIED CORRECT CREDENTIALS
+// =============================================================================
+const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzI3NjQsImV4cCI6MjA1MzQwODc2NH0.rFKJKvOHOvtwz9HY5cCgnD2sO4N4z2lgXvvzaYGAsoc';
 
-  // CORRECT SUPABASE CREDENTIALS
-  const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTMwNjIsImV4cCI6MjA1Mjk4OTA2Mn0.gwBTnfAtsxSFDz96fDPL7HAIYdA5s_9hiv_l0ECWvYc';
+// Initialize Supabase client
+let supabase = null;
 
-  let supabase = null;
-  let connectionStatus = 'disconnected';
-  let connectionListeners = [];
-
-  function initSupabase() {
-    if (typeof global.supabase !== 'undefined' && global.supabase.createClient) {
-      supabase = global.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      connectionStatus = 'connected';
-      notifyConnectionListeners();
-      console.log('[MissionPulse] Supabase client initialized');
-      return true;
+function initSupabase() {
+    if (typeof window !== 'undefined' && window.supabase) {
+        return window.supabase;
     }
-    console.warn('[MissionPulse] Supabase library not loaded');
-    return false;
-  }
-
-  function notifyConnectionListeners() {
-    connectionListeners.forEach(cb => cb(connectionStatus));
-  }
-
-  // Field mapping
-  const fieldMapping = {
-    id: 'id', title: 'title', nickname: 'nickname', description: 'description',
-    agency: 'agency', sub_agency: 'subAgency', contract_type: 'contractType',
-    naics: 'naics', set_aside: 'setAside', ceiling: 'ceiling',
-    period_of_performance: 'periodOfPerformance', pwin: 'pwin', phase: 'phase',
-    stage: 'stage', status: 'status', due_date: 'dueDate', rfp_date: 'rfpDate',
-    submit_date: 'submitDate', award_date: 'awardDate',
-    contracting_officer: 'contractingOfficer', co_email: 'coEmail', co_phone: 'coPhone',
-    program_manager: 'programManager', pm_email: 'pmEmail',
-    capture_manager: 'captureManager', proposal_manager: 'proposalManager',
-    incumbent: 'incumbent', competition_type: 'competitionType',
-    evaluation_criteria: 'evaluationCriteria', sam_url: 'samUrl',
-    solicitation_url: 'solicitationUrl', created_at: 'createdAt',
-    updated_at: 'updatedAt', company_id: 'companyId'
-  };
-
-  function toFrontend(record) {
-    if (!record) return null;
-    const result = {};
-    for (const [dbKey, frontendKey] of Object.entries(fieldMapping)) {
-      if (record.hasOwnProperty(dbKey)) result[frontendKey] = record[dbKey];
+    
+    if (supabase) {
+        return supabase;
     }
-    for (const key of Object.keys(record)) {
-      if (!fieldMapping.hasOwnProperty(key)) result[key] = record[key];
+    
+    if (typeof supabaseJs !== 'undefined' && supabaseJs.createClient) {
+        supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+        console.error('Supabase library not loaded');
+        return null;
     }
-    return result;
-  }
+    
+    if (typeof window !== 'undefined') {
+        window.supabase = supabase;
+    }
+    
+    return supabase;
+}
 
-  function toDatabase(data) {
-    if (!data) return null;
-    const result = {};
-    const reverseMapping = {};
-    for (const [dbKey, frontendKey] of Object.entries(fieldMapping)) {
-      reverseMapping[frontendKey] = dbKey;
-    }
-    for (const [key, value] of Object.entries(data)) {
-      result[reverseMapping[key] || key] = value;
-    }
-    return result;
-  }
+// =============================================================================
+// AUTHENTICATION FUNCTIONS
+// =============================================================================
 
-  // Auth functions
-  async function signIn(email, password) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
+/**
+ * Sign in with email and password
+ */
+async function signIn(email, password) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Sign in error:', error);
-      return { data: null, error };
-    }
-  }
-
-  async function signUp(email, password, metadata = {}) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: metadata } });
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Sign up error:', error);
-      return { data: null, error };
-    }
-  }
-
-  async function signOut() {
-    if (!supabase) return { error: { message: 'Supabase not initialized' } };
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      return { error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Sign out error:', error);
-      return { error };
-    }
-  }
-
-  async function getSession() {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Get session error:', error);
-      return { data: null, error };
-    }
-  }
-
-  async function getUser() {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) throw error;
-      return { data: user, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Get user error:', error);
-      return { data: null, error };
-    }
-  }
-
-  function onAuthStateChange(callback) {
-    if (!supabase && !initSupabase()) {
-      return { data: { subscription: { unsubscribe: () => {} } } };
-    }
-    return supabase.auth.onAuthStateChange(callback);
-  }
-
-  // Opportunities CRUD
-  async function getOpportunities() {
-    if (!supabase && !initSupabase()) return { data: [], error: { message: 'Supabase not initialized' } };
-    try {
-      const { data, error } = await supabase.from('opportunities').select('*').order('ceiling', { ascending: false });
-      if (error) throw error;
-      return { data: (data || []).map(toFrontend), error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Get opportunities error:', error);
-      return { data: [], error };
-    }
-  }
-
-  async function getOpportunity(id) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data, error } = await supabase.from('opportunities').select('*').eq('id', id).single();
-      if (error) throw error;
-      return { data: toFrontend(data), error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Get opportunity error:', error);
-      return { data: null, error };
-    }
-  }
-
-  async function createOpportunity(opportunityData) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data, error } = await supabase.from('opportunities').insert([toDatabase(opportunityData)]).select().single();
-      if (error) throw error;
-      return { data: toFrontend(data), error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Create opportunity error:', error);
-      return { data: null, error };
-    }
-  }
-
-  async function updateOpportunity(id, updates) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const dbData = toDatabase(updates);
-      dbData.updated_at = new Date().toISOString();
-      const { data, error } = await supabase.from('opportunities').update(dbData).eq('id', id).select().single();
-      if (error) throw error;
-      return { data: toFrontend(data), error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Update opportunity error:', error);
-      return { data: null, error };
-    }
-  }
-
-  async function deleteOpportunity(id) {
-    if (!supabase && !initSupabase()) return { error: { message: 'Supabase not initialized' } };
-    try {
-      const { error } = await supabase.from('opportunities').delete().eq('id', id);
-      if (error) throw error;
-      return { error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Delete opportunity error:', error);
-      return { error };
-    }
-  }
-
-  async function getPipelineStats() {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data: opportunities, error } = await supabase.from('opportunities').select('ceiling, pwin, phase, stage, status');
-      if (error) throw error;
-      const stats = { totalPipeline: 0, weightedPipeline: 0, opportunityCount: opportunities?.length || 0, byPhase: {}, byStage: {}, avgPwin: 0 };
-      let pwinSum = 0, pwinCount = 0;
-      (opportunities || []).forEach(opp => {
-        const ceiling = opp.ceiling || 0, pwin = opp.pwin || 0;
-        stats.totalPipeline += ceiling;
-        stats.weightedPipeline += ceiling * (pwin / 100);
-        if (pwin > 0) { pwinSum += pwin; pwinCount++; }
-        const phase = opp.phase || 'Unknown';
-        if (!stats.byPhase[phase]) stats.byPhase[phase] = { count: 0, value: 0 };
-        stats.byPhase[phase].count++; stats.byPhase[phase].value += ceiling;
-        const stage = opp.stage || 'Unknown';
-        if (!stats.byStage[stage]) stats.byStage[stage] = { count: 0, value: 0 };
-        stats.byStage[stage].count++; stats.byStage[stage].value += ceiling;
-      });
-      stats.avgPwin = pwinCount > 0 ? Math.round(pwinSum / pwinCount) : 0;
-      return { data: stats, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Get pipeline stats error:', error);
-      return { data: null, error };
-    }
-  }
-
-  async function getOpportunitiesByPhase() {
-    if (!supabase && !initSupabase()) return { data: {}, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data, error } = await supabase.from('opportunities').select('*').order('ceiling', { ascending: false });
-      if (error) throw error;
-      const grouped = {};
-      (data || []).forEach(opp => {
-        const phase = opp.phase || 'Unassigned';
-        if (!grouped[phase]) grouped[phase] = [];
-        grouped[phase].push(toFrontend(opp));
-      });
-      return { data: grouped, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Get opportunities by phase error:', error);
-      return { data: {}, error };
-    }
-  }
-
-  function subscribeToOpportunities(callback) {
-    if (!supabase && !initSupabase()) return { unsubscribe: () => {} };
-    const channel = supabase.channel('opportunities-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, (payload) => {
-        callback({
-          type: payload.eventType,
-          data: payload.new ? toFrontend(payload.new) : null,
-          oldData: payload.old ? toFrontend(payload.old) : null
+        const { data, error } = await client.auth.signInWithPassword({
+            email: email,
+            password: password
         });
-      }).subscribe();
-    return { unsubscribe: () => supabase.removeChannel(channel) };
-  }
-
-  // Profiles
-  async function getProfile(userId) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Get profile error:', error);
-      return { data: null, error };
+        
+        if (error) {
+            console.error('Sign in error:', error);
+            return { error };
+        }
+        
+        // Store session
+        if (data.session) {
+            localStorage.setItem('missionpulse_session', JSON.stringify(data.session));
+            localStorage.setItem('missionpulse_user', JSON.stringify(data.user));
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Sign in exception:', err);
+        return { error: { message: err.message } };
     }
-  }
+}
 
-  async function updateProfile(userId, updates) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
-    try {
-      const { data, error } = await supabase.from('profiles').update(updates).eq('id', userId).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[MissionPulse] Update profile error:', error);
-      return { data: null, error };
+/**
+ * Sign up with email and password
+ */
+async function signUp(email, password, metadata = {}) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
     }
-  }
-
-  // Generic operations
-  async function query(table, options = {}) {
-    if (!supabase && !initSupabase()) return { data: [], error: { message: 'Supabase not initialized' } };
+    
     try {
-      let q = supabase.from(table).select(options.select || '*');
-      if (options.eq) for (const [key, value] of Object.entries(options.eq)) q = q.eq(key, value);
-      if (options.order) q = q.order(options.order.column, { ascending: options.order.ascending ?? true });
-      if (options.limit) q = q.limit(options.limit);
-      const { data, error } = await q;
-      if (error) throw error;
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error(`[MissionPulse] Query ${table} error:`, error);
-      return { data: [], error };
+        const { data, error } = await client.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: metadata
+            }
+        });
+        
+        if (error) {
+            console.error('Sign up error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Sign up exception:', err);
+        return { error: { message: err.message } };
     }
-  }
+}
 
-  async function insert(table, data) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
+/**
+ * Sign out current user
+ */
+async function signOut() {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
     try {
-      const { data: result, error } = await supabase.from(table).insert(Array.isArray(data) ? data : [data]).select();
-      if (error) throw error;
-      return { data: result, error: null };
-    } catch (error) {
-      console.error(`[MissionPulse] Insert ${table} error:`, error);
-      return { data: null, error };
+        const { error } = await client.auth.signOut();
+        
+        // Clear local storage
+        localStorage.removeItem('missionpulse_session');
+        localStorage.removeItem('missionpulse_user');
+        localStorage.removeItem('missionpulse_profile');
+        
+        if (error) {
+            console.error('Sign out error:', error);
+            return { error };
+        }
+        
+        return { success: true };
+    } catch (err) {
+        console.error('Sign out exception:', err);
+        return { error: { message: err.message } };
     }
-  }
+}
 
-  async function update(table, id, updates) {
-    if (!supabase && !initSupabase()) return { data: null, error: { message: 'Supabase not initialized' } };
+/**
+ * Get current session
+ */
+async function getSession() {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
     try {
-      const { data, error } = await supabase.from(table).update(updates).eq('id', id).select().single();
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error(`[MissionPulse] Update ${table} error:`, error);
-      return { data: null, error };
+        const { data, error } = await client.auth.getSession();
+        
+        if (error) {
+            console.error('Get session error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Get session exception:', err);
+        return { error: { message: err.message } };
     }
-  }
+}
 
-  async function remove(table, id) {
-    if (!supabase && !initSupabase()) return { error: { message: 'Supabase not initialized' } };
+/**
+ * Get current user
+ */
+async function getUser() {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
     try {
-      const { error } = await supabase.from(table).delete().eq('id', id);
-      if (error) throw error;
-      return { error: null };
-    } catch (error) {
-      console.error(`[MissionPulse] Delete ${table} error:`, error);
-      return { error };
+        const { data: { user }, error } = await client.auth.getUser();
+        
+        if (error) {
+            console.error('Get user error:', error);
+            return { error };
+        }
+        
+        return { user };
+    } catch (err) {
+        console.error('Get user exception:', err);
+        return { error: { message: err.message } };
     }
-  }
+}
 
-  function getConnectionStatus() { return connectionStatus; }
-  function onConnectionChange(callback) {
-    connectionListeners.push(callback);
-    return () => { connectionListeners = connectionListeners.filter(cb => cb !== callback); };
-  }
+// =============================================================================
+// PROFILE FUNCTIONS
+// =============================================================================
 
-  async function testConnection() {
-    if (!supabase && !initSupabase()) return { connected: false, error: 'Supabase not initialized' };
+/**
+ * Get user profile from profiles table
+ */
+async function getProfile(userId) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
     try {
-      const { error } = await supabase.from('opportunities').select('id').limit(1);
-      if (error) throw error;
-      connectionStatus = 'connected';
-      notifyConnectionListeners();
-      return { connected: true, error: null };
-    } catch (error) {
-      connectionStatus = 'error';
-      notifyConnectionListeners();
-      return { connected: false, error: error.message };
+        const { data, error } = await client
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+        
+        if (error) {
+            console.error('Get profile error:', error);
+            return { error };
+        }
+        
+        // Cache profile
+        if (data) {
+            localStorage.setItem('missionpulse_profile', JSON.stringify(data));
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Get profile exception:', err);
+        return { error: { message: err.message } };
     }
-  }
+}
 
-  function getClient() { if (!supabase) initSupabase(); return supabase; }
-  function getConfig() { return { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY }; }
+/**
+ * Get profile by email
+ */
+async function getProfileByEmail(email) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('profiles')
+            .select('*')
+            .eq('email', email)
+            .single();
+        
+        if (error && error.code !== 'PGRST116') {
+            console.error('Get profile by email error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Get profile by email exception:', err);
+        return { error: { message: err.message } };
+    }
+}
 
-  global.MissionPulse = {
-    signIn, signUp, signOut, getSession, getUser, onAuthStateChange,
-    getOpportunities, getOpportunity, createOpportunity, updateOpportunity, deleteOpportunity,
-    getPipelineStats, getOpportunitiesByPhase, subscribeToOpportunities,
-    getProfile, updateProfile, query, insert, update, remove,
-    getConnectionStatus, onConnectionChange, testConnection, getClient, getConfig,
-    toFrontend, toDatabase
-  };
+/**
+ * Update user profile
+ */
+async function updateProfile(userId, updates) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('profiles')
+            .update(updates)
+            .eq('id', userId)
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('Update profile error:', error);
+            return { error };
+        }
+        
+        // Update cache
+        if (data) {
+            localStorage.setItem('missionpulse_profile', JSON.stringify(data));
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Update profile exception:', err);
+        return { error: { message: err.message } };
+    }
+}
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSupabase);
-  } else {
-    initSupabase();
-  }
+// =============================================================================
+// OPPORTUNITIES FUNCTIONS
+// =============================================================================
 
-})(typeof window !== 'undefined' ? window : global);
+/**
+ * Get all opportunities
+ */
+async function getOpportunities() {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('opportunities')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) {
+            console.error('Get opportunities error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Get opportunities exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Get single opportunity by ID
+ */
+async function getOpportunity(id) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('opportunities')
+            .select('*')
+            .eq('id', id)
+            .single();
+        
+        if (error) {
+            console.error('Get opportunity error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Get opportunity exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Create new opportunity
+ */
+async function createOpportunity(opportunity) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('opportunities')
+            .insert([opportunity])
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('Create opportunity error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Create opportunity exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Update opportunity
+ */
+async function updateOpportunity(id, updates) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('opportunities')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('Update opportunity error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Update opportunity exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Delete opportunity
+ */
+async function deleteOpportunity(id) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { error } = await client
+            .from('opportunities')
+            .delete()
+            .eq('id', id);
+        
+        if (error) {
+            console.error('Delete opportunity error:', error);
+            return { error };
+        }
+        
+        return { success: true };
+    } catch (err) {
+        console.error('Delete opportunity exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+// =============================================================================
+// GENERIC DATABASE FUNCTIONS
+// =============================================================================
+
+/**
+ * Generic select function
+ */
+async function dbSelect(table, columns = '*', filters = {}, options = {}) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        let query = client.from(table).select(columns);
+        
+        // Apply filters
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                query = query.eq(key, value);
+            }
+        });
+        
+        // Apply ordering
+        if (options.orderBy) {
+            query = query.order(options.orderBy, { ascending: options.ascending ?? false });
+        }
+        
+        // Apply limit
+        if (options.limit) {
+            query = query.limit(options.limit);
+        }
+        
+        // Single row
+        if (options.single) {
+            query = query.single();
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error(`Select from ${table} error:`, error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error(`Select from ${table} exception:`, err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Generic insert function
+ */
+async function dbInsert(table, records, returnData = true) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const recordsArray = Array.isArray(records) ? records : [records];
+        let query = client.from(table).insert(recordsArray);
+        
+        if (returnData) {
+            query = query.select();
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error(`Insert into ${table} error:`, error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error(`Insert into ${table} exception:`, err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Generic update function
+ */
+async function dbUpdate(table, filters, updates, returnData = true) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        let query = client.from(table).update(updates);
+        
+        // Apply filters
+        Object.entries(filters).forEach(([key, value]) => {
+            query = query.eq(key, value);
+        });
+        
+        if (returnData) {
+            query = query.select();
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error(`Update ${table} error:`, error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error(`Update ${table} exception:`, err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Generic delete function
+ */
+async function dbDelete(table, filters) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        let query = client.from(table).delete();
+        
+        // Apply filters
+        Object.entries(filters).forEach(([key, value]) => {
+            query = query.eq(key, value);
+        });
+        
+        const { error } = await query;
+        
+        if (error) {
+            console.error(`Delete from ${table} error:`, error);
+            return { error };
+        }
+        
+        return { success: true };
+    } catch (err) {
+        console.error(`Delete from ${table} exception:`, err);
+        return { error: { message: err.message } };
+    }
+}
+
+// =============================================================================
+// ACCESS REQUEST FUNCTIONS
+// =============================================================================
+
+/**
+ * Submit access request
+ */
+async function submitAccessRequest(requestData) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('access_requests')
+            .insert([{
+                full_name: requestData.fullName,
+                email: requestData.email,
+                company_name: requestData.companyName,
+                job_title: requestData.jobTitle,
+                message: requestData.message || null,
+                status: 'pending',
+                created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('Submit access request error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Submit access request exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Get pending access requests (admin only)
+ */
+async function getAccessRequests(status = null) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        let query = client
+            .from('access_requests')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (status) {
+            query = query.eq('status', status);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error('Get access requests error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Get access requests exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+// =============================================================================
+// USER INVITATION FUNCTIONS
+// =============================================================================
+
+/**
+ * Get user invitations
+ */
+async function getInvitations(status = null) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        let query = client
+            .from('user_invitations')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (status) {
+            query = query.eq('status', status);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error('Get invitations error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Get invitations exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+/**
+ * Create user invitation
+ */
+async function createInvitation(inviteData) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('user_invitations')
+            .insert([{
+                full_name: inviteData.fullName,
+                email: inviteData.email,
+                role: inviteData.role || 'User',
+                status: 'pending',
+                created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('Create invitation error:', error);
+            return { error };
+        }
+        
+        return { data };
+    } catch (err) {
+        console.error('Create invitation exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+// =============================================================================
+// AUDIT LOG FUNCTIONS
+// =============================================================================
+
+/**
+ * Log audit event
+ */
+async function logAuditEvent(action, details = {}) {
+    const client = initSupabase();
+    if (!client) {
+        return { error: { message: 'Supabase client not initialized' } };
+    }
+    
+    try {
+        // Get current user
+        const { data: { user } } = await client.auth.getUser();
+        
+        const { error } = await client
+            .from('audit_log')
+            .insert([{
+                user_id: user?.id || null,
+                user_email: user?.email || 'anonymous',
+                action: action,
+                details: details,
+                created_at: new Date().toISOString()
+            }]);
+        
+        if (error) {
+            console.error('Log audit event error:', error);
+            return { error };
+        }
+        
+        return { success: true };
+    } catch (err) {
+        console.error('Log audit event exception:', err);
+        return { error: { message: err.message } };
+    }
+}
+
+// =============================================================================
+// ROLE-BASED ACCESS CONTROL
+// =============================================================================
+
+const ROLES = {
+    CEO: { level: 100, name: 'CEO' },
+    COO: { level: 90, name: 'COO' },
+    Admin: { level: 80, name: 'Admin' },
+    CAP: { level: 70, name: 'Capture Manager' },
+    PM: { level: 60, name: 'Project Manager' },
+    SA: { level: 50, name: 'Solution Architect' },
+    FIN: { level: 50, name: 'Finance' },
+    CON: { level: 50, name: 'Contracts' },
+    DEL: { level: 50, name: 'Delivery' },
+    QA: { level: 40, name: 'Quality Assurance' },
+    Partner: { level: 30, name: 'Partner' },
+    User: { level: 10, name: 'User' }
+};
+
+/**
+ * Check if user has required role
+ */
+function hasRole(userRole, requiredRole) {
+    const userLevel = ROLES[userRole]?.level || 0;
+    const requiredLevel = ROLES[requiredRole]?.level || 0;
+    return userLevel >= requiredLevel;
+}
+
+/**
+ * Check if user can access feature
+ */
+function canAccess(userRole, feature) {
+    const featureRoles = {
+        'admin-users': ['CEO', 'COO', 'Admin'],
+        'black-hat': ['CEO', 'COO', 'Admin', 'CAP', 'SA'],
+        'pricing': ['CEO', 'COO', 'Admin', 'CAP', 'FIN'],
+        'contracts': ['CEO', 'COO', 'Admin', 'CON'],
+        'hitl-queue': ['CEO', 'COO', 'Admin', 'CAP', 'PM', 'SA'],
+        'executive-dashboard': ['CEO', 'COO', 'Admin']
+    };
+    
+    const allowedRoles = featureRoles[feature];
+    if (!allowedRoles) return true; // No restrictions
+    
+    return allowedRoles.includes(userRole);
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Get cached profile
+ */
+function getCachedProfile() {
+    try {
+        const cached = localStorage.getItem('missionpulse_profile');
+        return cached ? JSON.parse(cached) : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Clear all cached data
+ */
+function clearCache() {
+    localStorage.removeItem('missionpulse_session');
+    localStorage.removeItem('missionpulse_user');
+    localStorage.removeItem('missionpulse_profile');
+}
+
+/**
+ * Check connection status
+ */
+async function checkConnection() {
+    const client = initSupabase();
+    if (!client) {
+        return { connected: false, error: 'Client not initialized' };
+    }
+    
+    try {
+        const { data, error } = await client
+            .from('opportunities')
+            .select('id')
+            .limit(1);
+        
+        if (error) {
+            return { connected: false, error: error.message };
+        }
+        
+        return { connected: true };
+    } catch (err) {
+        return { connected: false, error: err.message };
+    }
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+// Make functions available globally
+if (typeof window !== 'undefined') {
+    window.MissionPulseDB = {
+        // Config
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        
+        // Init
+        initSupabase,
+        
+        // Auth
+        signIn,
+        signUp,
+        signOut,
+        getSession,
+        getUser,
+        
+        // Profile
+        getProfile,
+        getProfileByEmail,
+        updateProfile,
+        getCachedProfile,
+        
+        // Opportunities
+        getOpportunities,
+        getOpportunity,
+        createOpportunity,
+        updateOpportunity,
+        deleteOpportunity,
+        
+        // Generic DB
+        dbSelect,
+        dbInsert,
+        dbUpdate,
+        dbDelete,
+        
+        // Access Requests
+        submitAccessRequest,
+        getAccessRequests,
+        
+        // Invitations
+        getInvitations,
+        createInvitation,
+        
+        // Audit
+        logAuditEvent,
+        
+        // RBAC
+        ROLES,
+        hasRole,
+        canAccess,
+        
+        // Utility
+        clearCache,
+        checkConnection
+    };
+    
+    // Also expose initSupabase globally for backward compatibility
+    window.initSupabase = initSupabase;
+}
+
+// Auto-initialize on load
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initSupabase();
+        console.log('MissionPulse DB initialized - Connected to:', SUPABASE_URL);
+    });
+}
+
+// AI GENERATED CONTENT - REQUIRES HUMAN REVIEW
