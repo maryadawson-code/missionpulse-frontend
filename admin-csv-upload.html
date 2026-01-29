@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV User Upload | MissionPulse Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'deep-navy': '#00050F',
+            'cyber-cyan': '#00E5FA',
+            'slate-dark': '#0a1628'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: linear-gradient(135deg, #00050F 0%, #0a1628 50%, #00050F 100%); }
+    .glow-border { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+    .drag-active { border-color: #00E5FA; background: rgba(0, 229, 250, 0.1); }
+  </style>
+</head>
+<body class="min-h-screen text-white">
+  <header class="border-b border-slate-800/50 bg-deep-navy/80 backdrop-blur-sm">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyber-cyan to-blue-500 flex items-center justify-center">
+          <svg class="w-6 h-6 text-deep-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="text-lg font-bold text-white">MissionPulse</span>
+          <span class="text-xs text-slate-500 block">Admin • CSV User Upload</span>
+        </div>
+      </div>
+      <a href="admin-users.html" class="text-sm text-slate-400 hover:text-cyber-cyan transition-colors">← Back to Users</a>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6 py-8">
+    <div id="authCheck" class="text-center py-12">
+      <div class="w-8 h-8 border-2 border-cyber-cyan border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <p class="text-slate-400 mt-4">Verifying admin access...</p>
+    </div>
+
+    <div id="accessDenied" class="hidden text-center py-12">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+        <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-red-400 mb-2">Access Denied</h2>
+      <p class="text-slate-400">CEO, COO, or Admin role required.</p>
+      <a href="index.html" class="inline-block mt-4 text-cyber-cyan hover:underline">Return to Dashboard</a>
+    </div>
+
+    <div id="mainContent" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold">Bulk User Upload</h1>
+        <button onclick="downloadTemplate()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm flex items-center gap-2 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download Template
+        </button>
+      </div>
+
+      <div id="uploadZone" class="border-2 border-dashed border-slate-700 rounded-xl p-12 text-center cursor-pointer hover:border-slate-600 transition-colors">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
+          <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+        </div>
+        <p class="text-lg font-medium mb-1">Drop CSV file here</p>
+        <p class="text-slate-500 text-sm">or click to browse</p>
+        <input type="file" id="fileInput" accept=".csv" class="hidden">
+      </div>
+
+      <div id="fileInfo" class="hidden bg-slate-900/60 border border-slate-700/50 rounded-xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+              <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+            </div>
+            <div>
+              <p id="fileName" class="font-medium">users.csv</p>
+              <p id="fileSize" class="text-sm text-slate-500">0 KB • 0 rows</p>
+            </div>
+          </div>
+          <button onclick="clearFile()" class="text-slate-400 hover:text-red-400 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="overflow-x-auto mb-4">
+          <table class="w-full text-sm">
+            <thead id="previewHead" class="text-left text-slate-400 border-b border-slate-700"></thead>
+            <tbody id="previewBody" class="text-slate-300"></tbody>
+          </table>
+        </div>
+        <p id="previewMore" class="text-xs text-slate-500 hidden"></p>
+        <div id="validationErrors" class="hidden mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p class="text-red-400 font-medium mb-2">Validation Errors:</p>
+          <ul id="errorList" class="text-sm text-red-300 space-y-1"></ul>
+        </div>
+        <div class="flex gap-3 mt-6">
+          <button id="uploadBtn" onclick="processUpload()" class="flex-1 py-3 bg-gradient-to-r from-cyber-cyan to-blue-500 text-deep-navy font-bold rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+            </svg>
+            Import Users
+          </button>
+          <button onclick="clearFile()" class="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors">Cancel</button>
+        </div>
+      </div>
+
+      <div id="progressSection" class="hidden bg-slate-900/60 border border-slate-700/50 rounded-xl p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-8 h-8 border-2 border-cyber-cyan border-t-transparent rounded-full animate-spin"></div>
+          <p class="font-medium">Processing users...</p>
+        </div>
+        <div class="w-full bg-slate-800 rounded-full h-2 mb-2">
+          <div id="progressBar" class="bg-cyber-cyan h-2 rounded-full transition-all" style="width: 0%"></div>
+        </div>
+        <p id="progressText" class="text-sm text-slate-400">0 of 0 processed</p>
+      </div>
+
+      <div id="resultsSection" class="hidden bg-slate-900/60 border border-slate-700/50 rounded-xl p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div id="resultsIcon" class="w-12 h-12 rounded-full flex items-center justify-center"></div>
+          <div>
+            <p id="resultsTitle" class="text-lg font-bold"></p>
+            <p id="resultsSubtitle" class="text-sm text-slate-400"></p>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div class="bg-slate-800/50 rounded-lg p-4 text-center">
+            <p id="totalCount" class="text-2xl font-bold text-white">0</p>
+            <p class="text-xs text-slate-500">Total Rows</p>
+          </div>
+          <div class="bg-emerald-500/10 rounded-lg p-4 text-center">
+            <p id="successCount" class="text-2xl font-bold text-emerald-400">0</p>
+            <p class="text-xs text-slate-500">Created</p>
+          </div>
+          <div class="bg-red-500/10 rounded-lg p-4 text-center">
+            <p id="errorCount" class="text-2xl font-bold text-red-400">0</p>
+            <p class="text-xs text-slate-500">Errors</p>
+          </div>
+        </div>
+        <div id="resultErrors" class="hidden mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg max-h-48 overflow-y-auto">
+          <p class="text-red-400 font-medium mb-2">Failed Rows:</p>
+          <ul id="resultErrorList" class="text-sm text-red-300 space-y-1"></ul>
+        </div>
+        <button onclick="resetUpload()" class="w-full mt-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors">Upload Another File</button>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-6">
+        <h2 class="text-lg font-bold mb-4">Recent Imports</h2>
+        <div id="recentImports" class="space-y-3">
+          <p class="text-slate-500 text-sm">No imports yet</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-6">
+        <h2 class="text-lg font-bold mb-4">CSV Format Requirements</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="text-left text-slate-400 border-b border-slate-700">
+              <tr><th class="pb-2 pr-4">Column</th><th class="pb-2 pr-4">Required</th><th class="pb-2">Description</th></tr>
+            </thead>
+            <tbody class="text-slate-300">
+              <tr class="border-b border-slate-800"><td class="py-2 pr-4 font-mono text-cyber-cyan">email</td><td class="py-2 pr-4"><span class="text-red-400">Yes</span></td><td class="py-2">User's email address</td></tr>
+              <tr class="border-b border-slate-800"><td class="py-2 pr-4 font-mono text-cyber-cyan">full_name</td><td class="py-2 pr-4"><span class="text-red-400">Yes</span></td><td class="py-2">User's full name</td></tr>
+              <tr class="border-b border-slate-800"><td class="py-2 pr-4 font-mono text-cyber-cyan">role</td><td class="py-2 pr-4"><span class="text-amber-400">No</span></td><td class="py-2">CEO, COO, CAP, PM, SA, FIN, CON, DEL, QA, Partner, Admin</td></tr>
+              <tr class="border-b border-slate-800"><td class="py-2 pr-4 font-mono text-cyber-cyan">department</td><td class="py-2 pr-4"><span class="text-amber-400">No</span></td><td class="py-2">User's department</td></tr>
+              <tr><td class="py-2 pr-4 font-mono text-cyber-cyan">phone</td><td class="py-2 pr-4"><span class="text-amber-400">No</span></td><td class="py-2">Phone number</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-800/50 mt-12">
+    <div class="max-w-6xl mx-auto px-6 py-4 text-center text-slate-500 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</div>
+  </footer>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNTAsImV4cCI6MjA1MzE0MzI1MH0.GRTFxRV7WV67P9sYaIVRwKxVEDALfkWjmUxs4ADB1zs';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentUser = null;
+    let parsedData = [];
+    let currentFile = null;
+    const VALID_ROLES = ['CEO', 'COO', 'CAP', 'PM', 'SA', 'FIN', 'CON', 'DEL', 'QA', 'Partner', 'Admin'];
+
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; return; }
+      const { data: profile } = await supabase.from('profiles').select('role, company_id').eq('id', session.user.id).single();
+      if (!profile || !['CEO', 'COO', 'Admin'].includes(profile.role)) {
+        document.getElementById('authCheck').classList.add('hidden');
+        document.getElementById('accessDenied').classList.remove('hidden');
+        return;
+      }
+      currentUser = { ...session.user, ...profile };
+      document.getElementById('authCheck').classList.add('hidden');
+      document.getElementById('mainContent').classList.remove('hidden');
+      loadRecentImports();
+    }
+
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-active'); });
+    uploadZone.addEventListener('dragleave', () => { uploadZone.classList.remove('drag-active'); });
+    uploadZone.addEventListener('drop', (e) => { e.preventDefault(); uploadZone.classList.remove('drag-active'); const file = e.dataTransfer.files[0]; if (file && file.name.endsWith('.csv')) handleFile(file); });
+    fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+    function handleFile(file) {
+      currentFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => { parseCSV(e.target.result); showFileInfo(file); };
+      reader.readAsText(file);
+    }
+
+    function parseCSV(content) {
+      const lines = content.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+      parsedData = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+        const row = {};
+        headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+        if (row.email) parsedData.push(row);
+      }
+    }
+
+    function showFileInfo(file) {
+      document.getElementById('uploadZone').classList.add('hidden');
+      document.getElementById('fileInfo').classList.remove('hidden');
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('fileSize').textContent = `${(file.size / 1024).toFixed(1)} KB • ${parsedData.length} rows`;
+      const previewHead = document.getElementById('previewHead');
+      const previewBody = document.getElementById('previewBody');
+      previewHead.innerHTML = '<tr>' + ['email', 'full_name', 'role'].map(h => `<th class="pb-2 pr-4">${h}</th>`).join('') + '</tr>';
+      const previewRows = parsedData.slice(0, 5);
+      previewBody.innerHTML = previewRows.map(row => '<tr class="border-b border-slate-800">' + ['email', 'full_name', 'role'].map(h => `<td class="py-2 pr-4">${row[h] || '-'}</td>`).join('') + '</tr>').join('');
+      if (parsedData.length > 5) { document.getElementById('previewMore').classList.remove('hidden'); document.getElementById('previewMore').textContent = `+ ${parsedData.length - 5} more rows`; }
+      validateData();
+    }
+
+    function validateData() {
+      const errors = [];
+      const emails = new Set();
+      parsedData.forEach((row, idx) => {
+        if (!row.email) errors.push(`Row ${idx + 2}: Missing email`);
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) errors.push(`Row ${idx + 2}: Invalid email format`);
+        else if (emails.has(row.email.toLowerCase())) errors.push(`Row ${idx + 2}: Duplicate email ${row.email}`);
+        else emails.add(row.email.toLowerCase());
+        if (!row.full_name) errors.push(`Row ${idx + 2}: Missing full_name`);
+        if (row.role && !VALID_ROLES.includes(row.role)) errors.push(`Row ${idx + 2}: Invalid role "${row.role}"`);
+      });
+      if (errors.length > 0) {
+        document.getElementById('validationErrors').classList.remove('hidden');
+        document.getElementById('errorList').innerHTML = errors.slice(0, 10).map(e => `<li>• ${e}</li>`).join('');
+        if (errors.length > 10) document.getElementById('errorList').innerHTML += `<li class="text-slate-500">+ ${errors.length - 10} more errors</li>`;
+        document.getElementById('uploadBtn').disabled = true;
+        document.getElementById('uploadBtn').classList.add('opacity-50', 'cursor-not-allowed');
+      } else {
+        document.getElementById('validationErrors').classList.add('hidden');
+        document.getElementById('uploadBtn').disabled = false;
+        document.getElementById('uploadBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+    }
+
+    function clearFile() {
+      currentFile = null; parsedData = []; fileInput.value = '';
+      document.getElementById('uploadZone').classList.remove('hidden');
+      document.getElementById('fileInfo').classList.add('hidden');
+      document.getElementById('validationErrors').classList.add('hidden');
+    }
+
+    async function processUpload() {
+      document.getElementById('fileInfo').classList.add('hidden');
+      document.getElementById('progressSection').classList.remove('hidden');
+      let successCount = 0, errorCount = 0;
+      const errors = [];
+      for (let i = 0; i < parsedData.length; i++) {
+        const row = parsedData[i];
+        try {
+          const { data: existing } = await supabase.from('profiles').select('id').eq('email', row.email.toLowerCase()).single();
+          if (existing) { errors.push({ row: i + 2, email: row.email, error: 'User already exists' }); errorCount++; }
+          else {
+            const { error } = await supabase.from('profiles').insert({
+              email: row.email.toLowerCase(), full_name: row.full_name, role: row.role || 'PM',
+              department: row.department || null, phone: row.phone || null,
+              company_id: currentUser.company_id, status: 'pending_invite'
+            });
+            if (error) { errors.push({ row: i + 2, email: row.email, error: error.message }); errorCount++; }
+            else successCount++;
+          }
+        } catch (err) { errors.push({ row: i + 2, email: row.email, error: err.message }); errorCount++; }
+        const progress = ((i + 1) / parsedData.length) * 100;
+        document.getElementById('progressBar').style.width = `${progress}%`;
+        document.getElementById('progressText').textContent = `${i + 1} of ${parsedData.length} processed`;
+      }
+      await supabase.from('user_imports').insert({
+        company_id: currentUser.company_id, imported_by: currentUser.id, filename: currentFile.name,
+        total_rows: parsedData.length, success_count: successCount, error_count: errorCount,
+        errors: errors, status: 'complete', completed_at: new Date().toISOString()
+      });
+      showResults(parsedData.length, successCount, errorCount, errors);
+    }
+
+    function showResults(total, success, errorCount, errors) {
+      document.getElementById('progressSection').classList.add('hidden');
+      document.getElementById('resultsSection').classList.remove('hidden');
+      const allSuccess = errorCount === 0;
+      document.getElementById('resultsIcon').className = `w-12 h-12 rounded-full flex items-center justify-center ${allSuccess ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`;
+      document.getElementById('resultsIcon').innerHTML = allSuccess ? '<svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>' : '<svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
+      document.getElementById('resultsTitle').textContent = allSuccess ? 'Import Complete!' : 'Import Complete with Errors';
+      document.getElementById('resultsSubtitle').textContent = `${success} users created successfully`;
+      document.getElementById('totalCount').textContent = total;
+      document.getElementById('successCount').textContent = success;
+      document.getElementById('errorCount').textContent = errorCount;
+      if (errors.length > 0) {
+        document.getElementById('resultErrors').classList.remove('hidden');
+        document.getElementById('resultErrorList').innerHTML = errors.map(e => `<li>• Row ${e.row} (${e.email}): ${e.error}</li>`).join('');
+      }
+      loadRecentImports();
+    }
+
+    function resetUpload() {
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('resultErrors').classList.add('hidden');
+      clearFile();
+    }
+
+    async function loadRecentImports() {
+      const { data: imports } = await supabase.from('user_imports').select('*').eq('company_id', currentUser.company_id).order('created_at', { ascending: false }).limit(5);
+      const container = document.getElementById('recentImports');
+      if (!imports || imports.length === 0) { container.innerHTML = '<p class="text-slate-500 text-sm">No imports yet</p>'; return; }
+      container.innerHTML = imports.map(imp => `<div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg ${imp.error_count > 0 ? 'bg-amber-500/20' : 'bg-emerald-500/20'} flex items-center justify-center"><svg class="w-4 h-4 ${imp.error_count > 0 ? 'text-amber-400' : 'text-emerald-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div><div><p class="text-sm font-medium">${imp.filename}</p><p class="text-xs text-slate-500">${new Date(imp.created_at).toLocaleDateString()} • ${imp.success_count} created, ${imp.error_count} errors</p></div></div></div>`).join('');
+    }
+
+    function downloadTemplate() {
+      const csv = 'email,full_name,role,department,phone\njane.doe@example.com,Jane Doe,PM,Capture,555-0100\njohn.smith@example.com,John Smith,SA,Technical,555-0101';
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'missionpulse_user_template.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    checkAuth();
+  </script>
+</body>
+</html>
