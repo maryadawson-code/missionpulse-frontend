@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse - Capture Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mp-navy': '#00050F',
+                        'mp-cyan': '#00E5FA',
+                        'mp-slate': '#0A1628'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-mp-navy min-h-screen text-white">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // Demo calendar events
+        const eventsData = [
+            { id: 1, date: '2024-03-01', title: 'Gold Team Review', type: 'review', opportunity: 'DHA EHR Modernization', time: '09:00', duration: 4, priority: 'high' },
+            { id: 2, date: '2024-03-01', title: 'Cost Volume Draft Due', type: 'deadline', opportunity: 'DHA EHR Modernization', time: '17:00', priority: 'critical' },
+            { id: 3, date: '2024-03-04', title: 'Customer Meeting - VA', type: 'meeting', opportunity: 'VA Cloud Migration', time: '14:00', duration: 1, priority: 'high' },
+            { id: 4, date: '2024-03-05', title: 'Pink Team Review', type: 'review', opportunity: 'CMS Data Analytics', time: '10:00', duration: 3, priority: 'medium' },
+            { id: 5, date: '2024-03-07', title: 'Teaming Agreement Due', type: 'deadline', opportunity: 'VA Cloud Migration', time: '17:00', priority: 'high' },
+            { id: 6, date: '2024-03-08', title: 'Industry Day', type: 'event', opportunity: 'IHS Telehealth', time: '08:00', duration: 8, priority: 'medium' },
+            { id: 7, date: '2024-03-10', title: 'Final Review', type: 'review', opportunity: 'DHA EHR Modernization', time: '09:00', duration: 6, priority: 'critical' },
+            { id: 8, date: '2024-03-11', title: 'Q&A Responses Due', type: 'deadline', opportunity: 'CMS Data Analytics', time: '14:00', priority: 'medium' },
+            { id: 9, date: '2024-03-12', title: 'Red Team Review', type: 'review', opportunity: 'VA Cloud Migration', time: '09:00', duration: 4, priority: 'high' },
+            { id: 10, date: '2024-03-15', title: 'PROPOSAL DUE', type: 'submission', opportunity: 'DHA EHR Modernization', time: '14:00', priority: 'critical' },
+            { id: 11, date: '2024-03-18', title: 'Kickoff Meeting', type: 'meeting', opportunity: 'HHS Analytics Support', time: '10:00', duration: 2, priority: 'medium' },
+            { id: 12, date: '2024-03-20', title: 'Capture Strategy Session', type: 'meeting', opportunity: 'DoD Cyber IDIQ', time: '13:00', duration: 3, priority: 'high' },
+            { id: 13, date: '2024-03-22', title: 'Past Performance Collection', type: 'deadline', opportunity: 'VA Cloud Migration', time: '17:00', priority: 'medium' },
+            { id: 14, date: '2024-03-25', title: 'Blue Team Review', type: 'review', opportunity: 'CMS Data Analytics', time: '09:00', duration: 4, priority: 'high' },
+            { id: 15, date: '2024-03-28', title: 'Go/No-Go Decision', type: 'decision', opportunity: 'DoD Cyber IDIQ', time: '15:00', priority: 'critical' },
+            { id: 16, date: '2024-04-01', title: 'PROPOSAL DUE', type: 'submission', opportunity: 'VA Cloud Migration', time: '16:00', priority: 'critical' }
+        ];
+
+        const eventTypeConfig = {
+            review: { color: 'bg-blue-500', icon: '📋', label: 'Review' },
+            deadline: { color: 'bg-orange-500', icon: '⏰', label: 'Deadline' },
+            meeting: { color: 'bg-green-500', icon: '🤝', label: 'Meeting' },
+            submission: { color: 'bg-red-500', icon: '📤', label: 'Submission' },
+            event: { color: 'bg-purple-500', icon: '📅', label: 'Event' },
+            decision: { color: 'bg-yellow-500', icon: '⚖️', label: 'Decision' }
+        };
+
+        const opportunities = ['All', 'DHA EHR Modernization', 'VA Cloud Migration', 'CMS Data Analytics', 'IHS Telehealth', 'DoD Cyber IDIQ', 'HHS Analytics Support'];
+
+        function getDaysInMonth(year, month) {
+            return new Date(year, month + 1, 0).getDate();
+        }
+
+        function getFirstDayOfMonth(year, month) {
+            return new Date(year, month, 1).getDay();
+        }
+
+        function formatDate(year, month, day) {
+            return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+
+        function EventBadge({ event, compact = false }) {
+            const config = eventTypeConfig[event.type] || eventTypeConfig.meeting;
+            
+            if (compact) {
+                return (
+                    <div className={`${config.color} rounded px-1 py-0.5 text-xs text-white truncate mb-1`} title={event.title}>
+                        {event.title.length > 15 ? event.title.substring(0, 15) + '...' : event.title}
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`${config.color}/20 border-l-4 ${config.color.replace('bg-', 'border-')} rounded-r-lg p-3 mb-2`}>
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-white">{config.icon} {event.title}</span>
+                        <span className="text-xs text-gray-400">{event.time}</span>
+                    </div>
+                    <p className="text-xs text-gray-400">{event.opportunity}</p>
+                    {event.duration && (
+                        <p className="text-xs text-gray-500 mt-1">{event.duration}h duration</p>
+                    )}
+                </div>
+            );
+        }
+
+        function CalendarDay({ date, events, isToday, isCurrentMonth, onSelectDate, isSelected }) {
+            const dayEvents = events.filter(e => e.date === date);
+            const hasSubmission = dayEvents.some(e => e.type === 'submission');
+            const hasCritical = dayEvents.some(e => e.priority === 'critical');
+
+            return (
+                <div 
+                    className={`min-h-24 border border-gray-800 p-1 cursor-pointer transition-colors ${
+                        isCurrentMonth ? 'bg-mp-slate/30' : 'bg-mp-navy/50'
+                    } ${isToday ? 'ring-2 ring-mp-cyan' : ''} ${isSelected ? 'bg-mp-slate' : 'hover:bg-mp-slate/50'}`}
+                    onClick={() => onSelectDate(date)}
+                >
+                    <div className="flex items-center justify-between mb-1">
+                        <span className={`text-sm font-medium ${isCurrentMonth ? 'text-white' : 'text-gray-600'} ${isToday ? 'bg-mp-cyan text-mp-navy px-1.5 py-0.5 rounded' : ''}`}>
+                            {parseInt(date.split('-')[2])}
+                        </span>
+                        {hasCritical && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
+                    </div>
+                    <div className="space-y-0.5">
+                        {dayEvents.slice(0, 3).map(event => (
+                            <EventBadge key={event.id} event={event} compact />
+                        ))}
+                        {dayEvents.length > 3 && (
+                            <div className="text-xs text-gray-400 pl-1">+{dayEvents.length - 3} more</div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function UpcomingList({ events, days = 7 }) {
+            const today = new Date();
+            const upcoming = events
+                .filter(e => {
+                    const eventDate = new Date(e.date);
+                    const diffTime = eventDate - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays >= 0 && diffDays <= days;
+                })
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            return (
+                <div className="space-y-2">
+                    {upcoming.map(event => (
+                        <EventBadge key={event.id} event={event} />
+                    ))}
+                    {upcoming.length === 0 && (
+                        <div className="text-center py-6 text-gray-400">
+                            <span className="text-2xl">📭</span>
+                            <p className="mt-2 text-sm">No upcoming events</p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function App() {
+            const [currentDate, setCurrentDate] = useState(new Date(2024, 2, 1)); // March 2024
+            const [selectedDate, setSelectedDate] = useState(null);
+            const [filterOpportunity, setFilterOpportunity] = useState('All');
+            const [filterType, setFilterType] = useState('all');
+            const [viewMode, setViewMode] = useState('month');
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = getDaysInMonth(year, month);
+            const firstDay = getFirstDayOfMonth(year, month);
+            const prevMonthDays = getDaysInMonth(year, month - 1);
+
+            const filteredEvents = useMemo(() => {
+                return eventsData.filter(e => {
+                    const matchesOpp = filterOpportunity === 'All' || e.opportunity === filterOpportunity;
+                    const matchesType = filterType === 'all' || e.type === filterType;
+                    return matchesOpp && matchesType;
+                });
+            }, [filterOpportunity, filterType]);
+
+            const selectedDateEvents = useMemo(() => {
+                if (!selectedDate) return [];
+                return filteredEvents.filter(e => e.date === selectedDate);
+            }, [selectedDate, filteredEvents]);
+
+            const calendarDays = useMemo(() => {
+                const days = [];
+                
+                // Previous month days
+                for (let i = firstDay - 1; i >= 0; i--) {
+                    const day = prevMonthDays - i;
+                    const prevMonth = month === 0 ? 11 : month - 1;
+                    const prevYear = month === 0 ? year - 1 : year;
+                    days.push({
+                        date: formatDate(prevYear, prevMonth, day),
+                        isCurrentMonth: false
+                    });
+                }
+                
+                // Current month days
+                for (let i = 1; i <= daysInMonth; i++) {
+                    days.push({
+                        date: formatDate(year, month, i),
+                        isCurrentMonth: true
+                    });
+                }
+                
+                // Next month days
+                const remainingDays = 42 - days.length;
+                for (let i = 1; i <= remainingDays; i++) {
+                    const nextMonth = month === 11 ? 0 : month + 1;
+                    const nextYear = month === 11 ? year + 1 : year;
+                    days.push({
+                        date: formatDate(nextYear, nextMonth, i),
+                        isCurrentMonth: false
+                    });
+                }
+                
+                return days;
+            }, [year, month, daysInMonth, firstDay, prevMonthDays]);
+
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            const todayStr = '2024-03-01'; // Demo today
+
+            const metrics = useMemo(() => {
+                const thisMonth = filteredEvents.filter(e => e.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`));
+                const submissions = thisMonth.filter(e => e.type === 'submission').length;
+                const reviews = thisMonth.filter(e => e.type === 'review').length;
+                const meetings = thisMonth.filter(e => e.type === 'meeting').length;
+                const critical = thisMonth.filter(e => e.priority === 'critical').length;
+                return { total: thisMonth.length, submissions, reviews, meetings, critical };
+            }, [filteredEvents, year, month]);
+
+            return (
+                <div className="min-h-screen bg-mp-navy">
+                    {/* Header */}
+                    <header className="bg-mp-slate border-b border-gray-800 px-6 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-gradient-to-br from-mp-cyan to-blue-600 rounded-lg flex items-center justify-center">
+                                    <span className="text-xl">📅</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-white">Capture Calendar</h1>
+                                    <p className="text-sm text-gray-400">Milestones, reviews, and deadlines</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <select 
+                                    value={filterOpportunity}
+                                    onChange={(e) => setFilterOpportunity(e.target.value)}
+                                    className="bg-mp-navy border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+                                >
+                                    {opportunities.map(opp => (
+                                        <option key={opp} value={opp}>{opp}</option>
+                                    ))}
+                                </select>
+                                <select 
+                                    value={filterType}
+                                    onChange={(e) => setFilterType(e.target.value)}
+                                    className="bg-mp-navy border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+                                >
+                                    <option value="all">All Types</option>
+                                    {Object.entries(eventTypeConfig).map(([key, val]) => (
+                                        <option key={key} value={key}>{val.icon} {val.label}</option>
+                                    ))}
+                                </select>
+                                <button className="bg-mp-cyan text-mp-navy px-4 py-2 rounded-lg font-medium hover:bg-mp-cyan/90 transition-colors">
+                                    + Add Event
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Month Metrics */}
+                    <div className="px-6 py-4 border-b border-gray-800">
+                        <div className="grid grid-cols-5 gap-4">
+                            <div className="bg-mp-slate rounded-xl p-3 text-center">
+                                <p className="text-2xl font-bold text-white">{metrics.total}</p>
+                                <p className="text-xs text-gray-400">Events This Month</p>
+                            </div>
+                            <div className="bg-mp-slate rounded-xl p-3 text-center">
+                                <p className="text-2xl font-bold text-red-400">{metrics.submissions}</p>
+                                <p className="text-xs text-gray-400">Submissions</p>
+                            </div>
+                            <div className="bg-mp-slate rounded-xl p-3 text-center">
+                                <p className="text-2xl font-bold text-blue-400">{metrics.reviews}</p>
+                                <p className="text-xs text-gray-400">Reviews</p>
+                            </div>
+                            <div className="bg-mp-slate rounded-xl p-3 text-center">
+                                <p className="text-2xl font-bold text-green-400">{metrics.meetings}</p>
+                                <p className="text-xs text-gray-400">Meetings</p>
+                            </div>
+                            <div className="bg-mp-slate rounded-xl p-3 text-center">
+                                <p className="text-2xl font-bold text-yellow-400">{metrics.critical}</p>
+                                <p className="text-xs text-gray-400">Critical Items</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Calendar Navigation */}
+                    <div className="px-6 py-3 border-b border-gray-800 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+                                className="p-2 hover:bg-mp-slate rounded-lg transition-colors"
+                            >
+                                ◀
+                            </button>
+                            <h2 className="text-xl font-bold text-white w-48 text-center">
+                                {monthNames[month]} {year}
+                            </h2>
+                            <button 
+                                onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+                                className="p-2 hover:bg-mp-slate rounded-lg transition-colors"
+                            >
+                                ▶
+                            </button>
+                        </div>
+                        <button 
+                            onClick={() => setCurrentDate(new Date(2024, 2, 1))}
+                            className="px-3 py-1 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+                        >
+                            Today
+                        </button>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex">
+                        {/* Calendar Grid */}
+                        <div className="flex-1 p-4">
+                            {/* Day Headers */}
+                            <div className="grid grid-cols-7 mb-2">
+                                {dayNames.map(day => (
+                                    <div key={day} className="text-center text-sm font-medium text-gray-400 py-2">
+                                        {day}
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            {/* Calendar Days */}
+                            <div className="grid grid-cols-7">
+                                {calendarDays.map((day, idx) => (
+                                    <CalendarDay
+                                        key={idx}
+                                        date={day.date}
+                                        events={filteredEvents}
+                                        isToday={day.date === todayStr}
+                                        isCurrentMonth={day.isCurrentMonth}
+                                        isSelected={selectedDate === day.date}
+                                        onSelectDate={setSelectedDate}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Sidebar */}
+                        <div className="w-80 border-l border-gray-800 p-4 max-h-[calc(100vh-280px)] overflow-y-auto">
+                            {selectedDate ? (
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-semibold text-white">{selectedDate}</h3>
+                                        <button 
+                                            onClick={() => setSelectedDate(null)}
+                                            className="text-gray-400 hover:text-white"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    {selectedDateEvents.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {selectedDateEvents.map(event => (
+                                                <EventBadge key={event.id} event={event} />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-6 text-gray-400">
+                                            <p className="text-sm">No events on this date</p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div>
+                                    <h3 className="font-semibold text-white mb-4">Upcoming (7 days)</h3>
+                                    <UpcomingList events={filteredEvents} days={7} />
+                                </div>
+                            )}
+
+                            {/* Legend */}
+                            <div className="mt-6 pt-4 border-t border-gray-800">
+                                <h4 className="text-sm font-medium text-gray-400 mb-3">Event Types</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {Object.entries(eventTypeConfig).map(([key, val]) => (
+                                        <div key={key} className="flex items-center gap-2">
+                                            <div className={`w-3 h-3 rounded ${val.color}`}></div>
+                                            <span className="text-xs text-gray-400">{val.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <footer className="fixed bottom-0 left-0 right-0 bg-mp-slate border-t border-gray-800 px-6 py-3">
+                        <div className="flex items-center justify-between text-sm text-gray-400">
+                            <span>MissionPulse v12 • Capture Calendar Module</span>
+                            <span className="text-yellow-500">⚠️ AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
