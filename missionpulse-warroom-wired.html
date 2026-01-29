@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse | War Room</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="MMT_icon_32px.png">
+  
+  <!-- Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Supabase Client -->
+  <script src="supabase-client-v2.1.js"></script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes urgentPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 20px 10px rgba(239, 68, 68, 0.1); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .urgent-pulse { animation: urgentPulse 2s ease-in-out infinite; }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.1); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+// ============================================================
+// MISSIONPULSE WAR ROOM
+// P-0 Hot Pursuits - Live Data from Supabase
+// Mission Meets Tech © 2026
+// ============================================================
+
+const { useState, useEffect, useCallback } = React;
+
+// ============================================================
+// ICONS
+// ============================================================
+const Icons = {
+  shield: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+  refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+  alert: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+  clock: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+  fire: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" /></svg>,
+  target: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+  users: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  dollar: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  external: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>,
+};
+
+// ============================================================
+// UTILITIES
+// ============================================================
+const formatCurrency = (val) => {
+  if (!val) return '$0';
+  const num = parseFloat(val);
+  if (num >= 1000000000) return `$${(num / 1000000000).toFixed(1)}B`;
+  if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
+  return `$${num.toLocaleString()}`;
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'TBD';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const getDaysRemaining = (dateStr) => {
+  if (!dateStr) return null;
+  const due = new Date(dateStr);
+  const now = new Date();
+  return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+};
+
+const getUrgencyLevel = (days) => {
+  if (days === null) return 'unknown';
+  if (days < 0) return 'overdue';
+  if (days <= 3) return 'critical';
+  if (days <= 7) return 'urgent';
+  if (days <= 14) return 'warning';
+  return 'normal';
+};
+
+// ============================================================
+// COMPONENTS
+// ============================================================
+const Badge = ({ children, variant = 'default', size = 'sm', pulse }) => {
+  const variants = {
+    default: 'bg-slate-700 text-slate-300',
+    critical: 'bg-red-500/20 text-red-400 border border-red-500/50',
+    urgent: 'bg-amber-500/20 text-amber-400 border border-amber-500/50',
+    warning: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50',
+    success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50',
+    primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50',
+  };
+  const sizes = { xs: 'px-1.5 py-0.5 text-[10px]', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+  
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full font-semibold ${variants[variant]} ${sizes[size]} ${pulse ? 'animate-pulse' : ''}`}>
+      {children}
+    </span>
+  );
+};
+
+const Spinner = ({ size = 'md' }) => {
+  const sizes = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' };
+  return <div className={`${sizes[size]} border-2 border-red-500 border-t-transparent rounded-full animate-spin`}></div>;
+};
+
+// ============================================================
+// WAR ROOM CARD
+// ============================================================
+const WarRoomCard = ({ opportunity, rank }) => {
+  const days = getDaysRemaining(opportunity.due_date);
+  const urgency = getUrgencyLevel(days);
+  const pwin = opportunity.pwin || 50;
+  
+  const urgencyColors = {
+    critical: 'border-red-500/50 bg-red-500/5',
+    urgent: 'border-amber-500/50 bg-amber-500/5',
+    warning: 'border-yellow-500/30',
+    normal: 'border-slate-700/50',
+    unknown: 'border-slate-700/50',
+    overdue: 'border-red-500/50 bg-red-500/10',
+  };
+  
+  return (
+    <div className={`glass rounded-2xl p-6 border-2 ${urgencyColors[urgency]} ${urgency === 'critical' ? 'urgent-pulse' : ''} transition-all hover:scale-[1.01]`}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl ${
+            rank === 1 ? 'bg-red-500/20 text-red-400' :
+            rank === 2 ? 'bg-amber-500/20 text-amber-400' :
+            'bg-slate-700/50 text-slate-400'
+          }`}>
+            #{rank}
+          </div>
+          <div>
+            <h3 className="font-bold text-white text-lg">{opportunity.nickname || opportunity.title || 'Untitled'}</h3>
+            <p className="text-slate-400 text-sm">{opportunity.agency || 'Federal Agency'}</p>
+          </div>
+        </div>
+        
+        {urgency === 'critical' && (
+          <Badge variant="critical" size="md" pulse>
+            <Icons.fire /> CRITICAL
+          </Badge>
+        )}
+        {urgency === 'urgent' && (
+          <Badge variant="urgent" size="md">
+            ⚠️ URGENT
+          </Badge>
+        )}
+        {urgency === 'overdue' && (
+          <Badge variant="critical" size="md">
+            🚨 OVERDUE
+          </Badge>
+        )}
+      </div>
+      
+      {/* Stats Grid */}
+      <div className="grid grid-cols-4 gap-4 mb-4">
+        <div className="bg-slate-800/50 rounded-xl p-3 text-center">
+          <div className="text-slate-400 text-xs mb-1 flex items-center justify-center gap-1">
+            <Icons.dollar /> Value
+          </div>
+          <div className="text-white font-bold">{formatCurrency(opportunity.ceiling || opportunity.value)}</div>
+        </div>
+        
+        <div className="bg-slate-800/50 rounded-xl p-3 text-center">
+          <div className="text-slate-400 text-xs mb-1 flex items-center justify-center gap-1">
+            <Icons.clock /> Due
+          </div>
+          <div className={`font-bold ${
+            urgency === 'critical' || urgency === 'overdue' ? 'text-red-400' :
+            urgency === 'urgent' ? 'text-amber-400' :
+            'text-white'
+          }`}>
+            {days === null ? 'TBD' : 
+             days < 0 ? `${Math.abs(days)}d ago` :
+             days === 0 ? 'TODAY!' :
+             `${days} days`}
+          </div>
+        </div>
+        
+        <div className="bg-slate-800/50 rounded-xl p-3 text-center">
+          <div className="text-slate-400 text-xs mb-1 flex items-center justify-center gap-1">
+            <Icons.target /> Win %
+          </div>
+          <div className={`font-bold ${
+            pwin >= 70 ? 'text-emerald-400' :
+            pwin >= 50 ? 'text-amber-400' :
+            'text-red-400'
+          }`}>{pwin}%</div>
+        </div>
+        
+        <div className="bg-slate-800/50 rounded-xl p-3 text-center">
+          <div className="text-slate-400 text-xs mb-1">Phase</div>
+          <div className="text-cyan-400 font-bold text-sm">{opportunity.shipley_phase || 'Capture'}</div>
+        </div>
+      </div>
+      
+      {/* Progress Bar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1 text-xs">
+          <span className="text-slate-400">Win Probability</span>
+          <span className="text-slate-300">{pwin}%</span>
+        </div>
+        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+          <div 
+            className="h-full rounded-full transition-all"
+            style={{ 
+              width: `${pwin}%`,
+              background: pwin >= 70 ? 'linear-gradient(90deg, #22c55e, #10b981)' :
+                         pwin >= 50 ? 'linear-gradient(90deg, #f59e0b, #eab308)' :
+                         'linear-gradient(90deg, #ef4444, #dc2626)'
+            }}
+          ></div>
+        </div>
+      </div>
+      
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
+        <div className="text-xs text-slate-500">
+          Updated: {formatDate(opportunity.updated_at || opportunity.created_at)}
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-300 text-sm hover:bg-slate-700 transition">
+            View Details
+          </button>
+          <a 
+            href={`missionpulse-m9-hitl-enhanced.html?opp=${opportunity.id}`}
+            className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm hover:bg-cyan-500/30 transition flex items-center gap-1"
+          >
+            AI Review <Icons.external />
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// MAIN APP
+// ============================================================
+function WarRoom() {
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [dbStatus, setDbStatus] = useState('connecting');
+  const [filter, setFilter] = useState('all'); // all, critical, urgent
+  
+  // Load P-0 opportunities
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (typeof MissionPulse === 'undefined') {
+        throw new Error('MissionPulse client not loaded');
+      }
+      
+      const { data, error: fetchError } = await MissionPulse.opportunities.getAll();
+      
+      if (fetchError) throw fetchError;
+      
+      // Filter and sort by urgency (due date)
+      const sorted = (data || [])
+        .filter(o => !['Won', 'Lost'].includes(o.shipley_phase))
+        .sort((a, b) => {
+          // Sort by due date (soonest first), then by value
+          const dueA = a.due_date ? new Date(a.due_date) : new Date('2099-12-31');
+          const dueB = b.due_date ? new Date(b.due_date) : new Date('2099-12-31');
+          if (dueA - dueB !== 0) return dueA - dueB;
+          return (parseFloat(b.ceiling) || 0) - (parseFloat(a.ceiling) || 0);
+        });
+      
+      setOpportunities(sorted);
+      setDbStatus('connected');
+      
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError(err.message);
+      setDbStatus('error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  useEffect(() => {
+    const timer = setTimeout(loadData, 500);
+    return () => clearTimeout(timer);
+  }, [loadData]);
+  
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (typeof MissionPulse !== 'undefined' && MissionPulse.opportunities?.subscribe) {
+      const unsubscribe = MissionPulse.opportunities.subscribe(() => loadData());
+      return () => unsubscribe?.();
+    }
+  }, [loadData]);
+  
+  // Filter opportunities
+  const filteredOpps = opportunities.filter(o => {
+    const days = getDaysRemaining(o.due_date);
+    const urgency = getUrgencyLevel(days);
+    
+    if (filter === 'critical') return urgency === 'critical' || urgency === 'overdue';
+    if (filter === 'urgent') return ['critical', 'urgent', 'overdue'].includes(urgency);
+    return true;
+  });
+  
+  // Stats
+  const criticalCount = opportunities.filter(o => {
+    const days = getDaysRemaining(o.due_date);
+    return days !== null && days <= 3;
+  }).length;
+  
+  const urgentCount = opportunities.filter(o => {
+    const days = getDaysRemaining(o.due_date);
+    return days !== null && days <= 7;
+  }).length;
+  
+  const totalValue = opportunities.reduce((sum, o) => sum + (parseFloat(o.ceiling) || parseFloat(o.value) || 0), 0);
+  
+  return (
+    <div className="min-h-screen bg-[#00050F]">
+      {/* Header */}
+      <header className="bg-slate-900/80 backdrop-blur border-b border-red-500/30 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <a href="missionpulse-production-dashboard.html" className="flex items-center gap-3 hover:opacity-80 transition">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg shadow-red-500/30">
+                  <span className="text-xl">⚔️</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">War Room</h1>
+                  <p className="text-xs text-red-400">Hot Pursuit Command Center</p>
+                </div>
+              </a>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Alert Stats */}
+              {criticalCount > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/50">
+                  <Icons.fire />
+                  <span className="text-red-400 font-bold">{criticalCount} Critical</span>
+                </div>
+              )}
+              
+              {/* DB Status */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700">
+                <div className={`w-2 h-2 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-400' : dbStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'}`}></div>
+                <span className="text-xs text-slate-400">
+                  {dbStatus === 'connected' ? 'Live' : dbStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+                </span>
+              </div>
+              
+              {/* Refresh */}
+              <button 
+                onClick={loadData}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 transition text-slate-400 hover:text-white disabled:opacity-50"
+              >
+                <span className={loading ? 'animate-spin' : ''}><Icons.refresh /></span>
+              </button>
+              
+              {/* Back to Dashboard */}
+              <a 
+                href="missionpulse-production-dashboard.html"
+                className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 transition text-slate-300 hover:text-white text-sm"
+              >
+                ← Dashboard
+              </a>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-500/10 border-b border-red-500/30 px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-red-400">
+            <Icons.alert />
+            <span>Error: {error}</span>
+          </div>
+          <button onClick={loadData} className="px-3 py-1 bg-red-500/20 rounded-lg text-red-400 text-sm hover:bg-red-500/30">
+            Retry
+          </button>
+        </div>
+      )}
+      
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Stats Bar */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="glass rounded-xl p-4">
+            <div className="text-slate-400 text-sm mb-1">Active Pursuits</div>
+            <div className="text-2xl font-bold text-white">{opportunities.length}</div>
+          </div>
+          <div className="glass rounded-xl p-4 border-red-500/30">
+            <div className="text-slate-400 text-sm mb-1">Critical (≤3 days)</div>
+            <div className="text-2xl font-bold text-red-400">{criticalCount}</div>
+          </div>
+          <div className="glass rounded-xl p-4 border-amber-500/30">
+            <div className="text-slate-400 text-sm mb-1">Urgent (≤7 days)</div>
+            <div className="text-2xl font-bold text-amber-400">{urgentCount}</div>
+          </div>
+          <div className="glass rounded-xl p-4">
+            <div className="text-slate-400 text-sm mb-1">Total Pipeline</div>
+            <div className="text-2xl font-bold text-emerald-400">{formatCurrency(totalValue)}</div>
+          </div>
+        </div>
+        
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-2 mb-6">
+          <button 
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              filter === 'all' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            All ({opportunities.length})
+          </button>
+          <button 
+            onClick={() => setFilter('urgent')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              filter === 'urgent' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50' : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            Urgent ({urgentCount})
+          </button>
+          <button 
+            onClick={() => setFilter('critical')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              filter === 'critical' ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            🔥 Critical ({criticalCount})
+          </button>
+        </div>
+        
+        {/* Loading */}
+        {loading && (
+          <div className="text-center py-12">
+            <Spinner size="lg" />
+            <p className="text-slate-400 mt-4">Loading hot pursuits from Supabase...</p>
+          </div>
+        )}
+        
+        {/* Cards Grid */}
+        {!loading && filteredOpps.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🎯</div>
+            <h3 className="text-xl font-bold text-white mb-2">No {filter !== 'all' ? filter : ''} opportunities</h3>
+            <p className="text-slate-400">
+              {filter === 'all' ? 'Add opportunities to track them here' : 'All clear! No urgent deadlines.'}
+            </p>
+          </div>
+        )}
+        
+        {!loading && filteredOpps.length > 0 && (
+          <div className="grid gap-6">
+            {filteredOpps.map((opp, idx) => (
+              <WarRoomCard key={opp.id} opportunity={opp} rank={idx + 1} />
+            ))}
+          </div>
+        )}
+      </main>
+      
+      {/* Footer */}
+      <footer className="bg-slate-900/80 border-t border-slate-700/50 px-6 py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-500">
+          <span>© 2026 Mission Meets Tech • MissionPulse v12</span>
+          <span>AI GENERATED - REQUIRES HUMAN REVIEW</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Render
+ReactDOM.createRoot(document.getElementById('root')).render(<WarRoom />);
+  </script>
+</body>
+</html>
