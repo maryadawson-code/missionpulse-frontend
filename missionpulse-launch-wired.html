@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Launch & ROI</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    @keyframes launch { 0% { transform: translateY(0); } 50% { transform: translateY(-20px); } 100% { transform: translateY(0); } }
+    .launch-ready { animation: launch 1s ease-in-out infinite; }
+    .status-ready { border-left: 4px solid #10B981; }
+    .status-pending { border-left: 4px solid #F59E0B; }
+    .status-blocked { border-left: 4px solid #EF4444; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold">
+        <span class="text-cyan-400 glow-text">Launch</span> & ROI
+      </h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">Select Opportunity</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ROI Summary Cards -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-gray-400 text-sm">Proposal Cost</span>
+        <span class="text-cyan-400">💰</span>
+      </div>
+      <div id="proposalCost" class="text-2xl font-bold">$0</div>
+      <div class="text-xs text-gray-500">Labor + Materials</div>
+    </div>
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-gray-400 text-sm">Expected Value</span>
+        <span class="text-green-400">📈</span>
+      </div>
+      <div id="expectedValue" class="text-2xl font-bold text-green-400">$0</div>
+      <div class="text-xs text-gray-500">Contract × pWin</div>
+    </div>
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-gray-400 text-sm">ROI</span>
+        <span class="text-purple-400">🎯</span>
+      </div>
+      <div id="roiPercent" class="text-2xl font-bold text-purple-400">0%</div>
+      <div class="text-xs text-gray-500">(EV - Cost) / Cost</div>
+    </div>
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-gray-400 text-sm">Launch Status</span>
+        <span id="launchIcon" class="text-amber-400">⏳</span>
+      </div>
+      <div id="launchStatus" class="text-2xl font-bold text-amber-400">PENDING</div>
+      <div id="checklistProgress" class="text-xs text-gray-500">0/0 items complete</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid grid-cols-3 gap-6">
+    <!-- Launch Checklist -->
+    <div class="col-span-2">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Launch Checklist</h3>
+          <button onclick="openAddModal()" class="text-cyan-400 hover:text-cyan-300 text-sm">+ Add Item</button>
+        </div>
+        
+        <div id="checklistContainer" class="space-y-3">
+          <div class="text-gray-500 text-center py-4 animate-pulse">Loading checklist...</div>
+        </div>
+        
+        <div class="mt-6 pt-4 border-t border-slate-700">
+          <button onclick="submitProposal()" id="submitBtn" 
+                  class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-3"
+                  disabled>
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+            SUBMIT PROPOSAL
+          </button>
+          <p class="text-center text-xs text-gray-500 mt-2">Complete all checklist items to enable submission</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROI Calculator & Timeline -->
+    <div class="col-span-1 space-y-4">
+      <!-- ROI Calculator -->
+      <div class="card p-4">
+        <h3 class="font-semibold mb-4">ROI Calculator</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Contract Value ($)</label>
+            <input type="number" id="contractValue" placeholder="0" 
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"
+                   oninput="calculateROI()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Win Probability (%)</label>
+            <input type="number" id="pWin" placeholder="50" min="0" max="100"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"
+                   oninput="calculateROI()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Labor Hours</label>
+            <input type="number" id="laborHours" placeholder="0"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"
+                   oninput="calculateROI()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Hourly Rate ($)</label>
+            <input type="number" id="hourlyRate" placeholder="150"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"
+                   oninput="calculateROI()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Other Costs ($)</label>
+            <input type="number" id="otherCosts" placeholder="0"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"
+                   oninput="calculateROI()">
+          </div>
+          <button onclick="saveROI()" class="w-full btn-primary py-2 rounded-lg">Save ROI Data</button>
+        </div>
+      </div>
+
+      <!-- Key Dates -->
+      <div class="card p-4">
+        <h3 class="font-semibold mb-4">Key Dates</h3>
+        <div class="space-y-3">
+          <div class="flex justify-between">
+            <span class="text-gray-400 text-sm">Questions Due</span>
+            <span id="questionsDue" class="text-sm font-mono">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-400 text-sm">Proposal Due</span>
+            <span id="proposalDue" class="text-sm font-mono text-cyan-400">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-400 text-sm">Expected Award</span>
+            <span id="expectedAward" class="text-sm font-mono">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-400 text-sm">Days Remaining</span>
+            <span id="daysRemaining" class="text-lg font-bold text-amber-400">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submission Log -->
+      <div class="card p-4">
+        <h3 class="font-semibold mb-4">Submission Log</h3>
+        <div id="submissionLog" class="space-y-2 text-sm">
+          <p class="text-gray-500">No submissions yet</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Checklist Item Modal -->
+  <div id="checklistModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-cyan-400">Add Checklist Item</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="checklistForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="itemId">
+        
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Item Description *</label>
+          <input type="text" id="itemDescription" required placeholder="Complete technical volume review"
+                 class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Category</label>
+            <select id="itemCategory" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="content">Content</option>
+              <option value="review">Review</option>
+              <option value="compliance">Compliance</option>
+              <option value="submission">Submission</option>
+              <option value="approval">Approval</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Assigned To</label>
+            <input type="text" id="itemAssignee" placeholder="Name"
+                   class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Due Date</label>
+          <input type="date" id="itemDueDate"
+                 class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">
+    AI GENERATED - REQUIRES HUMAN REVIEW | Shield & Pulse UX v8.0 | MissionPulse © 2026
+  </div>
+
+  <script src="supabase-client-v2.1.js"></script>
+  <script>
+    // ========== STATE ==========
+    let checklistItems = [];
+    let opportunities = [];
+    let currentOpportunity = null;
+    let editingId = null;
+
+    // ========== SUPABASE CONFIG ==========
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5MjI4NzQsImV4cCI6MjA1MzQ5ODg3NH0.xV3_Dlcj1PZUkEa4cJzJqv0PdCbHfwVoVEpmr1tRvo0';
+    
+    let supabase;
+    
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      const status = document.getElementById('connectionStatus');
+      status.innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    // ========== DATA LOADING ==========
+    async function loadOpportunities() {
+      try {
+        const { data, error } = await supabase.from('opportunities').select('*').order('title');
+        if (error) throw error;
+        opportunities = data || [];
+        
+        const select = document.getElementById('opportunityFilter');
+        select.innerHTML = `<option value="">Select Opportunity</option>` + 
+          opportunities.map(o => `<option value="${o.id}">${o.title}</option>`).join('');
+      } catch (err) {
+        console.error('Failed to load opportunities:', err);
+      }
+    }
+
+    async function loadChecklist() {
+      const oppId = document.getElementById('opportunityFilter').value;
+      if (!oppId) {
+        showEmptyState('Select an opportunity to view launch checklist');
+        return;
+      }
+      
+      currentOpportunity = opportunities.find(o => o.id === oppId);
+      
+      try {
+        const { data, error } = await supabase.from('launch_checklist')
+          .select('*')
+          .eq('opportunity_id', oppId)
+          .order('created_at');
+        
+        if (error) throw error;
+        
+        checklistItems = data || [];
+        
+        // If no items, add default checklist
+        if (checklistItems.length === 0) {
+          await addDefaultChecklist(oppId);
+          return;
+        }
+        
+        renderChecklist();
+        updateLaunchStatus();
+        loadOpportunityData();
+      } catch (err) {
+        console.error('Failed to load checklist:', err);
+        showEmptyState('Failed to load checklist');
+      }
+    }
+
+    async function addDefaultChecklist(oppId) {
+      const defaults = [
+        { description: 'Technical Volume - Final Review Complete', category: 'review' },
+        { description: 'Management Volume - Final Review Complete', category: 'review' },
+        { description: 'Past Performance - All References Verified', category: 'content' },
+        { description: 'Pricing - Final Numbers Approved', category: 'approval' },
+        { description: 'Compliance Matrix - 100% Mapped', category: 'compliance' },
+        { description: 'Executive Summary - CEO Approved', category: 'approval' },
+        { description: 'All CUI Markings Applied', category: 'compliance' },
+        { description: 'PDF Package Generated', category: 'submission' },
+        { description: 'Submission Portal Account Verified', category: 'submission' },
+        { description: 'Final Go/No-Go Decision Documented', category: 'approval' }
+      ];
+      
+      try {
+        for (const item of defaults) {
+          await supabase.from('launch_checklist').insert([{
+            opportunity_id: oppId,
+            description: item.description,
+            category: item.category,
+            is_complete: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
+        }
+        await loadChecklist();
+      } catch (err) {
+        console.error('Failed to add default checklist:', err);
+      }
+    }
+
+    function loadOpportunityData() {
+      if (!currentOpportunity) return;
+      
+      // Update key dates
+      document.getElementById('proposalDue').textContent = formatDate(currentOpportunity.due_date) || '-';
+      
+      // Calculate days remaining
+      if (currentOpportunity.due_date) {
+        const dueDate = new Date(currentOpportunity.due_date);
+        const today = new Date();
+        const days = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        document.getElementById('daysRemaining').textContent = days > 0 ? days : 'OVERDUE';
+        document.getElementById('daysRemaining').className = days > 7 ? 'text-lg font-bold text-green-400' : 
+          days > 0 ? 'text-lg font-bold text-amber-400' : 'text-lg font-bold text-red-400';
+      }
+      
+      // Load ROI data if exists
+      document.getElementById('contractValue').value = currentOpportunity.value || '';
+      document.getElementById('pWin').value = currentOpportunity.pwin || 50;
+      calculateROI();
+    }
+
+    // ========== RENDERING ==========
+    function renderChecklist() {
+      const container = document.getElementById('checklistContainer');
+      
+      if (checklistItems.length === 0) {
+        showEmptyState('No checklist items');
+        return;
+      }
+      
+      // Group by category
+      const categories = ['content', 'review', 'compliance', 'approval', 'submission'];
+      const categoryLabels = {
+        content: '📝 Content',
+        review: '👁️ Review',
+        compliance: '✅ Compliance',
+        approval: '🔒 Approvals',
+        submission: '🚀 Submission'
+      };
+      
+      let html = '';
+      for (const cat of categories) {
+        const items = checklistItems.filter(i => i.category === cat);
+        if (items.length === 0) continue;
+        
+        html += `<div class="mb-4">
+          <h4 class="text-sm font-semibold text-gray-400 mb-2">${categoryLabels[cat] || cat}</h4>
+          ${items.map(item => `
+            <div class="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg mb-2 status-${item.is_complete ? 'ready' : 'pending'}">
+              <input type="checkbox" ${item.is_complete ? 'checked' : ''} 
+                     onchange="toggleItem('${item.id}')"
+                     class="w-5 h-5 rounded border-slate-600 text-cyan-400 focus:ring-cyan-400">
+              <div class="flex-1">
+                <span class="${item.is_complete ? 'line-through text-gray-500' : ''}">${item.description}</span>
+                ${item.assigned_to ? `<span class="text-xs text-gray-500 ml-2">→ ${item.assigned_to}</span>` : ''}
+              </div>
+              ${item.due_date ? `<span class="text-xs text-gray-500">${formatDate(item.due_date)}</span>` : ''}
+              <button onclick="deleteItem('${item.id}')" class="text-red-400 hover:text-red-300 text-xs">✕</button>
+            </div>
+          `).join('')}
+        </div>`;
+      }
+      
+      container.innerHTML = html;
+    }
+
+    function showEmptyState(message) {
+      document.getElementById('checklistContainer').innerHTML = `
+        <div class="text-center py-8 text-gray-500">
+          <svg class="w-12 h-12 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+          </svg>
+          <p>${message}</p>
+        </div>
+      `;
+    }
+
+    function updateLaunchStatus() {
+      const complete = checklistItems.filter(i => i.is_complete).length;
+      const total = checklistItems.length;
+      const allComplete = total > 0 && complete === total;
+      
+      document.getElementById('checklistProgress').textContent = `${complete}/${total} items complete`;
+      document.getElementById('launchStatus').textContent = allComplete ? 'READY' : 'PENDING';
+      document.getElementById('launchStatus').className = allComplete ? 'text-2xl font-bold text-green-400' : 'text-2xl font-bold text-amber-400';
+      document.getElementById('launchIcon').textContent = allComplete ? '🚀' : '⏳';
+      document.getElementById('launchIcon').className = allComplete ? 'launch-ready' : '';
+      
+      document.getElementById('submitBtn').disabled = !allComplete;
+    }
+
+    function formatDate(date) {
+      if (!date) return null;
+      return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // ========== ROI CALCULATOR ==========
+    function calculateROI() {
+      const contractValue = parseFloat(document.getElementById('contractValue').value) || 0;
+      const pWin = parseFloat(document.getElementById('pWin').value) || 0;
+      const laborHours = parseFloat(document.getElementById('laborHours').value) || 0;
+      const hourlyRate = parseFloat(document.getElementById('hourlyRate').value) || 150;
+      const otherCosts = parseFloat(document.getElementById('otherCosts').value) || 0;
+      
+      const laborCost = laborHours * hourlyRate;
+      const totalCost = laborCost + otherCosts;
+      const expectedValue = contractValue * (pWin / 100);
+      const roi = totalCost > 0 ? ((expectedValue - totalCost) / totalCost) * 100 : 0;
+      
+      document.getElementById('proposalCost').textContent = '$' + totalCost.toLocaleString();
+      document.getElementById('expectedValue').textContent = '$' + Math.round(expectedValue).toLocaleString();
+      document.getElementById('roiPercent').textContent = Math.round(roi) + '%';
+      
+      // Color code ROI
+      const roiEl = document.getElementById('roiPercent');
+      roiEl.className = roi > 500 ? 'text-2xl font-bold text-green-400' : 
+        roi > 100 ? 'text-2xl font-bold text-cyan-400' :
+        roi > 0 ? 'text-2xl font-bold text-amber-400' : 'text-2xl font-bold text-red-400';
+    }
+
+    async function saveROI() {
+      const oppId = document.getElementById('opportunityFilter').value;
+      if (!oppId) {
+        alert('Select an opportunity first');
+        return;
+      }
+      
+      try {
+        const { error } = await supabase.from('launch_roi').upsert([{
+          opportunity_id: oppId,
+          contract_value: parseFloat(document.getElementById('contractValue').value) || 0,
+          pwin: parseFloat(document.getElementById('pWin').value) || 0,
+          labor_hours: parseFloat(document.getElementById('laborHours').value) || 0,
+          hourly_rate: parseFloat(document.getElementById('hourlyRate').value) || 150,
+          other_costs: parseFloat(document.getElementById('otherCosts').value) || 0,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'opportunity_id' });
+        
+        if (error) throw error;
+        alert('ROI data saved!');
+      } catch (err) {
+        console.error('Failed to save ROI:', err);
+        alert('Failed to save: ' + err.message);
+      }
+    }
+
+    // ========== CHECKLIST ACTIONS ==========
+    async function toggleItem(id) {
+      const item = checklistItems.find(i => i.id === id);
+      if (!item) return;
+      
+      try {
+        const { error } = await supabase.from('launch_checklist')
+          .update({ 
+            is_complete: !item.is_complete,
+            completed_at: !item.is_complete ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        item.is_complete = !item.is_complete;
+        renderChecklist();
+        updateLaunchStatus();
+      } catch (err) {
+        console.error('Failed to toggle item:', err);
+      }
+    }
+
+    async function deleteItem(id) {
+      if (!confirm('Delete this checklist item?')) return;
+      try {
+        const { error } = await supabase.from('launch_checklist').delete().eq('id', id);
+        if (error) throw error;
+        checklistItems = checklistItems.filter(i => i.id !== id);
+        renderChecklist();
+        updateLaunchStatus();
+      } catch (err) {
+        console.error('Failed to delete:', err);
+      }
+    }
+
+    // ========== MODAL HANDLERS ==========
+    function openAddModal() {
+      if (!document.getElementById('opportunityFilter').value) {
+        alert('Select an opportunity first');
+        return;
+      }
+      editingId = null;
+      document.getElementById('checklistForm').reset();
+      document.getElementById('checklistModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('checklistModal').classList.add('hidden');
+      editingId = null;
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      const oppId = document.getElementById('opportunityFilter').value;
+      const itemData = {
+        opportunity_id: oppId,
+        description: document.getElementById('itemDescription').value,
+        category: document.getElementById('itemCategory').value,
+        assigned_to: document.getElementById('itemAssignee').value || null,
+        due_date: document.getElementById('itemDueDate').value || null,
+        is_complete: false,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          const { error } = await supabase.from('launch_checklist').update(itemData).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          itemData.created_at = new Date().toISOString();
+          const { error } = await supabase.from('launch_checklist').insert([itemData]);
+          if (error) throw error;
+        }
+        
+        closeModal();
+        await loadChecklist();
+      } catch (err) {
+        console.error('Failed to save item:', err);
+        alert('Failed to save: ' + err.message);
+      }
+    }
+
+    // ========== SUBMISSION ==========
+    async function submitProposal() {
+      if (!confirm('🚀 Submit proposal?\n\nThis will log the submission and update the opportunity status.')) return;
+      
+      const oppId = document.getElementById('opportunityFilter').value;
+      
+      try {
+        // Update opportunity status
+        await supabase.from('opportunities')
+          .update({ status: 'Submitted', updated_at: new Date().toISOString() })
+          .eq('id', oppId);
+        
+        // Log submission
+        await supabase.from('submission_log').insert([{
+          opportunity_id: oppId,
+          submitted_at: new Date().toISOString(),
+          submitted_by: 'System User',
+          submission_method: 'Electronic',
+          confirmation_number: 'SUB-' + Date.now()
+        }]);
+        
+        alert('🎉 Proposal submitted successfully!\n\nGood luck!');
+        loadSubmissionLog();
+      } catch (err) {
+        console.error('Failed to submit:', err);
+        alert('Failed to record submission: ' + err.message);
+      }
+    }
+
+    async function loadSubmissionLog() {
+      const oppId = document.getElementById('opportunityFilter').value;
+      if (!oppId) return;
+      
+      try {
+        const { data, error } = await supabase.from('submission_log')
+          .select('*')
+          .eq('opportunity_id', oppId)
+          .order('submitted_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        const logEl = document.getElementById('submissionLog');
+        if (!data || data.length === 0) {
+          logEl.innerHTML = '<p class="text-gray-500">No submissions yet</p>';
+          return;
+        }
+        
+        logEl.innerHTML = data.map(s => `
+          <div class="p-2 bg-slate-800 rounded">
+            <div class="flex justify-between">
+              <span class="text-green-400">✓ Submitted</span>
+              <span class="text-gray-500 text-xs">${formatDate(s.submitted_at)}</span>
+            </div>
+            <div class="text-xs text-gray-400">${s.confirmation_number || ''}</div>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error('Failed to load submission log:', err);
+      }
+    }
+
+    // ========== REAL-TIME ==========
+    function subscribeToChanges() {
+      supabase
+        .channel('launch_checklist_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_checklist' }, () => {
+          loadChecklist();
+        })
+        .subscribe();
+    }
+
+    // ========== EVENT LISTENERS ==========
+    document.getElementById('opportunityFilter').addEventListener('change', () => {
+      loadChecklist();
+      loadSubmissionLog();
+    });
+
+    // ========== INIT ==========
+    async function init() {
+      if (!initSupabase()) {
+        updateConnectionStatus(false);
+        return;
+      }
+      await loadOpportunities();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
