@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Past Performance</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .cpars-exceptional { border-left: 4px solid #10B981; }
+    .cpars-very-good { border-left: 4px solid #22D3EE; }
+    .cpars-satisfactory { border-left: 4px solid #F59E0B; }
+    .cpars-marginal { border-left: 4px solid #F97316; }
+    .cpars-unsatisfactory { border-left: 4px solid #EF4444; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Past</span> Performance</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ Add Reference</button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-5 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Total References</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statExceptional" class="text-3xl font-bold text-green-400">0</div>
+      <div class="text-gray-400 text-sm">Exceptional</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statVeryGood" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Very Good</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statTotalValue" class="text-2xl font-bold text-purple-400">$0</div>
+      <div class="text-gray-400 text-sm">Total Value</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statTimesUsed" class="text-3xl font-bold text-amber-400">0</div>
+      <div class="text-gray-400 text-sm">Times Used</div>
+    </div>
+  </div>
+
+  <!-- Search & Filters -->
+  <div class="card p-4 mb-6">
+    <div class="flex gap-4">
+      <input type="text" id="searchInput" placeholder="Search contracts..." class="flex-1 bg-slate-800 border border-slate-600 rounded px-4 py-2" oninput="filterReferences()">
+      <select id="cparsFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2" onchange="filterReferences()">
+        <option value="">All CPARS</option>
+        <option value="Exceptional">Exceptional</option>
+        <option value="Very Good">Very Good</option>
+        <option value="Satisfactory">Satisfactory</option>
+      </select>
+      <select id="primeSubFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2" onchange="filterReferences()">
+        <option value="">Prime/Sub</option>
+        <option value="Prime">Prime</option>
+        <option value="Sub">Subcontractor</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- References Grid -->
+  <div id="referencesContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card p-8 text-center text-gray-500 col-span-full">Loading references...</div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="refModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Reference</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="refForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="refId">
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Contract Name *</label>
+            <input type="text" id="contractName" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Contract Number</label>
+            <input type="text" id="contractNumber" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Client Agency *</label>
+            <input type="text" id="clientAgency" required placeholder="VA, DHA, CMS..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Client Office</label>
+            <input type="text" id="clientOffice" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Contract Type</label>
+            <select id="contractType" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="">Select...</option>
+              <option value="FFP">FFP</option>
+              <option value="T&M">T&M</option>
+              <option value="CPFF">CPFF</option>
+              <option value="CPAF">CPAF</option>
+              <option value="IDIQ">IDIQ</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Prime or Sub</label>
+            <select id="primeOrSub" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="Prime">Prime</option>
+              <option value="Sub">Subcontractor</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">CPARS Rating</label>
+            <select id="cparsRating" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="">Select...</option>
+              <option value="Exceptional">Exceptional</option>
+              <option value="Very Good">Very Good</option>
+              <option value="Satisfactory">Satisfactory</option>
+              <option value="Marginal">Marginal</option>
+              <option value="Unsatisfactory">Unsatisfactory</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">PoP Start</label>
+            <input type="date" id="popStart" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">PoP End</label>
+            <input type="date" id="popEnd" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Total Contract Value ($)</label>
+            <input type="number" id="totalValue" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Our Value ($)</label>
+            <input type="number" id="ourValue" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Performance Summary</label>
+          <textarea id="perfSummary" rows="3" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Key Accomplishments</label>
+          <textarea id="keyAccomplishments" rows="2" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Technical Areas</label>
+            <input type="text" id="technicalAreas" placeholder="Healthcare IT, Cloud, Cyber..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Relevance Tags</label>
+            <input type="text" id="relevanceTags" placeholder="EHR, VA, Agile..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Reference</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    let supabase, allReferences = [], editingId = null;
+
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      document.getElementById('connectionStatus').innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    async function loadReferences() {
+      try {
+        const { data, error } = await supabase.from('past_performance').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        allReferences = data || [];
+        filterReferences();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load:', err);
+        showEmptyState('Failed to load references');
+      }
+    }
+
+    function filterReferences() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const cparsFilter = document.getElementById('cparsFilter').value;
+      const primeSubFilter = document.getElementById('primeSubFilter').value;
+      
+      const filtered = allReferences.filter(r => {
+        const matchesSearch = !search || 
+          r.contract_name?.toLowerCase().includes(search) ||
+          r.client_agency?.toLowerCase().includes(search) ||
+          r.technical_areas?.toLowerCase().includes(search);
+        const matchesCpars = !cparsFilter || r.cpars_rating === cparsFilter;
+        const matchesPrimeSub = !primeSubFilter || r.prime_or_sub === primeSubFilter;
+        return matchesSearch && matchesCpars && matchesPrimeSub;
+      });
+      renderReferences(filtered);
+    }
+
+    function renderReferences(refs) {
+      const container = document.getElementById('referencesContainer');
+      if (refs.length === 0) { showEmptyState('No references found'); return; }
+      
+      container.innerHTML = refs.map(r => `
+        <div class="card p-4 cpars-${(r.cpars_rating || '').toLowerCase().replace(' ', '-')} hover:border-cyan-400/50 cursor-pointer" onclick="openEditModal('${r.id}')">
+          <div class="flex items-start justify-between mb-2">
+            <div>
+              <h3 class="font-semibold">${r.contract_name || 'Unnamed'}</h3>
+              <span class="text-xs text-gray-500">${r.contract_number || ''}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-xs px-2 py-1 rounded ${getCparsClass(r.cpars_rating)}">${r.cpars_rating || 'N/A'}</span>
+              <div class="text-xs text-gray-500 mt-1">${r.prime_or_sub || ''}</div>
+            </div>
+          </div>
+          
+          <div class="text-sm text-cyan-400 mb-2">${r.client_agency || ''} ${r.client_office ? '- ' + r.client_office : ''}</div>
+          
+          <div class="grid grid-cols-2 gap-2 mb-3 text-sm">
+            <div>
+              <span class="text-gray-500">Value:</span> 
+              <span class="text-green-400">$${((r.our_contract_value || 0) / 1000000).toFixed(1)}M</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Used:</span> 
+              <span class="text-amber-400">${r.times_used || 0}x</span>
+            </div>
+          </div>
+          
+          ${r.performance_summary ? `<p class="text-xs text-gray-400 mb-2 line-clamp-2">${r.performance_summary}</p>` : ''}
+          ${r.technical_areas ? `<div class="text-xs text-cyan-400/70 mb-2">🔧 ${r.technical_areas}</div>` : ''}
+          
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
+            <span class="text-xs text-gray-500">${formatDateRange(r.period_of_performance_start, r.period_of_performance_end)}</span>
+            <button onclick="event.stopPropagation(); deleteRef('${r.id}')" class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showEmptyState(msg) {
+      document.getElementById('referencesContainer').innerHTML = `<div class="card p-8 text-center text-gray-500 col-span-full"><p>${msg}</p><button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Add First Reference</button></div>`;
+    }
+
+    function getCparsClass(rating) {
+      const c = { 'Exceptional': 'bg-green-500/20 text-green-400', 'Very Good': 'bg-cyan-500/20 text-cyan-400', 'Satisfactory': 'bg-amber-500/20 text-amber-400', 'Marginal': 'bg-orange-500/20 text-orange-400', 'Unsatisfactory': 'bg-red-500/20 text-red-400' };
+      return c[rating] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    function formatDateRange(start, end) {
+      if (!start && !end) return 'N/A';
+      const s = start ? new Date(start).getFullYear() : '?';
+      const e = end ? new Date(end).getFullYear() : 'Present';
+      return `${s} - ${e}`;
+    }
+
+    function updateStats() {
+      const exceptional = allReferences.filter(r => r.cpars_rating === 'Exceptional').length;
+      const veryGood = allReferences.filter(r => r.cpars_rating === 'Very Good').length;
+      const totalValue = allReferences.reduce((sum, r) => sum + (r.our_contract_value || 0), 0);
+      const timesUsed = allReferences.reduce((sum, r) => sum + (r.times_used || 0), 0);
+      
+      document.getElementById('statTotal').textContent = allReferences.length;
+      document.getElementById('statExceptional').textContent = exceptional;
+      document.getElementById('statVeryGood').textContent = veryGood;
+      document.getElementById('statTotalValue').textContent = '$' + (totalValue / 1000000).toFixed(0) + 'M';
+      document.getElementById('statTimesUsed').textContent = timesUsed;
+    }
+
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'Add Reference';
+      document.getElementById('refForm').reset();
+      document.getElementById('refModal').classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      const ref = allReferences.find(r => r.id === id);
+      if (!ref) return;
+      
+      editingId = id;
+      document.getElementById('modalTitle').textContent = 'Edit Reference';
+      document.getElementById('contractName').value = ref.contract_name || '';
+      document.getElementById('contractNumber').value = ref.contract_number || '';
+      document.getElementById('clientAgency').value = ref.client_agency || '';
+      document.getElementById('clientOffice').value = ref.client_office || '';
+      document.getElementById('contractType').value = ref.contract_type || '';
+      document.getElementById('primeOrSub').value = ref.prime_or_sub || 'Prime';
+      document.getElementById('cparsRating').value = ref.cpars_rating || '';
+      document.getElementById('popStart').value = ref.period_of_performance_start || '';
+      document.getElementById('popEnd').value = ref.period_of_performance_end || '';
+      document.getElementById('totalValue').value = ref.total_contract_value || '';
+      document.getElementById('ourValue').value = ref.our_contract_value || '';
+      document.getElementById('perfSummary').value = ref.performance_summary || '';
+      document.getElementById('keyAccomplishments').value = ref.key_accomplishments || '';
+      document.getElementById('technicalAreas').value = ref.technical_areas || '';
+      document.getElementById('relevanceTags').value = ref.relevance_tags || '';
+      document.getElementById('refModal').classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('refModal').classList.add('hidden'); editingId = null; }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      const data = {
+        contract_name: document.getElementById('contractName').value,
+        contract_number: document.getElementById('contractNumber').value || null,
+        client_agency: document.getElementById('clientAgency').value,
+        client_office: document.getElementById('clientOffice').value || null,
+        contract_type: document.getElementById('contractType').value || null,
+        prime_or_sub: document.getElementById('primeOrSub').value,
+        cpars_rating: document.getElementById('cparsRating').value || null,
+        period_of_performance_start: document.getElementById('popStart').value || null,
+        period_of_performance_end: document.getElementById('popEnd').value || null,
+        total_contract_value: parseInt(document.getElementById('totalValue').value) || null,
+        our_contract_value: parseInt(document.getElementById('ourValue').value) || null,
+        performance_summary: document.getElementById('perfSummary').value || null,
+        key_accomplishments: document.getElementById('keyAccomplishments').value || null,
+        technical_areas: document.getElementById('technicalAreas').value || null,
+        relevance_tags: document.getElementById('relevanceTags').value || null,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          const { error } = await supabase.from('past_performance').update(data).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          data.created_at = new Date().toISOString();
+          const { error } = await supabase.from('past_performance').insert([data]);
+          if (error) throw error;
+        }
+        closeModal();
+        await loadReferences();
+      } catch (err) { console.error('Failed to save:', err); alert('Failed to save: ' + err.message); }
+    }
+
+    async function deleteRef(id) {
+      if (!confirm('Delete this reference?')) return;
+      try {
+        const { error } = await supabase.from('past_performance').delete().eq('id', id);
+        if (error) throw error;
+        await loadReferences();
+      } catch (err) { console.error('Failed to delete:', err); }
+    }
+
+    function subscribeToChanges() {
+      supabase.channel('pp_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'past_performance' }, () => loadReferences()).subscribe();
+    }
+
+    async function init() {
+      if (!initSupabase()) { updateConnectionStatus(false); return; }
+      await loadReferences();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</body>
+</html>

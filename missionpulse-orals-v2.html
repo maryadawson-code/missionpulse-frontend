@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Orals Prep</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .status-scheduled { border-left: 4px solid #F59E0B; }
+    .status-completed { border-left: 4px solid #10B981; }
+    .status-cancelled { border-left: 4px solid #EF4444; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Orals</span> Prep</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">All Opportunities</option>
+      </select>
+      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ New Session</button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Total Sessions</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statCompleted" class="text-3xl font-bold text-green-400">0</div>
+      <div class="text-gray-400 text-sm">Completed</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statScheduled" class="text-3xl font-bold text-amber-400">0</div>
+      <div class="text-gray-400 text-sm">Scheduled</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statAvgScore" class="text-3xl font-bold text-purple-400">-</div>
+      <div class="text-gray-400 text-sm">Avg Score</div>
+    </div>
+  </div>
+
+  <!-- Sessions Grid -->
+  <div id="sessionsContainer" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="card p-8 text-center text-gray-500 col-span-full">Loading sessions...</div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="sessionModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-xl">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">New Session</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="sessionForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="sessionId">
+        
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Session Name *</label>
+          <input type="text" id="sessionName" required placeholder="Mock Orals Round 1" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Session Date *</label>
+            <input type="datetime-local" id="sessionDate" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Duration (minutes)</label>
+            <input type="number" id="durationMinutes" placeholder="60" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Status</label>
+            <select id="sessionStatus" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Overall Score (1-100)</label>
+            <input type="number" id="overallScore" min="0" max="100" placeholder="85" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Evaluator Notes</label>
+          <textarea id="evaluatorNotes" rows="4" placeholder="Feedback from evaluators..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Session</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    let supabase, allSessions = [], opportunities = [], editingId = null;
+
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      document.getElementById('connectionStatus').innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    async function loadOpportunities() {
+      try {
+        const { data } = await supabase.from('opportunities').select('id, title, name').order('title');
+        opportunities = data || [];
+        document.getElementById('opportunityFilter').innerHTML = `<option value="">All Opportunities</option>` + 
+          opportunities.map(o => `<option value="${o.id}">${o.title || o.name}</option>`).join('');
+      } catch (err) { console.error('Failed to load opportunities:', err); }
+    }
+
+    async function loadSessions() {
+      try {
+        const oppFilter = document.getElementById('opportunityFilter').value;
+        let query = supabase.from('orals_sessions').select('*').order('session_date', { ascending: false });
+        if (oppFilter) query = query.eq('opportunity_id', oppFilter);
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allSessions = data || [];
+        renderSessions();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load sessions:', err);
+        showEmptyState('Failed to load sessions');
+      }
+    }
+
+    function renderSessions() {
+      const container = document.getElementById('sessionsContainer');
+      if (allSessions.length === 0) { showEmptyState('No sessions found'); return; }
+      
+      container.innerHTML = allSessions.map(s => `
+        <div class="card p-4 status-${s.status || 'scheduled'} hover:border-cyan-400/50 cursor-pointer" onclick="openEditModal('${s.id}')">
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="font-semibold">${s.session_name || 'Untitled Session'}</h3>
+            <span class="text-xs px-2 py-1 rounded ${getStatusClass(s.status)}">${(s.status || 'scheduled').toUpperCase()}</span>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="bg-slate-800 rounded p-2 text-center">
+              <div class="text-lg font-bold text-cyan-400">${s.duration_minutes || '-'}</div>
+              <div class="text-xs text-gray-500">Minutes</div>
+            </div>
+            <div class="bg-slate-800 rounded p-2 text-center">
+              <div class="text-lg font-bold ${getScoreColor(s.overall_score)}">${s.overall_score || '-'}</div>
+              <div class="text-xs text-gray-500">Score</div>
+            </div>
+          </div>
+          
+          ${s.evaluator_notes ? `<p class="text-xs text-gray-400 mb-2 line-clamp-2">📝 ${s.evaluator_notes}</p>` : ''}
+          
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
+            <span class="text-xs text-gray-500">${formatDate(s.session_date)}</span>
+            <button onclick="event.stopPropagation(); deleteSession('${s.id}')" class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showEmptyState(msg) {
+      document.getElementById('sessionsContainer').innerHTML = `<div class="card p-8 text-center text-gray-500 col-span-full"><p>${msg}</p><button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Schedule First Session</button></div>`;
+    }
+
+    function getStatusClass(status) {
+      const c = { scheduled: 'bg-amber-500/20 text-amber-400', completed: 'bg-green-500/20 text-green-400', cancelled: 'bg-red-500/20 text-red-400' };
+      return c[status] || c.scheduled;
+    }
+
+    function getScoreColor(score) {
+      if (!score) return 'text-gray-400';
+      if (score >= 80) return 'text-green-400';
+      if (score >= 60) return 'text-amber-400';
+      return 'text-red-400';
+    }
+
+    function formatDate(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'; }
+
+    function updateStats() {
+      const completed = allSessions.filter(s => s.status === 'completed');
+      const scheduled = allSessions.filter(s => s.status === 'scheduled');
+      const scores = completed.filter(s => s.overall_score).map(s => s.overall_score);
+      const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+      
+      document.getElementById('statTotal').textContent = allSessions.length;
+      document.getElementById('statCompleted').textContent = completed.length;
+      document.getElementById('statScheduled').textContent = scheduled.length;
+      document.getElementById('statAvgScore').textContent = avgScore || '-';
+    }
+
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = 'New Session';
+      document.getElementById('sessionForm').reset();
+      document.getElementById('sessionModal').classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      const session = allSessions.find(s => s.id === id);
+      if (!session) return;
+      
+      editingId = id;
+      document.getElementById('modalTitle').textContent = 'Edit Session';
+      document.getElementById('sessionName').value = session.session_name || '';
+      document.getElementById('sessionDate').value = session.session_date ? session.session_date.slice(0, 16) : '';
+      document.getElementById('durationMinutes').value = session.duration_minutes || '';
+      document.getElementById('sessionStatus').value = session.status || 'scheduled';
+      document.getElementById('overallScore').value = session.overall_score || '';
+      document.getElementById('evaluatorNotes').value = session.evaluator_notes || '';
+      document.getElementById('sessionModal').classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('sessionModal').classList.add('hidden'); editingId = null; }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      const data = {
+        session_name: document.getElementById('sessionName').value,
+        session_date: document.getElementById('sessionDate').value,
+        duration_minutes: parseInt(document.getElementById('durationMinutes').value) || null,
+        status: document.getElementById('sessionStatus').value,
+        overall_score: parseInt(document.getElementById('overallScore').value) || null,
+        evaluator_notes: document.getElementById('evaluatorNotes').value || null,
+        opportunity_id: document.getElementById('opportunityFilter').value || null,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          const { error } = await supabase.from('orals_sessions').update(data).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          data.created_at = new Date().toISOString();
+          const { error } = await supabase.from('orals_sessions').insert([data]);
+          if (error) throw error;
+        }
+        closeModal();
+        await loadSessions();
+      } catch (err) { console.error('Failed to save:', err); alert('Failed to save: ' + err.message); }
+    }
+
+    async function deleteSession(id) {
+      if (!confirm('Delete this session?')) return;
+      try {
+        const { error } = await supabase.from('orals_sessions').delete().eq('id', id);
+        if (error) throw error;
+        await loadSessions();
+      } catch (err) { console.error('Failed to delete:', err); }
+    }
+
+    function subscribeToChanges() {
+      supabase.channel('orals_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'orals_sessions' }, () => loadSessions()).subscribe();
+    }
+
+    document.getElementById('opportunityFilter').addEventListener('change', loadSessions);
+
+    async function init() {
+      if (!initSupabase()) { updateConnectionStatus(false); return; }
+      await loadOpportunities();
+      await loadSessions();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</body>
+</html>
