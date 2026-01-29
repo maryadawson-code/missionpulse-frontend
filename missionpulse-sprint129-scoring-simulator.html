@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- FILE: missionpulse-sprint129-scoring-simulator.html -->
+    <!-- ROLE: Admin | User -->
+    <!-- SECURITY: env vars verified, no hardcoded keys -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposal Scoring Simulator | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mp-navy': '#00050F',
+                        'mp-cyan': '#00E5FA',
+                        'mp-slate': '#0A1628',
+                        'mp-dark': '#010510'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-border { background: linear-gradient(135deg, #00E5FA 0%, #0066FF 100%); padding: 1px; }
+        .glass-card { background: rgba(10, 22, 40, 0.8); backdrop-filter: blur(10px); }
+        .score-excellent { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+        .score-good { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .score-acceptable { background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%); }
+        .score-marginal { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+        .score-unacceptable { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    </style>
+</head>
+<body class="bg-mp-navy min-h-screen text-white">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // Evaluation Criteria (Section M)
+        const evaluationFactors = [
+            {
+                id: 'F1',
+                name: 'Technical Approach',
+                weight: 40,
+                subfactors: [
+                    { id: 'F1.1', name: 'Understanding of Requirements', weight: 15, score: 'Good', strengths: 2, weaknesses: 1, deficiencies: 0 },
+                    { id: 'F1.2', name: 'Technical Solution', weight: 15, score: 'Excellent', strengths: 4, weaknesses: 0, deficiencies: 0 },
+                    { id: 'F1.3', name: 'Innovation & Efficiency', weight: 10, score: 'Good', strengths: 2, weaknesses: 1, deficiencies: 0 }
+                ]
+            },
+            {
+                id: 'F2',
+                name: 'Management Approach',
+                weight: 25,
+                subfactors: [
+                    { id: 'F2.1', name: 'Program Management', weight: 10, score: 'Excellent', strengths: 3, weaknesses: 0, deficiencies: 0 },
+                    { id: 'F2.2', name: 'Staffing Plan', weight: 10, score: 'Acceptable', strengths: 1, weaknesses: 2, deficiencies: 0 },
+                    { id: 'F2.3', name: 'Quality Control', weight: 5, score: 'Good', strengths: 2, weaknesses: 1, deficiencies: 0 }
+                ]
+            },
+            {
+                id: 'F3',
+                name: 'Past Performance',
+                weight: 20,
+                subfactors: [
+                    { id: 'F3.1', name: 'Relevance', weight: 10, score: 'Excellent', strengths: 3, weaknesses: 0, deficiencies: 0 },
+                    { id: 'F3.2', name: 'Quality of Performance', weight: 10, score: 'Good', strengths: 2, weaknesses: 1, deficiencies: 0 }
+                ]
+            },
+            {
+                id: 'F4',
+                name: 'Price/Cost',
+                weight: 15,
+                subfactors: [
+                    { id: 'F4.1', name: 'Price Reasonableness', weight: 8, score: 'Good', strengths: 1, weaknesses: 1, deficiencies: 0 },
+                    { id: 'F4.2', name: 'Price Realism', weight: 7, score: 'Acceptable', strengths: 1, weaknesses: 2, deficiencies: 0 }
+                ]
+            }
+        ];
+
+        const strengthsWeaknesses = [
+            { id: 'SW-001', type: 'strength', factor: 'F1.2', title: 'FHIR R4 Implementation Experience', description: 'Demonstrated expertise in FHIR R4 interoperability with 5+ successful VA implementations', impact: 'significant', aiSuggestion: 'Emphasize this in Executive Summary' },
+            { id: 'SW-002', type: 'strength', factor: 'F2.1', title: 'PM with DHA EHRM Experience', description: 'Proposed PM led $45M DHA modernization program with 100% KPI achievement', impact: 'significant', aiSuggestion: 'Include testimonial letter if available' },
+            { id: 'SW-003', type: 'weakness', factor: 'F1.1', title: 'Unclear Transition Approach', description: 'Section 3.4 lacks specific timeline for legacy system cutover', impact: 'minor', aiSuggestion: 'Add detailed 90-day transition timeline with milestones' },
+            { id: 'SW-004', type: 'weakness', factor: 'F2.2', title: 'Key Personnel Gap', description: 'No identified backup for Clinical SME role during Option Years', impact: 'significant', aiSuggestion: 'Add succession plan or partner clinical resource' },
+            { id: 'SW-005', type: 'strength', factor: 'F3.1', title: 'Three Highly Relevant Contracts', description: 'All past performance refs are healthcare IT with same agency', impact: 'significant', aiSuggestion: 'Request CPARS excerpts for proposal' },
+            { id: 'SW-006', type: 'weakness', factor: 'F4.2', title: 'Below-Market Cloud Costs', description: 'Proposed AWS costs 15% below comparable GovCloud pricing', impact: 'minor', aiSuggestion: 'Add BOE justification for cloud pricing assumptions' },
+            { id: 'SW-007', type: 'strength', factor: 'F1.2', title: 'Zero Trust Architecture', description: 'Comprehensive ZTA approach aligned with DoD requirements', impact: 'significant', aiSuggestion: null },
+            { id: 'SW-008', type: 'weakness', factor: 'F2.2', title: 'High Subcontractor Dependency', description: '58% workshare to subs may raise performance risk concerns', impact: 'minor', aiSuggestion: 'Add oversight mechanisms for subcontractor performance' }
+        ];
+
+        const scoreColors = {
+            'Excellent': 'score-excellent',
+            'Good': 'score-good',
+            'Acceptable': 'score-acceptable',
+            'Marginal': 'score-marginal',
+            'Unacceptable': 'score-unacceptable'
+        };
+
+        const scoreValues = {
+            'Excellent': 5,
+            'Good': 4,
+            'Acceptable': 3,
+            'Marginal': 2,
+            'Unacceptable': 1
+        };
+
+        // Score Badge Component
+        function ScoreBadge({ score, size = 'md' }) {
+            const sizeClasses = {
+                sm: 'px-2 py-0.5 text-xs',
+                md: 'px-3 py-1 text-sm',
+                lg: 'px-4 py-2 text-base'
+            };
+            
+            return (
+                <span className={`${scoreColors[score]} rounded-full font-semibold ${sizeClasses[size]}`}>
+                    {score}
+                </span>
+            );
+        }
+
+        // Radar Chart Component (simplified)
+        function RadarChart({ factors }) {
+            const centerX = 150;
+            const centerY = 150;
+            const radius = 100;
+            const levels = 5;
+            
+            // Calculate points for each factor
+            const angleStep = (2 * Math.PI) / factors.length;
+            
+            return (
+                <svg width="300" height="300" className="mx-auto">
+                    {/* Background circles */}
+                    {[...Array(levels)].map((_, i) => (
+                        <circle
+                            key={i}
+                            cx={centerX}
+                            cy={centerY}
+                            r={(radius / levels) * (i + 1)}
+                            fill="none"
+                            stroke="#374151"
+                            strokeWidth="1"
+                        />
+                    ))}
+                    
+                    {/* Axis lines */}
+                    {factors.map((_, i) => {
+                        const angle = angleStep * i - Math.PI / 2;
+                        const x = centerX + radius * Math.cos(angle);
+                        const y = centerY + radius * Math.sin(angle);
+                        return (
+                            <line
+                                key={i}
+                                x1={centerX}
+                                y1={centerY}
+                                x2={x}
+                                y2={y}
+                                stroke="#374151"
+                                strokeWidth="1"
+                            />
+                        );
+                    })}
+                    
+                    {/* Data polygon */}
+                    <polygon
+                        points={factors.map((factor, i) => {
+                            const avgScore = factor.subfactors.reduce((sum, sf) => sum + scoreValues[sf.score], 0) / factor.subfactors.length;
+                            const angle = angleStep * i - Math.PI / 2;
+                            const r = (avgScore / 5) * radius;
+                            const x = centerX + r * Math.cos(angle);
+                            const y = centerY + r * Math.sin(angle);
+                            return `${x},${y}`;
+                        }).join(' ')}
+                        fill="rgba(0, 229, 250, 0.2)"
+                        stroke="#00E5FA"
+                        strokeWidth="2"
+                    />
+                    
+                    {/* Factor labels */}
+                    {factors.map((factor, i) => {
+                        const angle = angleStep * i - Math.PI / 2;
+                        const x = centerX + (radius + 30) * Math.cos(angle);
+                        const y = centerY + (radius + 30) * Math.sin(angle);
+                        return (
+                            <text
+                                key={i}
+                                x={x}
+                                y={y}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                className="fill-gray-400 text-xs"
+                            >
+                                {factor.name.split(' ')[0]}
+                            </text>
+                        );
+                    })}
+                </svg>
+            );
+        }
+
+        // Factor Card Component
+        function FactorCard({ factor, onSubfactorClick }) {
+            const avgScore = factor.subfactors.reduce((sum, sf) => sum + scoreValues[sf.score], 0) / factor.subfactors.length;
+            const overallScore = avgScore >= 4.5 ? 'Excellent' : avgScore >= 3.5 ? 'Good' : avgScore >= 2.5 ? 'Acceptable' : avgScore >= 1.5 ? 'Marginal' : 'Unacceptable';
+            
+            return (
+                <div className="glass-card rounded-lg border border-gray-800 overflow-hidden">
+                    <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+                        <div>
+                            <h3 className="font-semibold">{factor.name}</h3>
+                            <span className="text-gray-500 text-sm">Weight: {factor.weight}%</span>
+                        </div>
+                        <ScoreBadge score={overallScore} size="md" />
+                    </div>
+                    <div className="divide-y divide-gray-800">
+                        {factor.subfactors.map(sf => (
+                            <div 
+                                key={sf.id}
+                                onClick={() => onSubfactorClick(sf)}
+                                className="p-3 hover:bg-mp-slate/50 cursor-pointer transition-colors"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm">{sf.name}</span>
+                                    <ScoreBadge score={sf.score} size="sm" />
+                                </div>
+                                <div className="flex items-center gap-4 text-xs">
+                                    <span className="text-green-400">+{sf.strengths} Strengths</span>
+                                    <span className="text-yellow-400">-{sf.weaknesses} Weaknesses</span>
+                                    {sf.deficiencies > 0 && (
+                                        <span className="text-red-400">!{sf.deficiencies} Deficiencies</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Strength/Weakness Item
+        function SWItem({ item }) {
+            const isStrength = item.type === 'strength';
+            
+            return (
+                <div className={`glass-card rounded-lg border p-4 ${isStrength ? 'border-green-500/30' : 'border-yellow-500/30'}`}>
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-lg ${isStrength ? 'text-green-400' : 'text-yellow-400'}`}>
+                                {isStrength ? '✓' : '⚠'}
+                            </span>
+                            <div>
+                                <span className={`text-xs px-2 py-0.5 rounded ${isStrength ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                    {isStrength ? 'Strength' : 'Weakness'}
+                                </span>
+                                <span className="text-xs text-gray-500 ml-2">{item.factor}</span>
+                            </div>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded ${item.impact === 'significant' ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                            {item.impact}
+                        </span>
+                    </div>
+                    <h4 className="font-medium mb-1">{item.title}</h4>
+                    <p className="text-gray-400 text-sm mb-3">{item.description}</p>
+                    {item.aiSuggestion && (
+                        <div className="p-2 bg-mp-cyan/10 border border-mp-cyan/30 rounded text-sm">
+                            <span className="text-mp-cyan font-medium">💡 AI Suggestion:</span>
+                            <span className="text-gray-300 ml-2">{item.aiSuggestion}</span>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [activeTab, setActiveTab] = useState('overview');
+            const [selectedSubfactor, setSelectedSubfactor] = useState(null);
+            const [showSimulation, setShowSimulation] = useState(false);
+
+            const totalStrengths = strengthsWeaknesses.filter(s => s.type === 'strength').length;
+            const totalWeaknesses = strengthsWeaknesses.filter(s => s.type === 'weakness').length;
+            const significantWeaknesses = strengthsWeaknesses.filter(s => s.type === 'weakness' && s.impact === 'significant').length;
+
+            // Calculate overall score
+            const overallScore = useMemo(() => {
+                let weightedSum = 0;
+                let totalWeight = 0;
+                
+                evaluationFactors.forEach(factor => {
+                    const avgScore = factor.subfactors.reduce((sum, sf) => sum + scoreValues[sf.score], 0) / factor.subfactors.length;
+                    weightedSum += avgScore * factor.weight;
+                    totalWeight += factor.weight;
+                });
+                
+                return (weightedSum / totalWeight).toFixed(2);
+            }, []);
+
+            const predictedRating = overallScore >= 4.5 ? 'Excellent' : overallScore >= 3.5 ? 'Good' : overallScore >= 2.5 ? 'Acceptable' : 'Marginal';
+            const winProbability = Math.min(95, Math.max(20, Math.round(overallScore * 18 + 5)));
+
+            return (
+                <div className="min-h-screen bg-mp-navy">
+                    {/* Header */}
+                    <header className="bg-mp-slate/50 border-b border-gray-800 px-6 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-gradient-to-br from-mp-cyan to-blue-600 rounded-lg flex items-center justify-center">
+                                    <span className="text-xl">🎯</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold">Proposal Scoring Simulator</h1>
+                                    <p className="text-gray-400 text-sm">Mock Evaluation Against Section M Criteria</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
+                                    Export Report
+                                </button>
+                                <button 
+                                    onClick={() => setShowSimulation(true)}
+                                    className="px-4 py-2 bg-mp-cyan text-mp-navy font-semibold rounded-lg hover:bg-mp-cyan/80 transition-colors"
+                                >
+                                    Run Simulation
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="p-6">
+                        {/* Score Summary */}
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+                            <div className="lg:col-span-1">
+                                <div className="gradient-border rounded-lg h-full">
+                                    <div className="glass-card rounded-lg p-6 h-full flex flex-col items-center justify-center">
+                                        <div className="text-gray-400 text-sm mb-2">Predicted Rating</div>
+                                        <ScoreBadge score={predictedRating} size="lg" />
+                                        <div className="text-4xl font-bold mt-3">{overallScore}</div>
+                                        <div className="text-gray-500 text-sm">out of 5.0</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="lg:col-span-1">
+                                <div className="gradient-border rounded-lg h-full">
+                                    <div className="glass-card rounded-lg p-6 h-full flex flex-col items-center justify-center">
+                                        <div className="text-gray-400 text-sm mb-2">Win Probability</div>
+                                        <div className="text-5xl font-bold text-mp-cyan">{winProbability}%</div>
+                                        <div className="w-full bg-gray-700 rounded-full h-2 mt-3">
+                                            <div 
+                                                className="h-2 rounded-full bg-gradient-to-r from-mp-cyan to-blue-500"
+                                                style={{ width: `${winProbability}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="lg:col-span-2">
+                                <div className="grid grid-cols-3 gap-4 h-full">
+                                    <div className="glass-card rounded-lg border border-gray-800 p-4 flex flex-col items-center justify-center">
+                                        <div className="text-3xl font-bold text-green-400">{totalStrengths}</div>
+                                        <div className="text-gray-400 text-sm">Strengths</div>
+                                    </div>
+                                    <div className="glass-card rounded-lg border border-gray-800 p-4 flex flex-col items-center justify-center">
+                                        <div className="text-3xl font-bold text-yellow-400">{totalWeaknesses}</div>
+                                        <div className="text-gray-400 text-sm">Weaknesses</div>
+                                    </div>
+                                    <div className="glass-card rounded-lg border border-gray-800 p-4 flex flex-col items-center justify-center">
+                                        <div className="text-3xl font-bold text-red-400">{significantWeaknesses}</div>
+                                        <div className="text-gray-400 text-sm">Significant</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex gap-2 mb-6">
+                            {['overview', 'factors', 'findings'].map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        activeTab === tab 
+                                            ? 'bg-mp-cyan text-mp-navy' 
+                                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    {tab === 'overview' && '📊 Score Overview'}
+                                    {tab === 'factors' && '📋 Evaluation Factors'}
+                                    {tab === 'findings' && '🔍 Findings'}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab Content */}
+                        {activeTab === 'overview' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="glass-card rounded-lg border border-gray-800 p-6">
+                                    <h3 className="text-lg font-semibold mb-4">Score Distribution</h3>
+                                    <RadarChart factors={evaluationFactors} />
+                                </div>
+                                <div className="glass-card rounded-lg border border-gray-800 p-6">
+                                    <h3 className="text-lg font-semibold mb-4">Factor Breakdown</h3>
+                                    <div className="space-y-4">
+                                        {evaluationFactors.map(factor => {
+                                            const avgScore = factor.subfactors.reduce((sum, sf) => sum + scoreValues[sf.score], 0) / factor.subfactors.length;
+                                            const percentage = (avgScore / 5) * 100;
+                                            return (
+                                                <div key={factor.id}>
+                                                    <div className="flex justify-between text-sm mb-1">
+                                                        <span className="text-gray-400">{factor.name}</span>
+                                                        <span className="text-mp-cyan font-mono">{avgScore.toFixed(1)}/5.0</span>
+                                                    </div>
+                                                    <div className="bg-gray-700 rounded-full h-3">
+                                                        <div 
+                                                            className={`h-3 rounded-full ${percentage >= 80 ? 'bg-green-500' : percentage >= 60 ? 'bg-blue-500' : percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                                            style={{ width: `${percentage}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                
+                                {/* AI Recommendations */}
+                                <div className="lg:col-span-2 glass-card rounded-lg border border-gray-800 p-6">
+                                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                        <span>🤖</span> AI Recommendations to Improve Score
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                                            <div className="text-green-400 font-medium mb-2">High Impact</div>
+                                            <p className="text-gray-300 text-sm">Add detailed 90-day transition timeline to Section 3.4 (+0.3 Technical score)</p>
+                                        </div>
+                                        <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                                            <div className="text-yellow-400 font-medium mb-2">Medium Impact</div>
+                                            <p className="text-gray-300 text-sm">Include Clinical SME succession plan in Staffing (+0.2 Management score)</p>
+                                        </div>
+                                        <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                            <div className="text-blue-400 font-medium mb-2">Quick Win</div>
+                                            <p className="text-gray-300 text-sm">Add BOE justification for cloud pricing assumptions (+0.1 Cost score)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'factors' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {evaluationFactors.map(factor => (
+                                    <FactorCard 
+                                        key={factor.id}
+                                        factor={factor}
+                                        onSubfactorClick={setSelectedSubfactor}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
+                        {activeTab === 'findings' && (
+                            <div className="space-y-4">
+                                <div className="flex gap-4 mb-4">
+                                    <button className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm">
+                                        Strengths ({totalStrengths})
+                                    </button>
+                                    <button className="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-lg text-sm">
+                                        Weaknesses ({totalWeaknesses})
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    {strengthsWeaknesses.map(item => (
+                                        <SWItem key={item.id} item={item} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Simulation Modal */}
+                    {showSimulation && (
+                        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                            <div className="glass-card rounded-lg border border-gray-800 p-6 max-w-2xl w-full mx-4">
+                                <h3 className="text-xl font-bold mb-4">🎯 Running Evaluation Simulation</h3>
+                                <div className="space-y-4 mb-6">
+                                    {evaluationFactors.map((factor, idx) => (
+                                        <div key={factor.id}>
+                                            <div className="flex justify-between text-sm mb-1">
+                                                <span>{factor.name}</span>
+                                                <span className="text-mp-cyan">Evaluating...</span>
+                                            </div>
+                                            <div className="bg-gray-700 rounded-full h-2 overflow-hidden">
+                                                <div 
+                                                    className="h-2 bg-mp-cyan rounded-full animate-pulse"
+                                                    style={{ 
+                                                        width: '100%',
+                                                        animation: `pulse 1s ease-in-out ${idx * 0.2}s infinite`
+                                                    }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-4 bg-mp-slate rounded-lg text-center">
+                                    <p className="text-gray-400 text-sm mb-2">Simulation completes evaluation against Section M criteria</p>
+                                    <p className="text-gray-500 text-xs">AI evaluator trained on 500+ source selection decisions</p>
+                                </div>
+                                <div className="flex justify-end mt-6">
+                                    <button 
+                                        onClick={() => setShowSimulation(false)}
+                                        className="px-6 py-2 bg-mp-cyan text-mp-navy font-semibold rounded-lg hover:bg-mp-cyan/80 transition-colors"
+                                    >
+                                        View Results
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <footer className="border-t border-gray-800 px-6 py-4 mt-8">
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>MissionPulse v12 • Sprint 129</span>
+                            <span className="text-yellow-500/70">⚠️ AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                            <span>© 2025 Mission Meets Tech</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
