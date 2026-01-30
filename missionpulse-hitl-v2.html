@@ -1,335 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HITL Queue | MissionPulse</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { font-family: 'Inter', sans-serif; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0a1628; }
-        ::-webkit-scrollbar-thumb { background: #00E5FA; border-radius: 3px; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .status-pulse { animation: pulse 2s infinite; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HITL Queue | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:#00050F;color:#e2e8f0;min-height:100vh}.glass{background:rgba(15,23,42,0.85);backdrop-filter:blur(16px);border:1px solid rgba(0,229,250,0.1);border-radius:12px}</style>
 </head>
-<body class="bg-[#00050F] text-white min-h-screen">
-    <div id="root"></div>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect}=React;
+const SUPABASE_URL='https://qdrtpnpnhkxvfmvfziop.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+const supabase=window.supabase?.createClient(SUPABASE_URL,SUPABASE_ANON);
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+const AGENTS=['Capture','Strategy','Writer','Compliance','Pricing','Contracts','Orals','BlackHat'];
 
-        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+function HITLQueue(){
+  const[connected,setConnected]=useState(false);
+  const[queue,setQueue]=useState([]);
+  const[selected,setSelected]=useState(null);
+  const[filter,setFilter]=useState('pending');
 
-        const AI_AGENTS = [
-            { id: 'capture', name: 'Capture Agent', icon: '🎯' },
-            { id: 'strategy', name: 'Strategy Agent', icon: '♟️' },
-            { id: 'blackhat', name: 'Black Hat Agent', icon: '🎩' },
-            { id: 'pricing', name: 'Pricing Agent', icon: '💵' },
-            { id: 'compliance', name: 'Compliance Agent', icon: '📋' },
-            { id: 'writer', name: 'Writer Agent', icon: '✍️' },
-            { id: 'contracts', name: 'Contracts Agent', icon: '⚖️' },
-            { id: 'orals', name: 'Orals Agent', icon: '🎤' }
-        ];
+  useEffect(()=>{
+    const load=async()=>{
+      try{
+        const{data,error}=await supabase.from('ai_approvals').select('*').order('created_at',{ascending:false});
+        if(!error)setQueue(data||[]);
+        setConnected(!error);
+      }catch{setConnected(false)}
+    };
+    load();
+  },[]);
 
-        const STATUSES = ['pending', 'approved', 'rejected', 'edited'];
+  const updateStatus=async(id,status)=>{
+    try{
+      await supabase.from('ai_approvals').update({status,reviewed_at:new Date().toISOString()}).eq('id',id);
+      setQueue(queue.map(q=>q.id===id?{...q,status}:q));
+      setSelected(null);
+    }catch(e){alert('Error: '+e.message)}
+  };
 
-        const App = () => {
-            const [approvals, setApprovals] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [connected, setConnected] = useState(false);
-            const [filter, setFilter] = useState('pending');
-            const [selectedItem, setSelectedItem] = useState(null);
-            const [editedContent, setEditedContent] = useState('');
+  const filtered=filter==='all'?queue:queue.filter(q=>q.status===filter);
+  const agentColor={Capture:'bg-blue-500/20 text-blue-400',Strategy:'bg-purple-500/20 text-purple-400',Writer:'bg-cyan-500/20 text-cyan-400',Compliance:'bg-emerald-500/20 text-emerald-400',Pricing:'bg-amber-500/20 text-amber-400',Contracts:'bg-orange-500/20 text-orange-400',Orals:'bg-pink-500/20 text-pink-400',BlackHat:'bg-red-500/20 text-red-400'};
 
-            const loadApprovals = async () => {
-                setLoading(true);
-                try {
-                    const { data, error } = await supabase
-                        .from('ai_approvals')
-                        .select('*')
-                        .order('created_at', { ascending: false });
-                    
-                    if (!error) {
-                        setApprovals(data || []);
-                        setConnected(true);
-                    }
-                } catch (e) {
-                    console.error(e);
-                    // Use demo data if no connection
-                    setApprovals([
-                        { id: 1, agent_type: 'writer', content_type: 'Executive Summary', original_content: 'Our team brings 15+ years of healthcare IT experience...', ai_confidence: 92, status: 'pending', created_at: new Date().toISOString() },
-                        { id: 2, agent_type: 'pricing', content_type: 'Labor Rate Analysis', original_content: 'Based on GSA rates, recommended PM rate: $185/hr...', ai_confidence: 88, status: 'pending', created_at: new Date().toISOString() },
-                        { id: 3, agent_type: 'compliance', content_type: 'FAR Compliance Check', original_content: 'All FAR 52.212 clauses have been incorporated...', ai_confidence: 95, status: 'approved', created_at: new Date().toISOString() },
-                        { id: 4, agent_type: 'blackhat', content_type: 'Competitor Analysis', original_content: 'Primary competitor Acme Corp has incumbent advantage...', ai_confidence: 78, status: 'pending', created_at: new Date().toISOString() },
-                    ]);
-                    setConnected(false);
-                } finally {
-                    setLoading(false);
-                }
-            };
+  return(
+    <div className="min-h-screen p-6">
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-3">🤖 Human-in-the-Loop Queue<span className={`text-xs px-2 py-1 rounded ${connected?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'}`}>{connected?'● Live':'○ Demo'}</span></h1>
+          <p className="text-slate-400 text-sm mt-1">Review and approve AI-generated content</p>
+        </div>
+      </div>
 
-            useEffect(() => { loadApprovals(); }, []);
+      <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="glass p-4"><div className="text-slate-400 text-xs">Pending</div><div className="text-2xl font-bold text-amber-400">{queue.filter(q=>q.status==='pending').length}</div></div>
+        <div className="glass p-4"><div className="text-slate-400 text-xs">In Review</div><div className="text-2xl font-bold text-cyan-400">{queue.filter(q=>q.status==='review').length}</div></div>
+        <div className="glass p-4"><div className="text-slate-400 text-xs">Approved</div><div className="text-2xl font-bold text-emerald-400">{queue.filter(q=>q.status==='approved').length}</div></div>
+        <div className="glass p-4"><div className="text-slate-400 text-xs">Rejected</div><div className="text-2xl font-bold text-red-400">{queue.filter(q=>q.status==='rejected').length}</div></div>
+        <div className="glass p-4"><div className="text-slate-400 text-xs">Avg Confidence</div><div className="text-2xl font-bold text-purple-400">{queue.length?Math.round(queue.reduce((s,q)=>s+(q.confidence||0),0)/queue.length):0}%</div></div>
+      </div>
 
-            const filteredApprovals = useMemo(() => {
-                if (filter === 'all') return approvals;
-                return approvals.filter(a => a.status === filter);
-            }, [approvals, filter]);
+      <div className="flex gap-2 mb-4">
+        {['pending','review','approved','rejected','all'].map(f=>(
+          <button key={f} onClick={()=>setFilter(f)} className={`px-3 py-1.5 rounded-lg text-sm capitalize ${filter===f?'bg-cyan-500 text-white':'bg-slate-800 text-slate-400'}`}>{f}</button>
+        ))}
+      </div>
 
-            const stats = useMemo(() => ({
-                pending: approvals.filter(a => a.status === 'pending').length,
-                approved: approvals.filter(a => a.status === 'approved').length,
-                rejected: approvals.filter(a => a.status === 'rejected').length,
-                avgConfidence: approvals.length ? Math.round(approvals.reduce((sum, a) => sum + (a.ai_confidence || 0), 0) / approvals.length) : 0
-            }), [approvals]);
-
-            const handleApprove = async (id) => {
-                try {
-                    await supabase.from('ai_approvals').update({ 
-                        status: 'approved', 
-                        reviewed_at: new Date().toISOString(),
-                        reviewer: 'Mary Womack'
-                    }).eq('id', id);
-                    loadApprovals();
-                    setSelectedItem(null);
-                } catch (e) {
-                    // Demo mode
-                    setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'approved' } : a));
-                    setSelectedItem(null);
-                }
-            };
-
-            const handleReject = async (id) => {
-                try {
-                    await supabase.from('ai_approvals').update({ 
-                        status: 'rejected',
-                        reviewed_at: new Date().toISOString(),
-                        reviewer: 'Mary Womack'
-                    }).eq('id', id);
-                    loadApprovals();
-                    setSelectedItem(null);
-                } catch (e) {
-                    setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'rejected' } : a));
-                    setSelectedItem(null);
-                }
-            };
-
-            const handleEdit = async (id) => {
-                try {
-                    await supabase.from('ai_approvals').update({ 
-                        status: 'edited',
-                        edited_content: editedContent,
-                        reviewed_at: new Date().toISOString(),
-                        reviewer: 'Mary Womack'
-                    }).eq('id', id);
-                    loadApprovals();
-                    setSelectedItem(null);
-                } catch (e) {
-                    setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'edited', edited_content: editedContent } : a));
-                    setSelectedItem(null);
-                }
-            };
-
-            const getAgent = (type) => AI_AGENTS.find(a => a.id === type) || { name: type, icon: '🤖' };
-
-            const ConfidenceBadge = ({ score }) => {
-                const color = score >= 90 ? 'emerald' : score >= 70 ? 'amber' : 'red';
-                return (
-                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-${color}-500/20`}>
-                        <div className={`w-2 h-2 rounded-full bg-${color}-400`}></div>
-                        <span className={`text-${color}-400 text-sm font-medium`}>{score}%</span>
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-5">
+          <div className="glass p-4">
+            <h3 className="font-semibold text-white mb-3">Queue Items</h3>
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              {filtered.map(item=>(
+                <div key={item.id} onClick={()=>setSelected(item)} className={`p-3 rounded-lg cursor-pointer transition-all ${selected?.id===item.id?'bg-cyan-500/20 border border-cyan-500/50':'bg-slate-800/50 hover:bg-slate-700/50'}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${agentColor[item.agent]||'bg-slate-500/20 text-slate-400'}`}>{item.agent}</span>
+                      <div className="font-medium text-white text-sm mt-1">{item.title}</div>
+                      <div className="text-xs text-slate-500">{item.type}</div>
                     </div>
-                );
-            };
-
-            return (
-                <div className="min-h-screen bg-[#00050F] p-6">
-                    <div className="max-w-7xl mx-auto">
-                        {/* Header */}
-                        <div className="flex items-center justify-between mb-6">
-                            <div>
-                                <h1 className="text-2xl font-bold flex items-center gap-3">
-                                    <span className="text-3xl">👁️</span>
-                                    HITL Queue
-                                </h1>
-                                <p className="text-white/60 mt-1">Human-in-the-Loop AI approval system</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400'} status-pulse`}></div>
-                                    {connected ? 'Connected' : 'Demo Mode'}
-                                </div>
-                                <button onClick={loadApprovals} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">
-                                    🔄 Refresh
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Stats */}
-                        <div className="grid grid-cols-4 gap-4 mb-6">
-                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-amber-500/30">
-                                <div className="text-2xl font-bold text-amber-400">{stats.pending}</div>
-                                <div className="text-white/60 text-sm">Pending Review</div>
-                            </div>
-                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
-                                <div className="text-2xl font-bold text-emerald-400">{stats.approved}</div>
-                                <div className="text-white/60 text-sm">Approved</div>
-                            </div>
-                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
-                                <div className="text-2xl font-bold text-red-400">{stats.rejected}</div>
-                                <div className="text-white/60 text-sm">Rejected</div>
-                            </div>
-                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
-                                <div className="text-2xl font-bold text-[#00E5FA]">{stats.avgConfidence}%</div>
-                                <div className="text-white/60 text-sm">Avg Confidence</div>
-                            </div>
-                        </div>
-
-                        {/* Filters */}
-                        <div className="flex gap-2 mb-6">
-                            {['pending', 'approved', 'rejected', 'edited', 'all'].map(f => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className={`px-4 py-2 rounded-lg capitalize ${filter === f ? 'bg-[#00E5FA]/20 text-[#00E5FA]' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
-                                >
-                                    {f} {f === 'pending' && stats.pending > 0 && <span className="ml-1 px-1.5 py-0.5 bg-amber-500 text-[#00050F] rounded text-xs">{stats.pending}</span>}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Queue */}
-                        <div className="space-y-4">
-                            {loading ? (
-                                <div className="bg-[#0d1f3c] rounded-xl p-12 text-center border border-white/10">
-                                    <div className="text-white/50">Loading...</div>
-                                </div>
-                            ) : filteredApprovals.length === 0 ? (
-                                <div className="bg-[#0d1f3c] rounded-xl p-12 text-center border border-white/10">
-                                    <div className="text-4xl mb-4">✅</div>
-                                    <h3 className="font-semibold">Queue Clear</h3>
-                                    <p className="text-white/50">No {filter !== 'all' ? filter : ''} items to review</p>
-                                </div>
-                            ) : (
-                                filteredApprovals.map(item => {
-                                    const agent = getAgent(item.agent_type);
-                                    return (
-                                        <div key={item.id} className="bg-[#0d1f3c] rounded-xl border border-white/10 overflow-hidden hover:border-white/20 transition-all">
-                                            <div className="p-4 flex items-start gap-4">
-                                                <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
-                                                    {agent.icon}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <h3 className="font-semibold">{item.content_type}</h3>
-                                                        <span className="text-xs bg-white/10 px-2 py-0.5 rounded">{agent.name}</span>
-                                                        <span className={`text-xs px-2 py-0.5 rounded ${
-                                                            item.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
-                                                            item.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                            item.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
-                                                            'bg-blue-500/20 text-blue-400'
-                                                        }`}>
-                                                            {item.status}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-white/60 text-sm line-clamp-2">{item.original_content}</p>
-                                                    <div className="flex items-center gap-4 mt-3 text-xs text-white/40">
-                                                        <span>Created: {new Date(item.created_at).toLocaleString()}</span>
-                                                        {item.reviewed_at && <span>Reviewed: {new Date(item.reviewed_at).toLocaleString()}</span>}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-3 flex-shrink-0">
-                                                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
-                                                        item.ai_confidence >= 90 ? 'bg-emerald-500/20' :
-                                                        item.ai_confidence >= 70 ? 'bg-amber-500/20' : 'bg-red-500/20'
-                                                    }`}>
-                                                        <div className={`w-2 h-2 rounded-full ${
-                                                            item.ai_confidence >= 90 ? 'bg-emerald-400' :
-                                                            item.ai_confidence >= 70 ? 'bg-amber-400' : 'bg-red-400'
-                                                        }`}></div>
-                                                        <span className={`text-sm font-medium ${
-                                                            item.ai_confidence >= 90 ? 'text-emerald-400' :
-                                                            item.ai_confidence >= 70 ? 'text-amber-400' : 'text-red-400'
-                                                        }`}>{item.ai_confidence}%</span>
-                                                    </div>
-                                                    {item.status === 'pending' && (
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => handleApprove(item.id)} className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30" title="Approve">✓</button>
-                                                            <button onClick={() => { setSelectedItem(item); setEditedContent(item.original_content); }} className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30" title="Edit">✏️</button>
-                                                            <button onClick={() => handleReject(item.id)} className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30" title="Reject">✕</button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-
-                        {/* Edit Modal */}
-                        {selectedItem && (
-                            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6">
-                                <div className="bg-[#0d1f3c] rounded-xl w-full max-w-3xl border border-white/10 max-h-[90vh] overflow-y-auto">
-                                    <div className="p-6 border-b border-white/10">
-                                        <h2 className="text-xl font-bold">Review & Edit</h2>
-                                        <p className="text-white/60 text-sm mt-1">{selectedItem.content_type} from {getAgent(selectedItem.agent_type).name}</p>
-                                    </div>
-                                    <div className="p-6">
-                                        <div className="mb-4">
-                                            <label className="block text-sm text-white/60 mb-2">Original AI Output</label>
-                                            <div className="bg-[#00050F] p-4 rounded-lg text-white/70 text-sm border border-white/10">
-                                                {selectedItem.original_content}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm text-white/60 mb-2">Edit Content</label>
-                                            <textarea
-                                                value={editedContent}
-                                                onChange={(e) => setEditedContent(e.target.value)}
-                                                rows={8}
-                                                className="w-full bg-[#00050F] border border-white/10 rounded-lg p-4 text-white resize-none focus:border-[#00E5FA] focus:outline-none"
-                                            ></textarea>
-                                        </div>
-                                    </div>
-                                    <div className="p-6 border-t border-white/10 flex justify-between">
-                                        <button onClick={() => handleReject(selectedItem.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">
-                                            Reject
-                                        </button>
-                                        <div className="flex gap-3">
-                                            <button onClick={() => setSelectedItem(null)} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">
-                                                Cancel
-                                            </button>
-                                            <button onClick={() => handleApprove(selectedItem.id)} className="px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30">
-                                                Approve Original
-                                            </button>
-                                            <button onClick={() => handleEdit(selectedItem.id)} className="px-4 py-2 bg-[#00E5FA] text-[#00050F] rounded-lg font-medium">
-                                                Save Edits
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                    <div className="text-right">
+                      <div className={`text-xs ${item.confidence>=80?'text-emerald-400':item.confidence>=60?'text-amber-400':'text-red-400'}`}>{item.confidence}%</div>
                     </div>
-
-                    <div className="fixed bottom-0 left-0 right-0 bg-[#00050F]/90 border-t border-white/10 p-2 text-center text-xs text-white/40">
-                        AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026 Mission Meets Tech
-                    </div>
+                  </div>
                 </div>
-            );
-        };
+              ))}
+              {filtered.length===0&&<p className="text-slate-500 text-sm text-center py-4">No items in queue</p>}
+            </div>
+          </div>
+        </div>
 
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
+        <div className="col-span-7">
+          {selected?(
+            <div className="glass p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <span className={`text-xs px-2 py-0.5 rounded ${agentColor[selected.agent]}`}>{selected.agent} Agent</span>
+                  <h3 className="text-lg font-bold text-white mt-2">{selected.title}</h3>
+                  <p className="text-sm text-slate-400">{selected.type}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold" style={{color:selected.confidence>=80?'#34d399':selected.confidence>=60?'#fbbf24':'#f87171'}}>{selected.confidence}%</div>
+                  <div className="text-xs text-slate-500">Confidence</div>
+                </div>
+              </div>
+
+              <div className="bg-slate-800/50 rounded-lg p-4 mb-4 max-h-64 overflow-y-auto">
+                <div className="text-sm text-slate-300 whitespace-pre-wrap">{selected.content||'AI-generated content will appear here for review. This output was produced by the '+selected.agent+' Agent and requires human validation before use in the proposal.'}</div>
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2 text-amber-400 text-sm">
+                  <span>⚠️</span>
+                  <span>AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={()=>updateStatus(selected.id,'approved')} className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg">✓ Approve</button>
+                <button onClick={()=>updateStatus(selected.id,'review')} className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg">📝 Request Changes</button>
+                <button onClick={()=>updateStatus(selected.id,'rejected')} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg">✗ Reject</button>
+              </div>
+            </div>
+          ):(
+            <div className="glass p-12 text-center">
+              <span className="text-6xl">🤖</span>
+              <p className="text-slate-400 mt-4">Select an item to review</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="text-center text-xs text-slate-500 mt-8">AI GENERATED - REQUIRES HUMAN REVIEW | © 2026 Mission Meets Tech</div>
+    </div>
+  );
+}
+ReactDOM.render(<HITLQueue/>,document.getElementById('root'));
+</script>
 </body>
 </html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Health Check | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:#00050F;color:#e2e8f0;min-height:100vh}.glass{background:rgba(15,23,42,0.85);backdrop-filter:blur(16px);border:1px solid rgba(0,229,250,0.1);border-radius:12px}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect}=React;
+const SUPABASE_URL='https://qdrtpnpnhkxvfmvfziop.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+const API_URL='https://missionpulse-api.onrender.com';
+const supabase=window.supabase?.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+function HealthCheck(){
+  const[checks,setChecks]=useState([
+    {id:'supabase',name:'Supabase Database',status:'checking',latency:null},
+    {id:'api',name:'Render API',status:'checking',latency:null},
+    {id:'auth',name:'Authentication',status:'checking',latency:null},
+    {id:'storage',name:'File Storage',status:'checking',latency:null}
+  ]);
+  const[lastRun,setLastRun]=useState(null);
+
+  const runChecks=async()=>{
+    setChecks(c=>c.map(x=>({...x,status:'checking',latency:null})));
+
+    // Supabase
+    const sbStart=Date.now();
+    try{
+      const{error}=await supabase.from('opportunities').select('count').limit(1);
+      setChecks(c=>c.map(x=>x.id==='supabase'?{...x,status:error?'error':'healthy',latency:Date.now()-sbStart}:x));
+    }catch{
+      setChecks(c=>c.map(x=>x.id==='supabase'?{...x,status:'error',latency:Date.now()-sbStart}:x));
+    }
+
+    // API
+    const apiStart=Date.now();
+    try{
+      const res=await fetch(`${API_URL}/health`,{method:'GET',signal:AbortSignal.timeout(5000)});
+      setChecks(c=>c.map(x=>x.id==='api'?{...x,status:res.ok?'healthy':'degraded',latency:Date.now()-apiStart}:x));
+    }catch{
+      setChecks(c=>c.map(x=>x.id==='api'?{...x,status:'error',latency:Date.now()-apiStart}:x));
+    }
+
+    // Auth
+    const authStart=Date.now();
+    try{
+      const{data}=await supabase.auth.getSession();
+      setChecks(c=>c.map(x=>x.id==='auth'?{...x,status:'healthy',latency:Date.now()-authStart}:x));
+    }catch{
+      setChecks(c=>c.map(x=>x.id==='auth'?{...x,status:'degraded',latency:Date.now()-authStart}:x));
+    }
+
+    // Storage
+    const storageStart=Date.now();
+    try{
+      const{error}=await supabase.storage.listBuckets();
+      setChecks(c=>c.map(x=>x.id==='storage'?{...x,status:error?'degraded':'healthy',latency:Date.now()-storageStart}:x));
+    }catch{
+      setChecks(c=>c.map(x=>x.id==='storage'?{...x,status:'degraded',latency:Date.now()-storageStart}:x));
+    }
+
+    setLastRun(new Date().toLocaleString());
+  };
+
+  useEffect(()=>{runChecks()},[]);
+
+  const statusIcon={healthy:'✅',degraded:'⚠️',error:'❌',checking:'⏳'};
+  const statusColor={healthy:'text-emerald-400',degraded:'text-amber-400',error:'text-red-400',checking:'text-slate-400'};
+  const overallStatus=checks.every(c=>c.status==='healthy')?'healthy':checks.some(c=>c.status==='error')?'error':'degraded';
+
+  return(
+    <div className="min-h-screen p-6">
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            🏥 System Health Check
+            <span className={`text-xs px-2 py-1 rounded ${overallStatus==='healthy'?'bg-emerald-500/20 text-emerald-400':overallStatus==='error'?'bg-red-500/20 text-red-400':'bg-amber-500/20 text-amber-400'}`}>
+              {overallStatus.toUpperCase()}
+            </span>
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">System diagnostics and connectivity status</p>
+        </div>
+        <button onClick={runChecks} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg">
+          🔄 Run Diagnostics
+        </button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="glass p-4 text-center">
+          <div className="text-4xl mb-2">{statusIcon[overallStatus]}</div>
+          <div className="text-sm text-slate-400">Overall Status</div>
+          <div className={`font-bold ${statusColor[overallStatus]}`}>{overallStatus.toUpperCase()}</div>
+        </div>
+        <div className="glass p-4 text-center">
+          <div className="text-2xl font-bold text-emerald-400">{checks.filter(c=>c.status==='healthy').length}</div>
+          <div className="text-sm text-slate-400">Healthy Services</div>
+        </div>
+        <div className="glass p-4 text-center">
+          <div className="text-2xl font-bold text-amber-400">{checks.filter(c=>c.status==='degraded').length}</div>
+          <div className="text-sm text-slate-400">Degraded</div>
+        </div>
+        <div className="glass p-4 text-center">
+          <div className="text-2xl font-bold text-red-400">{checks.filter(c=>c.status==='error').length}</div>
+          <div className="text-sm text-slate-400">Errors</div>
+        </div>
+      </div>
+
+      <div className="glass overflow-hidden mb-6">
+        <div className="p-4 border-b border-slate-700/50">
+          <h3 className="font-semibold text-white">Service Status</h3>
+          {lastRun&&<p className="text-xs text-slate-500">Last checked: {lastRun}</p>}
+        </div>
+        <div className="divide-y divide-slate-700/30">
+          {checks.map(check=>(
+            <div key={check.id} className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{statusIcon[check.status]}</span>
+                <div>
+                  <div className="font-medium text-white">{check.name}</div>
+                  <div className="text-xs text-slate-500">{check.id==='supabase'?SUPABASE_URL:check.id==='api'?API_URL:'Internal Service'}</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={`font-medium ${statusColor[check.status]}`}>{check.status.toUpperCase()}</div>
+                {check.latency!==null&&<div className="text-xs text-slate-500">{check.latency}ms</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="glass p-4">
+          <h3 className="font-semibold text-white mb-3">Environment</h3>
+          <div className="space-y-2 text-sm">
+            {[
+              ['Platform','Netlify'],
+              ['Region','US East'],
+              ['Database','Supabase PostgreSQL'],
+              ['API Runtime','Node.js on Render'],
+              ['CDN','Netlify Edge']
+            ].map(([k,v])=>(
+              <div key={k} className="flex justify-between">
+                <span className="text-slate-400">{k}</span>
+                <span className="text-white">{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="glass p-4">
+          <h3 className="font-semibold text-white mb-3">Version Info</h3>
+          <div className="space-y-2 text-sm">
+            {[
+              ['Frontend','v3.0.0'],
+              ['API','v2.1.0'],
+              ['Database Schema','v18'],
+              ['Last Deploy','January 30, 2026'],
+              ['CMMC Compliance','Level 2']
+            ].map(([k,v])=>(
+              <div key={k} className="flex justify-between">
+                <span className="text-slate-400">{k}</span>
+                <span className="text-cyan-400 font-mono">{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="text-center text-xs text-slate-500 mt-8">AI GENERATED - REQUIRES HUMAN REVIEW | © 2026 Mission Meets Tech</div>
+    </div>
+  );
+}
+ReactDOM.render(<HealthCheck/>,document.getElementById('root'));
+</script>
+</body>
+</html>
