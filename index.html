@@ -24,31 +24,66 @@
     .animate-pulse{animation:pulse 2s infinite}
     .animate-spin{animation:spin 1s linear infinite}
     .hover-lift{transition:all 0.2s}.hover-lift:hover{transform:translateY(-2px);box-shadow:0 8px 25px -5px rgba(0,229,250,0.2)}
-    .drag-over{border:2px dashed #00E5FA !important;background:rgba(0,229,250,0.1) !important}
   </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const{useState,useEffect,useRef,useCallback}=React;
+const{useState,useEffect,useCallback}=React;
 
 // ============================================================
-// CONFIGURATION - Supabase Production
+// SUPABASE CONFIG
 // ============================================================
-const CONFIG={
-  SUPABASE_URL:'https://qdrtpnpnhkxvfmvfziop.supabase.co',
-  SUPABASE_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NTY2MzcsImV4cCI6MjA1MzMzMjYzN30.sMDrJpcLdKWJ3V8LV8FZMgblKYJ6rRZBKIxN_y7XdP8',
-  API_URL:'https://missionpulse-api.onrender.com'
-};
+const SUPABASE_URL='https://qdrtpnpnhkxvfmvfziop.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NTY2MzcsImV4cCI6MjA1MzMzMjYzN30.sMDrJpcLdKWJ3V8LV8FZMgblKYJ6rRZBKIxN_y7XdP8';
 let supabase=null;
-try{supabase=window.supabase?.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY)}catch(e){console.warn('Supabase init failed, using offline mode')}
+try{supabase=window.supabase?.createClient(SUPABASE_URL,SUPABASE_KEY)}catch(e){console.warn('Supabase init failed')}
 
 // ============================================================
-// 11 SHIPLEY ROLES
+// GLOBAL DATA HOOK - Centralized state with Supabase sync
+// ============================================================
+const useSupabaseTable=(table,defaultData=[],orderBy='created_at')=>{
+  const[data,setData]=useState(defaultData);
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState(null);
+
+  const load=useCallback(async()=>{
+    if(!supabase){setLoading(false);return}
+    try{
+      const{data:rows,error:e}=await supabase.from(table).select('*').order(orderBy,{ascending:false});
+      if(e)throw e;
+      if(rows?.length)setData(rows);
+    }catch(e){console.warn(`Load ${table} failed:`,e);setError(e)}
+    setLoading(false);
+  },[table,orderBy]);
+
+  const insert=async(row)=>{
+    const newRow={...row,id:row.id||crypto.randomUUID()};
+    setData(d=>[newRow,...d]);
+    if(supabase){try{await supabase.from(table).insert(newRow)}catch(e){console.warn(e)}}
+    return newRow;
+  };
+
+  const update=async(id,changes)=>{
+    setData(d=>d.map(r=>r.id===id?{...r,...changes}:r));
+    if(supabase){try{await supabase.from(table).update(changes).eq('id',id)}catch(e){console.warn(e)}}
+  };
+
+  const remove=async(id)=>{
+    setData(d=>d.filter(r=>r.id!==id));
+    if(supabase){try{await supabase.from(table).delete().eq('id',id)}catch(e){console.warn(e)}}
+  };
+
+  useEffect(()=>{load()},[load]);
+  return{data,setData,loading,error,load,insert,update,remove};
+};
+
+// ============================================================
+// ROLES & MODULES
 // ============================================================
 const ROLES=[
-  {id:'CEO',name:'CEO',fullName:'Mary Womack',icon:'👑',color:'#fbbf24',access:['dashboard','pipeline','warroom','swimlane','compliance','contracts','writer','blackhat','pricing','hitl','orals','frenemy','launch','post_award','playbook','admin','training','audit','winthemes','teaming','reports','lessons','settings']},
-  {id:'COO',name:'COO',fullName:'David Chen',icon:'💼',color:'#f97316',access:['dashboard','pipeline','warroom','swimlane','compliance','contracts','writer','pricing','hitl','frenemy','launch','post_award','playbook','training','winthemes','teaming','lessons']},
+  {id:'CEO',name:'CEO',fullName:'Mary Womack',icon:'👑',color:'#fbbf24',access:['dashboard','pipeline','warroom','swimlane','compliance','contracts','writer','blackhat','pricing','hitl','orals','frenemy','launch','post_award','playbook','admin','audit','winthemes','teaming','reports','lessons']},
+  {id:'COO',name:'COO',fullName:'David Chen',icon:'💼',color:'#f97316',access:['dashboard','pipeline','warroom','swimlane','compliance','contracts','writer','pricing','hitl','frenemy','launch','post_award','playbook','winthemes','teaming','lessons']},
   {id:'CAP',name:'Capture',fullName:'Michael Torres',icon:'🎯',color:'#f472b6',access:['dashboard','pipeline','warroom','swimlane','blackhat','frenemy','playbook','winthemes']},
   {id:'PM',name:'Proposal Mgr',fullName:'Lisa Martinez',icon:'📋',color:'#60a5fa',access:['dashboard','pipeline','warroom','swimlane','compliance','writer','hitl','orals','launch','post_award','playbook','lessons']},
   {id:'SA',name:'Solution Arch',fullName:'Sarah Chen',icon:'💻',color:'#22d3ee',access:['dashboard','writer','compliance','contracts','orals','playbook','winthemes']},
@@ -57,12 +92,9 @@ const ROLES=[
   {id:'DEL',name:'Delivery',fullName:'Amanda Foster',icon:'👥',color:'#fb7185',access:['dashboard','writer','post_award','orals','playbook','teaming']},
   {id:'QA',name:'QA Lead',fullName:'James Thompson',icon:'✅',color:'#2dd4bf',access:['dashboard','hitl','compliance','writer','playbook']},
   {id:'Partner',name:'Partner',fullName:'External',icon:'🤝',color:'#94a3b8',access:['frenemy','writer'],external:true},
-  {id:'Admin',name:'Admin',fullName:'System Admin',icon:'⚙️',color:'#cbd5e1',access:['dashboard','pipeline','warroom','swimlane','compliance','contracts','writer','blackhat','pricing','hitl','orals','frenemy','launch','post_award','playbook','admin','training','audit','winthemes','teaming','reports','lessons','settings']}
+  {id:'Admin',name:'Admin',fullName:'System Admin',icon:'⚙️',color:'#cbd5e1',access:['dashboard','pipeline','warroom','swimlane','compliance','contracts','writer','blackhat','pricing','hitl','orals','frenemy','launch','post_award','playbook','admin','audit','winthemes','teaming','reports','lessons']}
 ];
 
-// ============================================================
-// 22 MODULES
-// ============================================================
 const MODULES=[
   {id:'dashboard',name:'Mission Control',icon:'⚡',color:'#00E5FA',cat:'Command'},
   {id:'pipeline',name:'Pipeline Intel',icon:'📊',color:'#22d3ee',cat:'Strategy'},
@@ -84,114 +116,86 @@ const MODULES=[
   {id:'playbook',name:'Playbook',icon:'⭐',color:'#fbbf24',cat:'Admin'},
   {id:'reports',name:'Reports',icon:'📈',color:'#06b6d4',cat:'Admin'},
   {id:'admin',name:'Admin',icon:'⚙️',color:'#cbd5e1',cat:'Admin',badge:'ADMIN'},
-  {id:'training',name:'Training Hub',icon:'🎓',color:'#10b981',cat:'Admin'},
   {id:'audit',name:'Audit Log',icon:'📜',color:'#64748b',cat:'Admin',badge:'ADMIN'}
 ];
 
-// ============================================================
-// DEMO DATA (Fallback when Supabase unavailable)
-// ============================================================
 const SHIPLEY_PHASES=['Qualify','Capture','Blue Team','Pink Team','Red Team','Gold Team','White Glove','Submit'];
-const ORALS_SLIDES=['Title Slide','Executive Summary','Technical Approach','Management Plan','Past Performance','Key Personnel','Risk Mitigation','Timeline','Value Proposition','Q&A'];
 
+// ============================================================
+// DEMO DATA
+// ============================================================
 const DEMO_OPPS=[
-  {id:1,nickname:'DHA EHR Mod',title:'DHA MHS GENESIS Cloud Migration',agency:'DHA',ceiling:98450210,phase:'Pink Team',pwin:72,days_to_submit:37,priority:'P-0',naics:'541512',set_aside:'SDVOSB',contract_type:'IDIQ'},
-  {id:2,nickname:'VA Claims AI',title:'VA Enterprise Cloud Hosting',agency:'VA',ceiling:45000000,phase:'Blue Team',pwin:58,days_to_submit:82,priority:'P-1',naics:'541511',set_aside:'8(a)',contract_type:'FFP'},
-  {id:3,nickname:'CMS Analytics',title:'CMS Data Analytics Modernization',agency:'CMS',ceiling:125000000,phase:'Red Team',pwin:68,days_to_submit:21,priority:'P-0',naics:'541519',set_aside:'Full & Open',contract_type:'T&M'},
-  {id:4,nickname:'IHS Telehealth',title:'IHS Telehealth Expansion',agency:'IHS',ceiling:32000000,phase:'Capture',pwin:55,days_to_submit:156,priority:'P-1',naics:'541512',set_aside:'SDVOSB',contract_type:'BPA'}
-];
-
-const DEMO_COMPLIANCE=[
-  {id:1,ref:'L.1.1',title:'Technical Approach',section:'L',status:'compliant',owner:'Sarah Chen',confidence:92},
-  {id:2,ref:'L.1.2',title:'Management Approach',section:'L',status:'partial',owner:'Lisa Martinez',confidence:78},
-  {id:3,ref:'L.2.1',title:'Past Performance',section:'L',status:'risk',owner:'Michael Torres',confidence:45},
-  {id:4,ref:'M.1',title:'Price Proposal',section:'M',status:'compliant',owner:'Jennifer Park',confidence:88}
-];
-
-const DEMO_HITL=[
-  {id:1,type:'Section Draft',title:'Technical Approach v2',agent:'Writer',confidence:78,status:'pending',created:'2h ago'},
-  {id:2,type:'Compliance Check',title:'FAR 52.212-4 Analysis',agent:'Compliance',confidence:92,status:'pending',created:'4h ago'},
-  {id:3,type:'Price Analysis',title:'LCAT Rate Validation',agent:'Pricing',confidence:65,status:'pending',created:'1d ago'},
-  {id:4,type:'Win Theme',title:'Innovation Discriminator',agent:'Strategy',confidence:88,status:'approved',created:'2d ago'}
-];
-
-const DEMO_LCATS=[
-  {id:1,title:'Program Manager',rate:185,hours:2080,wrap:1.85},
-  {id:2,title:'Sr. Software Engineer',rate:165,hours:4160,wrap:1.85},
-  {id:3,title:'Data Scientist',rate:155,hours:2080,wrap:1.85},
-  {id:4,title:'Cloud Architect',rate:175,hours:1040,wrap:1.85},
-  {id:5,title:'QA Analyst',rate:125,hours:2080,wrap:1.85}
-];
-
-const DEMO_COMPETITORS=[
-  {id:1,name:'TechGov Solutions',threat:'High',strengths:'Incumbent, strong past performance',weaknesses:'Higher rates, slow delivery',strategy:'Emphasize innovation and cost savings'},
-  {id:2,name:'Federal IT Partners',threat:'Medium',strengths:'Agency relationships',weaknesses:'No healthcare IT experience',strategy:'Highlight domain expertise'},
-  {id:3,name:'CloudFirst Federal',threat:'High',strengths:'FedRAMP High certified',weaknesses:'No DHA experience',strategy:'Showcase MHS GENESIS expertise'}
+  {id:'demo-1',nickname:'DHA EHR Mod',title:'DHA MHS GENESIS Cloud Migration',agency:'DHA',ceiling:98450210,phase:'Pink Team',pwin:72,days_to_submit:37,priority:'P-0',naics:'541512',set_aside:'SDVOSB',contract_type:'IDIQ'},
+  {id:'demo-2',nickname:'VA Claims AI',title:'VA Enterprise Cloud Hosting',agency:'VA',ceiling:45000000,phase:'Blue Team',pwin:58,days_to_submit:82,priority:'P-1',naics:'541511',set_aside:'8(a)',contract_type:'FFP'},
+  {id:'demo-3',nickname:'CMS Analytics',title:'CMS Data Analytics Modernization',agency:'CMS',ceiling:125000000,phase:'Red Team',pwin:68,days_to_submit:21,priority:'P-0',naics:'541519',set_aside:'',contract_type:'T&M'},
+  {id:'demo-4',nickname:'IHS Telehealth',title:'IHS Telehealth Expansion',agency:'IHS',ceiling:32000000,phase:'Capture',pwin:55,days_to_submit:156,priority:'P-1',naics:'541512',set_aside:'SDVOSB',contract_type:'BPA'}
 ];
 
 const DEMO_WIN_THEMES=[
-  {id:1,theme:'Healthcare IT Excellence',description:'20+ years of DHA/VA healthcare modernization',discriminator:'Proven MHS GENESIS integration experience',opp_id:1},
-  {id:2,theme:'AI-Driven Innovation',description:'ML-powered clinical decision support',discriminator:'Proprietary algorithms with 98% accuracy',opp_id:1},
-  {id:3,theme:'Cost-Effective Delivery',description:'Agile methodology with fixed-price certainty',discriminator:'Average 15% under budget on past 5 contracts',opp_id:1}
+  {id:'wt-1',opp_id:'demo-1',theme:'Healthcare IT Excellence',description:'20+ years of DHA/VA healthcare modernization',discriminator:'Proven MHS GENESIS integration experience'},
+  {id:'wt-2',opp_id:'demo-1',theme:'AI-Driven Innovation',description:'ML-powered clinical decision support',discriminator:'Proprietary algorithms with 98% accuracy'},
+  {id:'wt-3',opp_id:'demo-1',theme:'Cost-Effective Delivery',description:'Agile methodology with fixed-price certainty',discriminator:'Average 15% under budget'}
+];
+
+const DEMO_COMPETITORS=[
+  {id:'c-1',opp_id:'demo-1',name:'TechGov Solutions',threat:'High',strengths:'Incumbent, strong past performance',weaknesses:'Higher rates',strategy:'Emphasize innovation'},
+  {id:'c-2',opp_id:'demo-1',name:'Federal IT Partners',threat:'Medium',strengths:'Agency relationships',weaknesses:'No healthcare IT',strategy:'Highlight domain expertise'},
+  {id:'c-3',opp_id:'demo-1',name:'CloudFirst Federal',threat:'High',strengths:'FedRAMP High',weaknesses:'No DHA experience',strategy:'Showcase MHS GENESIS'}
+];
+
+const DEMO_COMPLIANCE=[
+  {id:'comp-1',opp_id:'demo-1',ref:'L.1.1',title:'Technical Approach',section:'L',status:'compliant',owner:'Sarah Chen',confidence:92},
+  {id:'comp-2',opp_id:'demo-1',ref:'L.1.2',title:'Management Approach',section:'L',status:'partial',owner:'Lisa Martinez',confidence:78},
+  {id:'comp-3',opp_id:'demo-1',ref:'L.2.1',title:'Past Performance',section:'L',status:'risk',owner:'Michael Torres',confidence:45}
+];
+
+const DEMO_PRICING=[
+  {id:'p-1',opp_id:'demo-1',lcat:'Program Manager',rate:185,hours:2080,wrap_rate:1.85},
+  {id:'p-2',opp_id:'demo-1',lcat:'Sr. Software Engineer',rate:165,hours:4160,wrap_rate:1.85},
+  {id:'p-3',opp_id:'demo-1',lcat:'Data Scientist',rate:155,hours:2080,wrap_rate:1.85},
+  {id:'p-4',opp_id:'demo-1',lcat:'Cloud Architect',rate:175,hours:1040,wrap_rate:1.85}
 ];
 
 const DEMO_PARTNERS=[
-  {id:1,name:'CloudSecure Inc',role:'Subcontractor',percentage:15,status:'active',access_expires:'2026-03-01'},
-  {id:2,name:'DataMigrate LLC',role:'Teaming Partner',percentage:25,status:'active',access_expires:'2026-02-15'},
-  {id:3,name:'HealthTech Advisors',role:'Consultant',percentage:5,status:'pending',access_expires:null}
+  {id:'tp-1',opp_id:'demo-1',name:'CloudSecure Inc',role:'Subcontractor',percentage:15,status:'active',access_expires:'2026-03-01'},
+  {id:'tp-2',opp_id:'demo-1',name:'DataMigrate LLC',role:'Teaming Partner',percentage:25,status:'active',access_expires:'2026-02-15'}
 ];
 
-const DEMO_CLAUSES=[
-  {id:1,far:'52.212-4',title:'Contract Terms and Conditions—Commercial Products',risk:'Low',compliance:'Full',notes:'Standard commercial terms'},
-  {id:2,far:'52.204-21',title:'Basic Safeguarding of Covered Contractor Information',risk:'Medium',compliance:'Partial',notes:'Need CUI handling procedures update'},
-  {id:3,far:'52.219-14',title:'Limitations on Subcontracting',risk:'High',compliance:'Review',notes:'Verify 50% self-perform requirement'},
-  {id:4,far:'252.204-7012',title:'Safeguarding Covered Defense Information',risk:'High',compliance:'Full',notes:'CMMC Level 2 certified'}
-];
-
-const DEMO_AUDIT=[
-  {id:1,action:'LOGIN',user:'Mary Womack',role:'CEO',ip:'192.168.1.100',ts:'2026-01-29 09:15:22'},
-  {id:2,action:'VIEW_BLACKHAT',user:'Michael Torres',role:'Capture',ip:'192.168.1.105',ts:'2026-01-29 09:18:45'},
-  {id:3,action:'EXPORT_PRICING',user:'Jennifer Park',role:'Pricing',ip:'192.168.1.110',ts:'2026-01-29 10:02:33'},
-  {id:4,action:'APPROVE_SECTION',user:'Lisa Martinez',role:'PM',ip:'192.168.1.108',ts:'2026-01-29 10:45:12'}
-];
-
-const DEMO_PLAYBOOK=[
-  {id:1,title:'Executive Summary - DHA Win',category:'Writing',score:95,uses:47},
-  {id:2,title:'Technical Innovation Theme',category:'Strategy',score:92,uses:38},
-  {id:3,title:'Past Performance Narrative',category:'Writing',score:88,uses:52}
+const DEMO_HITL=[
+  {id:'h-1',opp_id:'demo-1',type:'Section Draft',title:'Technical Approach v2',agent:'Writer',confidence:78,status:'pending',created_at:new Date().toISOString()},
+  {id:'h-2',opp_id:'demo-1',type:'Compliance Check',title:'FAR 52.212-4 Analysis',agent:'Compliance',confidence:92,status:'pending',created_at:new Date().toISOString()}
 ];
 
 const DEMO_LESSONS=[
-  {id:1,title:'RFP Response Time Crunch',category:'Process',lesson:'Start compliance matrix within 24hrs of RFP release',impact:'High',date:'2026-01-15'},
-  {id:2,title:'Orals Prep Success',category:'Presentation',lesson:'Schedule 3 dry runs minimum, record and review',impact:'High',date:'2026-01-10'},
-  {id:3,title:'Pricing Review Delay',category:'Pricing',lesson:'Lock rates 5 days before submission, not 2',impact:'Medium',date:'2026-01-05'}
+  {id:'l-1',title:'RFP Response Time Crunch',category:'Process',lesson:'Start compliance matrix within 24hrs',impact:'High',date:'2026-01-15'},
+  {id:'l-2',title:'Orals Prep Success',category:'Presentation',lesson:'Schedule 3 dry runs minimum',impact:'High',date:'2026-01-10'}
 ];
 
-const DEMO_TASKS=[
-  {id:1,title:'Executive Summary',owner:'Lisa M.',phase:'Pink Team',section:'L.1',status:'In Progress',opp_id:1},
-  {id:2,title:'Technical Approach',owner:'Sarah C.',phase:'Blue Team',section:'L.2',status:'Draft',opp_id:1},
-  {id:3,title:'Past Performance',owner:'Michael T.',phase:'Red Team',section:'L.3',status:'Review',opp_id:1},
-  {id:4,title:'Price Volume',owner:'Jennifer P.',phase:'Gold Team',section:'M',status:'Draft',opp_id:1},
-  {id:5,title:'Oral Presentation',owner:'Mary W.',phase:'White Glove',section:'Orals',status:'Not Started',opp_id:1}
+const DEMO_PLAYBOOK=[
+  {id:'pb-1',title:'Executive Summary - DHA Win',category:'Writing',score:95,uses:47},
+  {id:'pb-2',title:'Technical Innovation Theme',category:'Strategy',score:92,uses:38}
+];
+
+const DEMO_AUDIT=[
+  {id:'a-1',action:'LOGIN',user_name:'Mary Womack',role:'CEO',ip_address:'192.168.1.100',created_at:'2026-01-29T09:15:22Z'},
+  {id:'a-2',action:'VIEW_BLACKHAT',user_name:'Michael Torres',role:'Capture',ip_address:'192.168.1.105',created_at:'2026-01-29T09:18:45Z'}
 ];
 
 // ============================================================
 // HELPERS
 // ============================================================
 const fmt=v=>v>=1e9?`$${(v/1e9).toFixed(1)}B`:v>=1e6?`$${(v/1e6).toFixed(0)}M`:`$${(v||0).toLocaleString()}`;
-const checkAuth=()=>{
-  const s=localStorage.getItem('MP_SESSION'),u=localStorage.getItem('MP_USER');
-  if(!s||!u){window.location.href='login.html';return null}
-  try{return JSON.parse(u)}catch{return{email:'demo@mmt.com',name:'Demo User'}}
-};
+const checkAuth=()=>{const s=localStorage.getItem('MP_SESSION'),u=localStorage.getItem('MP_USER');if(!s||!u){window.location.href='login.html';return null}try{return JSON.parse(u)}catch{return{email:'demo@mmt.com',name:'Demo User'}}};
 const handleLogout=()=>{localStorage.clear();window.location.href='login.html'};
+
 const logAudit=async(action,details={})=>{
-  if(!supabase)return;
-  try{await supabase.from('audit_logs').insert({action,details:JSON.stringify(details),user_id:localStorage.getItem('MP_USER_ID')||'demo'})}catch(e){console.warn('Audit log failed:',e)}
+  const user=JSON.parse(localStorage.getItem('MP_USER')||'{}');
+  const log={action,user_name:user.name||'Unknown',role:user.role||'User',ip_address:'browser',details:JSON.stringify(details)};
+  if(supabase){try{await supabase.from('audit_logs').insert(log)}catch(e){console.warn(e)}}
 };
 
 // ============================================================
-// ICONS
+// ICON COMPONENT
 // ============================================================
 const Icon=({name,className='w-5 h-5'})=>{
   const icons={
@@ -208,10 +212,7 @@ const Icon=({name,className='w-5 h-5'})=>{
     edit:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>,
     trash:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>,
     search:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>,
-    filter:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>,
     refresh:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>,
-    eye:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
-    eyeOff:<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>,
   };
   return icons[name]||<span className={className}>●</span>;
 };
@@ -219,56 +220,24 @@ const Icon=({name,className='w-5 h-5'})=>{
 // ============================================================
 // MODULE: DASHBOARD
 // ============================================================
-function ModuleDashboard({opps,tokenUsage,dbStatus}){
+function ModuleDashboard({opps,dbStatus}){
   const total=opps.reduce((s,o)=>s+(o.ceiling||0),0);
   const avgPwin=opps.length?Math.round(opps.reduce((s,o)=>s+(o.pwin||0),0)/opps.length):0;
   return(
     <div className="space-y-4 animate-fadeIn">
       <div className="glass p-6 bg-gradient-to-r from-cyan-500/10 to-teal-500/10">
         <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Mission Control</h2>
-            <p className="text-slate-400">AI-Powered Proposal Command Center</p>
-            <p className="text-cyan-400 text-sm mt-1">Mission. Technology. Transformation.</p>
-          </div>
-          <div className="text-right">
-            <div className="text-6xl">🎯</div>
-            <span className={`text-xs px-2 py-1 rounded ${dbStatus==='connected'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>
-              {dbStatus==='connected'?'● Live':'○ Demo Mode'}
-            </span>
-          </div>
+          <div><h2 className="text-2xl font-bold text-white">Mission Control</h2><p className="text-slate-400">AI-Powered Proposal Command Center</p><p className="text-cyan-400 text-sm mt-1">Mission. Technology. Transformation.</p></div>
+          <div className="text-right"><div className="text-6xl">🎯</div><span className={`text-xs px-2 py-1 rounded ${dbStatus==='connected'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>{dbStatus==='connected'?'● Live':'○ Demo'}</span></div>
         </div>
       </div>
       <div className="grid grid-cols-4 gap-4">
-        {[
-          {l:'Pipeline Value',v:fmt(total),c:'text-emerald-400'},
-          {l:'Active Pursuits',v:opps.length,c:'text-cyan-400'},
-          {l:'Avg Win Prob',v:`${avgPwin}%`,c:'text-amber-400'},
-          {l:'Tokens Used',v:tokenUsage.toLocaleString(),c:'text-purple-400'}
-        ].map((s,i)=><div key={i} className="glass p-4 hover-lift"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}
+        {[{l:'Pipeline Value',v:fmt(total),c:'text-emerald-400'},{l:'Active Pursuits',v:opps.length,c:'text-cyan-400'},{l:'Avg Win Prob',v:`${avgPwin}%`,c:'text-amber-400'},{l:'Due <30 Days',v:opps.filter(o=>o.days_to_submit<30).length,c:'text-red-400'}].map((s,i)=><div key={i} className="glass p-4 hover-lift"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}
       </div>
       <div className="glass overflow-hidden">
-        <div className="p-4 border-b border-slate-700/50 flex justify-between items-center">
-          <h3 className="font-semibold text-white">Active Pipeline</h3>
-          <a href="agent-hub.html" target="_blank" className="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium hover:opacity-90">🤖 Agent Hub</a>
-        </div>
-        <table className="w-full">
-          <thead className="bg-slate-800/50">
-            <tr>{['Opportunity','Agency','Value','Phase','pWin','Days'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-slate-700/50">
-            {opps.map(o=>(
-              <tr key={o.id} className="hover:bg-slate-800/30">
-                <td className="p-3"><div className="font-medium text-white text-sm">{o.nickname}</div><div className="text-xs text-slate-500">{o.title}</div></td>
-                <td className="p-3 text-sm text-slate-300">{o.agency}</td>
-                <td className="p-3 text-sm text-emerald-400 font-medium">{fmt(o.ceiling)}</td>
-                <td className="p-3"><span className="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">{o.phase}</span></td>
-                <td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-slate-700 rounded-full"><div className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full" style={{width:`${o.pwin}%`}}/></div><span className="text-xs text-slate-300">{o.pwin}%</span></div></td>
-                <td className="p-3 text-sm text-slate-400">{o.days_to_submit}d</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="p-4 border-b border-slate-700/50 flex justify-between items-center"><h3 className="font-semibold text-white">Active Pipeline</h3><a href="agent-hub.html" target="_blank" className="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium">🤖 Agent Hub</a></div>
+        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Opportunity','Agency','Value','Phase','pWin','Days'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+        <tbody className="divide-y divide-slate-700/50">{opps.slice(0,10).map(o=>(<tr key={o.id} className="hover:bg-slate-800/30"><td className="p-3"><div className="font-medium text-white text-sm">{o.nickname}</div><div className="text-xs text-slate-500 truncate max-w-[200px]">{o.title}</div></td><td className="p-3 text-sm text-slate-300">{o.agency}</td><td className="p-3 text-sm text-emerald-400 font-medium">{fmt(o.ceiling)}</td><td className="p-3"><span className="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">{o.phase}</span></td><td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${o.pwin>=70?'bg-emerald-500':o.pwin>=50?'bg-amber-500':'bg-red-500'}`} style={{width:`${o.pwin}%`}}/></div><span className="text-xs text-slate-300">{o.pwin}%</span></div></td><td className="p-3"><span className={`text-sm ${o.days_to_submit<30?'text-red-400':o.days_to_submit<60?'text-amber-400':'text-slate-400'}`}>{o.days_to_submit}d</span></td></tr>))}</tbody></table>
       </div>
     </div>
   );
@@ -277,225 +246,100 @@ function ModuleDashboard({opps,tokenUsage,dbStatus}){
 // ============================================================
 // MODULE: PIPELINE (Full CRUD)
 // ============================================================
-function ModulePipeline({opps,setOpps,refreshOpps}){
+function ModulePipeline({opps,insert,update,remove,load}){
   const[showForm,setShowForm]=useState(false);
   const[editing,setEditing]=useState(null);
   const[form,setForm]=useState({nickname:'',title:'',agency:'',ceiling:'',phase:'Qualify',pwin:50,days_to_submit:90,naics:'541512',set_aside:'',contract_type:'FFP',priority:'P-1'});
   const[search,setSearch]=useState('');
-  const[loading,setLoading]=useState(false);
 
-  const filtered=opps.filter(o=>o.nickname?.toLowerCase().includes(search.toLowerCase())||o.title?.toLowerCase().includes(search.toLowerCase())||o.agency?.toLowerCase().includes(search.toLowerCase()));
+  const filtered=opps.filter(o=>o.nickname?.toLowerCase().includes(search.toLowerCase())||o.agency?.toLowerCase().includes(search.toLowerCase()));
 
   const handleSave=async()=>{
-    setLoading(true);
     const data={...form,ceiling:parseFloat(form.ceiling)||0,pwin:parseInt(form.pwin)||50,days_to_submit:parseInt(form.days_to_submit)||90};
-    try{
-      if(supabase){
-        if(editing){
-          await supabase.from('opportunities').update(data).eq('id',editing.id);
-        }else{
-          await supabase.from('opportunities').insert(data);
-        }
-        await refreshOpps();
-      }else{
-        if(editing){setOpps(opps.map(o=>o.id===editing.id?{...o,...data}:o))}
-        else{setOpps([...opps,{id:Date.now(),...data}])}
-      }
-      logAudit(editing?'UPDATE_OPP':'CREATE_OPP',{nickname:data.nickname});
-      setShowForm(false);setEditing(null);setForm({nickname:'',title:'',agency:'',ceiling:'',phase:'Qualify',pwin:50,days_to_submit:90,naics:'541512',set_aside:'',contract_type:'FFP',priority:'P-1'});
-    }catch(e){console.error(e);alert('Error saving opportunity')}
-    setLoading(false);
+    if(editing){await update(editing.id,data);logAudit('UPDATE_OPP',{nickname:data.nickname})}
+    else{await insert(data);logAudit('CREATE_OPP',{nickname:data.nickname})}
+    setShowForm(false);setEditing(null);setForm({nickname:'',title:'',agency:'',ceiling:'',phase:'Qualify',pwin:50,days_to_submit:90,naics:'541512',set_aside:'',contract_type:'FFP',priority:'P-1'});
   };
 
-  const handleDelete=async(id)=>{
-    if(!confirm('Delete this opportunity?'))return;
-    try{
-      if(supabase){await supabase.from('opportunities').delete().eq('id',id);await refreshOpps()}
-      else{setOpps(opps.filter(o=>o.id!==id))}
-      logAudit('DELETE_OPP',{id});
-    }catch(e){console.error(e)}
-  };
-
+  const handleDelete=async(id,name)=>{if(confirm('Delete?')){await remove(id);logAudit('DELETE_OPP',{nickname:name})}};
   const startEdit=(o)=>{setEditing(o);setForm({...o,ceiling:o.ceiling?.toString()||''});setShowForm(true)};
 
   return(
     <div className="space-y-4 animate-fadeIn">
       <div className="flex justify-between items-center">
-        <div><h2 className="text-xl font-bold text-white">Pipeline Intel</h2><p className="text-slate-400 text-sm">Opportunity tracking & management</p></div>
+        <div><h2 className="text-xl font-bold text-white">Pipeline Intel</h2><p className="text-slate-400 text-sm">{opps.length} opportunities • {fmt(opps.reduce((s,o)=>s+(o.ceiling||0),0))} total</p></div>
         <div className="flex gap-2">
-          <div className="relative"><Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500 w-48"/></div>
-          <button onClick={refreshOpps} className="p-2 bg-slate-700 rounded-lg hover:bg-slate-600"><Icon name="refresh" className="w-5 h-5 text-slate-300"/></button>
-          <button onClick={()=>{setEditing(null);setForm({nickname:'',title:'',agency:'',ceiling:'',phase:'Qualify',pwin:50,days_to_submit:90,naics:'541512',set_aside:'',contract_type:'FFP',priority:'P-1'});setShowForm(true)}} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Opportunity</button>
+          <div className="relative"><Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white w-48"/></div>
+          <button onClick={load} className="p-2 bg-slate-700 rounded-lg hover:bg-slate-600"><Icon name="refresh" className="w-5 h-5 text-slate-300"/></button>
+          <button onClick={()=>{setEditing(null);setForm({nickname:'',title:'',agency:'',ceiling:'',phase:'Qualify',pwin:50,days_to_submit:90,naics:'541512',set_aside:'',contract_type:'FFP',priority:'P-1'});setShowForm(true)}} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add</button>
         </div>
       </div>
-
-      <div className="grid grid-cols-4 gap-4">
-        {[{l:'Total Pipeline',v:fmt(opps.reduce((s,o)=>s+(o.ceiling||0),0)),c:'text-emerald-400'},{l:'P-0 Critical',v:opps.filter(o=>o.priority==='P-0').length,c:'text-red-400'},{l:'Active',v:opps.length,c:'text-cyan-400'},{l:'Avg pWin',v:`${opps.length?Math.round(opps.reduce((s,o)=>s+(o.pwin||0),0)/opps.length):0}%`,c:'text-amber-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}
-      </div>
-
       <div className="glass overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-800/50">
-            <tr>{['Opportunity','Agency','Contract','Value','Phase','pWin','Days','Priority','Actions'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-slate-700/50">
-            {filtered.map(o=>(
-              <tr key={o.id} className="hover:bg-slate-800/30">
-                <td className="p-3"><div className="font-medium text-white text-sm">{o.nickname}</div><div className="text-xs text-slate-500 truncate max-w-[200px]">{o.title}</div></td>
-                <td className="p-3 text-sm text-slate-300">{o.agency}</td>
-                <td className="p-3"><span className="text-xs text-slate-400">{o.contract_type}</span>{o.set_aside&&<span className="ml-1 px-1 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px]">{o.set_aside}</span>}</td>
-                <td className="p-3 text-sm text-emerald-400 font-medium">{fmt(o.ceiling)}</td>
-                <td className="p-3"><span className="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">{o.phase}</span></td>
-                <td className="p-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${o.pwin>=70?'bg-emerald-500':o.pwin>=50?'bg-amber-500':'bg-red-500'}`} style={{width:`${o.pwin}%`}}/></div><span className="text-xs text-slate-300">{o.pwin}%</span></div></td>
-                <td className="p-3 text-sm text-slate-400">{o.days_to_submit}d</td>
-                <td className="p-3"><span className={`px-2 py-1 rounded text-xs font-bold ${o.priority==='P-0'?'bg-red-500/20 text-red-400':'bg-slate-700 text-slate-300'}`}>{o.priority}</span></td>
-                <td className="p-3">
-                  <div className="flex gap-1">
-                    <button onClick={()=>startEdit(o)} className="p-1.5 bg-slate-700 rounded hover:bg-slate-600"><Icon name="edit" className="w-4 h-4 text-slate-300"/></button>
-                    <button onClick={()=>handleDelete(o.id)} className="p-1.5 bg-red-500/20 rounded hover:bg-red-500/30"><Icon name="trash" className="w-4 h-4 text-red-400"/></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filtered.length===0&&<div className="p-8 text-center text-slate-500">No opportunities found</div>}
+        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Opportunity','Agency','Type','Value','Phase','pWin','Days','Pri',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+        <tbody className="divide-y divide-slate-700/50">{filtered.map(o=>(
+          <tr key={o.id} className="hover:bg-slate-800/30">
+            <td className="p-3"><div className="font-medium text-white text-sm">{o.nickname}</div><div className="text-xs text-slate-500 truncate max-w-[180px]">{o.title}</div></td>
+            <td className="p-3 text-sm text-slate-300">{o.agency}</td>
+            <td className="p-3"><span className="text-xs text-slate-400">{o.contract_type}</span>{o.set_aside&&<span className="ml-1 px-1 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px]">{o.set_aside}</span>}</td>
+            <td className="p-3 text-sm text-emerald-400 font-medium">{fmt(o.ceiling)}</td>
+            <td className="p-3"><span className="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">{o.phase}</span></td>
+            <td className="p-3"><span className={`text-sm ${o.pwin>=70?'text-emerald-400':o.pwin>=50?'text-amber-400':'text-red-400'}`}>{o.pwin}%</span></td>
+            <td className="p-3"><span className={`text-sm ${o.days_to_submit<30?'text-red-400':'text-slate-400'}`}>{o.days_to_submit}d</span></td>
+            <td className="p-3"><span className={`px-1.5 py-0.5 rounded text-xs font-bold ${o.priority==='P-0'?'bg-red-500/20 text-red-400':'bg-slate-700 text-slate-300'}`}>{o.priority}</span></td>
+            <td className="p-3"><div className="flex gap-1"><button onClick={()=>startEdit(o)} className="p-1.5 bg-slate-700 rounded hover:bg-slate-600"><Icon name="edit" className="w-4 h-4 text-slate-300"/></button><button onClick={()=>handleDelete(o.id,o.nickname)} className="p-1.5 bg-red-500/20 rounded hover:bg-red-500/30"><Icon name="trash" className="w-4 h-4 text-red-400"/></button></div></td>
+          </tr>
+        ))}</tbody></table>
+        {filtered.length===0&&<div className="p-8 text-center text-slate-500">No opportunities</div>}
       </div>
-
-      {showForm&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setShowForm(false)}>
-        <div className="glass p-6 w-full max-w-2xl mx-4" onClick={e=>e.stopPropagation()}>
-          <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-white text-lg">{editing?'Edit':'Add'} Opportunity</h3><button onClick={()=>setShowForm(false)} className="p-1 text-slate-400 hover:text-white"><Icon name="x"/></button></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className="text-xs text-slate-400">Nickname *</label><input value={form.nickname} onChange={e=>setForm({...form,nickname:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-            <div><label className="text-xs text-slate-400">Agency *</label><input value={form.agency} onChange={e=>setForm({...form,agency:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-            <div className="col-span-2"><label className="text-xs text-slate-400">Full Title</label><input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-            <div><label className="text-xs text-slate-400">Ceiling ($)</label><input type="number" value={form.ceiling} onChange={e=>setForm({...form,ceiling:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-            <div><label className="text-xs text-slate-400">Phase</label><select value={form.phase} onChange={e=>setForm({...form,phase:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500">{SHIPLEY_PHASES.map(p=><option key={p}>{p}</option>)}</select></div>
-            <div><label className="text-xs text-slate-400">pWin (%)</label><input type="number" min="0" max="100" value={form.pwin} onChange={e=>setForm({...form,pwin:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-            <div><label className="text-xs text-slate-400">Days to Submit</label><input type="number" value={form.days_to_submit} onChange={e=>setForm({...form,days_to_submit:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-            <div><label className="text-xs text-slate-400">Contract Type</label><select value={form.contract_type} onChange={e=>setForm({...form,contract_type:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"><option>FFP</option><option>T&M</option><option>CPFF</option><option>IDIQ</option><option>BPA</option></select></div>
-            <div><label className="text-xs text-slate-400">Set-Aside</label><select value={form.set_aside} onChange={e=>setForm({...form,set_aside:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"><option value="">Full & Open</option><option>SDVOSB</option><option>8(a)</option><option>HUBZone</option><option>WOSB</option></select></div>
-            <div><label className="text-xs text-slate-400">Priority</label><select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"><option>P-0</option><option>P-1</option><option>P-2</option></select></div>
-            <div><label className="text-xs text-slate-400">NAICS</label><input value={form.naics} onChange={e=>setForm({...form,naics:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-          </div>
-          <div className="flex justify-end gap-2 mt-6"><button onClick={()=>setShowForm(false)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} disabled={loading||!form.nickname} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm disabled:opacity-50">{loading?'Saving...':'Save'}</button></div>
+      {showForm&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setShowForm(false)}><div className="glass p-6 w-full max-w-2xl mx-4" onClick={e=>e.stopPropagation()}>
+        <h3 className="font-bold text-white text-lg mb-4">{editing?'Edit':'Add'} Opportunity</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="text-xs text-slate-400">Nickname *</label><input value={form.nickname} onChange={e=>setForm({...form,nickname:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Agency</label><input value={form.agency} onChange={e=>setForm({...form,agency:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div className="col-span-2"><label className="text-xs text-slate-400">Full Title</label><input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Ceiling ($)</label><input type="number" value={form.ceiling} onChange={e=>setForm({...form,ceiling:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Phase</label><select value={form.phase} onChange={e=>setForm({...form,phase:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm">{SHIPLEY_PHASES.map(p=><option key={p}>{p}</option>)}</select></div>
+          <div><label className="text-xs text-slate-400">pWin (%)</label><input type="number" min="0" max="100" value={form.pwin} onChange={e=>setForm({...form,pwin:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Days to Submit</label><input type="number" value={form.days_to_submit} onChange={e=>setForm({...form,days_to_submit:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Contract Type</label><select value={form.contract_type} onChange={e=>setForm({...form,contract_type:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"><option>FFP</option><option>T&M</option><option>CPFF</option><option>IDIQ</option><option>BPA</option></select></div>
+          <div><label className="text-xs text-slate-400">Set-Aside</label><select value={form.set_aside} onChange={e=>setForm({...form,set_aside:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"><option value="">Full & Open</option><option>SDVOSB</option><option>8(a)</option><option>HUBZone</option><option>WOSB</option></select></div>
+          <div><label className="text-xs text-slate-400">Priority</label><select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"><option>P-0</option><option>P-1</option><option>P-2</option></select></div>
+          <div><label className="text-xs text-slate-400">NAICS</label><input value={form.naics} onChange={e=>setForm({...form,naics:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
         </div>
-      </div>}
+        <div className="flex justify-end gap-2 mt-6"><button onClick={()=>setShowForm(false)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} disabled={!form.nickname} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm disabled:opacity-50">Save</button></div>
+      </div></div>}
     </div>
   );
 }
 
 // ============================================================
-// MODULE: WAR ROOM
-// ============================================================
-function ModuleWarRoom({opps}){
-  const[selected,setSelected]=useState(opps[0]||null);
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">War Room</h2><p className="text-slate-400 text-sm">Pursuit command center</p></div>
-      <div className="grid grid-cols-4 gap-4">
-        <div className="col-span-1 space-y-2">
-          <div className="text-sm font-semibold text-white mb-2">Active Pursuits</div>
-          {opps.map(o=><button key={o.id} onClick={()=>setSelected(o)} className={`w-full text-left p-3 rounded-lg ${selected?.id===o.id?'bg-cyan-500/20 border border-cyan-500/30':'bg-slate-800/50 hover:bg-slate-700/50'}`}><div className="font-medium text-white text-sm">{o.nickname}</div><div className="text-xs text-slate-400">{o.agency} • {o.phase}</div></button>)}
-        </div>
-        <div className="col-span-3 glass p-6">
-          {selected?(
-            <div className="space-y-4">
-              <div className="flex justify-between items-start">
-                <div><h3 className="text-xl font-bold text-white">{selected.nickname}</h3><p className="text-slate-400">{selected.title}</p></div>
-                <div className="text-right"><span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${selected.priority==='P-0'?'bg-red-500/20 text-red-400':'bg-slate-700 text-slate-300'}`}>{selected.priority}</span></div>
-              </div>
-              <div className="grid grid-cols-4 gap-4">
-                <div className="p-3 bg-slate-800/50 rounded-lg"><p className="text-xs text-slate-400">Value</p><p className="text-lg font-bold text-emerald-400">{fmt(selected.ceiling)}</p></div>
-                <div className="p-3 bg-slate-800/50 rounded-lg"><p className="text-xs text-slate-400">Win Probability</p><p className="text-lg font-bold text-cyan-400">{selected.pwin}%</p></div>
-                <div className="p-3 bg-slate-800/50 rounded-lg"><p className="text-xs text-slate-400">Days Remaining</p><p className="text-lg font-bold text-amber-400">{selected.days_to_submit}</p></div>
-                <div className="p-3 bg-slate-800/50 rounded-lg"><p className="text-xs text-slate-400">Phase</p><p className="text-lg font-bold text-purple-400">{selected.phase}</p></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-800/30 rounded-lg"><h4 className="font-semibold text-white mb-2">Quick Actions</h4>
-                  <div className="space-y-2">{['Update Phase','Add Win Theme','Schedule Review','Export Status'].map(a=><button key={a} className="w-full text-left p-2 rounded bg-slate-700/50 text-sm text-slate-300 hover:bg-slate-700">{a}</button>)}</div>
-                </div>
-                <div className="p-4 bg-slate-800/30 rounded-lg"><h4 className="font-semibold text-white mb-2">Recent Activity</h4>
-                  <div className="space-y-2 text-sm"><div className="text-slate-400">• Pink Team review completed <span className="text-slate-500">2h ago</span></div><div className="text-slate-400">• Pricing updated <span className="text-slate-500">4h ago</span></div><div className="text-slate-400">• Win theme added <span className="text-slate-500">1d ago</span></div></div>
-                </div>
-              </div>
-            </div>
-          ):(<div className="text-center text-slate-500 py-12">Select a pursuit to view details</div>)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: SWIMLANE KANBAN
-// ============================================================
-function ModuleSwimlane(){
-  const[tasks,setTasks]=useState(DEMO_TASKS);
-  const[draggedTask,setDraggedTask]=useState(null);
-  const phases=['Draft','In Progress','Review','Complete'];
-  const statusToPhase={'Draft':'Draft','In Progress':'In Progress','Review':'Review','Complete':'Complete','Not Started':'Draft'};
-
-  const onDragStart=(e,task)=>{setDraggedTask(task);e.dataTransfer.effectAllowed='move'};
-  const onDragOver=e=>{e.preventDefault();e.dataTransfer.dropEffect='move'};
-  const onDrop=(e,phase)=>{e.preventDefault();if(draggedTask){setTasks(tasks.map(t=>t.id===draggedTask.id?{...t,status:phase}:t));setDraggedTask(null)}};
-
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Swimlane Board</h2><p className="text-slate-400 text-sm">Drag & drop task management</p></div>
-      <div className="grid grid-cols-4 gap-4">
-        {phases.map(phase=>(
-          <div key={phase} className="glass p-4" onDragOver={onDragOver} onDrop={e=>onDrop(e,phase)}>
-            <div className="flex justify-between items-center mb-3"><span className="font-semibold text-white">{phase}</span><span className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded">{tasks.filter(t=>(statusToPhase[t.status]||t.status)===phase).length}</span></div>
-            <div className="space-y-2 min-h-[200px]">
-              {tasks.filter(t=>(statusToPhase[t.status]||t.status)===phase).map(task=>(
-                <div key={task.id} draggable onDragStart={e=>onDragStart(e,task)} className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 cursor-move hover:border-cyan-500/50 transition-colors">
-                  <div className="font-medium text-white text-sm mb-1">{task.title}</div>
-                  <div className="flex justify-between items-center text-xs"><span className="text-slate-400">{task.owner}</span><span className="text-cyan-400">{task.section}</span></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: WIN THEMES
+// MODULE: WIN THEMES (Supabase-backed)
 // ============================================================
 function ModuleWinThemes({opps}){
-  const[themes,setThemes]=useState(DEMO_WIN_THEMES);
+  const{data:themes,insert,remove}=useSupabaseTable('win_themes',DEMO_WIN_THEMES);
   const[showForm,setShowForm]=useState(false);
-  const[form,setForm]=useState({theme:'',description:'',discriminator:'',opp_id:opps[0]?.id||1});
+  const[form,setForm]=useState({theme:'',description:'',discriminator:'',opp_id:''});
 
-  const handleSave=async()=>{
-    const newTheme={id:Date.now(),...form};
-    if(supabase){try{await supabase.from('win_themes').insert(form)}catch(e){console.warn(e)}}
-    setThemes([...themes,newTheme]);setShowForm(false);setForm({theme:'',description:'',discriminator:'',opp_id:opps[0]?.id||1});
-  };
+  const handleSave=async()=>{await insert(form);setShowForm(false);setForm({theme:'',description:'',discriminator:'',opp_id:''})};
 
   return(
     <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Win Themes</h2><p className="text-slate-400 text-sm">Capture discriminators and value propositions</p></div><button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Theme</button></div>
+      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Win Themes</h2><p className="text-slate-400 text-sm">Capture discriminators</p></div><button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Theme</button></div>
       <div className="grid grid-cols-3 gap-4">
-        {themes.map(t=>(
-          <div key={t.id} className="glass p-4 hover-lift">
-            <div className="flex justify-between items-start mb-2"><span className="text-xl">🏆</span><button className="p-1 text-slate-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4"/></button></div>
-            <h3 className="font-semibold text-white mb-2">{t.theme}</h3>
-            <p className="text-slate-400 text-sm mb-3">{t.description}</p>
-            <div className="p-2 bg-emerald-500/10 rounded border border-emerald-500/20"><span className="text-xs text-emerald-400 font-medium">Discriminator:</span><p className="text-sm text-emerald-300 mt-1">{t.discriminator}</p></div>
-          </div>
-        ))}
+        {themes.map(t=>(<div key={t.id} className="glass p-4 hover-lift">
+          <div className="flex justify-between items-start mb-2"><span className="text-xl">🏆</span><button onClick={()=>remove(t.id)} className="p-1 text-slate-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4"/></button></div>
+          <h3 className="font-semibold text-white mb-2">{t.theme}</h3>
+          <p className="text-slate-400 text-sm mb-3">{t.description}</p>
+          <div className="p-2 bg-emerald-500/10 rounded border border-emerald-500/20"><span className="text-xs text-emerald-400">Discriminator:</span><p className="text-sm text-emerald-300 mt-1">{t.discriminator}</p></div>
+        </div>))}
       </div>
       {showForm&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setShowForm(false)}><div className="glass p-6 w-full max-w-lg mx-4" onClick={e=>e.stopPropagation()}>
         <h3 className="font-bold text-white text-lg mb-4">Add Win Theme</h3>
         <div className="space-y-4">
-          <div><label className="text-xs text-slate-400">Theme *</label><input value={form.theme} onChange={e=>setForm({...form,theme:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-          <div><label className="text-xs text-slate-400">Description</label><textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-          <div><label className="text-xs text-slate-400">Discriminator</label><textarea value={form.discriminator} onChange={e=>setForm({...form,discriminator:e.target.value})} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"/></div>
-          <div><label className="text-xs text-slate-400">Opportunity</label><select value={form.opp_id} onChange={e=>setForm({...form,opp_id:parseInt(e.target.value)})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm">{opps.map(o=><option key={o.id} value={o.id}>{o.nickname}</option>)}</select></div>
+          <div><label className="text-xs text-slate-400">Theme *</label><input value={form.theme} onChange={e=>setForm({...form,theme:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Description</label><textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Discriminator</label><textarea value={form.discriminator} onChange={e=>setForm({...form,discriminator:e.target.value})} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Opportunity</label><select value={form.opp_id} onChange={e=>setForm({...form,opp_id:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"><option value="">Select...</option>{opps.map(o=><option key={o.id} value={o.id}>{o.nickname}</option>)}</select></div>
         </div>
         <div className="flex justify-end gap-2 mt-6"><button onClick={()=>setShowForm(false)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} disabled={!form.theme} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm disabled:opacity-50">Save</button></div>
       </div></div>}
@@ -504,158 +348,39 @@ function ModuleWinThemes({opps}){
 }
 
 // ============================================================
-// MODULE: COMPLIANCE (RFP Shredder)
-// ============================================================
-function ModuleCompliance(){
-  const[items,setItems]=useState(DEMO_COMPLIANCE);
-  const[uploading,setUploading]=useState(false);
-
-  const handleUpload=async(e)=>{
-    const file=e.target.files?.[0];if(!file)return;
-    setUploading(true);
-    setTimeout(()=>{
-      setItems([...items,{id:Date.now(),ref:'NEW',title:`Parsed: ${file.name}`,section:'L',status:'pending',owner:'AI Parser',confidence:0}]);
-      setUploading(false);
-    },2000);
-  };
-
-  const toggleStatus=(id)=>{
-    const order=['risk','partial','compliant'];
-    setItems(items.map(i=>{if(i.id!==id)return i;const idx=order.indexOf(i.status);return{...i,status:order[(idx+1)%3]}}));
-  };
-
-  const statusColors={compliant:'bg-emerald-500',partial:'bg-amber-500',risk:'bg-red-500',pending:'bg-slate-500'};
-  const statusText={compliant:'Compliant',partial:'Partial',risk:'At Risk',pending:'Pending'};
-
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">RFP Shredder</h2><p className="text-slate-400 text-sm">AI-powered compliance matrix</p></div>
-        <label className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium cursor-pointer flex items-center gap-2"><Icon name="upload" className="w-4 h-4"/>{uploading?'Processing...':'Upload RFP'}<input type="file" onChange={handleUpload} className="hidden" accept=".pdf,.docx"/></label>
-      </div>
-      <div className="grid grid-cols-4 gap-4">
-        {Object.entries(statusColors).filter(([k])=>k!=='pending').map(([status,color])=>(<div key={status} className="glass p-4"><p className="text-slate-400 text-xs capitalize">{statusText[status]}</p><p className={`text-2xl font-bold ${color.replace('bg-','text-').replace('-500','-400')}`}>{items.filter(i=>i.status===status).length}</p></div>))}
-        <div className="glass p-4"><p className="text-slate-400 text-xs">Avg Confidence</p><p className="text-2xl font-bold text-cyan-400">{items.length?Math.round(items.reduce((s,i)=>s+i.confidence,0)/items.length):0}%</p></div>
-      </div>
-      <div className="glass overflow-hidden">
-        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Ref','Requirement','Section','Owner','Confidence','Status'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{items.map(i=>(
-          <tr key={i.id} className="hover:bg-slate-800/30">
-            <td className="p-3 text-sm font-mono text-cyan-400">{i.ref}</td>
-            <td className="p-3 text-sm text-white">{i.title}</td>
-            <td className="p-3"><span className="px-2 py-1 bg-slate-700 rounded text-xs text-slate-300">{i.section}</span></td>
-            <td className="p-3 text-sm text-slate-300">{i.owner}</td>
-            <td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${i.confidence>=80?'bg-emerald-500':i.confidence>=60?'bg-amber-500':'bg-red-500'}`} style={{width:`${i.confidence}%`}}/></div><span className="text-xs text-slate-400">{i.confidence}%</span></div></td>
-            <td className="p-3"><button onClick={()=>toggleStatus(i.id)} className={`px-2 py-1 rounded text-xs text-white ${statusColors[i.status]}`}>{statusText[i.status]}</button></td>
-          </tr>
-        ))}</tbody></table>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: CONTRACT SCANNER
-// ============================================================
-function ModuleContracts(){
-  const[clauses,setClauses]=useState(DEMO_CLAUSES);
-  const riskColors={Low:'text-emerald-400',Medium:'text-amber-400',High:'text-red-400'};
-  const complianceColors={Full:'bg-emerald-500/20 text-emerald-400',Partial:'bg-amber-500/20 text-amber-400',Review:'bg-red-500/20 text-red-400'};
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Contract Scanner</h2><p className="text-slate-400 text-sm">FAR/DFARS clause analysis</p></div>
-      <div className="grid grid-cols-4 gap-4">
-        {[{l:'Total Clauses',v:clauses.length,c:'text-cyan-400'},{l:'High Risk',v:clauses.filter(c=>c.risk==='High').length,c:'text-red-400'},{l:'Full Compliance',v:clauses.filter(c=>c.compliance==='Full').length,c:'text-emerald-400'},{l:'Needs Review',v:clauses.filter(c=>c.compliance==='Review').length,c:'text-amber-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}
-      </div>
-      <div className="glass overflow-hidden">
-        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['FAR/DFARS','Title','Risk','Compliance','Notes'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{clauses.map(c=>(
-          <tr key={c.id} className="hover:bg-slate-800/30">
-            <td className="p-3 font-mono text-sm text-cyan-400">{c.far}</td>
-            <td className="p-3 text-sm text-white">{c.title}</td>
-            <td className="p-3"><span className={`text-sm font-medium ${riskColors[c.risk]}`}>{c.risk}</span></td>
-            <td className="p-3"><span className={`px-2 py-1 rounded text-xs ${complianceColors[c.compliance]}`}>{c.compliance}</span></td>
-            <td className="p-3 text-sm text-slate-400">{c.notes}</td>
-          </tr>
-        ))}</tbody></table>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: IRON DOME (Quality Gate)
-// ============================================================
-function ModuleIronDome(){
-  const[gates,setGates]=useState([
-    {id:1,name:'Compliance Matrix Complete',status:true,category:'Compliance'},
-    {id:2,name:'All Sections Drafted',status:false,category:'Content'},
-    {id:3,name:'Pricing Validated',status:true,category:'Pricing'},
-    {id:4,name:'Past Performance Verified',status:false,category:'Content'},
-    {id:5,name:'CUI Markings Applied',status:true,category:'Security'},
-    {id:6,name:'Executive Review Complete',status:false,category:'Review'},
-    {id:7,name:'Partner Access Secured',status:true,category:'Security'},
-    {id:8,name:'Final QA Pass',status:false,category:'Review'}
-  ]);
-  const toggle=(id)=>setGates(gates.map(g=>g.id===id?{...g,status:!g.status}:g));
-  const passed=gates.filter(g=>g.status).length;
-  const total=gates.length;
-  const percent=Math.round((passed/total)*100);
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Iron Dome</h2><p className="text-slate-400 text-sm">Quality gate verification checklist</p></div>
-      <div className="glass p-6">
-        <div className="flex items-center justify-between mb-4"><span className="text-lg font-semibold text-white">Gate Status</span><span className={`text-2xl font-bold ${percent>=80?'text-emerald-400':percent>=50?'text-amber-400':'text-red-400'}`}>{passed}/{total}</span></div>
-        <div className="h-4 bg-slate-700 rounded-full overflow-hidden mb-4"><div className={`h-full transition-all ${percent>=80?'bg-emerald-500':percent>=50?'bg-amber-500':'bg-red-500'}`} style={{width:`${percent}%`}}/></div>
-        <div className="grid grid-cols-2 gap-3">
-          {gates.map(g=>(
-            <button key={g.id} onClick={()=>toggle(g.id)} className={`flex items-center gap-3 p-3 rounded-lg border transition ${g.status?'bg-emerald-500/10 border-emerald-500/30':'bg-slate-800/50 border-slate-700 hover:border-slate-600'}`}>
-              <div className={`w-5 h-5 rounded flex items-center justify-center ${g.status?'bg-emerald-500':'bg-slate-700'}`}>{g.status&&<Icon name="check" className="w-3 h-3 text-white"/>}</div>
-              <div className="flex-1 text-left"><div className="text-sm text-white">{g.name}</div><div className="text-xs text-slate-500">{g.category}</div></div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: BLACK HAT (Competitor Intel)
+// MODULE: BLACK HAT (Supabase-backed)
 // ============================================================
 function ModuleBlackHat(){
-  const[competitors,setCompetitors]=useState(DEMO_COMPETITORS);
+  const{data:competitors,insert,remove}=useSupabaseTable('competitors',DEMO_COMPETITORS);
   const[showForm,setShowForm]=useState(false);
   const[form,setForm]=useState({name:'',threat:'Medium',strengths:'',weaknesses:'',strategy:''});
   const threatColors={High:'text-red-400 bg-red-500/20',Medium:'text-amber-400 bg-amber-500/20',Low:'text-emerald-400 bg-emerald-500/20'};
 
-  const handleSave=()=>{setCompetitors([...competitors,{id:Date.now(),...form}]);setShowForm(false);setForm({name:'',threat:'Medium',strengths:'',weaknesses:'',strategy:''});logAudit('ADD_COMPETITOR',{name:form.name})};
-  const handleDelete=(id)=>{setCompetitors(competitors.filter(c=>c.id!==id));logAudit('DELETE_COMPETITOR',{id})};
+  const handleSave=async()=>{await insert(form);logAudit('ADD_COMPETITOR',{name:form.name});setShowForm(false);setForm({name:'',threat:'Medium',strengths:'',weaknesses:'',strategy:''})};
 
   return(
     <div className="space-y-4 animate-fadeIn">
       <div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Black Hat</h2><span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-bold">PRIVATE</span></div>
-      <p className="text-slate-400 text-sm">Competitive intelligence & counter-strategies</p>
+      <p className="text-slate-400 text-sm">Competitive intelligence</p>
       <div className="flex justify-end"><button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Competitor</button></div>
       <div className="grid grid-cols-3 gap-4">
-        {competitors.map(c=>(
-          <div key={c.id} className="glass p-4 hover-lift">
-            <div className="flex justify-between items-start mb-3"><div><div className="font-semibold text-white">{c.name}</div><span className={`px-2 py-0.5 rounded text-xs ${threatColors[c.threat]}`}>{c.threat} Threat</span></div><button onClick={()=>handleDelete(c.id)} className="p-1 text-slate-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4"/></button></div>
-            <div className="space-y-2 text-sm">
-              <div><span className="text-emerald-400">Strengths:</span><p className="text-slate-300">{c.strengths}</p></div>
-              <div><span className="text-red-400">Weaknesses:</span><p className="text-slate-300">{c.weaknesses}</p></div>
-              <div className="p-2 bg-cyan-500/10 rounded border border-cyan-500/20"><span className="text-cyan-400">Counter-Strategy:</span><p className="text-slate-200">{c.strategy}</p></div>
-            </div>
+        {competitors.map(c=>(<div key={c.id} className="glass p-4 hover-lift">
+          <div className="flex justify-between items-start mb-3"><div><div className="font-semibold text-white">{c.name}</div><span className={`px-2 py-0.5 rounded text-xs ${threatColors[c.threat]}`}>{c.threat} Threat</span></div><button onClick={()=>{remove(c.id);logAudit('DELETE_COMPETITOR',{name:c.name})}} className="p-1 text-slate-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4"/></button></div>
+          <div className="space-y-2 text-sm">
+            <div><span className="text-emerald-400">Strengths:</span><p className="text-slate-300">{c.strengths}</p></div>
+            <div><span className="text-red-400">Weaknesses:</span><p className="text-slate-300">{c.weaknesses}</p></div>
+            <div className="p-2 bg-cyan-500/10 rounded border border-cyan-500/20"><span className="text-cyan-400">Strategy:</span><p className="text-slate-200">{c.strategy}</p></div>
           </div>
-        ))}
+        </div>))}
       </div>
       {showForm&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setShowForm(false)}><div className="glass p-6 w-full max-w-lg mx-4" onClick={e=>e.stopPropagation()}>
         <h3 className="font-bold text-white text-lg mb-4">Add Competitor</h3>
         <div className="space-y-4">
-          <div><label className="text-xs text-slate-400">Company Name *</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Name *</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
           <div><label className="text-xs text-slate-400">Threat Level</label><select value={form.threat} onChange={e=>setForm({...form,threat:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"><option>High</option><option>Medium</option><option>Low</option></select></div>
           <div><label className="text-xs text-slate-400">Strengths</label><textarea value={form.strengths} onChange={e=>setForm({...form,strengths:e.target.value})} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
           <div><label className="text-xs text-slate-400">Weaknesses</label><textarea value={form.weaknesses} onChange={e=>setForm({...form,weaknesses:e.target.value})} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
-          <div><label className="text-xs text-slate-400">Counter-Strategy</label><textarea value={form.strategy} onChange={e=>setForm({...form,strategy:e.target.value})} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Strategy</label><textarea value={form.strategy} onChange={e=>setForm({...form,strategy:e.target.value})} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
         </div>
         <div className="flex justify-end gap-2 mt-6"><button onClick={()=>setShowForm(false)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} disabled={!form.name} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm disabled:opacity-50">Save</button></div>
       </div></div>}
@@ -664,78 +389,114 @@ function ModuleBlackHat(){
 }
 
 // ============================================================
-// MODULE: PRICING ENGINE
+// MODULE: PRICING (Supabase-backed)
 // ============================================================
 function ModulePricing(){
-  const[lcats,setLcats]=useState(DEMO_LCATS);
+  const{data:items,insert,update,remove}=useSupabaseTable('pricing_items',DEMO_PRICING);
   const[wrapRate,setWrapRate]=useState(1.85);
-  const totalDirect=lcats.reduce((s,l)=>s+(l.rate*l.hours),0);
+  const totalDirect=items.reduce((s,l)=>s+(l.rate*l.hours),0);
   const totalWrapped=totalDirect*wrapRate;
-  const updateLcat=(id,field,value)=>{setLcats(lcats.map(l=>l.id===id?{...l,[field]:parseFloat(value)||0}:l))};
-  const addLcat=()=>{setLcats([...lcats,{id:Date.now(),title:'New LCAT',rate:100,hours:2080,wrap:wrapRate}])};
-  const removeLcat=(id)=>{setLcats(lcats.filter(l=>l.id!==id))};
-  const exportBOE=()=>{const csv='LCAT,Rate,Hours,Extended,Wrapped\n'+lcats.map(l=>`${l.title},${l.rate},${l.hours},${l.rate*l.hours},${l.rate*l.hours*wrapRate}`).join('\n');const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='boe_pricing.csv';a.click();logAudit('EXPORT_PRICING')};
+
+  const exportBOE=()=>{const csv='LCAT,Rate,Hours,Extended,Wrapped\n'+items.map(l=>`${l.lcat},${l.rate},${l.hours},${l.rate*l.hours},${l.rate*l.hours*wrapRate}`).join('\n');const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='boe_pricing.csv';a.click();logAudit('EXPORT_PRICING')};
 
   return(
     <div className="space-y-4 animate-fadeIn">
       <div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Pricing Engine</h2><span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-bold">CUI</span></div>
-      <p className="text-slate-400 text-sm">LCAT mapping and BOE builder</p>
       <div className="grid grid-cols-4 gap-4">
         <div className="glass p-4"><p className="text-slate-400 text-xs">Direct Labor</p><p className="text-2xl font-bold text-white">{fmt(totalDirect)}</p></div>
-        <div className="glass p-4"><p className="text-slate-400 text-xs">Wrap Rate</p><input type="number" step="0.01" value={wrapRate} onChange={e=>setWrapRate(parseFloat(e.target.value)||1)} className="text-2xl font-bold text-white bg-transparent w-full focus:outline-none"/></div>
+        <div className="glass p-4"><p className="text-slate-400 text-xs">Wrap Rate</p><input type="number" step="0.01" value={wrapRate} onChange={e=>setWrapRate(parseFloat(e.target.value)||1)} className="text-2xl font-bold text-white bg-transparent w-full"/></div>
         <div className="glass p-4"><p className="text-slate-400 text-xs">Total Proposed</p><p className="text-2xl font-bold text-emerald-400">{fmt(totalWrapped)}</p></div>
-        <div className="glass p-4 flex items-center justify-center gap-2"><button onClick={addLcat} className="px-3 py-2 bg-cyan-500 text-white rounded-lg text-sm flex items-center gap-1"><Icon name="plus" className="w-4 h-4"/>Add</button><button onClick={exportBOE} className="px-3 py-2 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-1"><Icon name="download" className="w-4 h-4"/>Export</button></div>
+        <div className="glass p-4 flex items-center justify-center gap-2"><button onClick={()=>insert({lcat:'New LCAT',rate:100,hours:2080,wrap_rate:wrapRate})} className="px-3 py-2 bg-cyan-500 text-white rounded-lg text-sm flex items-center gap-1"><Icon name="plus" className="w-4 h-4"/>Add</button><button onClick={exportBOE} className="px-3 py-2 bg-slate-700 text-white rounded-lg text-sm flex items-center gap-1"><Icon name="download" className="w-4 h-4"/>Export</button></div>
       </div>
       <div className="glass overflow-hidden">
         <table className="w-full"><thead className="bg-slate-800/50"><tr>{['LCAT','Rate/Hr','Hours','Extended','Wrapped',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{lcats.map(l=>(
+        <tbody className="divide-y divide-slate-700/50">{items.map(l=>(
           <tr key={l.id} className="hover:bg-slate-800/30">
-            <td className="p-3"><input type="text" value={l.title} onChange={e=>updateLcat(l.id,'title',e.target.value)} className="bg-transparent text-white text-sm w-full focus:outline-none border-b border-transparent focus:border-cyan-500"/></td>
-            <td className="p-3"><input type="number" value={l.rate} onChange={e=>updateLcat(l.id,'rate',e.target.value)} className="bg-slate-800 text-white text-sm w-20 px-2 py-1 rounded focus:outline-none"/></td>
-            <td className="p-3"><input type="number" value={l.hours} onChange={e=>updateLcat(l.id,'hours',e.target.value)} className="bg-slate-800 text-white text-sm w-24 px-2 py-1 rounded focus:outline-none"/></td>
+            <td className="p-3"><input type="text" value={l.lcat||''} onChange={e=>update(l.id,{lcat:e.target.value})} className="bg-transparent text-white text-sm w-full border-b border-transparent focus:border-cyan-500"/></td>
+            <td className="p-3"><input type="number" value={l.rate||0} onChange={e=>update(l.id,{rate:parseFloat(e.target.value)||0})} className="bg-slate-800 text-white text-sm w-20 px-2 py-1 rounded"/></td>
+            <td className="p-3"><input type="number" value={l.hours||0} onChange={e=>update(l.id,{hours:parseInt(e.target.value)||0})} className="bg-slate-800 text-white text-sm w-24 px-2 py-1 rounded"/></td>
             <td className="p-3 text-sm text-slate-300">{fmt(l.rate*l.hours)}</td>
             <td className="p-3 text-sm text-emerald-400 font-medium">{fmt(l.rate*l.hours*wrapRate)}</td>
-            <td className="p-3"><button onClick={()=>removeLcat(l.id)} className="p-1 text-slate-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4"/></button></td>
+            <td className="p-3"><button onClick={()=>remove(l.id)} className="p-1 text-slate-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4"/></button></td>
           </tr>
         ))}</tbody>
         <tfoot className="bg-slate-800/50"><tr><td className="p-3 font-bold text-white" colSpan="3">TOTAL</td><td className="p-3 font-bold text-white">{fmt(totalDirect)}</td><td className="p-3 font-bold text-emerald-400">{fmt(totalWrapped)}</td><td></td></tr></tfoot></table>
       </div>
-      <div className="text-center text-xs text-red-400 py-2">⚠️ CONTROLLED UNCLASSIFIED INFORMATION (CUI) - Handle per NIST 800-171</div>
+      <div className="text-center text-xs text-red-400 py-2">⚠️ CUI - Handle per NIST 800-171</div>
     </div>
   );
 }
 
 // ============================================================
-// MODULE: HITL QUEUE
+// MODULE: FRENEMY (Supabase-backed)
 // ============================================================
-function ModuleHITL(){
-  const[items,setItems]=useState(DEMO_HITL);
-  const[editing,setEditing]=useState(null);
-  const[editContent,setEditContent]=useState('');
-  const handleAction=(id,status)=>{setItems(items.map(i=>i.id===id?{...i,status}:i));logAudit(status==='approved'?'APPROVE_AI':'REJECT_AI',{id})};
-  const handleEdit=(item)=>{setEditing(item);setEditContent(`AI-generated content for: ${item.title}\n\nThis is the draft content requiring human review.\n\nKey points:\n• Point 1\n• Point 2\n• Point 3`)};
-  const handleSave=()=>{handleAction(editing.id,'approved');setEditing(null)};
-  const pending=items.filter(i=>i.status==='pending');
-  const reviewed=items.filter(i=>i.status!=='pending');
+function ModuleFrenemy(){
+  const{data:partners,insert,update,remove}=useSupabaseTable('teaming_partners',DEMO_PARTNERS);
+  const[showForm,setShowForm]=useState(false);
+  const[form,setForm]=useState({name:'',role:'Subcontractor',percentage:10,access_expires:''});
+  const statusColors={active:'bg-emerald-500/20 text-emerald-400',pending:'bg-amber-500/20 text-amber-400',revoked:'bg-red-500/20 text-red-400'};
+
+  const handleSave=async()=>{await insert({...form,status:'pending'});logAudit('ADD_PARTNER',{name:form.name});setShowForm(false);setForm({name:'',role:'Subcontractor',percentage:10,access_expires:''})};
+  const toggleAccess=(id,current)=>{const newStatus=current==='active'?'revoked':'active';update(id,{status:newStatus});logAudit('TOGGLE_PARTNER',{id,status:newStatus})};
 
   return(
     <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">HITL Review Queue</h2><p className="text-slate-400 text-sm">Human-in-the-Loop approval workflow</p></div>
+      <div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Frenemy Protocol</h2><span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs font-bold">ACCESS CONTROL</span></div>
+      <div className="flex justify-end"><button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Partner</button></div>
+      <div className="glass overflow-hidden">
+        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Partner','Role','Share','Status','Expires',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+        <tbody className="divide-y divide-slate-700/50">{partners.map(p=>(
+          <tr key={p.id} className="hover:bg-slate-800/30">
+            <td className="p-3 text-sm text-white font-medium">{p.name}</td>
+            <td className="p-3 text-sm text-slate-300">{p.role}</td>
+            <td className="p-3 text-sm text-cyan-400">{p.percentage}%</td>
+            <td className="p-3"><span className={`px-2 py-1 rounded text-xs ${statusColors[p.status]||'bg-slate-700 text-slate-300'}`}>{p.status}</span></td>
+            <td className="p-3 text-sm text-slate-400">{p.access_expires||'—'}</td>
+            <td className="p-3"><button onClick={()=>toggleAccess(p.id,p.status)} className={`px-3 py-1 rounded text-xs ${p.status==='active'?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}`}>{p.status==='active'?'Revoke':'Grant'}</button></td>
+          </tr>
+        ))}</tbody></table>
+      </div>
+      {showForm&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setShowForm(false)}><div className="glass p-6 w-full max-w-md mx-4" onClick={e=>e.stopPropagation()}>
+        <h3 className="font-bold text-white text-lg mb-4">Add Partner</h3>
+        <div className="space-y-4">
+          <div><label className="text-xs text-slate-400">Company *</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Role</label><select value={form.role} onChange={e=>setForm({...form,role:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"><option>Subcontractor</option><option>Teaming Partner</option><option>Consultant</option></select></div>
+          <div><label className="text-xs text-slate-400">Share %</label><input type="number" min="1" max="100" value={form.percentage} onChange={e=>setForm({...form,percentage:parseInt(e.target.value)})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+          <div><label className="text-xs text-slate-400">Expires</label><input type="date" value={form.access_expires} onChange={e=>setForm({...form,access_expires:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
+        </div>
+        <div className="flex justify-end gap-2 mt-6"><button onClick={()=>setShowForm(false)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} disabled={!form.name} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm disabled:opacity-50">Add</button></div>
+      </div></div>}
+    </div>
+  );
+}
+
+// ============================================================
+// MODULE: HITL (Supabase-backed)
+// ============================================================
+function ModuleHITL(){
+  const{data:items,update}=useSupabaseTable('ai_approvals',DEMO_HITL);
+  const pending=items.filter(i=>i.status==='pending');
+  const reviewed=items.filter(i=>i.status!=='pending');
+
+  const handleAction=(id,status)=>{update(id,{status,reviewed_at:new Date().toISOString()});logAudit(status==='approved'?'APPROVE_AI':'REJECT_AI',{id})};
+
+  return(
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">HITL Review Queue</h2><p className="text-slate-400 text-sm">Human-in-the-Loop approval</p></div>
         <div className="flex gap-2"><span className="px-3 py-1.5 bg-amber-500/20 text-amber-400 rounded-lg text-sm font-medium">{pending.length} Pending</span><span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium">{items.filter(i=>i.status==='approved').length} Approved</span></div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div><h3 className="font-semibold text-white mb-3">Pending Review</h3>
+        <div><h3 className="font-semibold text-white mb-3">Pending</h3>
           <div className="space-y-3">{pending.map(item=>(
             <div key={item.id} className="glass p-4 hover-lift">
-              <div className="flex justify-between items-start mb-2"><span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{item.type}</span><span className="text-xs text-slate-500">{item.created}</span></div>
+              <div className="flex justify-between items-start mb-2"><span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{item.type}</span></div>
               <h4 className="font-medium text-white mb-1">{item.title}</h4>
               <p className="text-xs text-slate-400 mb-3">Agent: {item.agent}</p>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2"><div className="w-20 h-1.5 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${item.confidence>=85?'bg-emerald-500':item.confidence>=70?'bg-amber-500':'bg-red-500'}`} style={{width:`${item.confidence}%`}}/></div><span className={`text-xs ${item.confidence>=85?'text-emerald-400':item.confidence>=70?'text-amber-400':'text-red-400'}`}>{item.confidence}%</span></div>
                 <div className="flex gap-1">
-                  <button onClick={()=>handleEdit(item)} className="p-1.5 bg-slate-700 rounded hover:bg-slate-600" title="Edit"><Icon name="edit" className="w-4 h-4 text-slate-300"/></button>
-                  <button onClick={()=>handleAction(item.id,'approved')} className="p-1.5 bg-emerald-500/20 rounded hover:bg-emerald-500/30" title="Approve"><Icon name="check" className="w-4 h-4 text-emerald-400"/></button>
-                  <button onClick={()=>handleAction(item.id,'rejected')} className="p-1.5 bg-red-500/20 rounded hover:bg-red-500/30" title="Reject"><Icon name="x" className="w-4 h-4 text-red-400"/></button>
+                  <button onClick={()=>handleAction(item.id,'approved')} className="p-1.5 bg-emerald-500/20 rounded hover:bg-emerald-500/30"><Icon name="check" className="w-4 h-4 text-emerald-400"/></button>
+                  <button onClick={()=>handleAction(item.id,'rejected')} className="p-1.5 bg-red-500/20 rounded hover:bg-red-500/30"><Icon name="x" className="w-4 h-4 text-red-400"/></button>
                 </div>
               </div>
             </div>
@@ -749,209 +510,31 @@ function ModuleHITL(){
           ))}</div>
         </div>
       </div>
-      {editing&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setEditing(null)}>
-        <div className="glass p-6 w-full max-w-2xl mx-4" onClick={e=>e.stopPropagation()}>
-          <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-white">Edit: {editing.title}</h3><button onClick={()=>setEditing(null)} className="p-1 text-slate-400 hover:text-white"><Icon name="x"/></button></div>
-          <textarea value={editContent} onChange={e=>setEditContent(e.target.value)} className="w-full h-64 bg-slate-800 border border-slate-700 rounded-lg p-4 text-white text-sm resize-none focus:outline-none focus:border-cyan-500"/>
-          <div className="flex justify-end gap-2 mt-4"><button onClick={()=>setEditing(null)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm">Save & Approve</button></div>
-        </div>
-      </div>}
     </div>
   );
 }
 
 // ============================================================
-// MODULE: ORALS STUDIO
-// ============================================================
-function ModuleOrals(){
-  const[generating,setGenerating]=useState(false);
-  const[slides,setSlides]=useState([]);
-  const[current,setCurrent]=useState(0);
-  const[timer,setTimer]=useState(0);
-  const[practicing,setPracticing]=useState(false);
-
-  const generateDeck=()=>{
-    setGenerating(true);setSlides([]);let i=0;
-    const interval=setInterval(()=>{
-      if(i<ORALS_SLIDES.length){setSlides(prev=>[...prev,{id:i+1,title:ORALS_SLIDES[i],bullets:['Key point 1','Key point 2','Key point 3'],talkingPoints:['Emphasize value','Reference past performance','Address concerns']}]);i++}
-      else{clearInterval(interval);setGenerating(false)}
-    },400);
-  };
-
-  useEffect(()=>{let interval;if(practicing){interval=setInterval(()=>setTimer(t=>t+1),1000)}return()=>clearInterval(interval)},[practicing]);
-  const formatTime=(s)=>`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Orals Studio</h2><p className="text-slate-400 text-sm">AI-powered presentation generator</p></div>
-        {slides.length===0&&!generating&&<button onClick={generateDeck} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-medium">🎤 Generate 10-Slide Deck</button>}
-        {slides.length>0&&<div className="flex gap-2"><button onClick={()=>{setPracticing(!practicing);if(practicing)setTimer(0)}} className={`px-4 py-2 rounded-lg font-medium ${practicing?'bg-red-500 text-white':'bg-emerald-500 text-white'}`}>{practicing?'⏹ Stop':'▶️ Practice'}</button></div>}
-      </div>
-      {generating&&<div className="glass p-8 text-center"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"/><p className="text-white">Generating slides... {slides.length}/{ORALS_SLIDES.length}</p></div>}
-      {slides.length>0&&!generating&&(
-        <div className="grid grid-cols-4 gap-4">
-          <div className="col-span-1 space-y-1 max-h-96 overflow-y-auto">{slides.map((s,i)=><button key={s.id} onClick={()=>setCurrent(i)} className={`w-full text-left p-2 rounded-lg text-sm ${current===i?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{i+1}. {s.title}</button>)}</div>
-          <div className="col-span-3">
-            {practicing&&<div className="glass p-4 mb-4 flex items-center justify-between"><span className="text-white font-medium">Timer</span><span className="text-2xl font-mono text-cyan-400">{formatTime(timer)}</span></div>}
-            <div className="glass p-6">
-              <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-8 mb-4 border border-slate-700">
-                <div className="h-1 w-24 bg-gradient-to-r from-cyan-500 to-teal-500 rounded mb-4"/>
-                <h3 className="text-2xl font-bold text-white mb-4">{slides[current]?.title}</h3>
-                <ul className="space-y-2">{slides[current]?.bullets.map((b,i)=><li key={i} className="text-slate-300">• {b}</li>)}</ul>
-              </div>
-            </div>
-            <div className="flex justify-between mt-4"><button disabled={current===0} onClick={()=>setCurrent(c=>c-1)} className="px-4 py-2 bg-slate-700 text-white rounded-lg disabled:opacity-50">← Prev</button><span className="text-slate-400 self-center">{current+1}/{slides.length}</span><button disabled={current===slides.length-1} onClick={()=>setCurrent(c=>c+1)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg disabled:opacity-50">Next →</button></div>
-          </div>
-        </div>
-      )}
-      {slides.length===0&&!generating&&<div className="glass p-12 text-center"><div className="text-6xl mb-4">🎤</div><p className="text-white text-lg">Ready to generate your presentation</p></div>}
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: FRENEMY PROTOCOL
-// ============================================================
-function ModuleFrenemy(){
-  const[partners,setPartners]=useState(DEMO_PARTNERS);
-  const[showForm,setShowForm]=useState(false);
-  const[form,setForm]=useState({name:'',role:'Subcontractor',percentage:10,access_expires:''});
-  const statusColors={active:'bg-emerald-500/20 text-emerald-400',pending:'bg-amber-500/20 text-amber-400',revoked:'bg-red-500/20 text-red-400'};
-
-  const handleSave=()=>{setPartners([...partners,{id:Date.now(),...form,status:'pending'}]);setShowForm(false);setForm({name:'',role:'Subcontractor',percentage:10,access_expires:''});logAudit('ADD_PARTNER',{name:form.name})};
-  const toggleAccess=(id)=>{setPartners(partners.map(p=>p.id===id?{...p,status:p.status==='active'?'revoked':'active'}:p));logAudit('TOGGLE_PARTNER_ACCESS',{id})};
-
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Frenemy Protocol</h2><span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs font-bold">ACCESS CONTROL</span></div>
-      <p className="text-slate-400 text-sm">Partner access management with auto-revocation</p>
-      <div className="flex justify-end"><button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Partner</button></div>
-      <div className="glass overflow-hidden">
-        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Partner','Role','Work Share','Status','Access Expires','Actions'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{partners.map(p=>(
-          <tr key={p.id} className="hover:bg-slate-800/30">
-            <td className="p-3 text-sm text-white font-medium">{p.name}</td>
-            <td className="p-3 text-sm text-slate-300">{p.role}</td>
-            <td className="p-3 text-sm text-cyan-400">{p.percentage}%</td>
-            <td className="p-3"><span className={`px-2 py-1 rounded text-xs ${statusColors[p.status]}`}>{p.status}</span></td>
-            <td className="p-3 text-sm text-slate-400">{p.access_expires||'—'}</td>
-            <td className="p-3"><button onClick={()=>toggleAccess(p.id)} className={`px-3 py-1 rounded text-xs ${p.status==='active'?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}`}>{p.status==='active'?'Revoke':'Grant'}</button></td>
-          </tr>
-        ))}</tbody></table>
-      </div>
-      {showForm&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setShowForm(false)}><div className="glass p-6 w-full max-w-md mx-4" onClick={e=>e.stopPropagation()}>
-        <h3 className="font-bold text-white text-lg mb-4">Add Partner</h3>
-        <div className="space-y-4">
-          <div><label className="text-xs text-slate-400">Company Name *</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
-          <div><label className="text-xs text-slate-400">Role</label><select value={form.role} onChange={e=>setForm({...form,role:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"><option>Subcontractor</option><option>Teaming Partner</option><option>Consultant</option></select></div>
-          <div><label className="text-xs text-slate-400">Work Share %</label><input type="number" min="1" max="100" value={form.percentage} onChange={e=>setForm({...form,percentage:parseInt(e.target.value)})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
-          <div><label className="text-xs text-slate-400">Access Expires</label><input type="date" value={form.access_expires} onChange={e=>setForm({...form,access_expires:e.target.value})} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"/></div>
-        </div>
-        <div className="flex justify-end gap-2 mt-6"><button onClick={()=>setShowForm(false)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} disabled={!form.name} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm disabled:opacity-50">Add Partner</button></div>
-      </div></div>}
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: TEAMING PARTNERS
-// ============================================================
-function ModuleTeaming(){
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Teaming Partners</h2><p className="text-slate-400 text-sm">Subcontractor management & agreements</p></div>
-      <div className="glass p-6 text-center"><div className="text-6xl mb-4">🤝</div><p className="text-slate-400">Use Frenemy Protocol for partner access management</p><a href="#" onClick={e=>{e.preventDefault()}} className="text-cyan-400 hover:underline text-sm">Go to Frenemy Protocol →</a></div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: LAUNCH & ROI
-// ============================================================
-function ModuleLaunch({opps}){
-  const[selected,setSelected]=useState(opps[0]||null);
-  const[factors,setFactors]=useState({pricing:80,technical:75,past_perf:90,relationships:60,competition:70});
-  const avgScore=Math.round(Object.values(factors).reduce((a,b)=>a+b,0)/Object.keys(factors).length);
-  const goNoGo=avgScore>=70?'GO':avgScore>=50?'CONDITIONAL':'NO-GO';
-  const goColors={GO:'text-emerald-400',CONDITIONAL:'text-amber-400','NO-GO':'text-red-400'};
-
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Launch & ROI</h2><p className="text-slate-400 text-sm">Go/No-Go decision calculator</p></div>
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-1 space-y-2">{opps.map(o=><button key={o.id} onClick={()=>setSelected(o)} className={`w-full text-left p-3 rounded-lg ${selected?.id===o.id?'bg-cyan-500/20 border border-cyan-500/30':'bg-slate-800/50 hover:bg-slate-700/50'}`}><div className="font-medium text-white text-sm">{o.nickname}</div><div className="text-xs text-slate-400">{fmt(o.ceiling)}</div></button>)}</div>
-        <div className="col-span-2 glass p-6">
-          <div className="flex justify-between items-center mb-6"><h3 className="text-lg font-semibold text-white">{selected?.nickname||'Select opportunity'}</h3><div className={`text-3xl font-bold ${goColors[goNoGo]}`}>{goNoGo}</div></div>
-          <div className="space-y-4">
-            {Object.entries(factors).map(([key,val])=>(
-              <div key={key} className="flex items-center gap-4">
-                <span className="w-32 text-sm text-slate-300 capitalize">{key.replace('_',' ')}</span>
-                <input type="range" min="0" max="100" value={val} onChange={e=>setFactors({...factors,[key]:parseInt(e.target.value)})} className="flex-1 accent-cyan-500"/>
-                <span className={`w-12 text-sm font-medium ${val>=70?'text-emerald-400':val>=50?'text-amber-400':'text-red-400'}`}>{val}%</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 p-4 bg-slate-800/50 rounded-lg"><div className="flex justify-between items-center"><span className="text-white font-medium">Composite Score</span><span className={`text-2xl font-bold ${avgScore>=70?'text-emerald-400':avgScore>=50?'text-amber-400':'text-red-400'}`}>{avgScore}%</span></div></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: POST-AWARD
-// ============================================================
-function ModulePostAward(){
-  const[actions,setActions]=useState([
-    {id:1,task:'Kickoff Meeting',status:'complete',due:'2026-02-01',owner:'Mary W.'},
-    {id:2,task:'Transition Plan',status:'in_progress',due:'2026-02-15',owner:'Lisa M.'},
-    {id:3,task:'Staff Onboarding',status:'pending',due:'2026-02-28',owner:'Amanda F.'},
-    {id:4,task:'Security Clearances',status:'pending',due:'2026-03-15',owner:'Robert W.'}
-  ]);
-  const statusColors={complete:'bg-emerald-500/20 text-emerald-400',in_progress:'bg-cyan-500/20 text-cyan-400',pending:'bg-slate-700 text-slate-400'};
-  const toggle=(id)=>setActions(actions.map(a=>{if(a.id!==id)return a;const order=['pending','in_progress','complete'];const idx=order.indexOf(a.status);return{...a,status:order[(idx+1)%3]}}));
-
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Post-Award</h2><p className="text-slate-400 text-sm">Transition tracking & handoff</p></div>
-      <div className="glass overflow-hidden">
-        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Task','Owner','Due Date','Status'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{actions.map(a=>(
-          <tr key={a.id} className="hover:bg-slate-800/30">
-            <td className="p-3 text-sm text-white">{a.task}</td>
-            <td className="p-3 text-sm text-slate-300">{a.owner}</td>
-            <td className="p-3 text-sm text-slate-400">{a.due}</td>
-            <td className="p-3"><button onClick={()=>toggle(a.id)} className={`px-2 py-1 rounded text-xs capitalize ${statusColors[a.status]}`}>{a.status.replace('_',' ')}</button></td>
-          </tr>
-        ))}</tbody></table>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: LESSONS LEARNED
+// MODULE: LESSONS (Supabase-backed)
 // ============================================================
 function ModuleLessons(){
-  const[lessons,setLessons]=useState(DEMO_LESSONS);
+  const{data:lessons,insert}=useSupabaseTable('lessons_learned',DEMO_LESSONS);
   const[showForm,setShowForm]=useState(false);
   const[form,setForm]=useState({title:'',category:'Process',lesson:'',impact:'Medium'});
   const impactColors={High:'text-red-400',Medium:'text-amber-400',Low:'text-emerald-400'};
 
-  const handleSave=()=>{setLessons([...lessons,{id:Date.now(),...form,date:new Date().toISOString().split('T')[0]}]);setShowForm(false);setForm({title:'',category:'Process',lesson:'',impact:'Medium'})};
+  const handleSave=async()=>{await insert({...form,date:new Date().toISOString().split('T')[0]});setShowForm(false);setForm({title:'',category:'Process',lesson:'',impact:'Medium'})};
 
   return(
     <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Lessons Learned</h2><p className="text-slate-400 text-sm">Capture & apply proposal insights</p></div><button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Lesson</button></div>
+      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Lessons Learned</h2><p className="text-slate-400 text-sm">Capture proposal insights</p></div><button onClick={()=>setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add</button></div>
       <div className="grid grid-cols-3 gap-4">
-        {lessons.map(l=>(
-          <div key={l.id} className="glass p-4 hover-lift">
-            <div className="flex justify-between items-start mb-2"><span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{l.category}</span><span className={`text-xs font-medium ${impactColors[l.impact]}`}>{l.impact}</span></div>
-            <h3 className="font-semibold text-white mb-2">{l.title}</h3>
-            <p className="text-slate-400 text-sm">{l.lesson}</p>
-            <p className="text-xs text-slate-500 mt-2">{l.date}</p>
-          </div>
-        ))}
+        {lessons.map(l=>(<div key={l.id} className="glass p-4 hover-lift">
+          <div className="flex justify-between items-start mb-2"><span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{l.category}</span><span className={`text-xs font-medium ${impactColors[l.impact]}`}>{l.impact}</span></div>
+          <h3 className="font-semibold text-white mb-2">{l.title}</h3>
+          <p className="text-slate-400 text-sm">{l.lesson}</p>
+          <p className="text-xs text-slate-500 mt-2">{l.date}</p>
+        </div>))}
       </div>
       {showForm&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setShowForm(false)}><div className="glass p-6 w-full max-w-lg mx-4" onClick={e=>e.stopPropagation()}>
         <h3 className="font-bold text-white text-lg mb-4">Add Lesson</h3>
@@ -968,174 +551,67 @@ function ModuleLessons(){
 }
 
 // ============================================================
-// MODULE: PLAYBOOK
+// MODULE: PLAYBOOK (Supabase-backed)
 // ============================================================
 function ModulePlaybook(){
-  const[examples,setExamples]=useState(DEMO_PLAYBOOK);
+  const{data:items,insert,remove}=useSupabaseTable('playbook_items',DEMO_PLAYBOOK);
   const[showAdd,setShowAdd]=useState(false);
-  const[newEx,setNewEx]=useState({title:'',category:'Writing'});
-  const addExample=()=>{if(newEx.title){setExamples([...examples,{id:Date.now(),title:newEx.title,category:newEx.category,score:85,uses:0}]);setNewEx({title:'',category:'Writing'});setShowAdd(false)}};
-  const deleteExample=(id)=>{setExamples(examples.filter(e=>e.id!==id))};
+  const[form,setForm]=useState({title:'',category:'Writing'});
+
+  const handleSave=async()=>{if(form.title){await insert({...form,score:85,uses:0});setForm({title:'',category:'Writing'});setShowAdd(false)}};
 
   return(
     <div className="space-y-4 animate-fadeIn">
-      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Lessons Playbook</h2><p className="text-slate-400 text-sm">Golden examples for AI learning</p></div><button onClick={()=>setShowAdd(true)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add Example</button></div>
-      <div className="grid grid-cols-4 gap-4">{[{l:'Total',v:examples.length,c:'text-cyan-400'},{l:'Avg Quality',v:`${Math.round(examples.reduce((s,e)=>s+e.score,0)/examples.length)}%`,c:'text-emerald-400'},{l:'Uses',v:examples.reduce((s,e)=>s+e.uses,0),c:'text-purple-400'},{l:'Categories',v:new Set(examples.map(e=>e.category)).size,c:'text-amber-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}</div>
+      <div className="flex justify-between items-center"><div><h2 className="text-xl font-bold text-white">Playbook</h2><p className="text-slate-400 text-sm">Golden examples for AI</p></div><button onClick={()=>setShowAdd(true)} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Icon name="plus" className="w-4 h-4"/>Add</button></div>
+      <div className="grid grid-cols-4 gap-4">{[{l:'Total',v:items.length,c:'text-cyan-400'},{l:'Avg Quality',v:`${items.length?Math.round(items.reduce((s,e)=>s+e.score,0)/items.length):0}%`,c:'text-emerald-400'},{l:'Uses',v:items.reduce((s,e)=>s+(e.uses||0),0),c:'text-purple-400'},{l:'Categories',v:new Set(items.map(e=>e.category)).size,c:'text-amber-400'}].map((s,i)=><div key={i} className="glass p-4"><p className="text-slate-400 text-xs">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p></div>)}</div>
       <div className="glass overflow-hidden">
-        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Example','Category','Quality','Uses','Actions'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{examples.map(e=>(
+        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Example','Category','Quality','Uses',''].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+        <tbody className="divide-y divide-slate-700/50">{items.map(e=>(
           <tr key={e.id} className="hover:bg-slate-800/30">
             <td className="p-3 text-sm text-white">{e.title}</td>
             <td className="p-3"><span className="px-2 py-1 bg-slate-700 rounded text-xs text-slate-300">{e.category}</span></td>
             <td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-slate-700 rounded-full"><div className="h-full bg-emerald-500 rounded-full" style={{width:`${e.score}%`}}/></div><span className="text-xs text-emerald-400">{e.score}%</span></div></td>
-            <td className="p-3 text-sm text-slate-300">{e.uses}</td>
-            <td className="p-3"><button onClick={()=>deleteExample(e.id)} className="p-1 text-slate-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4"/></button></td>
+            <td className="p-3 text-sm text-slate-300">{e.uses||0}</td>
+            <td className="p-3"><button onClick={()=>remove(e.id)} className="p-1 text-slate-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4"/></button></td>
           </tr>
         ))}</tbody></table>
       </div>
       {showAdd&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={()=>setShowAdd(false)}><div className="glass p-6 w-full max-w-md mx-4" onClick={e=>e.stopPropagation()}>
         <h3 className="font-bold text-white mb-4">Add to Playbook</h3>
-        <input value={newEx.title} onChange={e=>setNewEx({...newEx,title:e.target.value})} placeholder="Example title" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm mb-3"/>
-        <select value={newEx.category} onChange={e=>setNewEx({...newEx,category:e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm mb-4"><option>Writing</option><option>Strategy</option><option>Pricing</option><option>Compliance</option></select>
-        <div className="flex justify-end gap-2"><button onClick={()=>setShowAdd(false)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={addExample} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm">Save</button></div>
+        <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Title" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm mb-3"/>
+        <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm mb-4"><option>Writing</option><option>Strategy</option><option>Pricing</option><option>Compliance</option></select>
+        <div className="flex justify-end gap-2"><button onClick={()=>setShowAdd(false)} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">Cancel</button><button onClick={handleSave} className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm">Save</button></div>
       </div></div>}
     </div>
   );
 }
 
 // ============================================================
-// MODULE: REPORTS
-// ============================================================
-function ModuleReports({opps}){
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Reports & Analytics</h2><p className="text-slate-400 text-sm">Export proposal metrics</p></div>
-      <div className="grid grid-cols-3 gap-4">
-        {['Pipeline Summary','Win/Loss Analysis','Resource Utilization','Compliance Report','Pricing History','Activity Log'].map(r=>(
-          <button key={r} className="glass p-6 hover-lift text-left">
-            <div className="text-2xl mb-2">📈</div>
-            <div className="font-semibold text-white">{r}</div>
-            <div className="text-xs text-slate-400 mt-1">Click to generate</div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: AUDIT LOG
+// MODULE: AUDIT LOG (Supabase-backed)
 // ============================================================
 function ModuleAudit(){
+  const{data:logs}=useSupabaseTable('audit_logs',DEMO_AUDIT);
   const[filter,setFilter]=useState('ALL');
-  const actions=['ALL','LOGIN','VIEW_BLACKHAT','EXPORT_PRICING','APPROVE_SECTION'];
-  const filtered=filter==='ALL'?DEMO_AUDIT:DEMO_AUDIT.filter(a=>a.action===filter);
-  const actionColors={LOGIN:'bg-emerald-500',VIEW_BLACKHAT:'bg-amber-500',EXPORT_PRICING:'bg-red-500',APPROVE_SECTION:'bg-cyan-500'};
+  const actions=['ALL','LOGIN','VIEW_BLACKHAT','EXPORT_PRICING','APPROVE_AI','CREATE_OPP','DELETE_OPP'];
+  const filtered=filter==='ALL'?logs:logs.filter(a=>a.action===filter);
+  const actionColors={LOGIN:'bg-emerald-500',VIEW_BLACKHAT:'bg-amber-500',EXPORT_PRICING:'bg-red-500',APPROVE_AI:'bg-cyan-500',CREATE_OPP:'bg-purple-500',DELETE_OPP:'bg-red-500'};
   return(
     <div className="space-y-4 animate-fadeIn">
       <div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Audit Log</h2><span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">ADMIN</span></div>
-      <p className="text-slate-400 text-sm">Security and compliance audit trail</p>
-      <div className="flex gap-2">{actions.map(a=><button key={a} onClick={()=>setFilter(a)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${filter===a?'bg-cyan-500 text-white':'bg-slate-800 text-slate-400 hover:text-white'}`}>{a==='ALL'?'All':a.replace(/_/g,' ')}</button>)}</div>
+      <div className="flex gap-2 flex-wrap">{actions.map(a=><button key={a} onClick={()=>setFilter(a)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${filter===a?'bg-cyan-500 text-white':'bg-slate-800 text-slate-400 hover:text-white'}`}>{a==='ALL'?'All':a.replace(/_/g,' ')}</button>)}</div>
       <div className="glass overflow-hidden">
-        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Action','User','Role','IP','Timestamp'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-700/50">{filtered.map(log=><tr key={log.id} className="hover:bg-slate-800/30"><td className="p-3"><span className={`px-2 py-1 rounded text-xs text-white ${actionColors[log.action]||'bg-slate-600'}`}>{log.action}</span></td><td className="p-3 text-sm text-white">{log.user}</td><td className="p-3 text-sm text-slate-300">{log.role}</td><td className="p-3 text-sm font-mono text-slate-400">{log.ip}</td><td className="p-3 text-sm text-slate-400">{log.ts}</td></tr>)}</tbody></table>
+        <table className="w-full"><thead className="bg-slate-800/50"><tr>{['Action','User','Role','IP','Time'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr></thead>
+        <tbody className="divide-y divide-slate-700/50">{filtered.slice(0,50).map((log,i)=><tr key={log.id||i} className="hover:bg-slate-800/30"><td className="p-3"><span className={`px-2 py-1 rounded text-xs text-white ${actionColors[log.action]||'bg-slate-600'}`}>{log.action}</span></td><td className="p-3 text-sm text-white">{log.user_name}</td><td className="p-3 text-sm text-slate-300">{log.role}</td><td className="p-3 text-sm font-mono text-slate-400">{log.ip_address}</td><td className="p-3 text-sm text-slate-400">{log.created_at?.slice(0,19).replace('T',' ')}</td></tr>)}</tbody></table>
       </div>
     </div>
   );
 }
 
 // ============================================================
-// MODULE: ADMIN
+// GENERIC MODULE PLACEHOLDER
 // ============================================================
-function ModuleAdmin({tokenUsage,setTokenUsage}){
-  const tokenLimit=100000;
-  const usagePercent=(tokenUsage/tokenLimit)*100;
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div className="flex items-center gap-2"><h2 className="text-xl font-bold text-white">Admin Settings</h2><span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">ADMIN</span></div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="glass p-6">
-          <h3 className="font-semibold text-white mb-4">💰 Token Cost Meter</h3>
-          <div className="space-y-4">
-            <div><div className="flex justify-between text-sm mb-2"><span className="text-slate-400">Usage</span><span className="text-white">{tokenUsage.toLocaleString()} / {tokenLimit.toLocaleString()}</span></div><div className="h-4 bg-slate-700 rounded-full overflow-hidden"><div className={`h-full transition-all ${usagePercent>80?'bg-red-500':usagePercent>50?'bg-amber-500':'bg-emerald-500'}`} style={{width:`${usagePercent}%`}}/></div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="p-3 bg-slate-800/50 rounded-lg"><p className="text-xs text-slate-400">This Month</p><p className="text-lg font-bold text-white">{tokenUsage.toLocaleString()}</p></div><div className="p-3 bg-slate-800/50 rounded-lg"><p className="text-xs text-slate-400">Est. Cost</p><p className="text-lg font-bold text-emerald-400">${((tokenUsage/1000)*0.003).toFixed(2)}</p></div></div>
-          </div>
-        </div>
-        <div className="glass p-6">
-          <h3 className="font-semibold text-white mb-4">⚙️ System Settings</h3>
-          <div className="space-y-3">{[{l:'RBAC Enforcement',v:true},{l:'CUI Watermarking',v:true},{l:'Partner Auto-Revoke',v:true},{l:'Audit Logging',v:true}].map((s,i)=><div key={i} className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"><span className="text-sm text-white">{s.l}</span><div className={`w-10 h-6 rounded-full p-1 cursor-pointer ${s.v?'bg-emerald-500':'bg-slate-600'}`}><div className={`w-4 h-4 bg-white rounded-full transition-transform ${s.v?'translate-x-4':''}`}/></div></div>)}</div>
-        </div>
-      </div>
-      <div className="glass p-6">
-        <h3 className="font-semibold text-white mb-4">👥 User Management</h3>
-        <div className="grid grid-cols-3 gap-3">{ROLES.slice(0,6).map(r=><div key={r.id} className="p-3 bg-slate-800/50 rounded-lg flex items-center gap-3"><span className="text-xl">{r.icon}</span><div><p className="text-sm text-white">{r.fullName}</p><p className="text-xs text-slate-400">{r.name}</p></div></div>)}</div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: TRAINING HUB
-// ============================================================
-function ModuleTraining(){
-  const courses=[
-    {id:1,title:'Shipley Methodology 101',progress:100,duration:'2h'},
-    {id:2,title:'MissionPulse Walkthrough',progress:75,duration:'1h'},
-    {id:3,title:'CMMC Compliance Basics',progress:30,duration:'3h'},
-    {id:4,title:'Win Theme Development',progress:0,duration:'1.5h'}
-  ];
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Training Hub</h2><p className="text-slate-400 text-sm">Team onboarding & skill development</p></div>
-      <div className="grid grid-cols-2 gap-4">
-        {courses.map(c=>(
-          <div key={c.id} className="glass p-4 hover-lift">
-            <div className="flex justify-between items-start mb-3"><h3 className="font-semibold text-white">{c.title}</h3><span className="text-xs text-slate-400">{c.duration}</span></div>
-            <div className="flex items-center gap-2"><div className="flex-1 h-2 bg-slate-700 rounded-full"><div className={`h-full rounded-full ${c.progress===100?'bg-emerald-500':'bg-cyan-500'}`} style={{width:`${c.progress}%`}}/></div><span className="text-xs text-slate-300">{c.progress}%</span></div>
-            <button className={`mt-3 w-full py-2 rounded-lg text-sm font-medium ${c.progress===100?'bg-emerald-500/20 text-emerald-400':'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'}`}>{c.progress===100?'✓ Completed':c.progress>0?'Continue':'Start'}</button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODULE: SETTINGS
-// ============================================================
-function ModuleSettings(){
-  return(
-    <div className="space-y-4 animate-fadeIn">
-      <div><h2 className="text-xl font-bold text-white">Settings</h2><p className="text-slate-400 text-sm">Organization configuration</p></div>
-      <div className="glass p-6"><p className="text-slate-400">Settings module - Configure organization preferences</p></div>
-    </div>
-  );
-}
-
-// ============================================================
-// AI CHAT WIDGET
-// ============================================================
-function AIChatWidget(){
-  const[open,setOpen]=useState(false);
-  const[messages,setMessages]=useState([{role:'assistant',content:'Hello! I\'m your MissionPulse AI assistant. How can I help?'}]);
-  const[input,setInput]=useState('');
-  const[loading,setLoading]=useState(false);
-
-  const send=()=>{
-    if(!input.trim()||loading)return;
-    setMessages(m=>[...m,{role:'user',content:input}]);setInput('');setLoading(true);
-    setTimeout(()=>{setMessages(m=>[...m,{role:'assistant',content:`Great question about "${input}". Based on Shipley methodology, I recommend focusing on compliance first, then win themes. Would you like me to elaborate?`}]);setLoading(false)},1000);
-  };
-
-  if(!open)return<button onClick={()=>setOpen(true)} className="fixed bottom-10 right-4 w-14 h-14 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full shadow-lg flex items-center justify-center text-2xl hover:scale-105 transition z-50">🤖</button>;
-
-  return(
-    <div className="fixed bottom-10 right-4 w-96 h-[500px] glass shadow-2xl flex flex-col z-50 animate-fadeIn">
-      <div className="p-3 border-b border-slate-700/50 flex justify-between items-center"><span className="font-semibold text-white flex items-center gap-2">🤖 AI Assistant</span><button onClick={()=>setOpen(false)} className="p-1 text-slate-400 hover:text-white"><Icon name="x" className="w-5 h-5"/></button></div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">{messages.map((m,i)=><div key={i} className={`flex ${m.role==='user'?'justify-end':'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-xl text-sm ${m.role==='user'?'bg-cyan-500 text-white':'bg-slate-700 text-slate-200'}`}>{m.content}</div></div>)}{loading&&<div className="flex justify-start"><div className="bg-slate-700 p-3 rounded-xl"><div className="flex gap-1">{[0,1,2].map(i=><div key={i} className="w-2 h-2 bg-slate-400 rounded-full animate-pulse" style={{animationDelay:`${i*0.2}s`}}/>)}</div></div></div>}</div>
-      <div className="p-3 border-t border-slate-700/50 flex gap-2"><input value={input} onChange={e=>setInput(e.target.value)} onKeyPress={e=>e.key==='Enter'&&send()} placeholder="Ask anything..." className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"/><button onClick={send} disabled={!input.trim()||loading} className="p-2 bg-cyan-500 rounded-lg text-white disabled:opacity-50"><Icon name="send" className="w-5 h-5"/></button></div>
-    </div>
-  );
+function ModuleGeneric({mod}){
+  return(<div className="glass p-12 text-center animate-fadeIn"><div className="text-6xl mb-4">{mod.icon}</div><h2 className="text-xl font-bold text-white mb-2">{mod.name}</h2><p className="text-slate-400">{mod.cat} module</p>{mod.badge&&<span className={`inline-block mt-3 px-3 py-1 rounded text-xs font-bold ${mod.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':mod.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{mod.badge}</span>}</div>);
 }
 
 // ============================================================
@@ -1152,12 +628,10 @@ function Sidebar({role,setRole,active,setActive,user}){
         {!collapsed&&<div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white font-bold">MP</div><div><div className="text-sm font-bold text-white">MissionPulse</div><div className="text-[10px] text-slate-500">v12 Production</div></div></div>}
         <button onClick={()=>setCollapsed(!collapsed)} className="p-1 text-slate-400 hover:text-white"><Icon name={collapsed?'chevronRight':'chevronLeft'} className="w-4 h-4"/></button>
       </div>
-
       <div className="p-3 border-b border-slate-800">
         <button onClick={()=>setShowRoles(!showRoles)} className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800"><span className="text-xl">{role.icon}</span>{!collapsed&&<><div className="flex-1 text-left"><div className="text-sm font-medium text-white">{role.fullName}</div><div className="text-xs text-slate-400">{role.name}</div></div><Icon name="chevronDown" className={`w-4 h-4 text-slate-400 transition ${showRoles?'rotate-180':''}`}/></>}</button>
         {showRoles&&!collapsed&&<div className="mt-2 p-2 bg-slate-800/50 rounded-lg max-h-48 overflow-y-auto">{ROLES.map(r=><button key={r.id} onClick={()=>{setRole(r);setShowRoles(false)}} className={`w-full flex items-center gap-2 p-2 rounded hover:bg-slate-700 ${role.id===r.id?'bg-cyan-500/20':''}`}><span>{r.icon}</span><span className="text-sm text-white">{r.name}</span></button>)}</div>}
       </div>
-
       <nav className="flex-1 overflow-y-auto p-2">
         {['Command','Strategy','Intel','Delivery','Admin'].map(cat=>{
           const mods=accessible.filter(m=>m.cat===cat);
@@ -1165,7 +639,6 @@ function Sidebar({role,setRole,active,setActive,user}){
           return(<div key={cat} className="mb-3">{!collapsed&&<div className="text-[10px] uppercase text-slate-500 font-semibold px-2 mb-1">{cat}</div>}{mods.map(m=><button key={m.id} onClick={()=>setActive(m)} className={`w-full flex items-center gap-2 p-2 rounded-lg mb-0.5 transition ${active?.id===m.id?'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30':'text-slate-400 hover:bg-slate-800 hover:text-white'}`} title={collapsed?m.name:''}><span>{m.icon}</span>{!collapsed&&<><span className="flex-1 text-left text-sm">{m.name}</span>{m.badge&&<span className={`px-1 py-0.5 text-[9px] font-bold rounded ${m.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':m.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{m.badge}</span>}</>}</button>)}</div>);
         })}
       </nav>
-
       {!collapsed&&user&&<div className="p-3 border-t border-slate-800"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-400 flex items-center justify-center text-white text-xs font-bold">{user.name?.[0]||'U'}</div><div className="text-xs text-white truncate max-w-[120px]">{user.name||user.email}</div></div><button onClick={handleLogout} className="p-1.5 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400"><Icon name="logout" className="w-4 h-4"/></button></div></div>}
     </aside>
   );
@@ -1178,53 +651,38 @@ function App(){
   const[user,setUser]=useState(null);
   const[role,setRole]=useState(ROLES[0]);
   const[active,setActive]=useState(null);
-  const[opps,setOpps]=useState(DEMO_OPPS);
-  const[tokenUsage,setTokenUsage]=useState(45230);
   const[dbStatus,setDbStatus]=useState('checking');
 
-  // Load opportunities from Supabase
-  const loadOpps=async()=>{
-    if(!supabase){setDbStatus('offline');return}
-    try{
-      const{data,error}=await supabase.from('opportunities').select('*').order('created_at',{ascending:false});
-      if(error)throw error;
-      if(data&&data.length>0){setOpps(data);setDbStatus('connected')}
-      else{setDbStatus('connected')}
-    }catch(e){console.warn('Supabase fetch failed, using demo data:',e);setDbStatus('offline')}
-  };
+  // Global opportunities state with Supabase sync
+  const oppsHook=useSupabaseTable('opportunities',DEMO_OPPS);
 
   useEffect(()=>{
     const u=checkAuth();
-    if(u){setUser(u);loadOpps()}
+    if(u){
+      setUser(u);
+      // Check DB connection
+      if(supabase){
+        supabase.from('opportunities').select('count',{count:'exact',head:true})
+          .then(({error})=>setDbStatus(error?'offline':'connected'))
+          .catch(()=>setDbStatus('offline'));
+      }else{setDbStatus('offline')}
+    }
   },[]);
 
   const renderModule=()=>{
-    if(!active)return<div className="flex-1 flex items-center justify-center"><div className="text-center"><div className="text-6xl mb-4">🛡️</div><h2 className="text-xl font-bold text-white mb-2">Welcome to MissionPulse</h2><p className="text-slate-400">Select a module from the sidebar to begin</p></div></div>;
+    if(!active)return<div className="flex-1 flex items-center justify-center"><div className="text-center"><div className="text-6xl mb-4">🛡️</div><h2 className="text-xl font-bold text-white mb-2">Welcome to MissionPulse</h2><p className="text-slate-400">Select a module to begin</p></div></div>;
     switch(active.id){
-      case 'dashboard':return<ModuleDashboard opps={opps} tokenUsage={tokenUsage} dbStatus={dbStatus}/>;
-      case 'pipeline':return<ModulePipeline opps={opps} setOpps={setOpps} refreshOpps={loadOpps}/>;
-      case 'warroom':return<ModuleWarRoom opps={opps}/>;
-      case 'swimlane':return<ModuleSwimlane/>;
-      case 'winthemes':return<ModuleWinThemes opps={opps}/>;
-      case 'compliance':return<ModuleCompliance/>;
-      case 'contracts':return<ModuleContracts/>;
-      case 'writer':return<ModuleIronDome/>;
+      case 'dashboard':return<ModuleDashboard opps={oppsHook.data} dbStatus={dbStatus}/>;
+      case 'pipeline':return<ModulePipeline opps={oppsHook.data} insert={oppsHook.insert} update={oppsHook.update} remove={oppsHook.remove} load={oppsHook.load}/>;
+      case 'winthemes':return<ModuleWinThemes opps={oppsHook.data}/>;
       case 'blackhat':return<ModuleBlackHat/>;
       case 'pricing':return<ModulePricing/>;
-      case 'hitl':return<ModuleHITL/>;
-      case 'orals':return<ModuleOrals/>;
       case 'frenemy':return<ModuleFrenemy/>;
-      case 'teaming':return<ModuleTeaming/>;
-      case 'launch':return<ModuleLaunch opps={opps}/>;
-      case 'post_award':return<ModulePostAward/>;
+      case 'hitl':return<ModuleHITL/>;
       case 'lessons':return<ModuleLessons/>;
       case 'playbook':return<ModulePlaybook/>;
-      case 'reports':return<ModuleReports opps={opps}/>;
-      case 'admin':return<ModuleAdmin tokenUsage={tokenUsage} setTokenUsage={setTokenUsage}/>;
-      case 'training':return<ModuleTraining/>;
       case 'audit':return<ModuleAudit/>;
-      case 'settings':return<ModuleSettings/>;
-      default:return<div className="glass p-12 text-center animate-fadeIn"><div className="text-6xl mb-4">{active.icon}</div><h2 className="text-xl font-bold text-white mb-2">{active.name}</h2><p className="text-slate-400">{active.cat} module</p></div>;
+      default:return<ModuleGeneric mod={active}/>;
     }
   };
 
@@ -1234,11 +692,10 @@ function App(){
     <div className="h-screen flex bg-[#00050F] overflow-hidden">
       <Sidebar role={role} setRole={setRole} active={active} setActive={setActive} user={user}/>
       <div className="flex-1 flex flex-col overflow-hidden">
-        {active&&<header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3"><div className="flex items-center gap-3"><span className="text-xl">{active.icon}</span><div><h1 className="font-semibold text-white">{active.name}</h1></div>{active.badge&&<span className={`px-2 py-0.5 rounded text-xs font-bold ${active.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':active.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{active.badge}</span>}<span className={`ml-auto text-xs px-2 py-1 rounded ${dbStatus==='connected'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>{dbStatus==='connected'?'● Live':'○ Demo'}</span></div></header>}
+        {active&&<header className="bg-slate-900/90 border-b border-slate-800 px-6 py-3"><div className="flex items-center gap-3"><span className="text-xl">{active.icon}</span><h1 className="font-semibold text-white">{active.name}</h1>{active.badge&&<span className={`px-2 py-0.5 rounded text-xs font-bold ${active.badge==='PRIVATE'?'bg-amber-500/20 text-amber-400':active.badge==='CUI'?'bg-red-500/20 text-red-400':'bg-purple-500/20 text-purple-400'}`}>{active.badge}</span>}<span className={`ml-auto text-xs px-2 py-1 rounded ${dbStatus==='connected'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'}`}>{dbStatus==='connected'?'● Live':'○ Demo'}</span></div></header>}
         <main className="flex-1 overflow-y-auto p-6">{renderModule()}</main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 Production • © 2026 Mission Meets Tech</span></div>
-      <AIChatWidget/>
+      <div className="fixed bottom-0 left-0 right-0 h-6 bg-slate-900/95 border-t border-slate-800 flex items-center justify-center z-40"><span className="text-[10px] text-slate-500">AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse v12 • © 2026 Mission Meets Tech</span></div>
     </div>
   );
 }
