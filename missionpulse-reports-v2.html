@@ -3,405 +3,242 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - Reports</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <title>Reports | MissionPulse</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
-    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
-    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
-    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
-    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
-    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',system-ui,sans-serif;background:#00050F;color:#e2e8f0;min-height:100vh}
+    .glass{background:rgba(15,23,42,0.85);backdrop-filter:blur(16px);border:1px solid rgba(0,229,250,0.1);border-radius:12px}
   </style>
 </head>
-<body class="p-6">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
-    <div class="flex items-center gap-4">
-      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
-      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Reports</span> Center</h1>
-    </div>
-    <div class="flex items-center gap-4">
-      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
-        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-        <span class="text-gray-400">Connecting...</span>
-      </div>
-      <select id="typeFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
-        <option value="">All Types</option>
-        <option value="pipeline">Pipeline</option>
-        <option value="win_loss">Win/Loss</option>
-        <option value="compliance">Compliance</option>
-        <option value="executive">Executive</option>
-        <option value="capture">Capture</option>
-      </select>
-      <button onclick="openGenerateModal()" class="btn-primary px-4 py-2 rounded-lg">+ Generate Report</button>
-    </div>
-  </div>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect}=React;
+const SUPABASE_URL='https://qdrtpnpnhkxvfmvfziop.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+const supabase=window.supabase?.createClient(SUPABASE_URL,SUPABASE_ANON);
 
-  <!-- Stats Row -->
-  <div class="grid grid-cols-4 gap-4 mb-6">
-    <div class="card p-4 text-center">
-      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
-      <div class="text-gray-400 text-sm">Total Reports</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statThisMonth" class="text-3xl font-bold text-green-400">0</div>
-      <div class="text-gray-400 text-sm">This Month</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statPDF" class="text-3xl font-bold text-red-400">0</div>
-      <div class="text-gray-400 text-sm">PDF Exports</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statExcel" class="text-3xl font-bold text-emerald-400">0</div>
-      <div class="text-gray-400 text-sm">Excel Exports</div>
-    </div>
-  </div>
+const REPORT_TYPES=[
+  {id:'pipeline',name:'Pipeline Summary',icon:'📊',desc:'Active opportunities and metrics'},
+  {id:'compliance',name:'Compliance Status',icon:'✓',desc:'L/M requirement completion'},
+  {id:'pricing',name:'Pricing Summary',icon:'💵',desc:'BOE and cost analysis'},
+  {id:'team',name:'Team Utilization',icon:'👥',desc:'Assignment and workload'},
+  {id:'timeline',name:'Timeline Report',icon:'📅',desc:'Milestones and deadlines'},
+  {id:'executive',name:'Executive Brief',icon:'📋',desc:'High-level summary for leadership'}
+];
 
-  <!-- Quick Generate Templates -->
-  <div class="card p-4 mb-6">
-    <h3 class="text-sm text-gray-400 mb-3">Quick Generate</h3>
-    <div class="flex gap-3 flex-wrap">
-      <button onclick="quickGenerate('pipeline')" class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm">📊 Pipeline Summary</button>
-      <button onclick="quickGenerate('win_loss')" class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 text-sm">📈 Win/Loss Analysis</button>
-      <button onclick="quickGenerate('compliance')" class="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 text-sm">✓ Compliance Status</button>
-      <button onclick="quickGenerate('executive')" class="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 text-sm">👔 Executive Brief</button>
-      <button onclick="quickGenerate('capture')" class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 text-sm">🎯 Capture Metrics</button>
-    </div>
-  </div>
+function Reports(){
+  const[connected,setConnected]=useState(false);
+  const[selectedReport,setSelectedReport]=useState('pipeline');
+  const[dateRange,setDateRange]=useState('30d');
+  const[exporting,setExporting]=useState(false);
+  const[data,setData]=useState({opps:[],compliance:[],pricing:[]});
 
-  <!-- Reports Grid -->
-  <div id="reportsContainer" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-    <div class="card p-8 text-center text-gray-500 col-span-full">Loading reports...</div>
-  </div>
+  useEffect(()=>{
+    const load=async()=>{
+      try{
+        const[oppsRes,compRes,priceRes]=await Promise.all([
+          supabase.from('opportunities').select('*'),
+          supabase.from('compliance_items').select('*'),
+          supabase.from('pricing_items').select('*')
+        ]);
+        setData({
+          opps:oppsRes.data||[],
+          compliance:compRes.data||[],
+          pricing:priceRes.data||[]
+        });
+        setConnected(!oppsRes.error);
+      }catch{setConnected(false)}
+    };
+    load();
+  },[]);
 
-  <!-- Generate Report Modal -->
-  <div id="generateModal" class="modal hidden">
-    <div class="card p-6 w-full max-w-lg">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-bold text-cyan-400">Generate Report</h2>
-        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
-      </div>
-      <form id="generateForm" onsubmit="handleGenerate(event)">
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Report Name *</label>
-          <input type="text" id="reportName" required placeholder="Q1 Pipeline Analysis" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-        </div>
+  const fmt=v=>v>=1e9?`$${(v/1e9).toFixed(1)}B`:v>=1e6?`$${(v/1e6).toFixed(1)}M`:`$${(v||0).toLocaleString()}`;
 
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Report Type *</label>
-            <select id="reportType" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-              <option value="pipeline">Pipeline Summary</option>
-              <option value="win_loss">Win/Loss Analysis</option>
-              <option value="compliance">Compliance Status</option>
-              <option value="executive">Executive Brief</option>
-              <option value="capture">Capture Metrics</option>
-              <option value="custom">Custom Report</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Export Format</label>
-            <select id="exportFormat" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-              <option value="pdf">PDF</option>
-              <option value="excel">Excel</option>
-              <option value="csv">CSV</option>
-              <option value="json">JSON</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Date Range Start</label>
-            <input type="date" id="dateRangeStart" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Date Range End</label>
-            <input type="date" id="dateRangeEnd" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Generated By</label>
-          <input type="text" id="generatedBy" placeholder="Your name" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-        </div>
-
-        <div class="flex justify-end gap-3">
-          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
-          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Generate Report</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- View Report Modal -->
-  <div id="viewModal" class="modal hidden">
-    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <h2 id="viewTitle" class="text-xl font-bold text-cyan-400">Report Details</h2>
-        <button onclick="closeViewModal()" class="text-gray-400 hover:text-white">✕</button>
-      </div>
-      
-      <div class="grid grid-cols-3 gap-4 mb-4">
-        <div class="bg-slate-800 rounded p-3">
-          <div class="text-xs text-gray-400">Type</div>
-          <div id="viewType" class="font-semibold">-</div>
-        </div>
-        <div class="bg-slate-800 rounded p-3">
-          <div class="text-xs text-gray-400">Format</div>
-          <div id="viewFormat" class="font-semibold">-</div>
-        </div>
-        <div class="bg-slate-800 rounded p-3">
-          <div class="text-xs text-gray-400">Generated</div>
-          <div id="viewGenerated" class="font-semibold">-</div>
-        </div>
-      </div>
-
-      <div class="mb-4">
-        <div class="text-sm text-gray-400 mb-1">Date Range</div>
-        <div id="viewDateRange" class="bg-slate-800 rounded p-3">-</div>
-      </div>
-
-      <div class="mb-4">
-        <div class="text-sm text-gray-400 mb-1">Report Data</div>
-        <pre id="viewData" class="bg-slate-800 rounded p-4 text-sm overflow-x-auto max-h-64 overflow-y-auto font-mono text-gray-300">-</pre>
-      </div>
-
-      <div class="flex justify-between">
-        <button onclick="deleteReport()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg">🗑️ Delete</button>
-        <div class="flex gap-2">
-          <button onclick="closeViewModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Close</button>
-          <button id="downloadBtn" onclick="downloadReport()" class="btn-primary px-4 py-2 rounded-lg">📥 Download</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
-
-  <script>
-    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-    
-    let supabase, allReports = [], currentReportId = null;
-
-    function initSupabase() {
-      if (typeof window.supabase !== 'undefined') {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        updateConnectionStatus(true);
-        return true;
+  const exportReport=(format)=>{
+    setExporting(true);
+    setTimeout(()=>{
+      const reportData=selectedReport==='pipeline'?data.opps:selectedReport==='compliance'?data.compliance:data.pricing;
+      if(format==='csv'){
+        const headers=Object.keys(reportData[0]||{}).join(',');
+        const rows=reportData.map(r=>Object.values(r).join(',')).join('\n');
+        const blob=new Blob([headers+'\n'+rows],{type:'text/csv'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;a.download=`${selectedReport}-report.csv`;a.click();
+      }else{
+        const blob=new Blob([JSON.stringify(reportData,null,2)],{type:'application/json'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;a.download=`${selectedReport}-report.json`;a.click();
       }
-      return false;
-    }
+      setExporting(false);
+    },1000);
+  };
 
-    function updateConnectionStatus(connected) {
-      document.getElementById('connectionStatus').innerHTML = connected 
-        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
-        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
-    }
+  const pipelineTotal=data.opps.reduce((s,o)=>s+(o.ceiling||0),0);
+  const avgPwin=data.opps.length?Math.round(data.opps.reduce((s,o)=>s+(o.pwin||0),0)/data.opps.length):0;
+  const complianceComplete=data.compliance.filter(c=>c.status==='complete').length;
+  const pricingTotal=data.pricing.reduce((s,p)=>s+(p.total||p.rate*p.hours*p.wrap||0),0);
 
-    async function loadReports() {
-      try {
-        const typeFilter = document.getElementById('typeFilter').value;
-        let query = supabase.from('reports').select('*').order('generated_at', { ascending: false });
-        if (typeFilter) query = query.eq('report_type', typeFilter);
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        allReports = data || [];
-        renderReports();
-        updateStats();
-      } catch (err) {
-        console.error('Failed to load reports:', err);
-        showEmptyState('Failed to load reports');
-      }
-    }
-
-    function renderReports() {
-      const container = document.getElementById('reportsContainer');
-      if (allReports.length === 0) {
-        showEmptyState('No reports found');
-        return;
-      }
-      
-      container.innerHTML = allReports.map(r => `
-        <div class="card p-4 hover:border-cyan-400/50 cursor-pointer" onclick="openViewModal('${r.id}')">
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-lg ${getTypeColor(r.report_type)} flex items-center justify-center text-lg">
-                ${getTypeIcon(r.report_type)}
-              </div>
-              <div>
-                <h3 class="font-semibold">${r.report_name || 'Untitled'}</h3>
-                <span class="text-xs text-gray-500">${formatType(r.report_type)}</span>
-              </div>
+  const renderReport=()=>{
+    switch(selectedReport){
+      case 'pipeline':
+        return(
+          <div className="space-y-6">
+            <div className="grid grid-cols-4 gap-4">
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Total Pipeline</div><div className="text-2xl font-bold text-emerald-400">{fmt(pipelineTotal)}</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Opportunities</div><div className="text-2xl font-bold text-cyan-400">{data.opps.length}</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Avg pWin</div><div className="text-2xl font-bold text-amber-400">{avgPwin}%</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Due &lt;30d</div><div className="text-2xl font-bold text-red-400">{data.opps.filter(o=>o.days_to_due<=30).length}</div></div>
             </div>
-            <span class="text-xs px-2 py-1 rounded ${getFormatClass(r.export_format)}">${(r.export_format || 'pdf').toUpperCase()}</span>
+            <div className="glass overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-slate-800/50">
+                  <tr>{['Opportunity','Agency','Value','Phase','pWin','Days'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/30">
+                  {data.opps.map(o=>(
+                    <tr key={o.id} className="hover:bg-slate-800/30">
+                      <td className="p-3 text-white">{o.nickname||o.title}</td>
+                      <td className="p-3 text-slate-400">{o.agency}</td>
+                      <td className="p-3 text-emerald-400">{fmt(o.ceiling)}</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-xs">{o.phase}</span></td>
+                      <td className="p-3 text-slate-300">{o.pwin}%</td>
+                      <td className="p-3 text-slate-400">{o.days_to_due}d</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          
-          ${r.date_range_start && r.date_range_end ? `<div class="text-xs text-gray-400 mb-2">📅 ${formatDate(r.date_range_start)} - ${formatDate(r.date_range_end)}</div>` : ''}
-          
-          ${r.generated_by ? `<div class="text-xs text-gray-500 mb-2">👤 ${r.generated_by}</div>` : ''}
-          
-          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
-            <span class="text-xs text-gray-500">${formatDateTime(r.generated_at)}</span>
-            ${r.file_url ? `<a href="${r.file_url}" target="_blank" onclick="event.stopPropagation()" class="text-cyan-400 hover:text-cyan-300 text-xs">📥 Download</a>` : ''}
+        );
+      case 'compliance':
+        return(
+          <div className="space-y-6">
+            <div className="grid grid-cols-4 gap-4">
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Total Items</div><div className="text-2xl font-bold text-white">{data.compliance.length}</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Complete</div><div className="text-2xl font-bold text-emerald-400">{complianceComplete}</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">In Progress</div><div className="text-2xl font-bold text-amber-400">{data.compliance.filter(c=>c.status==='in_progress').length}</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Completion</div><div className="text-2xl font-bold text-cyan-400">{data.compliance.length?Math.round((complianceComplete/data.compliance.length)*100):0}%</div></div>
+            </div>
+            <div className="glass overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-slate-800/50">
+                  <tr>{['Req ID','Type','Description','Section','Owner','Status'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/30">
+                  {data.compliance.map(c=>(
+                    <tr key={c.id} className="hover:bg-slate-800/30">
+                      <td className="p-3 text-cyan-400 font-mono">{c.req_id}</td>
+                      <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs ${c.type==='L'?'bg-blue-500/20 text-blue-400':'bg-purple-500/20 text-purple-400'}`}>{c.type}</span></td>
+                      <td className="p-3 text-white text-sm">{c.description}</td>
+                      <td className="p-3 text-slate-400">{c.section}</td>
+                      <td className="p-3 text-slate-300">{c.owner}</td>
+                      <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs ${c.status==='complete'?'bg-emerald-500/20 text-emerald-400':c.status==='in_progress'?'bg-amber-500/20 text-amber-400':'bg-slate-500/20 text-slate-400'}`}>{c.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+        );
+      case 'pricing':
+        return(
+          <div className="space-y-6">
+            <div className="grid grid-cols-4 gap-4">
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Total Cost</div><div className="text-2xl font-bold text-emerald-400">{fmt(pricingTotal)}</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">LCATs</div><div className="text-2xl font-bold text-cyan-400">{data.pricing.length}</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Total Hours</div><div className="text-2xl font-bold text-amber-400">{data.pricing.reduce((s,p)=>s+(p.hours||0),0).toLocaleString()}</div></div>
+              <div className="glass p-4"><div className="text-slate-400 text-xs">Avg Rate</div><div className="text-2xl font-bold text-purple-400">${data.pricing.length?Math.round(data.pricing.reduce((s,p)=>s+(p.rate||0),0)/data.pricing.length):0}</div></div>
+            </div>
+            <div className="glass overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-slate-800/50">
+                  <tr>{['LCAT','Rate','Hours','Wrap','Total'].map(h=><th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/30">
+                  {data.pricing.map(p=>(
+                    <tr key={p.id} className="hover:bg-slate-800/30">
+                      <td className="p-3 text-white">{p.lcat}</td>
+                      <td className="p-3 text-slate-300">${p.rate?.toFixed(2)}</td>
+                      <td className="p-3 text-slate-300">{p.hours?.toLocaleString()}</td>
+                      <td className="p-3 text-slate-400">{p.wrap}x</td>
+                      <td className="p-3 text-emerald-400 font-medium">{fmt(p.total||p.rate*p.hours*p.wrap)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      default:
+        return(
+          <div className="glass p-12 text-center">
+            <span className="text-6xl">{REPORT_TYPES.find(r=>r.id===selectedReport)?.icon}</span>
+            <h3 className="text-xl font-bold text-white mt-4">{REPORT_TYPES.find(r=>r.id===selectedReport)?.name}</h3>
+            <p className="text-slate-400 mt-2">Report data will be displayed here</p>
+          </div>
+        );
+    }
+  };
+
+  return(
+    <div className="min-h-screen p-6">
+      {/* Header */}
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            📈 Reports & Analytics
+            <span className={`text-xs px-2 py-1 rounded ${connected?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'}`}>
+              {connected?'● Live':'○ Demo'}
+            </span>
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">Generate and export proposal analytics</p>
         </div>
-      `).join('');
-    }
+        <div className="flex items-center gap-3">
+          <select value={dateRange} onChange={e=>setDateRange(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+            <option value="all">All time</option>
+          </select>
+          <button onClick={()=>exportReport('csv')} disabled={exporting} className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-600 disabled:opacity-50">
+            {exporting?'...':'📥 CSV'}
+          </button>
+          <button onClick={()=>exportReport('json')} disabled={exporting} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg text-sm disabled:opacity-50">
+            {exporting?'...':'📥 JSON'}
+          </button>
+        </div>
+      </div>
 
-    function showEmptyState(message) {
-      document.getElementById('reportsContainer').innerHTML = `
-        <div class="card p-8 text-center text-gray-500 col-span-full">
-          <p>${message}</p>
-          <button onclick="openGenerateModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Generate First Report</button>
-        </div>`;
-    }
+      {/* Report Selector */}
+      <div className="grid grid-cols-6 gap-3 mb-6">
+        {REPORT_TYPES.map(report=>(
+          <button key={report.id} onClick={()=>setSelectedReport(report.id)} className={`glass p-4 text-left transition-all ${selectedReport===report.id?'border-cyan-500/50 bg-cyan-500/10':''}`}>
+            <span className="text-2xl">{report.icon}</span>
+            <div className="font-medium text-white mt-2 text-sm">{report.name}</div>
+            <div className="text-xs text-slate-500 mt-1">{report.desc}</div>
+          </button>
+        ))}
+      </div>
 
-    function getTypeColor(type) {
-      const colors = { pipeline: 'bg-blue-500/20', win_loss: 'bg-purple-500/20', compliance: 'bg-amber-500/20', executive: 'bg-cyan-500/20', capture: 'bg-green-500/20' };
-      return colors[type] || 'bg-gray-500/20';
-    }
+      {/* Report Content */}
+      {renderReport()}
 
-    function getTypeIcon(type) {
-      const icons = { pipeline: '📊', win_loss: '📈', compliance: '✓', executive: '👔', capture: '🎯' };
-      return icons[type] || '📄';
-    }
+      <div className="text-center text-xs text-slate-500 mt-8">
+        AI GENERATED - REQUIRES HUMAN REVIEW | © 2026 Mission Meets Tech
+      </div>
+    </div>
+  );
+}
 
-    function formatType(type) {
-      const labels = { pipeline: 'Pipeline Summary', win_loss: 'Win/Loss Analysis', compliance: 'Compliance Status', executive: 'Executive Brief', capture: 'Capture Metrics' };
-      return labels[type] || type || 'Report';
-    }
-
-    function getFormatClass(format) {
-      return { pdf: 'bg-red-500/20 text-red-400', excel: 'bg-green-500/20 text-green-400', csv: 'bg-blue-500/20 text-blue-400', json: 'bg-purple-500/20 text-purple-400' }[format] || 'bg-gray-500/20 text-gray-400';
-    }
-
-    function formatDate(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'; }
-    function formatDateTime(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'; }
-
-    function updateStats() {
-      const thisMonth = new Date();
-      thisMonth.setDate(1);
-      
-      document.getElementById('statTotal').textContent = allReports.length;
-      document.getElementById('statThisMonth').textContent = allReports.filter(r => new Date(r.generated_at) >= thisMonth).length;
-      document.getElementById('statPDF').textContent = allReports.filter(r => r.export_format === 'pdf').length;
-      document.getElementById('statExcel').textContent = allReports.filter(r => r.export_format === 'excel').length;
-    }
-
-    function openGenerateModal() {
-      document.getElementById('generateForm').reset();
-      // Set default dates
-      const today = new Date();
-      const monthAgo = new Date();
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
-      document.getElementById('dateRangeEnd').value = today.toISOString().split('T')[0];
-      document.getElementById('dateRangeStart').value = monthAgo.toISOString().split('T')[0];
-      document.getElementById('generateModal').classList.remove('hidden');
-    }
-
-    function closeModal() { document.getElementById('generateModal').classList.add('hidden'); }
-
-    function quickGenerate(type) {
-      document.getElementById('reportType').value = type;
-      document.getElementById('reportName').value = formatType(type) + ' - ' + new Date().toLocaleDateString();
-      openGenerateModal();
-    }
-
-    async function handleGenerate(event) {
-      event.preventDefault();
-      
-      const reportData = {
-        report_name: document.getElementById('reportName').value,
-        report_type: document.getElementById('reportType').value,
-        export_format: document.getElementById('exportFormat').value,
-        date_range_start: document.getElementById('dateRangeStart').value || null,
-        date_range_end: document.getElementById('dateRangeEnd').value || null,
-        generated_by: document.getElementById('generatedBy').value || null,
-        generated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        report_data: JSON.stringify({ generated: true, timestamp: new Date().toISOString() })
-      };
-
-      try {
-        const { error } = await supabase.from('reports').insert([reportData]);
-        if (error) throw error;
-        closeModal();
-        await loadReports();
-        alert('Report generated successfully!');
-      } catch (err) {
-        console.error('Failed to generate:', err);
-        alert('Failed to generate: ' + err.message);
-      }
-    }
-
-    function openViewModal(id) {
-      const report = allReports.find(r => r.id === id);
-      if (!report) return;
-      
-      currentReportId = id;
-      document.getElementById('viewTitle').textContent = report.report_name || 'Report Details';
-      document.getElementById('viewType').textContent = formatType(report.report_type);
-      document.getElementById('viewFormat').textContent = (report.export_format || 'pdf').toUpperCase();
-      document.getElementById('viewGenerated').textContent = report.generated_by || 'System';
-      document.getElementById('viewDateRange').textContent = report.date_range_start && report.date_range_end 
-        ? `${formatDate(report.date_range_start)} - ${formatDate(report.date_range_end)}` 
-        : 'No date range specified';
-      
-      try {
-        const data = JSON.parse(report.report_data || '{}');
-        document.getElementById('viewData').textContent = JSON.stringify(data, null, 2);
-      } catch {
-        document.getElementById('viewData').textContent = report.report_data || 'No data';
-      }
-      
-      document.getElementById('downloadBtn').style.display = report.file_url ? 'block' : 'none';
-      document.getElementById('viewModal').classList.remove('hidden');
-    }
-
-    function closeViewModal() { document.getElementById('viewModal').classList.add('hidden'); currentReportId = null; }
-
-    async function deleteReport() {
-      if (!currentReportId || !confirm('Delete this report?')) return;
-      try {
-        const { error } = await supabase.from('reports').delete().eq('id', currentReportId);
-        if (error) throw error;
-        closeViewModal();
-        await loadReports();
-      } catch (err) {
-        console.error('Failed to delete:', err);
-        alert('Failed to delete: ' + err.message);
-      }
-    }
-
-    function downloadReport() {
-      const report = allReports.find(r => r.id === currentReportId);
-      if (report?.file_url) window.open(report.file_url, '_blank');
-    }
-
-    function subscribeToChanges() {
-      supabase.channel('reports_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => loadReports()).subscribe();
-    }
-
-    document.getElementById('typeFilter').addEventListener('change', loadReports);
-
-    async function init() {
-      if (!initSupabase()) { updateConnectionStatus(false); return; }
-      await loadReports();
-      subscribeToChanges();
-    }
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
-  </script>
+ReactDOM.render(<Reports/>,document.getElementById('root'));
+</script>
 </body>
 </html>
