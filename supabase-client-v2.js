@@ -6,7 +6,7 @@
 (function(global) {
   'use strict';
 
-  const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+  const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
   const RENDER_API_URL = 'https://missionpulse-api.onrender.com';
 
