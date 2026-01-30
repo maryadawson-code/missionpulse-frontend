@@ -1,420 +1,399 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - RFP Shredder</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
-    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
-    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
-    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
-    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
-    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
-    .type-shall { border-left: 4px solid #EF4444; }
-    .type-should { border-left: 4px solid #F59E0B; }
-    .type-may { border-left: 4px solid #10B981; }
-    .type-will { border-left: 4px solid #8B5CF6; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFP Shredder | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a1628; }
+        ::-webkit-scrollbar-thumb { background: #00E5FA; border-radius: 3px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-pulse { animation: pulse 2s infinite; }
+        .spinner { animation: spin 1s linear infinite; }
+        .drop-zone { border: 2px dashed rgba(0, 229, 250, 0.3); transition: all 0.3s; }
+        .drop-zone:hover, .drop-zone.dragover { border-color: #00E5FA; background: rgba(0, 229, 250, 0.1); }
+    </style>
 </head>
-<body class="p-6">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
-    <div class="flex items-center gap-4">
-      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
-      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">RFP</span> Shredder</h1>
-    </div>
-    <div class="flex items-center gap-4">
-      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
-        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-        <span class="text-gray-400">Connecting...</span>
-      </div>
-      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
-        <option value="">Select Opportunity</option>
-      </select>
-      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ Add Requirement</button>
-    </div>
-  </div>
+<body class="bg-[#00050F] text-white min-h-screen">
+    <div id="root"></div>
 
-  <!-- Stats Row -->
-  <div class="grid grid-cols-6 gap-4 mb-6">
-    <div class="card p-4 text-center">
-      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
-      <div class="text-gray-400 text-sm">Total Reqs</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statShall" class="text-3xl font-bold text-red-400">0</div>
-      <div class="text-gray-400 text-sm">SHALL</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statMapped" class="text-3xl font-bold text-green-400">0</div>
-      <div class="text-gray-400 text-sm">Mapped</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statCompliant" class="text-3xl font-bold text-emerald-400">0</div>
-      <div class="text-gray-400 text-sm">Compliant</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statRisks" class="text-3xl font-bold text-amber-400">0</div>
-      <div class="text-gray-400 text-sm">Risks</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statProgress" class="text-3xl font-bold text-purple-400">0%</div>
-      <div class="text-gray-400 text-sm">Progress</div>
-    </div>
-  </div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
 
-  <!-- Filters -->
-  <div class="card p-4 mb-6">
-    <div class="flex gap-4">
-      <input type="text" id="searchInput" placeholder="Search requirements..." class="flex-1 bg-slate-800 border border-slate-600 rounded px-4 py-2" oninput="filterRequirements()">
-      <select id="typeFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2" onchange="filterRequirements()">
-        <option value="">All Types</option>
-        <option value="shall">SHALL</option>
-        <option value="should">SHOULD</option>
-        <option value="will">WILL</option>
-        <option value="may">MAY</option>
-      </select>
-      <select id="sectionFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2" onchange="filterRequirements()">
-        <option value="">All Sections</option>
-        <option value="L">Section L</option>
-        <option value="M">Section M</option>
-        <option value="C">Section C</option>
-      </select>
-      <select id="statusFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2" onchange="filterRequirements()">
-        <option value="">All Status</option>
-        <option value="unmapped">Unmapped</option>
-        <option value="mapped">Mapped</option>
-        <option value="risk">Has Risk</option>
-      </select>
-    </div>
-  </div>
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-  <!-- Requirements Grid -->
-  <div id="requirementsContainer" class="space-y-3">
-    <div class="card p-8 text-center text-gray-500">Select an opportunity to view requirements</div>
-  </div>
+        const SECTIONS = ['L - Technical', 'M - Management', 'N - Past Performance', 'O - Price', 'K - Certifications'];
+        const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
+        const STATUSES = ['Pending', 'Mapped', 'Assigned', 'Complete'];
 
-  <!-- Add/Edit Modal -->
-  <div id="reqModal" class="modal hidden">
-    <div class="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Requirement</h2>
-        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
-      </div>
-      <form id="reqForm" onsubmit="handleSubmit(event)">
-        <input type="hidden" id="reqId">
-        
-        <div class="grid grid-cols-3 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Requirement ID *</label>
-            <input type="text" id="requirementId" required placeholder="L-001" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">RFP Section</label>
-            <select id="rfpSection" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-              <option value="L">Section L</option>
-              <option value="M">Section M</option>
-              <option value="C">Section C</option>
-              <option value="H">Section H</option>
-              <option value="I">Section I</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Type *</label>
-            <select id="requirementType" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-              <option value="shall">SHALL</option>
-              <option value="should">SHOULD</option>
-              <option value="will">WILL</option>
-              <option value="may">MAY</option>
-            </select>
-          </div>
-        </div>
+        const App = () => {
+            const [opportunities, setOpportunities] = useState([]);
+            const [selectedOpp, setSelectedOpp] = useState('');
+            const [requirements, setRequirements] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [connected, setConnected] = useState(false);
+            const [search, setSearch] = useState('');
+            const [sectionFilter, setSectionFilter] = useState('All');
+            const [showModal, setShowModal] = useState(false);
+            const [editingReq, setEditingReq] = useState(null);
+            const [formData, setFormData] = useState({});
+            const [analyzing, setAnalyzing] = useState(false);
+            const [dragOver, setDragOver] = useState(false);
+            const fileInputRef = useRef(null);
 
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Requirement Text *</label>
-          <textarea id="requirementText" required rows="3" placeholder="The Contractor shall..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
-        </div>
+            const loadOpportunities = async () => {
+                try {
+                    const { data } = await supabase.from('opportunities').select('id, title').order('title');
+                    setOpportunities(data || []);
+                    if (data?.length) setSelectedOpp(data[0].id);
+                    setConnected(true);
+                } catch (e) {
+                    console.error(e);
+                    setConnected(false);
+                }
+            };
 
-        <div class="grid grid-cols-3 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Priority</label>
-            <select id="priority" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Source Page</label>
-            <input type="text" id="sourcePage" placeholder="p. 42" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Assigned To</label>
-            <input type="text" id="assignedTo" placeholder="Author name..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-        </div>
+            const loadRequirements = async () => {
+                if (!selectedOpp) return;
+                setLoading(true);
+                try {
+                    const { data } = await supabase
+                        .from('rfp_requirements')
+                        .select('*')
+                        .eq('opportunity_id', selectedOpp)
+                        .order('section', { ascending: true });
+                    setRequirements(data || []);
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    setLoading(false);
+                }
+            };
 
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Proposal Section Mapping</label>
-          <input type="text" id="proposalSection" placeholder="Technical Approach 2.1" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-        </div>
+            useEffect(() => { loadOpportunities(); }, []);
+            useEffect(() => { loadRequirements(); }, [selectedOpp]);
 
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Compliance Response</label>
-          <textarea id="complianceResponse" rows="2" placeholder="How we address this requirement..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
-        </div>
+            const filtered = useMemo(() => {
+                return requirements.filter(r => {
+                    const matchesSearch = !search || 
+                        r.requirement_text?.toLowerCase().includes(search.toLowerCase()) ||
+                        r.reference?.toLowerCase().includes(search.toLowerCase());
+                    const matchesSection = sectionFilter === 'All' || r.section?.startsWith(sectionFilter.split(' ')[0]);
+                    return matchesSearch && matchesSection;
+                });
+            }, [requirements, search, sectionFilter]);
 
-        <div class="flex gap-6 mb-4">
-          <label class="flex items-center gap-2">
-            <input type="checkbox" id="isMapped" class="rounded border-slate-600">
-            <span class="text-sm text-gray-400">Mapped to proposal</span>
-          </label>
-          <label class="flex items-center gap-2">
-            <input type="checkbox" id="isCompliant" class="rounded border-slate-600">
-            <span class="text-sm text-gray-400">Compliant</span>
-          </label>
-          <label class="flex items-center gap-2">
-            <input type="checkbox" id="isRisk" class="rounded border-slate-600">
-            <span class="text-sm text-gray-400">Risk Flag</span>
-          </label>
-        </div>
+            const stats = useMemo(() => ({
+                total: requirements.length,
+                critical: requirements.filter(r => r.priority === 'Critical').length,
+                mapped: requirements.filter(r => r.status === 'Mapped' || r.status === 'Assigned' || r.status === 'Complete').length,
+                complete: requirements.filter(r => r.status === 'Complete').length
+            }), [requirements]);
 
-        <div class="flex justify-end gap-3">
-          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
-          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Requirement</button>
-        </div>
-      </form>
-    </div>
-  </div>
+            const openModal = (req = null) => {
+                setEditingReq(req);
+                setFormData(req || {
+                    opportunity_id: selectedOpp,
+                    reference: '',
+                    requirement_text: '',
+                    section: 'L - Technical',
+                    priority: 'Medium',
+                    status: 'Pending',
+                    response_section: '',
+                    notes: ''
+                });
+                setShowModal(true);
+            };
 
-  <!-- Footer -->
-  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
+            const saveRequirement = async () => {
+                try {
+                    if (editingReq) {
+                        await supabase.from('rfp_requirements').update(formData).eq('id', editingReq.id);
+                    } else {
+                        await supabase.from('rfp_requirements').insert([formData]);
+                    }
+                    setShowModal(false);
+                    loadRequirements();
+                } catch (e) {
+                    alert('Error: ' + e.message);
+                }
+            };
 
-  <script>
-    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-    
-    let supabase, allRequirements = [], opportunities = [], editingId = null;
+            const deleteRequirement = async (id) => {
+                if (!confirm('Delete this requirement?')) return;
+                await supabase.from('rfp_requirements').delete().eq('id', id);
+                loadRequirements();
+            };
 
-    function initSupabase() {
-      if (typeof window.supabase !== 'undefined') {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        updateConnectionStatus(true);
-        return true;
-      }
-      return false;
-    }
+            const updateStatus = async (id, status) => {
+                await supabase.from('rfp_requirements').update({ status }).eq('id', id);
+                loadRequirements();
+            };
 
-    function updateConnectionStatus(connected) {
-      document.getElementById('connectionStatus').innerHTML = connected 
-        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
-        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
-    }
+            const handleFileDrop = async (e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer?.files?.[0] || e.target?.files?.[0];
+                if (!file) return;
+                
+                setAnalyzing(true);
+                // Simulate AI analysis - in production this would call the AI API
+                await new Promise(r => setTimeout(r, 2000));
+                
+                // Mock extracted requirements
+                const mockRequirements = [
+                    { reference: 'L.1.1', requirement_text: 'The Contractor shall provide cloud hosting services...', section: 'L - Technical', priority: 'Critical' },
+                    { reference: 'L.1.2', requirement_text: 'The system shall maintain 99.9% uptime...', section: 'L - Technical', priority: 'High' },
+                    { reference: 'L.2.1', requirement_text: 'The Contractor shall implement FedRAMP High controls...', section: 'L - Technical', priority: 'Critical' },
+                    { reference: 'M.1.1', requirement_text: 'The Contractor shall provide a Program Manager...', section: 'M - Management', priority: 'High' },
+                    { reference: 'N.1.1', requirement_text: 'Provide three relevant past performance references...', section: 'N - Past Performance', priority: 'Medium' },
+                ];
+                
+                for (const req of mockRequirements) {
+                    await supabase.from('rfp_requirements').insert([{
+                        opportunity_id: selectedOpp,
+                        ...req,
+                        status: 'Pending',
+                        notes: 'Auto-extracted by RFP Shredder AI'
+                    }]);
+                }
+                
+                setAnalyzing(false);
+                loadRequirements();
+            };
 
-    async function loadOpportunities() {
-      try {
-        const { data } = await supabase.from('opportunities').select('id, title, name').order('title');
-        opportunities = data || [];
-        document.getElementById('opportunityFilter').innerHTML = `<option value="">Select Opportunity</option>` + 
-          opportunities.map(o => `<option value="${o.id}">${o.title || o.name}</option>`).join('');
-      } catch (err) { console.error('Failed to load opportunities:', err); }
-    }
+            return (
+                <div className="min-h-screen bg-[#00050F] p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h1 className="text-2xl font-bold flex items-center gap-3">
+                                    <span className="text-3xl">📄</span>
+                                    RFP Shredder
+                                </h1>
+                                <p className="text-white/60 mt-1">Extract and track RFP requirements</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <select
+                                    value={selectedOpp}
+                                    onChange={(e) => setSelectedOpp(e.target.value)}
+                                    className="bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white min-w-[250px]"
+                                >
+                                    {opportunities.map(o => (
+                                        <option key={o.id} value={o.id}>{o.title}</option>
+                                    ))}
+                                </select>
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'} status-pulse`}></div>
+                                    {connected ? 'Connected' : 'Offline'}
+                                </div>
+                                <button onClick={() => openModal()} className="px-4 py-2 bg-[#00E5FA] text-[#00050F] rounded-lg font-medium hover:bg-[#00E5FA]/90">
+                                    + Add Requirement
+                                </button>
+                            </div>
+                        </div>
 
-    async function loadRequirements() {
-      try {
-        const oppFilter = document.getElementById('opportunityFilter').value;
-        if (!oppFilter) {
-          showEmptyState('Select an opportunity to view requirements');
-          return;
-        }
-        
-        const { data, error } = await supabase.from('rfp_requirements')
-          .select('*')
-          .eq('opportunity_id', oppFilter)
-          .order('requirement_id');
-        if (error) throw error;
-        
-        allRequirements = data || [];
-        filterRequirements();
-        updateStats();
-      } catch (err) {
-        console.error('Failed to load requirements:', err);
-        showEmptyState('Failed to load requirements');
-      }
-    }
+                        {/* Upload Zone */}
+                        <div 
+                            className={`drop-zone rounded-xl p-8 mb-6 text-center cursor-pointer ${dragOver ? 'dragover' : ''}`}
+                            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                            onDragLeave={() => setDragOver(false)}
+                            onDrop={handleFileDrop}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <input 
+                                ref={fileInputRef}
+                                type="file" 
+                                className="hidden" 
+                                accept=".pdf,.docx,.doc"
+                                onChange={handleFileDrop}
+                            />
+                            {analyzing ? (
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-10 h-10 border-4 border-[#00E5FA]/30 border-t-[#00E5FA] rounded-full spinner"></div>
+                                    <p className="text-[#00E5FA]">AI is analyzing RFP document...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="text-4xl mb-3">📤</div>
+                                    <p className="text-white/80">Drop RFP document here or click to upload</p>
+                                    <p className="text-sm text-white/40 mt-1">Supports PDF, DOCX • AI will extract requirements automatically</p>
+                                </>
+                            )}
+                        </div>
 
-    function filterRequirements() {
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      const typeFilter = document.getElementById('typeFilter').value;
-      const sectionFilter = document.getElementById('sectionFilter').value;
-      const statusFilter = document.getElementById('statusFilter').value;
-      
-      const filtered = allRequirements.filter(r => {
-        const matchesSearch = !search || r.requirement_text?.toLowerCase().includes(search) || r.requirement_id?.toLowerCase().includes(search);
-        const matchesType = !typeFilter || r.requirement_type === typeFilter;
-        const matchesSection = !sectionFilter || r.rfp_section === sectionFilter;
-        const matchesStatus = !statusFilter || 
-          (statusFilter === 'unmapped' && !r.is_mapped) ||
-          (statusFilter === 'mapped' && r.is_mapped) ||
-          (statusFilter === 'risk' && r.is_risk);
-        return matchesSearch && matchesType && matchesSection && matchesStatus;
-      });
-      renderRequirements(filtered);
-    }
+                        {/* Stats */}
+                        <div className="grid grid-cols-4 gap-4 mb-6">
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-[#00E5FA]">{stats.total}</div>
+                                <div className="text-white/60 text-sm">Total Requirements</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-red-400">{stats.critical}</div>
+                                <div className="text-white/60 text-sm">Critical</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-amber-400">{stats.mapped}</div>
+                                <div className="text-white/60 text-sm">Mapped</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-emerald-400">{stats.complete}</div>
+                                <div className="text-white/60 text-sm">Complete</div>
+                                <div className="w-full bg-white/10 rounded-full h-1.5 mt-2">
+                                    <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: `${stats.total ? (stats.complete / stats.total * 100) : 0}%` }}></div>
+                                </div>
+                            </div>
+                        </div>
 
-    function renderRequirements(reqs) {
-      const container = document.getElementById('requirementsContainer');
-      if (reqs.length === 0) {
-        showEmptyState('No requirements found');
-        return;
-      }
-      
-      container.innerHTML = reqs.map(r => `
-        <div class="card p-4 type-${r.requirement_type || 'shall'} hover:border-cyan-400/50 cursor-pointer" onclick="openEditModal('${r.id}')">
-          <div class="flex items-start justify-between mb-2">
-            <div class="flex items-center gap-3">
-              <span class="font-mono text-cyan-400 text-sm">${r.requirement_id || '-'}</span>
-              <span class="text-xs px-2 py-0.5 rounded ${getTypeClass(r.requirement_type)}">${(r.requirement_type || 'shall').toUpperCase()}</span>
-              ${r.is_risk ? '<span class="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">⚠️ RISK</span>' : ''}
-            </div>
-            <div class="flex items-center gap-2">
-              ${r.is_mapped ? '<span class="text-xs text-green-400">✓ Mapped</span>' : '<span class="text-xs text-gray-500">Unmapped</span>'}
-              ${r.is_compliant ? '<span class="text-xs text-emerald-400 ml-2">✓ Compliant</span>' : ''}
-            </div>
-          </div>
-          
-          <p class="text-sm text-gray-300 mb-2">${truncate(r.requirement_text, 200)}</p>
-          
-          <div class="flex items-center gap-4 text-xs text-gray-500">
-            <span>📋 Section ${r.rfp_section || '-'}</span>
-            ${r.source_page ? `<span>📄 ${r.source_page}</span>` : ''}
-            ${r.proposal_section ? `<span class="text-cyan-400">→ ${r.proposal_section}</span>` : ''}
-            ${r.assigned_to ? `<span>👤 ${r.assigned_to}</span>` : ''}
-          </div>
-          
-          ${r.compliance_response ? `<div class="mt-2 text-xs text-gray-400 bg-slate-800 rounded p-2">💬 ${truncate(r.compliance_response, 100)}</div>` : ''}
-        </div>
-      `).join('');
-    }
+                        {/* Filters */}
+                        <div className="flex gap-4 mb-6">
+                            <input
+                                type="text"
+                                placeholder="Search requirements..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="flex-1 bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/40"
+                            />
+                            <select
+                                value={sectionFilter}
+                                onChange={(e) => setSectionFilter(e.target.value)}
+                                className="bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white"
+                            >
+                                <option value="All">All Sections</option>
+                                {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
 
-    function showEmptyState(message) {
-      document.getElementById('requirementsContainer').innerHTML = `
-        <div class="card p-8 text-center text-gray-500">
-          <p>${message}</p>
-          ${document.getElementById('opportunityFilter').value ? `<button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Add First Requirement</button>` : ''}
-        </div>`;
-    }
+                        {/* Table */}
+                        <div className="bg-[#0d1f3c] rounded-xl border border-white/10 overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-[#00050F]/50">
+                                    <tr>
+                                        <th className="text-left p-4 text-white/60 font-medium w-24">Ref</th>
+                                        <th className="text-left p-4 text-white/60 font-medium">Requirement</th>
+                                        <th className="text-center p-4 text-white/60 font-medium w-32">Section</th>
+                                        <th className="text-center p-4 text-white/60 font-medium w-24">Priority</th>
+                                        <th className="text-center p-4 text-white/60 font-medium w-32">Status</th>
+                                        <th className="text-center p-4 text-white/60 font-medium w-24">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.map(req => (
+                                        <tr key={req.id} className="border-t border-white/5 hover:bg-white/5">
+                                            <td className="p-4 font-mono text-sm text-[#00E5FA]">{req.reference}</td>
+                                            <td className="p-4 text-sm">{req.requirement_text}</td>
+                                            <td className="p-4 text-center">
+                                                <span className="text-xs bg-white/10 px-2 py-1 rounded">{req.section?.split(' ')[0]}</span>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <span className={`px-2 py-1 rounded text-xs ${
+                                                    req.priority === 'Critical' ? 'bg-red-500/20 text-red-400' :
+                                                    req.priority === 'High' ? 'bg-amber-500/20 text-amber-400' :
+                                                    req.priority === 'Medium' ? 'bg-blue-500/20 text-blue-400' :
+                                                    'bg-white/10 text-white/60'
+                                                }`}>
+                                                    {req.priority}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <select
+                                                    value={req.status}
+                                                    onChange={(e) => updateStatus(req.id, e.target.value)}
+                                                    className={`text-xs px-2 py-1 rounded border-0 ${
+                                                        req.status === 'Complete' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                        req.status === 'Assigned' ? 'bg-blue-500/20 text-blue-400' :
+                                                        req.status === 'Mapped' ? 'bg-purple-500/20 text-purple-400' :
+                                                        'bg-white/10 text-white/60'
+                                                    }`}
+                                                >
+                                                    {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <button onClick={() => openModal(req)} className="p-1.5 hover:bg-white/10 rounded">✏️</button>
+                                                <button onClick={() => deleteRequirement(req.id)} className="p-1.5 hover:bg-red-500/20 rounded ml-1">🗑️</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {filtered.length === 0 && (
+                                        <tr><td colSpan="6" className="p-8 text-center text-white/50">
+                                            {loading ? 'Loading...' : 'No requirements found. Upload an RFP to extract requirements.'}
+                                        </td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
 
-    function getTypeClass(type) {
-      return { shall: 'bg-red-500/20 text-red-400', should: 'bg-amber-500/20 text-amber-400', may: 'bg-green-500/20 text-green-400', will: 'bg-purple-500/20 text-purple-400' }[type] || 'bg-gray-500/20 text-gray-400';
-    }
+                        {/* Modal */}
+                        {showModal && (
+                            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                                <div className="bg-[#0d1f3c] rounded-xl p-6 w-full max-w-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
+                                    <h2 className="text-xl font-bold mb-4">{editingReq ? 'Edit' : 'Add'} Requirement</h2>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-white/60 mb-1">Reference</label>
+                                            <input type="text" value={formData.reference || ''} onChange={(e) => setFormData({...formData, reference: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white" placeholder="L.1.1" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-white/60 mb-1">Section</label>
+                                            <select value={formData.section || 'L - Technical'} onChange={(e) => setFormData({...formData, section: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white">
+                                                {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm text-white/60 mb-1">Requirement Text</label>
+                                            <textarea value={formData.requirement_text || ''} onChange={(e) => setFormData({...formData, requirement_text: e.target.value})} rows={4} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white"></textarea>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-white/60 mb-1">Priority</label>
+                                            <select value={formData.priority || 'Medium'} onChange={(e) => setFormData({...formData, priority: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white">
+                                                {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-white/60 mb-1">Status</label>
+                                            <select value={formData.status || 'Pending'} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white">
+                                                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm text-white/60 mb-1">Response Section</label>
+                                            <input type="text" value={formData.response_section || ''} onChange={(e) => setFormData({...formData, response_section: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white" placeholder="Where this will be addressed in proposal" />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm text-white/60 mb-1">Notes</label>
+                                            <textarea value={formData.notes || ''} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows={2} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white"></textarea>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-3 mt-6">
+                                        <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">Cancel</button>
+                                        <button onClick={saveRequirement} className="px-4 py-2 bg-[#00E5FA] text-[#00050F] rounded-lg font-medium">Save</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
-    function truncate(str, len) { return str && str.length > len ? str.substring(0, len) + '...' : str || ''; }
+                    <div className="fixed bottom-0 left-0 right-0 bg-[#00050F]/90 border-t border-white/10 p-2 text-center text-xs text-white/40">
+                        AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026 Mission Meets Tech
+                    </div>
+                </div>
+            );
+        };
 
-    function updateStats() {
-      const total = allRequirements.length;
-      const shall = allRequirements.filter(r => r.requirement_type === 'shall').length;
-      const mapped = allRequirements.filter(r => r.is_mapped).length;
-      const compliant = allRequirements.filter(r => r.is_compliant).length;
-      const risks = allRequirements.filter(r => r.is_risk).length;
-      const progress = total > 0 ? Math.round((mapped / total) * 100) : 0;
-      
-      document.getElementById('statTotal').textContent = total;
-      document.getElementById('statShall').textContent = shall;
-      document.getElementById('statMapped').textContent = mapped;
-      document.getElementById('statCompliant').textContent = compliant;
-      document.getElementById('statRisks').textContent = risks;
-      document.getElementById('statProgress').textContent = progress + '%';
-    }
-
-    function openAddModal() {
-      if (!document.getElementById('opportunityFilter').value) {
-        alert('Please select an opportunity first');
-        return;
-      }
-      editingId = null;
-      document.getElementById('modalTitle').textContent = 'Add Requirement';
-      document.getElementById('reqForm').reset();
-      document.getElementById('reqModal').classList.remove('hidden');
-    }
-
-    function openEditModal(id) {
-      const req = allRequirements.find(r => r.id === id);
-      if (!req) return;
-      
-      editingId = id;
-      document.getElementById('modalTitle').textContent = 'Edit Requirement';
-      document.getElementById('reqId').value = id;
-      document.getElementById('requirementId').value = req.requirement_id || '';
-      document.getElementById('rfpSection').value = req.rfp_section || 'L';
-      document.getElementById('requirementType').value = req.requirement_type || 'shall';
-      document.getElementById('requirementText').value = req.requirement_text || '';
-      document.getElementById('priority').value = req.priority || 'medium';
-      document.getElementById('sourcePage').value = req.source_page || '';
-      document.getElementById('assignedTo').value = req.assigned_to || '';
-      document.getElementById('proposalSection').value = req.proposal_section || '';
-      document.getElementById('complianceResponse').value = req.compliance_response || '';
-      document.getElementById('isMapped').checked = req.is_mapped || false;
-      document.getElementById('isCompliant').checked = req.is_compliant || false;
-      document.getElementById('isRisk').checked = req.is_risk || false;
-      document.getElementById('reqModal').classList.remove('hidden');
-    }
-
-    function closeModal() { document.getElementById('reqModal').classList.add('hidden'); editingId = null; }
-
-    async function handleSubmit(event) {
-      event.preventDefault();
-      
-      const reqData = {
-        requirement_id: document.getElementById('requirementId').value,
-        rfp_section: document.getElementById('rfpSection').value,
-        requirement_type: document.getElementById('requirementType').value,
-        requirement_text: document.getElementById('requirementText').value,
-        priority: document.getElementById('priority').value,
-        source_page: document.getElementById('sourcePage').value || null,
-        assigned_to: document.getElementById('assignedTo').value || null,
-        proposal_section: document.getElementById('proposalSection').value || null,
-        compliance_response: document.getElementById('complianceResponse').value || null,
-        is_mapped: document.getElementById('isMapped').checked,
-        is_compliant: document.getElementById('isCompliant').checked,
-        is_risk: document.getElementById('isRisk').checked,
-        opportunity_id: document.getElementById('opportunityFilter').value,
-        updated_at: new Date().toISOString()
-      };
-
-      try {
-        if (editingId) {
-          const { error } = await supabase.from('rfp_requirements').update(reqData).eq('id', editingId);
-          if (error) throw error;
-        } else {
-          reqData.created_at = new Date().toISOString();
-          const { error } = await supabase.from('rfp_requirements').insert([reqData]);
-          if (error) throw error;
-        }
-        closeModal();
-        await loadRequirements();
-      } catch (err) { console.error('Failed to save:', err); alert('Failed to save: ' + err.message); }
-    }
-
-    function subscribeToChanges() {
-      supabase.channel('rfp_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'rfp_requirements' }, () => loadRequirements()).subscribe();
-    }
-
-    document.getElementById('opportunityFilter').addEventListener('change', loadRequirements);
-
-    async function init() {
-      if (!initSupabase()) { updateConnectionStatus(false); return; }
-      await loadOpportunities();
-      subscribeToChanges();
-    }
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
-  </script>
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
 </body>
 </html>
