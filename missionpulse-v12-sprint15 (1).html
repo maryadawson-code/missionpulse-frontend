@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 | Sprint 15 - Federal Proposal Pipeline</title>
+  <meta name="description" content="Enterprise proposal management with Shipley methodology phases">
+  
+  <!-- Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --mmt-cyan: #00E5FA;
+      --mmt-navy: #00050F;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--mmt-navy); 
+      min-height: 100vh;
+      color: #e2e8f0;
+    }
+    
+    /* Light theme */
+    body.light {
+      --mmt-navy: #f8fafc;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    
+    /* Animations */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes slideInUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+    .animate-slideInRight { animation: slideInRight 0.3s ease-out; }
+    .animate-slideInUp { animation: slideInUp 0.3s ease-out; }
+    .animate-pulse { animation: pulse 2s infinite; }
+    .animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-shake { animation: shake 0.3s ease-in-out; }
+    
+    /* Drag and Drop */
+    .dragging { opacity: 0.5; transform: rotate(3deg); }
+    .drag-over { background: rgba(0, 229, 250, 0.1); border-color: #00E5FA !important; }
+    
+    /* Calendar Grid */
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    
+    /* Command Palette Backdrop */
+    .command-backdrop {
+      background: rgba(0, 5, 15, 0.8);
+      backdrop-filter: blur(8px);
+    }
+    
+    /* Notification Badge Animation */
+    @keyframes badgePulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+    .badge-pulse { animation: badgePulse 0.3s ease-out; }
+  </style>
+</head>
+<body class="dark">
+  <div id="root"></div>
+  
+  <script type="text/babel">
+// ============================================================
+// MISSIONPULSE v12 - SPRINT 15
+// Calendar View | Notification Center | Command Palette | Saved Filters
+// © 2026 Mission Meets Tech
+// ============================================================
+
+const { useState, useEffect, useMemo, useCallback, useRef, createContext, useContext } = React;
+
+// ============================================================
+// SUPABASE CONFIGURATION
+// ============================================================
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+const SHIPLEY_PHASES = [
+  { id: 'gate_1', name: 'Gate 1', color: '#94a3b8' },
+  { id: 'blue_team', name: 'Blue Team', color: '#60a5fa' },
+  { id: 'pink_team', name: 'Pink Team', color: '#f472b6' },
+  { id: 'red_team', name: 'Red Team', color: '#ef4444' },
+  { id: 'gold_team', name: 'Gold Team', color: '#fbbf24' },
+  { id: 'submitted', name: 'Submitted', color: '#22c55e' },
+  { id: 'awarded', name: 'Awarded', color: '#8b5cf6' },
+  { id: 'lost', name: 'Lost', color: '#64748b' }
+];
+
+const PRIORITIES = [
+  { id: 'P-0', name: 'P-0 Critical', color: '#ef4444' },
+  { id: 'P-1', name: 'P-1 High', color: '#f59e0b' },
+  { id: 'P-2', name: 'P-2 Medium', color: '#3b82f6' },
+  { id: 'P-3', name: 'P-3 Low', color: '#64748b' }
+];
+
+const AGENCIES = ['DHA', 'VA', 'CMS', 'IHS', 'NIH', 'CDC', 'HHS', 'DOD', 'Army', 'Navy', 'Air Force'];
+
+const SHIPLEY_ROLES = [
+  { id: 'CEO', name: 'CEO', color: '#fbbf24' },
+  { id: 'COO', name: 'COO', color: '#f97316' },
+  { id: 'CAP', name: 'Capture Manager', color: '#f472b6' },
+  { id: 'PM', name: 'Proposal Manager', color: '#60a5fa' },
+  { id: 'SA', name: 'Solution Architect', color: '#22d3ee' },
+  { id: 'FIN', name: 'Pricing Lead', color: '#34d399' },
+  { id: 'CON', name: 'Contracts', color: '#a78bfa' },
+  { id: 'DEL', name: 'Delivery Lead', color: '#fb7185' },
+  { id: 'QA', name: 'QA Lead', color: '#2dd4bf' }
+];
+
+const NOTIFICATION_TYPES = {
+  due_soon: { icon: 'clock', color: '#f59e0b', label: 'Due Soon' },
+  phase_stuck: { icon: 'alertCircle', color: '#ef4444', label: 'Phase Stuck' },
+  p0_alert: { icon: 'alertTriangle', color: '#ef4444', label: 'P-0 Alert' },
+  assignment: { icon: 'userPlus', color: '#3b82f6', label: 'Assignment' },
+  comment_mention: { icon: 'messageCircle', color: '#8b5cf6', label: 'Mention' }
+};
+
+// ============================================================
+// ICONS
+// ============================================================
+const Icons = {
+  grid: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+  list: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>,
+  calendar: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+  chart: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+  gantt: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h14" /></svg>,
+  plus: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+  search: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+  filter: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+  x: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+  check: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+  chevronLeft: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
+  chevronRight: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+  chevronDown: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+  bell: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
+  sun: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  moon: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>,
+  settings: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  moreVertical: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>,
+  trash: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+  edit: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+  copy: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+  save: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
+  clock: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  alertCircle: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  alertTriangle: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+  userPlus: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>,
+  messageCircle: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+  command: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 3a3 3 0 00-3 3v12a3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3H6a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3V6a3 3 0 00-3-3 3 3 0 00-3 3 3 3 0 003 3h12a3 3 0 003-3 3 3 0 00-3-3z" /></svg>,
+  bookmark: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>,
+  shield: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+  activity: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+  download: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+  upload: (props) => <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+  pin: (props) => <svg {...props} fill="currentColor" viewBox="0 0 24 24"><path d="M16 4v8l2 2v2h-5v6l-1 1-1-1v-6H6v-2l2-2V4h8z" /></svg>
+};
+
+const Icon = ({ name, className = "w-5 h-5" }) => {
+  const IconComponent = Icons[name];
+  return IconComponent ? <IconComponent className={className} /> : null;
+};
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+const formatCurrency = (value) => {
+  if (!value) return '$0';
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
+  return `$${value.toLocaleString()}`;
+};
+
+const formatDate = (date) => {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const formatRelativeTime = (date) => {
+  if (!date) return '';
+  const now = new Date();
+  const d = new Date(date);
+  const diff = now - d;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return formatDate(date);
+};
+
+const getDaysUntil = (date) => {
+  if (!date) return null;
+  const d = new Date(date);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return Math.ceil((d - now) / 86400000);
+};
+
+const generateId = () => crypto.randomUUID();
+
+// Field mapping
+const mapToFrontend = (record) => {
+  if (!record) return null;
+  return {
+    id: record.id,
+    name: record.name,
+    agency: record.agency,
+    contractValue: record.contract_value,
+    priority: record.priority,
+    shipleyPhase: record.shipley_phase,
+    winProbability: record.win_probability,
+    dueDate: record.due_date,
+    solicitationNumber: record.solicitation_number,
+    description: record.description,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at
+  };
+};
+
+const mapToDatabase = (data) => {
+  if (!data) return null;
+  const mapped = {};
+  if (data.name !== undefined) mapped.name = data.name;
+  if (data.agency !== undefined) mapped.agency = data.agency;
+  if (data.contractValue !== undefined) mapped.contract_value = data.contractValue;
+  if (data.priority !== undefined) mapped.priority = data.priority;
+  if (data.shipleyPhase !== undefined) mapped.shipley_phase = data.shipleyPhase;
+  if (data.winProbability !== undefined) mapped.win_probability = data.winProbability;
+  if (data.dueDate !== undefined) mapped.due_date = data.dueDate;
+  if (data.solicitationNumber !== undefined) mapped.solicitation_number = data.solicitationNumber;
+  if (data.description !== undefined) mapped.description = data.description;
+  return mapped;
+};
+
+// ============================================================
+// UI COMPONENTS
+// ============================================================
+const Button = ({ children, variant = 'primary', size = 'md', icon, className = '', disabled = false, ...props }) => {
+  const variants = {
+    primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30',
+    secondary: 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-700',
+    danger: 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30',
+    success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30',
+    ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+  };
+  const sizes = {
+    xs: 'px-2 py-1 text-xs',
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-sm',
+    lg: 'px-6 py-3 text-base'
+  };
+  
+  return (
+    <button 
+      disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      {...props}
+    >
+      {icon && <Icon name={icon} className="w-4 h-4" />}
+      {children}
+    </button>
+  );
+};
+
+const Badge = ({ children, color = '#94a3b8', size = 'sm' }) => {
+  const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-0.5 text-xs', md: 'px-2.5 py-1 text-sm' };
+  return (
+    <span 
+      className={`inline-flex items-center rounded-full font-medium ${sizes[size]}`}
+      style={{ backgroundColor: `${color}20`, color, border: `1px solid ${color}40` }}
+    >
+      {children}
+    </span>
+  );
+};
+
+const Input = ({ label, ...props }) => (
+  <div className="space-y-1">
+    {label && <label className="text-sm font-medium text-slate-400">{label}</label>}
+    <input 
+      className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50"
+      {...props}
+    />
+  </div>
+);
+
+const Select = ({ label, options = [], ...props }) => (
+  <div className="space-y-1">
+    {label && <label className="text-sm font-medium text-slate-400">{label}</label>}
+    <select 
+      className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500/50"
+      {...props}
+    >
+      {options.map(opt => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+  </div>
+);
+
+const Toast = ({ message, type = 'success', onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+  
+  const colors = {
+    success: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400',
+    error: 'bg-red-500/20 border-red-500/50 text-red-400',
+    info: 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+  };
+  
+  return (
+    <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg border ${colors[type]} animate-slideInUp z-50`}>
+      <div className="flex items-center gap-3">
+        <Icon name={type === 'success' ? 'check' : type === 'error' ? 'x' : 'alertCircle'} className="w-5 h-5" />
+        <span>{message}</span>
+        <button onClick={onClose} className="ml-2 hover:opacity-75">
+          <Icon name="x" className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// OPPORTUNITY CARD
+// ============================================================
+const OpportunityCard = ({ opportunity, onClick, onDragStart, onQuickPhaseForward }) => {
+  const priority = PRIORITIES.find(p => p.id === opportunity.priority) || PRIORITIES[3];
+  const phase = SHIPLEY_PHASES.find(p => p.id === opportunity.shipleyPhase) || SHIPLEY_PHASES[0];
+  const daysUntil = getDaysUntil(opportunity.dueDate);
+  const isUrgent = daysUntil !== null && daysUntil <= 3 && daysUntil >= 0;
+  const isOverdue = daysUntil !== null && daysUntil < 0;
+  
+  return (
+    <div 
+      draggable
+      onDragStart={(e) => onDragStart(e, opportunity)}
+      onClick={() => onClick(opportunity)}
+      className={`p-3 bg-slate-800/50 border rounded-lg cursor-pointer transition-all hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10 ${isUrgent ? 'border-amber-500/50' : isOverdue ? 'border-red-500/50' : 'border-slate-700/50'}`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <h4 className="font-medium text-white text-sm line-clamp-1">{opportunity.name}</h4>
+        <Badge color={priority.color} size="xs">{priority.id}</Badge>
+      </div>
+      
+      <div className="text-xs text-slate-400 mb-2">{opportunity.agency}</div>
+      
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-cyan-400">{formatCurrency(opportunity.contractValue)}</span>
+        {opportunity.dueDate && (
+          <span className={`text-xs ${isOverdue ? 'text-red-400' : isUrgent ? 'text-amber-400' : 'text-slate-500'}`}>
+            {isOverdue ? `${Math.abs(daysUntil)}d overdue` : daysUntil === 0 ? 'Due today' : `${daysUntil}d`}
+          </span>
+        )}
+      </div>
+      
+      {opportunity.winProbability !== undefined && (
+        <div className="mt-2">
+          <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div 
+              className="h-full rounded-full transition-all"
+              style={{ 
+                width: `${opportunity.winProbability}%`,
+                backgroundColor: opportunity.winProbability >= 70 ? '#22c55e' : opportunity.winProbability >= 40 ? '#f59e0b' : '#ef4444'
+              }}
+            />
+          </div>
+          <span className="text-xs text-slate-500 mt-1">{opportunity.winProbability}% pWin</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// BOARD VIEW
+// ============================================================
+const BoardView = ({ opportunities, onSelectOpportunity, onPhaseChange }) => {
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOverPhase, setDragOverPhase] = useState(null);
+  
+  const handleDragStart = (e, opp) => {
+    setDraggedItem(opp);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  
+  const handleDragOver = (e, phaseId) => {
+    e.preventDefault();
+    setDragOverPhase(phaseId);
+  };
+  
+  const handleDragLeave = () => {
+    setDragOverPhase(null);
+  };
+  
+  const handleDrop = (e, phaseId) => {
+    e.preventDefault();
+    if (draggedItem && draggedItem.shipleyPhase !== phaseId) {
+      onPhaseChange(draggedItem.id, phaseId);
+    }
+    setDraggedItem(null);
+    setDragOverPhase(null);
+  };
+  
+  const groupedByPhase = useMemo(() => {
+    const grouped = {};
+    SHIPLEY_PHASES.forEach(phase => {
+      grouped[phase.id] = opportunities.filter(opp => opp.shipleyPhase === phase.id);
+    });
+    return grouped;
+  }, [opportunities]);
+  
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-4 h-full">
+      {SHIPLEY_PHASES.map(phase => (
+        <div 
+          key={phase.id}
+          className={`flex-shrink-0 w-72 bg-slate-900/50 rounded-xl border transition-all ${dragOverPhase === phase.id ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-800'}`}
+          onDragOver={(e) => handleDragOver(e, phase.id)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, phase.id)}
+        >
+          <div className="p-3 border-b border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
+                <span className="font-medium text-white">{phase.name}</span>
+              </div>
+              <Badge color={phase.color} size="xs">{groupedByPhase[phase.id]?.length || 0}</Badge>
+            </div>
+          </div>
+          <div className="p-2 space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
+            {groupedByPhase[phase.id]?.map(opp => (
+              <OpportunityCard 
+                key={opp.id} 
+                opportunity={opp} 
+                onClick={onSelectOpportunity}
+                onDragStart={handleDragStart}
+              />
+            ))}
+            {groupedByPhase[phase.id]?.length === 0 && (
+              <div className="text-center py-8 text-slate-500 text-sm">
+                Drop opportunities here
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ============================================================
+// TABLE VIEW
+// ============================================================
+const TableView = ({ opportunities, onSelectOpportunity, sortConfig, onSort }) => {
+  const columns = [
+    { key: 'name', label: 'Opportunity' },
+    { key: 'agency', label: 'Agency' },
+    { key: 'contractValue', label: 'Value' },
+    { key: 'priority', label: 'Priority' },
+    { key: 'shipleyPhase', label: 'Phase' },
+    { key: 'winProbability', label: 'pWin' },
+    { key: 'dueDate', label: 'Due Date' }
+  ];
+  
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key) {
+      if (sortConfig.direction === 'asc') direction = 'desc';
+      else if (sortConfig.direction === 'desc') direction = null;
+    }
+    onSort(direction ? { key, direction } : { key: null, direction: null });
+  };
+  
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-slate-800">
+            {columns.map(col => (
+              <th 
+                key={col.key}
+                onClick={() => handleSort(col.key)}
+                className="px-4 py-3 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {col.label}
+                  {sortConfig.key === col.key && (
+                    <span className="text-cyan-400">
+                      {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {opportunities.map(opp => {
+            const priority = PRIORITIES.find(p => p.id === opp.priority);
+            const phase = SHIPLEY_PHASES.find(p => p.id === opp.shipleyPhase);
+            const daysUntil = getDaysUntil(opp.dueDate);
+            
+            return (
+              <tr 
+                key={opp.id}
+                onClick={() => onSelectOpportunity(opp)}
+                className="border-b border-slate-800/50 hover:bg-slate-800/30 cursor-pointer transition-colors"
+              >
+                <td className="px-4 py-3">
+                  <div className="font-medium text-white">{opp.name}</div>
+                  <div className="text-xs text-slate-500">{opp.solicitationNumber}</div>
+                </td>
+                <td className="px-4 py-3 text-slate-300">{opp.agency}</td>
+                <td className="px-4 py-3 text-cyan-400 font-medium">{formatCurrency(opp.contractValue)}</td>
+                <td className="px-4 py-3">
+                  <Badge color={priority?.color}>{opp.priority}</Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <Badge color={phase?.color}>{phase?.name}</Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full"
+                        style={{ 
+                          width: `${opp.winProbability || 0}%`,
+                          backgroundColor: (opp.winProbability || 0) >= 70 ? '#22c55e' : (opp.winProbability || 0) >= 40 ? '#f59e0b' : '#ef4444'
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm text-slate-400">{opp.winProbability || 0}%</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`text-sm ${daysUntil !== null && daysUntil < 0 ? 'text-red-400' : daysUntil !== null && daysUntil <= 3 ? 'text-amber-400' : 'text-slate-400'}`}>
+                    {formatDate(opp.dueDate)}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ============================================================
+// CALENDAR VIEW (Sprint 15 - Task 15.1)
+// ============================================================
+const CalendarView = ({ opportunities, onSelectOpportunity, onCreateWithDate }) => {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [showDatePopover, setShowDatePopover] = useState(null);
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+  const startDate = new Date(monthStart);
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+  
+  const weeks = [];
+  let current = new Date(startDate);
+  
+  while (current <= monthEnd || current.getDay() !== 0) {
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    weeks.push(week);
+    if (weeks.length >= 6) break;
+  }
+  
+  const getOpportunitiesForDate = (date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return opportunities.filter(opp => opp.dueDate === dateStr);
+  };
+  
+  const prevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
+  
+  const nextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
+  
+  const goToToday = () => {
+    setCurrentMonth(new Date());
+  };
+  
+  const handleDateClick = (date, opps) => {
+    if (opps.length > 0) {
+      setShowDatePopover({ date, opps });
+    }
+  };
+  
+  const handleDateDoubleClick = (date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    onCreateWithDate(dateStr);
+  };
+  
+  return (
+    <div className="h-full flex flex-col">
+      {/* Calendar Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-bold text-white">
+            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h2>
+          <Button variant="ghost" size="sm" onClick={goToToday}>Today</Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" icon="chevronLeft" onClick={prevMonth} />
+          <Button variant="ghost" size="sm" icon="chevronRight" onClick={nextMonth} />
+        </div>
+      </div>
+      
+      {/* Week Day Headers */}
+      <div className="calendar-grid border-b border-slate-800 mb-2">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <div key={day} className="py-2 text-center text-sm font-medium text-slate-500">
+            {day}
+          </div>
+        ))}
+      </div>
+      
+      {/* Calendar Grid */}
+      <div className="flex-1 calendar-grid gap-px bg-slate-800/50">
+        {weeks.map((week, weekIdx) => (
+          week.map((date, dayIdx) => {
+            const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
+            const isToday = date.toDateString() === today.toDateString();
+            const dayOpps = getOpportunitiesForDate(date);
+            
+            return (
+              <div
+                key={`${weekIdx}-${dayIdx}`}
+                className={`min-h-[100px] p-2 border border-slate-800/50 transition-colors cursor-pointer hover:bg-slate-800/50 ${isCurrentMonth ? 'bg-slate-900/50' : 'bg-slate-900/20'} ${isToday ? 'ring-2 ring-cyan-500/50' : ''}`}
+                onClick={() => handleDateClick(date, dayOpps)}
+                onDoubleClick={() => handleDateDoubleClick(date)}
+              >
+                <div className={`text-sm font-medium mb-1 ${isToday ? 'text-cyan-400' : isCurrentMonth ? 'text-white' : 'text-slate-600'}`}>
+                  {date.getDate()}
+                </div>
+                
+                {/* Opportunity Dots */}
+                <div className="flex flex-wrap gap-1">
+                  {dayOpps.slice(0, 3).map(opp => {
+                    const priority = PRIORITIES.find(p => p.id === opp.priority);
+                    return (
+                      <div 
+                        key={opp.id}
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: priority?.color || '#64748b' }}
+                        title={opp.name}
+                      />
+                    );
+                  })}
+                  {dayOpps.length > 3 && (
+                    <span className="text-xs text-slate-500">+{dayOpps.length - 3}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        ))}
+      </div>
+      
+      {/* Date Popover */}
+      {showDatePopover && (
+        <div className="fixed inset-0 z-50" onClick={() => setShowDatePopover(null)}>
+          <div 
+            className="absolute bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-4 w-80 animate-fadeIn"
+            style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-white">
+                {showDatePopover.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              </h3>
+              <button onClick={() => setShowDatePopover(null)} className="text-slate-400 hover:text-white">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {showDatePopover.opps.map(opp => (
+                <div 
+                  key={opp.id}
+                  onClick={() => { setShowDatePopover(null); onSelectOpportunity(opp); }}
+                  className="p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:border-cyan-500/50 cursor-pointer transition-all"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-white text-sm">{opp.name}</span>
+                    <Badge color={PRIORITIES.find(p => p.id === opp.priority)?.color} size="xs">{opp.priority}</Badge>
+                  </div>
+                  <div className="text-xs text-slate-400">{opp.agency} • {formatCurrency(opp.contractValue)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// NOTIFICATION CENTER (Sprint 15 - Task 15.2)
+// ============================================================
+const NotificationCenter = ({ opportunities, isOpen, onClose, onSelectOpportunity }) => {
+  const [notifications, setNotifications] = useState([]);
+  const [filter, setFilter] = useState('all');
+  
+  // Generate notifications on mount
+  useEffect(() => {
+    const generated = [];
+    const now = new Date();
+    
+    opportunities.forEach(opp => {
+      const daysUntil = getDaysUntil(opp.dueDate);
+      
+      // Due Soon (within 3 days)
+      if (daysUntil !== null && daysUntil >= 0 && daysUntil <= 3) {
+        generated.push({
+          id: `due-${opp.id}`,
+          opportunityId: opp.id,
+          type: 'due_soon',
+          title: daysUntil === 0 ? 'Due Today!' : `Due in ${daysUntil} day${daysUntil > 1 ? 's' : ''}`,
+          message: opp.name,
+          isRead: false,
+          createdAt: now.toISOString()
+        });
+      }
+      
+      // P-0 Alert
+      if (opp.priority === 'P-0') {
+        generated.push({
+          id: `p0-${opp.id}`,
+          opportunityId: opp.id,
+          type: 'p0_alert',
+          title: 'Critical Priority',
+          message: `${opp.name} is P-0`,
+          isRead: false,
+          createdAt: opp.createdAt || now.toISOString()
+        });
+      }
+    });
+    
+    // Load from localStorage and merge
+    const stored = JSON.parse(localStorage.getItem('MP_NOTIFICATIONS') || '[]');
+    const merged = [...generated];
+    stored.forEach(s => {
+      if (!merged.find(m => m.id === s.id)) {
+        merged.push(s);
+      } else {
+        const idx = merged.findIndex(m => m.id === s.id);
+        merged[idx] = { ...merged[idx], isRead: s.isRead, dismissed: s.dismissed };
+      }
+    });
+    
+    setNotifications(merged.filter(n => !n.dismissed).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+  }, [opportunities]);
+  
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+  
+  const filteredNotifications = useMemo(() => {
+    if (filter === 'all') return notifications;
+    if (filter === 'unread') return notifications.filter(n => !n.isRead);
+    return notifications.filter(n => n.type === filter);
+  }, [notifications, filter]);
+  
+  const markAllRead = () => {
+    const updated = notifications.map(n => ({ ...n, isRead: true }));
+    setNotifications(updated);
+    localStorage.setItem('MP_NOTIFICATIONS', JSON.stringify(updated));
+  };
+  
+  const dismissNotification = (id) => {
+    const updated = notifications.map(n => n.id === id ? { ...n, dismissed: true } : n);
+    setNotifications(updated.filter(n => !n.dismissed));
+    localStorage.setItem('MP_NOTIFICATIONS', JSON.stringify(updated));
+  };
+  
+  const handleNotificationClick = (notification) => {
+    const opp = opportunities.find(o => o.id === notification.opportunityId);
+    if (opp) {
+      const updated = notifications.map(n => n.id === notification.id ? { ...n, isRead: true } : n);
+      setNotifications(updated);
+      localStorage.setItem('MP_NOTIFICATIONS', JSON.stringify(updated));
+      onSelectOpportunity(opp);
+      onClose();
+    }
+  };
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-y-0 right-0 w-80 bg-slate-900 border-l border-slate-800 shadow-2xl z-40 animate-slideInRight">
+      <div className="p-4 border-b border-slate-800">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-white">Notifications</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
+            <Icon name="x" className="w-5 h-5" />
+          </button>
+        </div>
+        {unreadCount > 0 && (
+          <Button variant="ghost" size="xs" onClick={markAllRead}>
+            Mark all read ({unreadCount})
+          </Button>
+        )}
+      </div>
+      
+      {/* Filter Tabs */}
+      <div className="px-4 py-2 border-b border-slate-800 flex gap-2 overflow-x-auto">
+        {[
+          { id: 'all', label: 'All' },
+          { id: 'unread', label: 'Unread' },
+          { id: 'due_soon', label: 'Due Soon' },
+          { id: 'p0_alert', label: 'Alerts' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setFilter(tab.id)}
+            className={`px-3 py-1 text-sm rounded-full whitespace-nowrap transition-colors ${filter === tab.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      
+      {/* Notifications List */}
+      <div className="overflow-y-auto max-h-[calc(100vh-180px)]">
+        {filteredNotifications.length === 0 ? (
+          <div className="p-8 text-center text-slate-500">
+            No notifications
+          </div>
+        ) : (
+          filteredNotifications.map(notif => {
+            const typeConfig = NOTIFICATION_TYPES[notif.type];
+            return (
+              <div 
+                key={notif.id}
+                onClick={() => handleNotificationClick(notif)}
+                className={`p-4 border-b border-slate-800/50 hover:bg-slate-800/30 cursor-pointer transition-colors ${!notif.isRead ? 'bg-slate-800/20' : ''}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div 
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `${typeConfig?.color || '#64748b'}20` }}
+                  >
+                    <Icon name={typeConfig?.icon || 'bell'} className="w-4 h-4" style={{ color: typeConfig?.color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {!notif.isRead && <div className="w-2 h-2 rounded-full bg-cyan-400" />}
+                      <span className="font-medium text-white text-sm">{notif.title}</span>
+                    </div>
+                    <p className="text-sm text-slate-400 truncate">{notif.message}</p>
+                    <span className="text-xs text-slate-500">{formatRelativeTime(notif.createdAt)}</span>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); dismissNotification(notif.id); }}
+                    className="text-slate-500 hover:text-white p-1"
+                  >
+                    <Icon name="x" className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// COMMAND PALETTE (Sprint 15 - Task 15.3)
+// ============================================================
+const CommandPalette = ({ isOpen, onClose, opportunities, onSelectOpportunity, onAction }) => {
+  const [query, setQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef(null);
+  
+  useEffect(() => {
+    if (isOpen) {
+      setQuery('');
+      setSelectedIndex(0);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isOpen]);
+  
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(i => Math.min(i + 1, results.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(i => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter' && results[selectedIndex]) {
+        handleSelect(results[selectedIndex]);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, selectedIndex]);
+  
+  const quickActions = [
+    { id: 'new', label: 'New Opportunity', icon: 'plus', action: () => onAction('new') },
+    { id: 'board', label: 'Switch to Board View', icon: 'grid', action: () => onAction('view', 'board') },
+    { id: 'table', label: 'Switch to Table View', icon: 'list', action: () => onAction('view', 'table') },
+    { id: 'calendar', label: 'Switch to Calendar View', icon: 'calendar', action: () => onAction('view', 'calendar') },
+    { id: 'dashboard', label: 'Switch to Dashboard', icon: 'chart', action: () => onAction('view', 'dashboard') },
+    { id: 'theme', label: 'Toggle Theme', icon: 'sun', action: () => onAction('theme') },
+    { id: 'export', label: 'Export CSV', icon: 'download', action: () => onAction('export', 'csv') },
+    { id: 'settings', label: 'Open Settings', icon: 'settings', action: () => onAction('settings') }
+  ];
+  
+  const filteredOpps = useMemo(() => {
+    if (!query) return [];
+    const q = query.toLowerCase();
+    return opportunities.filter(opp => 
+      opp.name?.toLowerCase().includes(q) ||
+      opp.agency?.toLowerCase().includes(q) ||
+      opp.solicitationNumber?.toLowerCase().includes(q)
+    ).slice(0, 5);
+  }, [query, opportunities]);
+  
+  const filteredActions = useMemo(() => {
+    if (!query) return quickActions;
+    const q = query.toLowerCase();
+    return quickActions.filter(a => a.label.toLowerCase().includes(q));
+  }, [query]);
+  
+  const results = [
+    ...filteredOpps.map(opp => ({ type: 'opportunity', data: opp })),
+    ...filteredActions.map(action => ({ type: 'action', data: action }))
+  ];
+  
+  const handleSelect = (item) => {
+    if (item.type === 'opportunity') {
+      onSelectOpportunity(item.data);
+    } else {
+      item.data.action();
+    }
+    onClose();
+  };
+  
+  // Store recent searches
+  useEffect(() => {
+    if (query && filteredOpps.length > 0) {
+      const recent = JSON.parse(localStorage.getItem('MP_RECENT_SEARCHES') || '[]');
+      const updated = [query, ...recent.filter(r => r !== query)].slice(0, 5);
+      localStorage.setItem('MP_RECENT_SEARCHES', JSON.stringify(updated));
+    }
+  }, [query, filteredOpps]);
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 command-backdrop" onClick={onClose}>
+      <div 
+        className="absolute top-[20%] left-1/2 -translate-x-1/2 w-full max-w-xl bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden animate-fadeIn"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Search Input */}
+        <div className="flex items-center gap-3 p-4 border-b border-slate-800">
+          <Icon name="search" className="w-5 h-5 text-slate-400" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
+            placeholder="Search opportunities or type a command..."
+            className="flex-1 bg-transparent text-white placeholder-slate-500 outline-none"
+          />
+          <div className="flex items-center gap-1 text-xs text-slate-500">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 rounded">esc</kbd>
+            <span>to close</span>
+          </div>
+        </div>
+        
+        {/* Results */}
+        <div className="max-h-80 overflow-y-auto">
+          {filteredOpps.length > 0 && (
+            <div className="p-2">
+              <div className="px-2 py-1 text-xs font-medium text-slate-500 uppercase">Opportunities</div>
+              {filteredOpps.map((opp, idx) => (
+                <div
+                  key={opp.id}
+                  onClick={() => handleSelect({ type: 'opportunity', data: opp })}
+                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${idx === selectedIndex ? 'bg-cyan-500/20' : 'hover:bg-slate-800/50'}`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                    <Icon name="activity" className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white truncate">{opp.name}</div>
+                    <div className="text-xs text-slate-400">{opp.agency} • {formatCurrency(opp.contractValue)}</div>
+                  </div>
+                  <Badge color={PRIORITIES.find(p => p.id === opp.priority)?.color} size="xs">{opp.priority}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="p-2 border-t border-slate-800">
+            <div className="px-2 py-1 text-xs font-medium text-slate-500 uppercase">Quick Actions</div>
+            {filteredActions.map((action, idx) => {
+              const resultIdx = filteredOpps.length + idx;
+              return (
+                <div
+                  key={action.id}
+                  onClick={() => handleSelect({ type: 'action', data: action })}
+                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${resultIdx === selectedIndex ? 'bg-cyan-500/20' : 'hover:bg-slate-800/50'}`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                    <Icon name={action.icon} className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <span className="text-white">{action.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div className="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center gap-3">
+            <span><kbd className="px-1 bg-slate-800 rounded">↑</kbd><kbd className="px-1 bg-slate-800 rounded">↓</kbd> navigate</span>
+            <span><kbd className="px-1 bg-slate-800 rounded">⏎</kbd> select</span>
+          </div>
+          <span>Type to search</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// SAVED FILTER PRESETS (Sprint 15 - Task 15.4)
+// ============================================================
+const SavedFilterPresets = ({ filters, onApplyPreset, onSavePreset }) => {
+  const [presets, setPresets] = useState([]);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
+  const [activePresetId, setActivePresetId] = useState(null);
+  const [menuOpenId, setMenuOpenId] = useState(null);
+  
+  // Load presets from localStorage
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem('MP_FILTER_PRESETS') || '[]');
+    
+    // Add built-in presets if not present
+    const builtIn = [
+      { id: 'builtin-due-week', name: 'Due This Week', filters: { dueDateEnd: '7_days' }, isBuiltIn: true },
+      { id: 'builtin-high-priority', name: 'High Priority', filters: { priorities: ['P-0', 'P-1'] }, isBuiltIn: true },
+      { id: 'builtin-active', name: 'Active Pipeline', filters: { excludePhases: ['submitted', 'awarded', 'lost'] }, isBuiltIn: true }
+    ];
+    
+    const merged = [...builtIn, ...stored.filter(s => !s.isBuiltIn)];
+    setPresets(merged);
+    
+    // Apply default preset on load
+    const defaultPreset = merged.find(p => p.isDefault);
+    if (defaultPreset && !activePresetId) {
+      handleApplyPreset(defaultPreset);
+    }
+  }, []);
+  
+  // Save presets to localStorage
+  const savePresets = (updated) => {
+    const toStore = updated.filter(p => !p.isBuiltIn);
+    localStorage.setItem('MP_FILTER_PRESETS', JSON.stringify(toStore));
+    setPresets(updated);
+  };
+  
+  const handleSavePreset = () => {
+    if (!newPresetName.trim()) return;
+    
+    const userPresets = presets.filter(p => !p.isBuiltIn);
+    if (userPresets.length >= 10) {
+      alert('Maximum 10 saved presets. Delete one to add more.');
+      return;
+    }
+    
+    const newPreset = {
+      id: generateId(),
+      name: newPresetName.trim(),
+      filters: { ...filters },
+      isDefault: false,
+      createdAt: new Date().toISOString()
+    };
+    
+    savePresets([...presets, newPreset]);
+    setNewPresetName('');
+    setShowSaveModal(false);
+  };
+  
+  const handleApplyPreset = (preset) => {
+    setActivePresetId(activePresetId === preset.id ? null : preset.id);
+    onApplyPreset(activePresetId === preset.id ? null : preset.filters);
+  };
+  
+  const handleDeletePreset = (id) => {
+    savePresets(presets.filter(p => p.id !== id));
+    if (activePresetId === id) setActivePresetId(null);
+  };
+  
+  const handleSetDefault = (id) => {
+    const updated = presets.map(p => ({ ...p, isDefault: p.id === id ? !p.isDefault : false }));
+    savePresets(updated);
+    setMenuOpenId(null);
+  };
+  
+  const hasActiveFilters = filters.search || filters.agencies?.length > 0 || filters.priorities?.length > 0 || 
+    filters.phases?.length > 0 || filters.pWinMin > 0 || filters.pWinMax < 100 || 
+    filters.dueDateStart || filters.dueDateEnd;
+  
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {/* Preset Badges */}
+      {presets.map(preset => (
+        <div key={preset.id} className="relative">
+          <button
+            onClick={() => handleApplyPreset(preset)}
+            className={`px-3 py-1.5 text-sm rounded-lg border transition-all flex items-center gap-2 ${
+              activePresetId === preset.id 
+                ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' 
+                : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+            }`}
+          >
+            {preset.isDefault && <Icon name="bookmark" className="w-3 h-3" />}
+            {preset.name}
+            {!preset.isBuiltIn && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === preset.id ? null : preset.id); }}
+                className="ml-1 text-slate-400 hover:text-white"
+              >
+                <Icon name="moreVertical" className="w-3 h-3" />
+              </button>
+            )}
+          </button>
+          
+          {/* Preset Menu */}
+          {menuOpenId === preset.id && (
+            <div className="absolute top-full left-0 mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-10 py-1 min-w-32 animate-fadeIn">
+              <button
+                onClick={() => handleSetDefault(preset.id)}
+                className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50 flex items-center gap-2"
+              >
+                <Icon name="bookmark" className="w-4 h-4" />
+                {preset.isDefault ? 'Remove Default' : 'Set as Default'}
+              </button>
+              <button
+                onClick={() => handleDeletePreset(preset.id)}
+                className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-slate-800/50 flex items-center gap-2"
+              >
+                <Icon name="trash" className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+      
+      {/* Save Filter Button */}
+      {hasActiveFilters && (
+        <Button variant="ghost" size="sm" icon="save" onClick={() => setShowSaveModal(true)}>
+          Save Filter
+        </Button>
+      )}
+      
+      {/* Save Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSaveModal(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-96 animate-fadeIn" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-white mb-4">Save Filter Preset</h3>
+            <Input
+              label="Preset Name"
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+              placeholder="e.g., My DHA Opps"
+              autoFocus
+            />
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="ghost" onClick={() => setShowSaveModal(false)}>Cancel</Button>
+              <Button onClick={handleSavePreset} disabled={!newPresetName.trim()}>Save Preset</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// OPPORTUNITY DRAWER
+// ============================================================
+const OpportunityDrawer = ({ opportunity, isOpen, onClose, onSave, onDelete }) => {
+  const [formData, setFormData] = useState({});
+  const [activeTab, setActiveTab] = useState('details');
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [assignments, setAssignments] = useState([]);
+  
+  useEffect(() => {
+    if (opportunity) {
+      setFormData({ ...opportunity });
+      // Load comments and assignments from localStorage
+      const storedComments = JSON.parse(localStorage.getItem(`MP_COMMENTS_${opportunity.id}`) || '[]');
+      const storedAssignments = JSON.parse(localStorage.getItem(`MP_ASSIGNMENTS_${opportunity.id}`) || '[]');
+      setComments(storedComments);
+      setAssignments(storedAssignments);
+    }
+  }, [opportunity]);
+  
+  const handleSave = () => {
+    onSave(formData);
+    onClose();
+  };
+  
+  const addComment = () => {
+    if (!newComment.trim()) return;
+    const comment = {
+      id: generateId(),
+      content: newComment.trim(),
+      author: 'user',
+      isPinned: false,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [...comments, comment];
+    setComments(updated);
+    localStorage.setItem(`MP_COMMENTS_${opportunity.id}`, JSON.stringify(updated));
+    setNewComment('');
+  };
+  
+  const togglePinComment = (id) => {
+    const updated = comments.map(c => c.id === id ? { ...c, isPinned: !c.isPinned } : c);
+    setComments(updated);
+    localStorage.setItem(`MP_COMMENTS_${opportunity.id}`, JSON.stringify(updated));
+  };
+  
+  const deleteComment = (id) => {
+    const updated = comments.filter(c => c.id !== id);
+    setComments(updated);
+    localStorage.setItem(`MP_COMMENTS_${opportunity.id}`, JSON.stringify(updated));
+  };
+  
+  const addAssignment = (role) => {
+    if (assignments.find(a => a.role === role)) return;
+    const assignment = { id: generateId(), role, assigneeName: '', assigneeEmail: '', createdAt: new Date().toISOString() };
+    const updated = [...assignments, assignment];
+    setAssignments(updated);
+    localStorage.setItem(`MP_ASSIGNMENTS_${opportunity.id}`, JSON.stringify(updated));
+  };
+  
+  const updateAssignment = (id, field, value) => {
+    const updated = assignments.map(a => a.id === id ? { ...a, [field]: value } : a);
+    setAssignments(updated);
+    localStorage.setItem(`MP_ASSIGNMENTS_${opportunity.id}`, JSON.stringify(updated));
+  };
+  
+  const removeAssignment = (id) => {
+    const updated = assignments.filter(a => a.id !== id);
+    setAssignments(updated);
+    localStorage.setItem(`MP_ASSIGNMENTS_${opportunity.id}`, JSON.stringify(updated));
+  };
+  
+  if (!isOpen) return null;
+  
+  const sortedComments = [...comments].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+  
+  return (
+    <div className="fixed inset-y-0 right-0 w-[500px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 animate-slideInRight flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b border-slate-800">
+        <div className="flex items-center justify-between mb-2">
+          <Badge color={PRIORITIES.find(p => p.id === formData.priority)?.color}>{formData.priority}</Badge>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
+            <Icon name="x" className="w-5 h-5" />
+          </button>
+        </div>
+        <h2 className="text-lg font-semibold text-white">{formData.name}</h2>
+        <p className="text-sm text-slate-400">{formData.agency} • {formData.solicitationNumber}</p>
+      </div>
+      
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-3 p-4 border-b border-slate-800">
+        <div className="text-center">
+          <div className="text-lg font-bold text-cyan-400">{formatCurrency(formData.contractValue)}</div>
+          <div className="text-xs text-slate-500">Value</div>
+        </div>
+        <div className="text-center">
+          <div className="text-lg font-bold text-white">{formData.winProbability || 0}%</div>
+          <div className="text-xs text-slate-500">pWin</div>
+        </div>
+        <div className="text-center">
+          <div className={`text-lg font-bold ${getDaysUntil(formData.dueDate) < 0 ? 'text-red-400' : 'text-white'}`}>
+            {getDaysUntil(formData.dueDate)}d
+          </div>
+          <div className="text-xs text-slate-500">Days Left</div>
+        </div>
+      </div>
+      
+      {/* Tabs */}
+      <div className="flex border-b border-slate-800">
+        {['details', 'notes', 'team'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 px-4 py-3 text-sm font-medium capitalize ${activeTab === tab ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-white'}`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+      
+      {/* Tab Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {activeTab === 'details' && (
+          <div className="space-y-4">
+            <Input
+              label="Opportunity Name"
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Agency"
+                value={formData.agency || ''}
+                onChange={(e) => setFormData({ ...formData, agency: e.target.value })}
+                options={[{ value: '', label: 'Select...' }, ...AGENCIES.map(a => ({ value: a, label: a }))]}
+              />
+              <Select
+                label="Priority"
+                value={formData.priority || ''}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                options={PRIORITIES.map(p => ({ value: p.id, label: p.name }))}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Contract Value"
+                type="number"
+                value={formData.contractValue || ''}
+                onChange={(e) => setFormData({ ...formData, contractValue: parseInt(e.target.value) || 0 })}
+              />
+              <Input
+                label="Win Probability"
+                type="number"
+                min="0"
+                max="100"
+                value={formData.winProbability || ''}
+                onChange={(e) => setFormData({ ...formData, winProbability: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+            
+            <Select
+              label="Phase"
+              value={formData.shipleyPhase || ''}
+              onChange={(e) => setFormData({ ...formData, shipleyPhase: e.target.value })}
+              options={SHIPLEY_PHASES.map(p => ({ value: p.id, label: p.name }))}
+            />
+            
+            <Input
+              label="Due Date"
+              type="date"
+              value={formData.dueDate || ''}
+              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+            />
+            
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-400">Description</label>
+              <textarea
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 h-24 resize-none"
+              />
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'notes' && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <input
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && e.ctrlKey && addComment()}
+                placeholder="Add a note... (Ctrl+Enter to submit)"
+                className="flex-1 px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                maxLength={1000}
+              />
+              <Button onClick={addComment} icon="plus">Add</Button>
+            </div>
+            <div className="text-xs text-slate-500 text-right">{newComment.length}/1000</div>
+            
+            <div className="space-y-3">
+              {sortedComments.map(comment => (
+                <div key={comment.id} className={`p-3 bg-slate-800/50 border rounded-lg ${comment.isPinned ? 'border-amber-500/50' : 'border-slate-700'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm text-slate-300 flex-1">{comment.content}</p>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => togglePinComment(comment.id)} className={`p-1 ${comment.isPinned ? 'text-amber-400' : 'text-slate-500 hover:text-white'}`}>
+                        <Icon name="pin" className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => deleteComment(comment.id)} className="p-1 text-slate-500 hover:text-red-400">
+                        <Icon name="trash" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-2">{formatRelativeTime(comment.createdAt)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'team' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-white">Team Assignments</h3>
+              <span className="text-sm text-slate-400">{assignments.length} assigned</span>
+            </div>
+            
+            {/* Add Role Dropdown */}
+            <Select
+              label="Add Role"
+              value=""
+              onChange={(e) => { if (e.target.value) addAssignment(e.target.value); }}
+              options={[
+                { value: '', label: 'Select role to add...' },
+                ...SHIPLEY_ROLES.filter(r => !assignments.find(a => a.role === r.id)).map(r => ({ value: r.id, label: r.name }))
+              ]}
+            />
+            
+            {/* Assignments List */}
+            <div className="space-y-3">
+              {assignments.map(assignment => {
+                const role = SHIPLEY_ROLES.find(r => r.id === assignment.role);
+                return (
+                  <div key={assignment.id} className="p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${role?.color}30`, color: role?.color }}>
+                          {role?.id}
+                        </div>
+                        <span className="font-medium text-white">{role?.name}</span>
+                      </div>
+                      <button onClick={() => removeAssignment(assignment.id)} className="text-slate-500 hover:text-red-400">
+                        <Icon name="x" className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        value={assignment.assigneeName}
+                        onChange={(e) => updateAssignment(assignment.id, 'assigneeName', e.target.value)}
+                        placeholder="Name"
+                        className="px-2 py-1 bg-slate-900/50 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                      />
+                      <input
+                        value={assignment.assigneeEmail}
+                        onChange={(e) => updateAssignment(assignment.id, 'assigneeEmail', e.target.value)}
+                        placeholder="Email"
+                        className="px-2 py-1 bg-slate-900/50 border border-slate-700 rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Footer Actions */}
+      <div className="p-4 border-t border-slate-800 flex justify-between">
+        <Button variant="danger" icon="trash" onClick={() => { onDelete(opportunity.id); onClose(); }}>
+          Delete
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button icon="check" onClick={handleSave}>Save Changes</Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// CREATE OPPORTUNITY MODAL
+// ============================================================
+const CreateOpportunityModal = ({ isOpen, onClose, onCreate, defaultDueDate }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    agency: '',
+    contractValue: '',
+    priority: 'P-2',
+    shipleyPhase: 'gate_1',
+    winProbability: 50,
+    dueDate: defaultDueDate || '',
+    solicitationNumber: '',
+    description: ''
+  });
+  
+  useEffect(() => {
+    if (defaultDueDate) {
+      setFormData(f => ({ ...f, dueDate: defaultDueDate }));
+    }
+  }, [defaultDueDate]);
+  
+  const handleCreate = () => {
+    if (!formData.name.trim()) return;
+    onCreate({
+      ...formData,
+      contractValue: parseInt(formData.contractValue) || 0
+    });
+    setFormData({
+      name: '', agency: '', contractValue: '', priority: 'P-2', shipleyPhase: 'gate_1',
+      winProbability: 50, dueDate: '', solicitationNumber: '', description: ''
+    });
+    onClose();
+  };
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg animate-fadeIn" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">New Opportunity</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
+            <Icon name="x" className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <Input
+            label="Opportunity Name *"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="e.g., DHA EHR Modernization"
+          />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Agency"
+              value={formData.agency}
+              onChange={(e) => setFormData({ ...formData, agency: e.target.value })}
+              options={[{ value: '', label: 'Select...' }, ...AGENCIES.map(a => ({ value: a, label: a }))]}
+            />
+            <Select
+              label="Priority"
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+              options={PRIORITIES.map(p => ({ value: p.id, label: p.name }))}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Contract Value ($)"
+              type="number"
+              value={formData.contractValue}
+              onChange={(e) => setFormData({ ...formData, contractValue: e.target.value })}
+              placeholder="e.g., 50000000"
+            />
+            <Input
+              label="Win Probability (%)"
+              type="number"
+              min="0"
+              max="100"
+              value={formData.winProbability}
+              onChange={(e) => setFormData({ ...formData, winProbability: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Phase"
+              value={formData.shipleyPhase}
+              onChange={(e) => setFormData({ ...formData, shipleyPhase: e.target.value })}
+              options={SHIPLEY_PHASES.map(p => ({ value: p.id, label: p.name }))}
+            />
+            <Input
+              label="Due Date"
+              type="date"
+              value={formData.dueDate}
+              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+            />
+          </div>
+          
+          <Input
+            label="Solicitation Number"
+            value={formData.solicitationNumber}
+            onChange={(e) => setFormData({ ...formData, solicitationNumber: e.target.value })}
+            placeholder="e.g., HC1028-24-R-0001"
+          />
+        </div>
+        
+        <div className="p-4 border-t border-slate-800 flex justify-end gap-3">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button icon="plus" onClick={handleCreate} disabled={!formData.name.trim()}>
+            Create Opportunity
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// SIMPLE DASHBOARD VIEW
+// ============================================================
+const DashboardView = ({ opportunities }) => {
+  const stats = useMemo(() => {
+    const total = opportunities.length;
+    const totalValue = opportunities.reduce((sum, o) => sum + (o.contractValue || 0), 0);
+    const avgPwin = total ? Math.round(opportunities.reduce((sum, o) => sum + (o.winProbability || 0), 0) / total) : 0;
+    const dueThisWeek = opportunities.filter(o => {
+      const d = getDaysUntil(o.dueDate);
+      return d !== null && d >= 0 && d <= 7;
+    }).length;
+    
+    const byPhase = {};
+    SHIPLEY_PHASES.forEach(p => { byPhase[p.id] = { count: 0, value: 0 }; });
+    opportunities.forEach(o => {
+      const phase = o.shipleyPhase || 'gate_1';
+      byPhase[phase].count++;
+      byPhase[phase].value += o.contractValue || 0;
+    });
+    
+    const byPriority = {};
+    PRIORITIES.forEach(p => { byPriority[p.id] = 0; });
+    opportunities.forEach(o => { byPriority[o.priority || 'P-3']++; });
+    
+    return { total, totalValue, avgPwin, dueThisWeek, byPhase, byPriority };
+  }, [opportunities]);
+  
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+          <div className="text-sm text-slate-400 mb-1">Total Pipeline</div>
+          <div className="text-2xl font-bold text-cyan-400">{formatCurrency(stats.totalValue)}</div>
+          <div className="text-xs text-slate-500">{stats.total} opportunities</div>
+        </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+          <div className="text-sm text-slate-400 mb-1">Avg Win Probability</div>
+          <div className="text-2xl font-bold text-white">{stats.avgPwin}%</div>
+          <div className="text-xs text-slate-500">Across all opps</div>
+        </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+          <div className="text-sm text-slate-400 mb-1">Due This Week</div>
+          <div className="text-2xl font-bold text-amber-400">{stats.dueThisWeek}</div>
+          <div className="text-xs text-slate-500">Need attention</div>
+        </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+          <div className="text-sm text-slate-400 mb-1">P-0 Critical</div>
+          <div className="text-2xl font-bold text-red-400">{stats.byPriority['P-0'] || 0}</div>
+          <div className="text-xs text-slate-500">Highest priority</div>
+        </div>
+      </div>
+      
+      {/* Phase Funnel */}
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+        <h3 className="font-semibold text-white mb-4">Pipeline by Phase</h3>
+        <div className="space-y-3">
+          {SHIPLEY_PHASES.slice(0, 6).map(phase => {
+            const data = stats.byPhase[phase.id];
+            const maxValue = Math.max(...Object.values(stats.byPhase).map(v => v.value));
+            const width = maxValue > 0 ? (data.value / maxValue) * 100 : 0;
+            
+            return (
+              <div key={phase.id} className="flex items-center gap-4">
+                <div className="w-24 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: phase.color }} />
+                  <span className="text-sm text-slate-400">{phase.name}</span>
+                </div>
+                <div className="flex-1">
+                  <div className="h-6 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${width}%`, backgroundColor: phase.color }}
+                    />
+                  </div>
+                </div>
+                <div className="w-32 text-right">
+                  <span className="text-white font-medium">{formatCurrency(data.value)}</span>
+                  <span className="text-slate-500 text-sm ml-2">({data.count})</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// MAIN APP COMPONENT
+// ============================================================
+const MissionPulseApp = () => {
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('board');
+  const [theme, setTheme] = useState(() => localStorage.getItem('MP_THEME') || 'dark');
+  const [selectedOpportunity, setSelectedOpportunity] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createDefaultDate, setCreateDefaultDate] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  
+  // Filters
+  const [filters, setFilters] = useState({
+    search: '',
+    agencies: [],
+    priorities: [],
+    phases: [],
+    pWinMin: 0,
+    pWinMax: 100,
+    dueDateStart: null,
+    dueDateEnd: null
+  });
+  
+  // Theme effect
+  useEffect(() => {
+    document.body.className = theme;
+    localStorage.setItem('MP_THEME', theme);
+  }, [theme]);
+  
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(true);
+      } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setShowCreateModal(true);
+      } else if (e.key === 'Escape') {
+        setShowCommandPalette(false);
+        setShowNotifications(false);
+      } else if (e.key === '1') {
+        setView('board');
+      } else if (e.key === '2') {
+        setView('table');
+      } else if (e.key === '3') {
+        setView('calendar');
+      } else if (e.key === '4') {
+        setView('dashboard');
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+  
+  // Fetch opportunities
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('opportunities')
+          .select('*')
+          .order('due_date', { ascending: true });
+        
+        if (error) throw error;
+        setOpportunities((data || []).map(mapToFrontend));
+      } catch (err) {
+        console.error('Error fetching opportunities:', err);
+        setToast({ message: 'Failed to load opportunities', type: 'error' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+    
+    // Subscribe to real-time updates
+    const subscription = supabase
+      .channel('opportunities-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setOpportunities(prev => [...prev, mapToFrontend(payload.new)]);
+        } else if (payload.eventType === 'UPDATE') {
+          setOpportunities(prev => prev.map(o => o.id === payload.new.id ? mapToFrontend(payload.new) : o));
+        } else if (payload.eventType === 'DELETE') {
+          setOpportunities(prev => prev.filter(o => o.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+    
+    return () => { subscription.unsubscribe(); };
+  }, []);
+  
+  // Filter opportunities
+  const filteredOpportunities = useMemo(() => {
+    let result = [...opportunities];
+    
+    // Search
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      result = result.filter(o => 
+        o.name?.toLowerCase().includes(q) ||
+        o.agency?.toLowerCase().includes(q) ||
+        o.solicitationNumber?.toLowerCase().includes(q)
+      );
+    }
+    
+    // Agency filter
+    if (filters.agencies?.length > 0) {
+      result = result.filter(o => filters.agencies.includes(o.agency));
+    }
+    
+    // Priority filter
+    if (filters.priorities?.length > 0) {
+      result = result.filter(o => filters.priorities.includes(o.priority));
+    }
+    
+    // Phase filter
+    if (filters.phases?.length > 0) {
+      result = result.filter(o => filters.phases.includes(o.shipleyPhase));
+    }
+    
+    // Exclude phases (for presets)
+    if (filters.excludePhases?.length > 0) {
+      result = result.filter(o => !filters.excludePhases.includes(o.shipleyPhase));
+    }
+    
+    // pWin range
+    result = result.filter(o => {
+      const pwin = o.winProbability || 0;
+      return pwin >= filters.pWinMin && pwin <= filters.pWinMax;
+    });
+    
+    // Due date filter
+    if (filters.dueDateStart) {
+      result = result.filter(o => o.dueDate >= filters.dueDateStart);
+    }
+    if (filters.dueDateEnd) {
+      if (filters.dueDateEnd === '7_days') {
+        const weekFromNow = new Date();
+        weekFromNow.setDate(weekFromNow.getDate() + 7);
+        result = result.filter(o => o.dueDate && new Date(o.dueDate) <= weekFromNow);
+      } else {
+        result = result.filter(o => o.dueDate <= filters.dueDateEnd);
+      }
+    }
+    
+    // Sort
+    if (sortConfig.key) {
+      result.sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        
+        // Handle nulls
+        if (aVal == null) return 1;
+        if (bVal == null) return -1;
+        
+        // Custom sort for priority
+        if (sortConfig.key === 'priority') {
+          const order = { 'P-0': 0, 'P-1': 1, 'P-2': 2, 'P-3': 3 };
+          aVal = order[aVal] ?? 4;
+          bVal = order[bVal] ?? 4;
+        }
+        
+        // Custom sort for phase
+        if (sortConfig.key === 'shipleyPhase') {
+          const order = SHIPLEY_PHASES.reduce((acc, p, i) => ({ ...acc, [p.id]: i }), {});
+          aVal = order[aVal] ?? 99;
+          bVal = order[bVal] ?? 99;
+        }
+        
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [opportunities, filters, sortConfig]);
+  
+  // CRUD handlers
+  const handleCreate = async (data) => {
+    try {
+      const dbData = mapToDatabase(data);
+      dbData.created_at = new Date().toISOString();
+      dbData.updated_at = new Date().toISOString();
+      
+      const { error } = await supabase.from('opportunities').insert([dbData]);
+      if (error) throw error;
+      
+      setToast({ message: 'Opportunity created', type: 'success' });
+    } catch (err) {
+      console.error('Error creating opportunity:', err);
+      setToast({ message: 'Failed to create opportunity', type: 'error' });
+    }
+  };
+  
+  const handleUpdate = async (data) => {
+    try {
+      const dbData = mapToDatabase(data);
+      dbData.updated_at = new Date().toISOString();
+      
+      const { error } = await supabase.from('opportunities').update(dbData).eq('id', data.id);
+      if (error) throw error;
+      
+      setToast({ message: 'Opportunity updated', type: 'success' });
+    } catch (err) {
+      console.error('Error updating opportunity:', err);
+      setToast({ message: 'Failed to update opportunity', type: 'error' });
+    }
+  };
+  
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this opportunity?')) return;
+    
+    try {
+      const { error } = await supabase.from('opportunities').delete().eq('id', id);
+      if (error) throw error;
+      
+      setToast({ message: 'Opportunity deleted', type: 'success' });
+    } catch (err) {
+      console.error('Error deleting opportunity:', err);
+      setToast({ message: 'Failed to delete opportunity', type: 'error' });
+    }
+  };
+  
+  const handlePhaseChange = async (id, newPhase) => {
+    try {
+      const { error } = await supabase.from('opportunities').update({
+        shipley_phase: newPhase,
+        updated_at: new Date().toISOString()
+      }).eq('id', id);
+      
+      if (error) throw error;
+      setToast({ message: 'Phase updated', type: 'success' });
+    } catch (err) {
+      console.error('Error updating phase:', err);
+      setToast({ message: 'Failed to update phase', type: 'error' });
+    }
+  };
+  
+  // Command palette actions
+  const handleCommandAction = (action, payload) => {
+    if (action === 'new') setShowCreateModal(true);
+    else if (action === 'view') setView(payload);
+    else if (action === 'theme') setTheme(t => t === 'dark' ? 'light' : 'dark');
+    else if (action === 'export') {
+      const csv = [
+        ['Name', 'Agency', 'Value', 'Priority', 'Phase', 'pWin', 'Due Date'],
+        ...filteredOpportunities.map(o => [
+          o.name, o.agency, o.contractValue, o.priority, o.shipleyPhase, o.winProbability, o.dueDate
+        ])
+      ].map(row => row.join(',')).join('\n');
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `missionpulse-export-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      
+      setToast({ message: 'Export complete', type: 'success' });
+    }
+  };
+  
+  // Apply filter preset
+  const handleApplyPreset = (presetFilters) => {
+    if (!presetFilters) {
+      setFilters({
+        search: '', agencies: [], priorities: [], phases: [],
+        pWinMin: 0, pWinMax: 100, dueDateStart: null, dueDateEnd: null
+      });
+    } else {
+      setFilters(f => ({ ...f, ...presetFilters }));
+    }
+  };
+  
+  // Create from calendar
+  const handleCreateWithDate = (date) => {
+    setCreateDefaultDate(date);
+    setShowCreateModal(true);
+  };
+  
+  const unreadNotificationCount = opportunities.filter(o => {
+    const d = getDaysUntil(o.dueDate);
+    return (d !== null && d >= 0 && d <= 3) || o.priority === 'P-0';
+  }).length;
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#00050F]">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-400">Loading MissionPulse...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#00050F]' : 'bg-slate-100'}`}>
+      {/* Header */}
+      <header className={`px-6 py-3 border-b ${theme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <div className="flex items-center justify-between">
+          {/* Logo & Title */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+              <Icon name="shield" className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white">MissionPulse</h1>
+              <p className="text-xs text-slate-500">Sprint 15 • Federal Pipeline</p>
+            </div>
+          </div>
+          
+          {/* Center - View Toggle */}
+          <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
+            {[
+              { id: 'board', icon: 'grid', label: 'Board' },
+              { id: 'table', icon: 'list', label: 'Table' },
+              { id: 'calendar', icon: 'calendar', label: 'Calendar' },
+              { id: 'dashboard', icon: 'chart', label: 'Dashboard' }
+            ].map(v => (
+              <button
+                key={v.id}
+                onClick={() => setView(v.id)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                  view === v.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+                }`}
+                title={v.label}
+              >
+                <Icon name={v.icon} className="w-4 h-4" />
+                <span className="hidden sm:inline">{v.label}</span>
+              </button>
+            ))}
+          </div>
+          
+          {/* Right - Actions */}
+          <div className="flex items-center gap-3">
+            {/* Command Palette Trigger */}
+            <button
+              onClick={() => setShowCommandPalette(true)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+            >
+              <Icon name="search" className="w-4 h-4" />
+              <span className="text-sm">Search</span>
+              <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-xs">⌘K</kbd>
+            </button>
+            
+            {/* Notifications */}
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <Icon name="bell" className="w-5 h-5" />
+              {unreadNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+                  {unreadNotificationCount}
+                </span>
+              )}
+            </button>
+            
+            {/* Theme Toggle */}
+            <button
+              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+              className="p-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} className="w-5 h-5" />
+            </button>
+            
+            {/* New Opportunity */}
+            <Button icon="plus" onClick={() => setShowCreateModal(true)}>
+              New Opportunity
+            </Button>
+          </div>
+        </div>
+      </header>
+      
+      {/* Filter Bar */}
+      <div className={`px-6 py-3 border-b ${theme === 'dark' ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Search */}
+          <div className="relative flex-1 min-w-64 max-w-md">
+            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              placeholder="Search opportunities..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+            />
+          </div>
+          
+          {/* Saved Filter Presets */}
+          <SavedFilterPresets 
+            filters={filters}
+            onApplyPreset={handleApplyPreset}
+            onSavePreset={() => {}}
+          />
+          
+          {/* Active Filter Count */}
+          {(filters.agencies?.length > 0 || filters.priorities?.length > 0 || filters.phases?.length > 0) && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              icon="x"
+              onClick={() => setFilters({ ...filters, agencies: [], priorities: [], phases: [] })}
+            >
+              Clear ({(filters.agencies?.length || 0) + (filters.priorities?.length || 0) + (filters.phases?.length || 0)})
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      {/* Main Content */}
+      <main className="p-6">
+        {view === 'board' && (
+          <BoardView
+            opportunities={filteredOpportunities}
+            onSelectOpportunity={setSelectedOpportunity}
+            onPhaseChange={handlePhaseChange}
+          />
+        )}
+        
+        {view === 'table' && (
+          <TableView
+            opportunities={filteredOpportunities}
+            onSelectOpportunity={setSelectedOpportunity}
+            sortConfig={sortConfig}
+            onSort={setSortConfig}
+          />
+        )}
+        
+        {view === 'calendar' && (
+          <CalendarView
+            opportunities={filteredOpportunities}
+            onSelectOpportunity={setSelectedOpportunity}
+            onCreateWithDate={handleCreateWithDate}
+          />
+        )}
+        
+        {view === 'dashboard' && (
+          <DashboardView opportunities={filteredOpportunities} />
+        )}
+      </main>
+      
+      {/* Footer */}
+      <footer className={`fixed bottom-0 left-0 right-0 px-6 py-2 border-t text-xs ${theme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400'}`}>
+        <div className="flex items-center justify-between">
+          <span>© 2026 Mission Meets Tech • MissionPulse v12 Sprint 15</span>
+          <span>AI GENERATED - REQUIRES HUMAN REVIEW</span>
+          <span>Shortcuts: N new | 1-4 views | ⌘K search</span>
+        </div>
+      </footer>
+      
+      {/* Modals & Panels */}
+      <OpportunityDrawer
+        opportunity={selectedOpportunity}
+        isOpen={!!selectedOpportunity}
+        onClose={() => setSelectedOpportunity(null)}
+        onSave={handleUpdate}
+        onDelete={handleDelete}
+      />
+      
+      <CreateOpportunityModal
+        isOpen={showCreateModal}
+        onClose={() => { setShowCreateModal(false); setCreateDefaultDate(null); }}
+        onCreate={handleCreate}
+        defaultDueDate={createDefaultDate}
+      />
+      
+      <NotificationCenter
+        opportunities={opportunities}
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        onSelectOpportunity={(opp) => { setSelectedOpportunity(opp); setShowNotifications(false); }}
+      />
+      
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        opportunities={opportunities}
+        onSelectOpportunity={(opp) => setSelectedOpportunity(opp)}
+        onAction={handleCommandAction}
+      />
+      
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+// Mount app
+ReactDOM.createRoot(document.getElementById('root')).render(<MissionPulseApp />);
+  </script>
+</body>
+</html>

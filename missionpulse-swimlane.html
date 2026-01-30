@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swimlane Board | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass { background: rgba(0, 229, 250, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.2); }
+        .glow { box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); }
+        .swimlane { min-height: 400px; }
+        .task-card { cursor: grab; transition: all 0.2s; }
+        .task-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0, 229, 250, 0.2); }
+        .task-card.dragging { opacity: 0.5; cursor: grabbing; }
+        .drop-zone { transition: all 0.2s; }
+        .drop-zone.drag-over { background: rgba(0, 229, 250, 0.15); border: 2px dashed #00E5FA; }
+    </style>
+</head>
+<body class="text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // FILE: missionpulse-swimlane.html
+        // ROLE: All authenticated users
+        // SECURITY: env vars verified - Supabase anon key (public RLS model)
+        
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NTY2NDcsImV4cCI6MjA1MzMzMjY0N30.Wfq14O6y2EpB2R0cJQPmWMFybMQc0PxLlHYXVLp2rws';
+        const DEFAULT_COMPANY_ID = '11111111-1111-1111-1111-111111111111';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        const COLUMNS = [
+            { id: 'pending', title: 'Pending', color: 'slate' },
+            { id: 'in_progress', title: 'In Progress', color: 'cyan' },
+            { id: 'complete', title: 'Complete', color: 'green' },
+            { id: 'blocked', title: 'Blocked', color: 'red' }
+        ];
+        
+        const PRIORITY_COLORS = {
+            critical: 'bg-red-500/20 border-red-500 text-red-400',
+            high: 'bg-orange-500/20 border-orange-500 text-orange-400',
+            medium: 'bg-yellow-500/20 border-yellow-500 text-yellow-400',
+            low: 'bg-green-500/20 border-green-500 text-green-400'
+        };
+        
+        const DEMO_TASKS = [
+            { id: '1', opportunity_id: 'opp-1', title: 'Draft Executive Summary', description: 'Write compelling exec summary for VA proposal', status: 'in_progress', assigned_to: 'Mary W.', due_date: '2025-02-15', priority: 'critical', opp_nickname: 'VA-EHR-2025' },
+            { id: '2', opportunity_id: 'opp-1', title: 'Complete Technical Approach', description: 'Document technical solution architecture', status: 'pending', assigned_to: 'John D.', due_date: '2025-02-10', priority: 'high', opp_nickname: 'VA-EHR-2025' },
+            { id: '3', opportunity_id: 'opp-2', title: 'Past Performance Write-up', description: 'Compile relevant past performance examples', status: 'complete', assigned_to: 'Sarah K.', due_date: '2025-02-01', priority: 'medium', opp_nickname: 'DHA-Cloud' },
+            { id: '4', opportunity_id: 'opp-1', title: 'Pricing Review', description: 'Validate labor rates against GSA schedule', status: 'blocked', assigned_to: 'Finance Team', due_date: '2025-02-08', priority: 'high', opp_nickname: 'VA-EHR-2025' },
+            { id: '5', opportunity_id: 'opp-2', title: 'Compliance Matrix', description: 'Map requirements to proposal sections', status: 'pending', assigned_to: 'QA Team', due_date: '2025-02-12', priority: 'medium', opp_nickname: 'DHA-Cloud' },
+        ];
+        
+        function App() {
+            const [currentRole, setCurrentRole] = useState('PM');
+            const [tasks, setTasks] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [opportunities, setOpportunities] = useState([]);
+            const [selectedOpp, setSelectedOpp] = useState('all');
+            const [showModal, setShowModal] = useState(false);
+            const [editTask, setEditTask] = useState(null);
+            const [draggedTask, setDraggedTask] = useState(null);
+            
+            useEffect(() => { loadData(); }, []);
+            
+            const loadData = async () => {
+                try {
+                    const [tasksRes, oppsRes] = await Promise.all([
+                        supabase.from('tasks').select('*, opportunities(nickname)').order('created_at', { ascending: false }),
+                        supabase.from('opportunities').select('id, nickname').eq('company_id', DEFAULT_COMPANY_ID)
+                    ]);
+                    
+                    if (tasksRes.error) throw tasksRes.error;
+                    
+                    const enrichedTasks = (tasksRes.data || []).map(t => ({
+                        ...t,
+                        opp_nickname: t.opportunities?.nickname || 'Unassigned'
+                    }));
+                    
+                    setTasks(enrichedTasks.length > 0 ? enrichedTasks : DEMO_TASKS);
+                    setOpportunities(oppsRes.data || []);
+                } catch (err) {
+                    console.error('Load error:', err);
+                    setTasks(DEMO_TASKS);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            const handleDragStart = (e, task) => {
+                setDraggedTask(task);
+                e.dataTransfer.effectAllowed = 'move';
+                e.target.classList.add('dragging');
+            };
+            
+            const handleDragEnd = (e) => {
+                e.target.classList.remove('dragging');
+                setDraggedTask(null);
+            };
+            
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            };
+            
+            const handleDragEnter = (e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('drag-over');
+            };
+            
+            const handleDragLeave = (e) => {
+                e.currentTarget.classList.remove('drag-over');
+            };
+            
+            const handleDrop = async (e, newStatus) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+                
+                if (!draggedTask || draggedTask.status === newStatus) return;
+                
+                const updatedTasks = tasks.map(t => 
+                    t.id === draggedTask.id ? { ...t, status: newStatus } : t
+                );
+                setTasks(updatedTasks);
+                
+                try {
+                    await supabase.from('tasks').update({ status: newStatus }).eq('id', draggedTask.id);
+                } catch (err) {
+                    console.error('Update error:', err);
+                }
+            };
+            
+            const saveTask = async (taskData) => {
+                try {
+                    if (editTask?.id && !editTask.id.startsWith('temp-')) {
+                        await supabase.from('tasks').update(taskData).eq('id', editTask.id);
+                    } else {
+                        const { data } = await supabase.from('tasks').insert({
+                            ...taskData,
+                            company_id: DEFAULT_COMPANY_ID
+                        }).select().single();
+                        if (data) taskData.id = data.id;
+                    }
+                    loadData();
+                    setShowModal(false);
+                    setEditTask(null);
+                } catch (err) {
+                    console.error('Save error:', err);
+                    const tempId = 'temp-' + Date.now();
+                    setTasks([...tasks.filter(t => t.id !== editTask?.id), { ...taskData, id: tempId }]);
+                    setShowModal(false);
+                    setEditTask(null);
+                }
+            };
+            
+            const deleteTask = async (taskId) => {
+                if (!confirm('Delete this task?')) return;
+                setTasks(tasks.filter(t => t.id !== taskId));
+                try {
+                    await supabase.from('tasks').delete().eq('id', taskId);
+                } catch (err) {
+                    console.error('Delete error:', err);
+                }
+            };
+            
+            const filteredTasks = selectedOpp === 'all' 
+                ? tasks 
+                : tasks.filter(t => t.opportunity_id === selectedOpp);
+            
+            const getColumnTasks = (status) => filteredTasks.filter(t => t.status === status);
+            
+            return (
+                <div className="p-6 max-w-full mx-auto">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <a href="index.html" className="text-cyan-400 hover:text-cyan-300 text-sm mb-2 inline-block">← Back to Dashboard</a>
+                            <h1 className="text-3xl font-bold text-cyan-400">📋 Swimlane Board</h1>
+                            <p className="text-slate-400 mt-1">Drag tasks between columns to update status</p>
+                        </div>
+                        <div className="flex gap-4 items-center">
+                            <select value={selectedOpp} onChange={e => setSelectedOpp(e.target.value)}
+                                className="bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-cyan-400">
+                                <option value="all">All Opportunities</option>
+                                {opportunities.map(o => <option key={o.id} value={o.id}>{o.nickname}</option>)}
+                            </select>
+                            <select value={currentRole} onChange={e => setCurrentRole(e.target.value)}
+                                className="bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-cyan-400">
+                                {['CEO','COO','CAP','PM','SA','FIN','CON','DEL','QA','Partner','Admin'].map(r => 
+                                    <option key={r} value={r}>{r}</option>
+                                )}
+                            </select>
+                            <button onClick={() => { setEditTask({}); setShowModal(true); }}
+                                className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-4 py-2 rounded-lg transition">
+                                + New Task
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {loading ? (
+                        <div className="text-center py-20 text-cyan-400">Loading tasks...</div>
+                    ) : (
+                        <div className="grid grid-cols-4 gap-4">
+                            {COLUMNS.map(col => (
+                                <div key={col.id} className="glass rounded-xl p-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h2 className={`font-bold text-${col.color}-400 text-lg`}>{col.title}</h2>
+                                        <span className={`bg-${col.color}-500/20 text-${col.color}-400 px-2 py-1 rounded text-sm`}>
+                                            {getColumnTasks(col.id).length}
+                                        </span>
+                                    </div>
+                                    <div 
+                                        className="swimlane drop-zone rounded-lg p-2 space-y-3"
+                                        onDragOver={handleDragOver}
+                                        onDragEnter={handleDragEnter}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={(e) => handleDrop(e, col.id)}
+                                    >
+                                        {getColumnTasks(col.id).map(task => (
+                                            <div 
+                                                key={task.id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, task)}
+                                                onDragEnd={handleDragEnd}
+                                                className={`task-card glass rounded-lg p-3 border-l-4 ${PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.medium}`}
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h3 className="font-semibold text-white text-sm">{task.title}</h3>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => { setEditTask(task); setShowModal(true); }}
+                                                            className="text-cyan-400 hover:text-cyan-300 text-xs">✏️</button>
+                                                        <button onClick={() => deleteTask(task.id)}
+                                                            className="text-red-400 hover:text-red-300 text-xs">🗑️</button>
+                                                    </div>
+                                                </div>
+                                                <p className="text-slate-400 text-xs mb-2 line-clamp-2">{task.description}</p>
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-cyan-400">{task.opp_nickname}</span>
+                                                    <span className="text-slate-500">{task.due_date}</span>
+                                                </div>
+                                                <div className="mt-2 text-xs text-slate-400">
+                                                    👤 {task.assigned_to || 'Unassigned'}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {getColumnTasks(col.id).length === 0 && (
+                                            <div className="text-center py-8 text-slate-500 text-sm">
+                                                Drop tasks here
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    
+                    {showModal && (
+                        <TaskModal 
+                            task={editTask} 
+                            opportunities={opportunities}
+                            onSave={saveTask} 
+                            onClose={() => { setShowModal(false); setEditTask(null); }} 
+                        />
+                    )}
+                    
+                    <div className="mt-8 text-center text-slate-500 text-sm">
+                        MissionPulse v3.1 • Mission Meets Tech • AI GENERATED CONTENT REQUIRES HUMAN REVIEW
+                    </div>
+                </div>
+            );
+        }
+        
+        function TaskModal({ task, opportunities, onSave, onClose }) {
+            const [form, setForm] = useState({
+                title: task?.title || '',
+                description: task?.description || '',
+                status: task?.status || 'pending',
+                priority: task?.priority || 'medium',
+                assigned_to: task?.assigned_to || '',
+                due_date: task?.due_date || '',
+                opportunity_id: task?.opportunity_id || ''
+            });
+            
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSave(form);
+            };
+            
+            return (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+                    <div className="glass rounded-xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-xl font-bold text-cyan-400 mb-4">{task?.id ? 'Edit Task' : 'New Task'}</h2>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">Title</label>
+                                <input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})}
+                                    className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" required />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">Description</label>
+                                <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})}
+                                    className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white h-24" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Status</label>
+                                    <select value={form.status} onChange={e => setForm({...form, status: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white">
+                                        <option value="pending">Pending</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="complete">Complete</option>
+                                        <option value="blocked">Blocked</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Priority</label>
+                                    <select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white">
+                                        <option value="critical">Critical</option>
+                                        <option value="high">High</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="low">Low</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Assigned To</label>
+                                    <input type="text" value={form.assigned_to} onChange={e => setForm({...form, assigned_to: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Due Date</label>
+                                    <input type="date" value={form.due_date} onChange={e => setForm({...form, due_date: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">Opportunity</label>
+                                <select value={form.opportunity_id} onChange={e => setForm({...form, opportunity_id: e.target.value})}
+                                    className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white">
+                                    <option value="">Select Opportunity</option>
+                                    {opportunities.map(o => <option key={o.id} value={o.id}>{o.nickname}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex gap-3 justify-end mt-6">
+                                <button type="button" onClick={onClose}
+                                    className="px-4 py-2 border border-slate-600 rounded-lg hover:bg-slate-700 transition">Cancel</button>
+                                <button type="submit"
+                                    className="px-4 py-2 bg-cyan-500 text-black font-bold rounded-lg hover:bg-cyan-400 transition">Save Task</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+        
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

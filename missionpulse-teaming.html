@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teaming Partners | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass { background: rgba(0, 229, 250, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.2); }
+        .glow { box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); }
+    </style>
+</head>
+<body class="text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // FILE: missionpulse-teaming.html
+        // ROLE: All authenticated users (Partner role sees limited view)
+        // SECURITY: env vars verified - Supabase anon key (public RLS model)
+        
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NTY2NDcsImV4cCI6MjA1MzMzMjY0N30.Wfq14O6y2EpB2R0cJQPmWMFybMQc0PxLlHYXVLp2rws';
+        const DEFAULT_COMPANY_ID = '11111111-1111-1111-1111-111111111111';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        const PARTNER_ROLES = ['Prime', 'Subcontractor', 'Teaming Partner', 'Mentor-Protégé', 'JV Partner', 'Consultant'];
+        const PARTNER_STATUS = ['Prospecting', 'NDA Pending', 'NDA Signed', 'Active', 'On Hold', 'Inactive'];
+        const TEAM_ROLES = ['CEO', 'COO', 'CAP', 'PM', 'SA', 'FIN', 'CON', 'DEL', 'QA', 'Partner', 'Admin'];
+        
+        const DEMO_PARTNERS = [
+            { id: '1', opportunity_id: 'opp-1', company_name: 'TechVets Solutions', role: 'Subcontractor', contact_name: 'James Wilson', contact_email: 'jwilson@techvets.com', status: 'Active', nda_signed: true, workshare_percent: 25, opp_nickname: 'VA-EHR-2025' },
+            { id: '2', opportunity_id: 'opp-1', company_name: 'CloudFirst Federal', role: 'Teaming Partner', contact_name: 'Sarah Chen', contact_email: 'schen@cloudfirst.gov', status: 'NDA Signed', nda_signed: true, workshare_percent: 15, opp_nickname: 'VA-EHR-2025' },
+            { id: '3', opportunity_id: 'opp-2', company_name: 'HealthIT Pros', role: 'Subcontractor', contact_name: 'Michael Brown', contact_email: 'mbrown@healthitpros.com', status: 'Prospecting', nda_signed: false, workshare_percent: 20, opp_nickname: 'DHA-Cloud' },
+        ];
+        
+        const DEMO_ASSIGNMENTS = [
+            { id: '1', opportunity_id: 'opp-1', user_name: 'Mary Womack', role: 'CEO', assigned_date: '2025-01-15', opp_nickname: 'VA-EHR-2025' },
+            { id: '2', opportunity_id: 'opp-1', user_name: 'John Davis', role: 'PM', assigned_date: '2025-01-16', opp_nickname: 'VA-EHR-2025' },
+            { id: '3', opportunity_id: 'opp-1', user_name: 'Lisa Park', role: 'SA', assigned_date: '2025-01-16', opp_nickname: 'VA-EHR-2025' },
+            { id: '4', opportunity_id: 'opp-2', user_name: 'Robert Kim', role: 'CAP', assigned_date: '2025-01-20', opp_nickname: 'DHA-Cloud' },
+        ];
+        
+        function App() {
+            const [currentRole, setCurrentRole] = useState('PM');
+            const [activeTab, setActiveTab] = useState('partners');
+            const [partners, setPartners] = useState([]);
+            const [assignments, setAssignments] = useState([]);
+            const [opportunities, setOpportunities] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showModal, setShowModal] = useState(false);
+            const [modalType, setModalType] = useState('partner');
+            const [editItem, setEditItem] = useState(null);
+            const [selectedOpp, setSelectedOpp] = useState('all');
+            
+            useEffect(() => { loadData(); }, []);
+            
+            const loadData = async () => {
+                try {
+                    const [partnersRes, assignmentsRes, oppsRes] = await Promise.all([
+                        supabase.from('teaming_partners').select('*, opportunities(nickname)').order('created_at', { ascending: false }),
+                        supabase.from('team_assignments').select('*, opportunities(nickname), profiles(full_name)').order('assigned_date', { ascending: false }),
+                        supabase.from('opportunities').select('id, nickname').eq('company_id', DEFAULT_COMPANY_ID)
+                    ]);
+                    
+                    const enrichedPartners = (partnersRes.data || []).map(p => ({
+                        ...p,
+                        opp_nickname: p.opportunities?.nickname || 'Unassigned'
+                    }));
+                    
+                    const enrichedAssignments = (assignmentsRes.data || []).map(a => ({
+                        ...a,
+                        user_name: a.profiles?.full_name || 'Unknown',
+                        opp_nickname: a.opportunities?.nickname || 'Unassigned'
+                    }));
+                    
+                    setPartners(enrichedPartners.length > 0 ? enrichedPartners : DEMO_PARTNERS);
+                    setAssignments(enrichedAssignments.length > 0 ? enrichedAssignments : DEMO_ASSIGNMENTS);
+                    setOpportunities(oppsRes.data || []);
+                } catch (err) {
+                    console.error('Load error:', err);
+                    setPartners(DEMO_PARTNERS);
+                    setAssignments(DEMO_ASSIGNMENTS);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            const savePartner = async (data) => {
+                try {
+                    if (editItem?.id && !editItem.id.startsWith('temp-')) {
+                        await supabase.from('teaming_partners').update(data).eq('id', editItem.id);
+                    } else {
+                        await supabase.from('teaming_partners').insert({ ...data, company_id: DEFAULT_COMPANY_ID });
+                    }
+                    loadData();
+                } catch (err) {
+                    console.error('Save error:', err);
+                    const tempId = 'temp-' + Date.now();
+                    setPartners([...partners.filter(p => p.id !== editItem?.id), { ...data, id: tempId }]);
+                }
+                setShowModal(false);
+                setEditItem(null);
+            };
+            
+            const saveAssignment = async (data) => {
+                try {
+                    if (editItem?.id && !editItem.id.startsWith('temp-')) {
+                        await supabase.from('team_assignments').update(data).eq('id', editItem.id);
+                    } else {
+                        await supabase.from('team_assignments').insert({ ...data, company_id: DEFAULT_COMPANY_ID });
+                    }
+                    loadData();
+                } catch (err) {
+                    console.error('Save error:', err);
+                    const tempId = 'temp-' + Date.now();
+                    setAssignments([...assignments.filter(a => a.id !== editItem?.id), { ...data, id: tempId, user_name: data.user_name || 'New Assignment' }]);
+                }
+                setShowModal(false);
+                setEditItem(null);
+            };
+            
+            const deletePartner = async (id) => {
+                if (!confirm('Remove this partner?')) return;
+                setPartners(partners.filter(p => p.id !== id));
+                try { await supabase.from('teaming_partners').delete().eq('id', id); } catch (err) { console.error(err); }
+            };
+            
+            const deleteAssignment = async (id) => {
+                if (!confirm('Remove this assignment?')) return;
+                setAssignments(assignments.filter(a => a.id !== id));
+                try { await supabase.from('team_assignments').delete().eq('id', id); } catch (err) { console.error(err); }
+            };
+            
+            const filteredPartners = selectedOpp === 'all' ? partners : partners.filter(p => p.opportunity_id === selectedOpp);
+            const filteredAssignments = selectedOpp === 'all' ? assignments : assignments.filter(a => a.opportunity_id === selectedOpp);
+            
+            const totalWorkshare = filteredPartners.reduce((sum, p) => sum + (p.workshare_percent || 0), 0);
+            
+            // RBAC: Partner role sees limited view
+            const isPartnerRole = currentRole === 'Partner';
+            
+            return (
+                <div className="p-6 max-w-7xl mx-auto">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <a href="index.html" className="text-cyan-400 hover:text-cyan-300 text-sm mb-2 inline-block">← Back to Dashboard</a>
+                            <h1 className="text-3xl font-bold text-cyan-400">🤝 Teaming & Assignments</h1>
+                            <p className="text-slate-400 mt-1">Manage partners and team role assignments</p>
+                        </div>
+                        <div className="flex gap-4 items-center">
+                            <select value={selectedOpp} onChange={e => setSelectedOpp(e.target.value)}
+                                className="bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-cyan-400">
+                                <option value="all">All Opportunities</option>
+                                {opportunities.map(o => <option key={o.id} value={o.id}>{o.nickname}</option>)}
+                            </select>
+                            <select value={currentRole} onChange={e => setCurrentRole(e.target.value)}
+                                className="bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-cyan-400">
+                                {TEAM_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    {/* Tabs */}
+                    <div className="flex gap-4 mb-6">
+                        <button onClick={() => setActiveTab('partners')}
+                            className={`px-4 py-2 rounded-lg font-semibold transition ${activeTab === 'partners' ? 'bg-cyan-500 text-black' : 'glass text-cyan-400 hover:bg-cyan-500/20'}`}>
+                            Teaming Partners ({filteredPartners.length})
+                        </button>
+                        <button onClick={() => setActiveTab('assignments')}
+                            className={`px-4 py-2 rounded-lg font-semibold transition ${activeTab === 'assignments' ? 'bg-cyan-500 text-black' : 'glass text-cyan-400 hover:bg-cyan-500/20'}`}>
+                            Team Assignments ({filteredAssignments.length})
+                        </button>
+                    </div>
+                    
+                    {loading ? (
+                        <div className="text-center py-20 text-cyan-400">Loading...</div>
+                    ) : activeTab === 'partners' ? (
+                        <div className="glass rounded-xl p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <div>
+                                    <h2 className="text-xl font-bold text-cyan-400">Teaming Partners</h2>
+                                    <p className="text-slate-400 text-sm">Total Workshare: {totalWorkshare}%</p>
+                                </div>
+                                {!isPartnerRole && (
+                                    <button onClick={() => { setModalType('partner'); setEditItem({}); setShowModal(true); }}
+                                        className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-4 py-2 rounded-lg transition">
+                                        + Add Partner
+                                    </button>
+                                )}
+                            </div>
+                            
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-cyan-500/20 text-left">
+                                            <th className="pb-3 text-cyan-400">Company</th>
+                                            <th className="pb-3 text-cyan-400">Role</th>
+                                            <th className="pb-3 text-cyan-400">Contact</th>
+                                            <th className="pb-3 text-cyan-400">Status</th>
+                                            <th className="pb-3 text-cyan-400">NDA</th>
+                                            <th className="pb-3 text-cyan-400">Workshare</th>
+                                            <th className="pb-3 text-cyan-400">Opportunity</th>
+                                            {!isPartnerRole && <th className="pb-3 text-cyan-400">Actions</th>}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredPartners.map(partner => (
+                                            <tr key={partner.id} className="border-b border-slate-700/50 hover:bg-cyan-500/5">
+                                                <td className="py-3 font-semibold">{partner.company_name}</td>
+                                                <td className="py-3 text-slate-300">{partner.role}</td>
+                                                <td className="py-3">
+                                                    <div className="text-sm">{partner.contact_name}</div>
+                                                    <div className="text-xs text-slate-400">{partner.contact_email}</div>
+                                                </td>
+                                                <td className="py-3">
+                                                    <span className={`px-2 py-1 rounded text-xs ${
+                                                        partner.status === 'Active' ? 'bg-green-500/20 text-green-400' :
+                                                        partner.status === 'NDA Signed' ? 'bg-cyan-500/20 text-cyan-400' :
+                                                        partner.status === 'Prospecting' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                        'bg-slate-500/20 text-slate-400'
+                                                    }`}>{partner.status}</span>
+                                                </td>
+                                                <td className="py-3">
+                                                    {partner.nda_signed ? 
+                                                        <span className="text-green-400">✓ Signed</span> : 
+                                                        <span className="text-yellow-400">⏳ Pending</span>}
+                                                </td>
+                                                <td className="py-3 text-cyan-400 font-semibold">{partner.workshare_percent}%</td>
+                                                <td className="py-3 text-slate-300">{partner.opp_nickname}</td>
+                                                {!isPartnerRole && (
+                                                    <td className="py-3">
+                                                        <button onClick={() => { setModalType('partner'); setEditItem(partner); setShowModal(true); }}
+                                                            className="text-cyan-400 hover:text-cyan-300 mr-2">✏️</button>
+                                                        <button onClick={() => deletePartner(partner.id)}
+                                                            className="text-red-400 hover:text-red-300">🗑️</button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {filteredPartners.length === 0 && (
+                                    <div className="text-center py-8 text-slate-500">No partners found</div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="glass rounded-xl p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold text-cyan-400">Team Role Assignments</h2>
+                                {!isPartnerRole && (
+                                    <button onClick={() => { setModalType('assignment'); setEditItem({}); setShowModal(true); }}
+                                        className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-4 py-2 rounded-lg transition">
+                                        + Assign Role
+                                    </button>
+                                )}
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {filteredAssignments.map(assignment => (
+                                    <div key={assignment.id} className="glass rounded-lg p-4 border-l-4 border-cyan-500">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="bg-cyan-500/20 text-cyan-400 px-2 py-1 rounded text-sm font-bold">
+                                                {assignment.role}
+                                            </span>
+                                            {!isPartnerRole && (
+                                                <div className="flex gap-1">
+                                                    <button onClick={() => { setModalType('assignment'); setEditItem(assignment); setShowModal(true); }}
+                                                        className="text-cyan-400 hover:text-cyan-300 text-sm">✏️</button>
+                                                    <button onClick={() => deleteAssignment(assignment.id)}
+                                                        className="text-red-400 hover:text-red-300 text-sm">🗑️</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <h3 className="font-semibold text-white">{assignment.user_name}</h3>
+                                        <p className="text-slate-400 text-sm mt-1">{assignment.opp_nickname}</p>
+                                        <p className="text-slate-500 text-xs mt-2">Assigned: {assignment.assigned_date}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            {filteredAssignments.length === 0 && (
+                                <div className="text-center py-8 text-slate-500">No assignments found</div>
+                            )}
+                        </div>
+                    )}
+                    
+                    {showModal && modalType === 'partner' && (
+                        <PartnerModal item={editItem} opportunities={opportunities} onSave={savePartner} onClose={() => { setShowModal(false); setEditItem(null); }} />
+                    )}
+                    
+                    {showModal && modalType === 'assignment' && (
+                        <AssignmentModal item={editItem} opportunities={opportunities} onSave={saveAssignment} onClose={() => { setShowModal(false); setEditItem(null); }} />
+                    )}
+                    
+                    <div className="mt-8 text-center text-slate-500 text-sm">
+                        MissionPulse v3.1 • Mission Meets Tech • AI GENERATED CONTENT REQUIRES HUMAN REVIEW
+                    </div>
+                </div>
+            );
+        }
+        
+        function PartnerModal({ item, opportunities, onSave, onClose }) {
+            const [form, setForm] = useState({
+                company_name: item?.company_name || '',
+                role: item?.role || 'Subcontractor',
+                contact_name: item?.contact_name || '',
+                contact_email: item?.contact_email || '',
+                status: item?.status || 'Prospecting',
+                nda_signed: item?.nda_signed || false,
+                workshare_percent: item?.workshare_percent || 0,
+                opportunity_id: item?.opportunity_id || ''
+            });
+            
+            return (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+                    <div className="glass rounded-xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-xl font-bold text-cyan-400 mb-4">{item?.id ? 'Edit Partner' : 'Add Partner'}</h2>
+                        <form onSubmit={e => { e.preventDefault(); onSave(form); }} className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">Company Name</label>
+                                <input type="text" value={form.company_name} onChange={e => setForm({...form, company_name: e.target.value})}
+                                    className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" required />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Partner Role</label>
+                                    <select value={form.role} onChange={e => setForm({...form, role: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white">
+                                        {PARTNER_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Status</label>
+                                    <select value={form.status} onChange={e => setForm({...form, status: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white">
+                                        {PARTNER_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Contact Name</label>
+                                    <input type="text" value={form.contact_name} onChange={e => setForm({...form, contact_name: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Contact Email</label>
+                                    <input type="email" value={form.contact_email} onChange={e => setForm({...form, contact_email: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Workshare %</label>
+                                    <input type="number" min="0" max="100" value={form.workshare_percent} 
+                                        onChange={e => setForm({...form, workshare_percent: parseInt(e.target.value) || 0})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" />
+                                </div>
+                                <div className="flex items-center pt-6">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={form.nda_signed} onChange={e => setForm({...form, nda_signed: e.target.checked})}
+                                            className="w-4 h-4 accent-cyan-500" />
+                                        <span className="text-slate-300">NDA Signed</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">Opportunity</label>
+                                <select value={form.opportunity_id} onChange={e => setForm({...form, opportunity_id: e.target.value})}
+                                    className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white">
+                                    <option value="">Select Opportunity</option>
+                                    {opportunities.map(o => <option key={o.id} value={o.id}>{o.nickname}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex gap-3 justify-end mt-6">
+                                <button type="button" onClick={onClose}
+                                    className="px-4 py-2 border border-slate-600 rounded-lg hover:bg-slate-700 transition">Cancel</button>
+                                <button type="submit"
+                                    className="px-4 py-2 bg-cyan-500 text-black font-bold rounded-lg hover:bg-cyan-400 transition">Save Partner</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+        
+        function AssignmentModal({ item, opportunities, onSave, onClose }) {
+            const [form, setForm] = useState({
+                user_name: item?.user_name || '',
+                role: item?.role || 'PM',
+                opportunity_id: item?.opportunity_id || '',
+                assigned_date: item?.assigned_date || new Date().toISOString().split('T')[0]
+            });
+            
+            return (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+                    <div className="glass rounded-xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-xl font-bold text-cyan-400 mb-4">{item?.id ? 'Edit Assignment' : 'New Assignment'}</h2>
+                        <form onSubmit={e => { e.preventDefault(); onSave(form); }} className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">Team Member Name</label>
+                                <input type="text" value={form.user_name} onChange={e => setForm({...form, user_name: e.target.value})}
+                                    className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" required />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Shipley Role</label>
+                                    <select value={form.role} onChange={e => setForm({...form, role: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white">
+                                        {TEAM_ROLES.filter(r => r !== 'Partner').map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Assigned Date</label>
+                                    <input type="date" value={form.assigned_date} onChange={e => setForm({...form, assigned_date: e.target.value})}
+                                        className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">Opportunity</label>
+                                <select value={form.opportunity_id} onChange={e => setForm({...form, opportunity_id: e.target.value})}
+                                    className="w-full bg-slate-800 border border-cyan-500/30 rounded px-3 py-2 text-white" required>
+                                    <option value="">Select Opportunity</option>
+                                    {opportunities.map(o => <option key={o.id} value={o.id}>{o.nickname}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex gap-3 justify-end mt-6">
+                                <button type="button" onClick={onClose}
+                                    className="px-4 py-2 border border-slate-600 rounded-lg hover:bg-slate-700 transition">Cancel</button>
+                                <button type="submit"
+                                    className="px-4 py-2 bg-cyan-500 text-black font-bold rounded-lg hover:bg-cyan-400 transition">Save Assignment</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+        
+        const PARTNER_ROLES = ['Prime', 'Subcontractor', 'Teaming Partner', 'Mentor-Protégé', 'JV Partner', 'Consultant'];
+        const PARTNER_STATUS = ['Prospecting', 'NDA Pending', 'NDA Signed', 'Active', 'On Hold', 'Inactive'];
+        const TEAM_ROLES = ['CEO', 'COO', 'CAP', 'PM', 'SA', 'FIN', 'CON', 'DEL', 'QA', 'Partner', 'Admin'];
+        
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

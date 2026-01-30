@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v12 - M8 Pricing Engine</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    
+    /* Design System Animations */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(0, 229, 250, 0.25); } 50% { box-shadow: 0 0 20px 10px rgba(0, 229, 250, 0.25); } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes countUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes successPop { 0% { transform: scale(0); } 70% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+    .animate-fadeInUp { animation: fadeInUp 0.4s ease-out forwards; }
+    .animate-slideInRight { animation: slideInRight 0.4s ease-out forwards; }
+    .animate-pulseGlow { animation: pulseGlow 2s ease-in-out infinite; }
+    .animate-shimmer { background: linear-gradient(90deg, transparent, rgba(0,229,250,0.1), transparent); background-size: 200% 100%; animation: shimmer 2s infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-countUp { animation: countUp 0.5s ease-out forwards; }
+    .animate-successPop { animation: successPop 0.4s ease-out forwards; }
+    
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    
+    /* Number input styling */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ICONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      calculator: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+      dollarSign: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      trendingUp: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+      trendingDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0v-8m0 8l-8-8-4 4-6-6" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      briefcase: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      pieChart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>,
+      barChart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      checkCircle: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      upload: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      minus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
+      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      info: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      copy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PRICING DATA - LABOR CATEGORIES (GSA RATES BASED)
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const LABOR_CATEGORIES = [
+      { id: 'pm-sr', title: 'Program Manager (Senior)', gsaMin: 185, gsaMax: 245, defaultHours: 2080, level: 'Senior' },
+      { id: 'pm', title: 'Program Manager', gsaMin: 155, gsaMax: 195, defaultHours: 2080, level: 'Mid' },
+      { id: 'arch-sr', title: 'Enterprise Architect (Senior)', gsaMin: 195, gsaMax: 275, defaultHours: 2080, level: 'Senior' },
+      { id: 'arch', title: 'Solutions Architect', gsaMin: 165, gsaMax: 225, defaultHours: 2080, level: 'Mid' },
+      { id: 'dev-sr', title: 'Software Engineer (Senior)', gsaMin: 155, gsaMax: 210, defaultHours: 2080, level: 'Senior' },
+      { id: 'dev', title: 'Software Engineer', gsaMin: 115, gsaMax: 165, defaultHours: 2080, level: 'Mid' },
+      { id: 'dev-jr', title: 'Software Engineer (Junior)', gsaMin: 75, gsaMax: 110, defaultHours: 2080, level: 'Junior' },
+      { id: 'sme-cyber', title: 'Cybersecurity SME', gsaMin: 175, gsaMax: 250, defaultHours: 1040, level: 'Senior' },
+      { id: 'sme-health', title: 'Healthcare IT SME', gsaMin: 165, gsaMax: 235, defaultHours: 1040, level: 'Senior' },
+      { id: 'ba-sr', title: 'Business Analyst (Senior)', gsaMin: 135, gsaMax: 185, defaultHours: 2080, level: 'Senior' },
+      { id: 'ba', title: 'Business Analyst', gsaMin: 95, gsaMax: 140, defaultHours: 2080, level: 'Mid' },
+      { id: 'qa-sr', title: 'QA Engineer (Senior)', gsaMin: 125, gsaMax: 175, defaultHours: 2080, level: 'Senior' },
+      { id: 'qa', title: 'QA Engineer', gsaMin: 85, gsaMax: 125, defaultHours: 2080, level: 'Mid' },
+      { id: 'admin', title: 'Administrative Support', gsaMin: 55, gsaMax: 85, defaultHours: 2080, level: 'Junior' },
+    ];
+
+    const WRAP_RATE_COMPONENTS = [
+      { id: 'fringe', name: 'Fringe Benefits', defaultRate: 0.35, tooltip: 'Healthcare, PTO, 401k, etc.' },
+      { id: 'overhead', name: 'Overhead', defaultRate: 0.45, tooltip: 'Facilities, utilities, admin' },
+      { id: 'gna', name: 'G&A', defaultRate: 0.12, tooltip: 'General & Administrative' },
+      { id: 'fee', name: 'Fee/Profit', defaultRate: 0.10, tooltip: 'Target profit margin' },
+    ];
+
+    const COMPETITOR_INTEL = [
+      { name: 'GDIT', avgRate: 185, marketShare: 22, recentWins: 8 },
+      { name: 'Booz Allen', avgRate: 205, marketShare: 18, recentWins: 6 },
+      { name: 'Leidos', avgRate: 175, marketShare: 15, recentWins: 5 },
+      { name: 'ManTech', avgRate: 165, marketShare: 12, recentWins: 4 },
+      { name: 'Peraton', avgRate: 170, marketShare: 10, recentWins: 3 },
+    ];
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // UTILITY FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const formatCurrency = (num) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
+    const formatPercent = (num) => `${(num * 100).toFixed(1)}%`;
+    const formatNumber = (num) => new Intl.NumberFormat('en-US').format(num);
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // COMPONENT: Navigation Tabs
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const NavTab = ({ id, title, icon, isActive, onClick, isRestricted = false }) => (
+      <button
+        onClick={() => onClick(id)}
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          isActive 
+            ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
+            : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+        } ${isRestricted ? 'opacity-75' : ''}`}
+      >
+        <Icon name={icon} className="w-4 h-4" />
+        <span>{title}</span>
+        {isRestricted && <Icon name="lock" className="w-3 h-3 text-amber-400" />}
+      </button>
+    );
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // COMPONENT: Stat Card
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const StatCard = ({ label, value, subValue, icon, color = 'cyan', trend = null }) => {
+      const colorMap = {
+        cyan: 'from-cyan-500/20 to-cyan-600/10 border-cyan-500/30 text-cyan-400',
+        emerald: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400',
+        amber: 'from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400',
+        purple: 'from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400',
+      };
+      
+      return (
+        <div className={`relative p-4 rounded-xl bg-gradient-to-br ${colorMap[color]} border overflow-hidden`}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+              <p className="text-2xl font-bold text-white animate-countUp">{value}</p>
+              {subValue && <p className="text-xs text-slate-400 mt-1">{subValue}</p>}
+            </div>
+            <div className={`w-10 h-10 rounded-lg bg-slate-800/50 flex items-center justify-center`}>
+              <Icon name={icon} className="w-5 h-5" />
+            </div>
+          </div>
+          {trend !== null && (
+            <div className={`absolute bottom-2 right-2 flex items-center gap-1 text-xs ${trend >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              <Icon name={trend >= 0 ? 'trendingUp' : 'trendingDown'} className="w-3 h-3" />
+              <span>{Math.abs(trend)}%</span>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // COMPONENT: LCAT Mapping Panel
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const LCATMappingPanel = ({ selectedLCATs, onUpdate }) => {
+      const [expandedCat, setExpandedCat] = useState(null);
+      
+      const handleAddLCAT = (lcat) => {
+        if (!selectedLCATs.find(l => l.id === lcat.id)) {
+          onUpdate([...selectedLCATs, { ...lcat, rate: Math.round((lcat.gsaMin + lcat.gsaMax) / 2), fte: 1, hours: lcat.defaultHours }]);
+        }
+      };
+
+      const handleRemoveLCAT = (id) => {
+        onUpdate(selectedLCATs.filter(l => l.id !== id));
+      };
+
+      const handleUpdateLCAT = (id, field, value) => {
+        onUpdate(selectedLCATs.map(l => l.id === id ? { ...l, [field]: value } : l));
+      };
+
+      return (
+        <div className="space-y-4">
+          {/* Available LCATs */}
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <Icon name="users" className="w-4 h-4 text-cyan-400" />
+              Available Labor Categories
+            </h3>
+            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto scrollbar-thin pr-2">
+              {LABOR_CATEGORIES.map(lcat => {
+                const isSelected = selectedLCATs.find(l => l.id === lcat.id);
+                return (
+                  <button
+                    key={lcat.id}
+                    onClick={() => !isSelected && handleAddLCAT(lcat)}
+                    disabled={isSelected}
+                    className={`p-2 rounded-lg text-left text-xs transition-all ${
+                      isSelected 
+                        ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400' 
+                        : 'bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:border-cyan-500/50 hover:bg-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium truncate">{lcat.title}</span>
+                      {isSelected && <Icon name="check" className="w-3 h-3" />}
+                    </div>
+                    <div className="text-slate-500 mt-0.5">{formatCurrency(lcat.gsaMin)} - {formatCurrency(lcat.gsaMax)}/hr</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected LCATs with Configuration */}
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <Icon name="briefcase" className="w-4 h-4 text-emerald-400" />
+              Selected Staff ({selectedLCATs.length})
+            </h3>
+            {selectedLCATs.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">Click categories above to add staff</p>
+            ) : (
+              <div className="space-y-2">
+                {selectedLCATs.map((lcat, idx) => (
+                  <div 
+                    key={lcat.id} 
+                    className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/50 animate-fadeInUp"
+                    style={{ animationDelay: `${idx * 50}ms` }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          lcat.level === 'Senior' ? 'bg-purple-500/20 text-purple-400' :
+                          lcat.level === 'Mid' ? 'bg-cyan-500/20 text-cyan-400' :
+                          'bg-slate-500/20 text-slate-400'
+                        }`}>{lcat.level}</span>
+                        <span className="text-sm font-medium text-white">{lcat.title}</span>
+                      </div>
+                      <button onClick={() => handleRemoveLCAT(lcat.id)} className="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors">
+                        <Icon name="trash" className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-xs text-slate-500 block mb-1">Rate/Hour</label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                          <input
+                            type="number"
+                            value={lcat.rate}
+                            onChange={(e) => handleUpdateLCAT(lcat.id, 'rate', Number(e.target.value))}
+                            className="w-full pl-5 pr-2 py-1.5 rounded bg-slate-800 border border-slate-600 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                          />
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">GSA: ${lcat.gsaMin}-${lcat.gsaMax}</div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-500 block mb-1">Staff Needed</label>
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={lcat.fte}
+                          onChange={(e) => handleUpdateLCAT(lcat.id, 'fte', Number(e.target.value))}
+                          className="w-full px-2 py-1.5 rounded bg-slate-800 border border-slate-600 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-500 block mb-1">Hours/Year</label>
+                        <input
+                          type="number"
+                          value={lcat.hours}
+                          onChange={(e) => handleUpdateLCAT(lcat.id, 'hours', Number(e.target.value))}
+                          className="w-full px-2 py-1.5 rounded bg-slate-800 border border-slate-600 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-slate-700/50 flex justify-between text-sm">
+                      <span className="text-slate-400">Annual Cost:</span>
+                      <span className="font-bold text-emerald-400">{formatCurrency(lcat.rate * lcat.hours * lcat.fte)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // COMPONENT: Wrap Rate Calculator
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const WrapRateCalculator = ({ wrapRates, onUpdate, baseLabor }) => {
+      const calculateBilledRate = (baseRate) => {
+        let rate = baseRate;
+        rate += rate * wrapRates.fringe;  // Apply fringe
+        rate += rate * wrapRates.overhead; // Apply overhead
+        rate += rate * wrapRates.gna;      // Apply G&A
+        rate += rate * wrapRates.fee;      // Apply fee
+        return rate;
+      };
+
+      const totalMultiplier = useMemo(() => {
+        let multiplier = 1;
+        multiplier *= (1 + wrapRates.fringe);
+        multiplier *= (1 + wrapRates.overhead);
+        multiplier *= (1 + wrapRates.gna);
+        multiplier *= (1 + wrapRates.fee);
+        return multiplier;
+      }, [wrapRates]);
+
+      const avgBaseRate = baseLabor > 0 ? baseLabor / 2080 : 100;
+      const billedRate = calculateBilledRate(avgBaseRate);
+
+      return (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+            <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+              <Icon name="calculator" className="w-4 h-4 text-purple-400" />
+              Wrap Rate Components
+            </h3>
+            <div className="space-y-4">
+              {WRAP_RATE_COMPONENTS.map(comp => (
+                <div key={comp.id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-300">{comp.name}</span>
+                      <div className="group relative">
+                        <Icon name="info" className="w-3 h-3 text-slate-500 cursor-help" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-700 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                          {comp.tooltip}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-mono text-cyan-400">{formatPercent(wrapRates[comp.id])}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={wrapRates[comp.id] * 100}
+                    onChange={(e) => onUpdate({ ...wrapRates, [comp.id]: Number(e.target.value) / 100 })}
+                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Wrap Rate Summary */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30">
+            <h4 className="text-sm font-semibold text-purple-400 mb-3">Fully Burdened Rate</h4>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Base Rate</p>
+                <p className="text-lg font-bold text-white">{formatCurrency(avgBaseRate)}/hr</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Multiplier</p>
+                <p className="text-lg font-bold text-cyan-400">{totalMultiplier.toFixed(2)}x</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Billed Rate</p>
+                <p className="text-lg font-bold text-emerald-400">{formatCurrency(billedRate)}/hr</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // COMPONENT: BOE Builder
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const BOEBuilder = ({ selectedLCATs, wrapRates, periodOfPerformance = 5 }) => {
+      const [includeODCs, setIncludeODCs] = useState(true);
+      const [odcAmount, setOdcAmount] = useState(150000);
+      const [escalation, setEscalation] = useState(0.03);
+
+      const calculateTotalMultiplier = () => {
+        let multiplier = 1;
+        multiplier *= (1 + wrapRates.fringe);
+        multiplier *= (1 + wrapRates.overhead);
+        multiplier *= (1 + wrapRates.gna);
+        multiplier *= (1 + wrapRates.fee);
+        return multiplier;
+      };
+
+      const yearlyBreakdown = useMemo(() => {
+        const years = [];
+        const multiplier = calculateTotalMultiplier();
+        
+        for (let year = 1; year <= periodOfPerformance; year++) {
+          const escalationFactor = Math.pow(1 + escalation, year - 1);
+          let laborCost = 0;
+          
+          selectedLCATs.forEach(lcat => {
+            const baseRate = lcat.rate * escalationFactor;
+            const billedRate = baseRate * multiplier;
+            laborCost += billedRate * lcat.hours * lcat.fte;
+          });
+
+          const odc = includeODCs ? odcAmount * escalationFactor : 0;
+          
+          years.push({
+            year,
+            labor: laborCost,
+            odc: odc,
+            total: laborCost + odc
+          });
+        }
+        
+        return years;
+      }, [selectedLCATs, wrapRates, periodOfPerformance, escalation, includeODCs, odcAmount]);
+
+      const totals = useMemo(() => ({
+        labor: yearlyBreakdown.reduce((sum, y) => sum + y.labor, 0),
+        odc: yearlyBreakdown.reduce((sum, y) => sum + y.odc, 0),
+        total: yearlyBreakdown.reduce((sum, y) => sum + y.total, 0)
+      }), [yearlyBreakdown]);
+
+      return (
+        <div className="space-y-4">
+          {/* Settings */}
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <Icon name="barChart" className="w-4 h-4 text-amber-400" />
+              Price Breakdown Settings
+            </h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Annual Escalation</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={(escalation * 100).toFixed(1)}
+                    onChange={(e) => setEscalation(Number(e.target.value) / 100)}
+                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">%</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Annual ODC Budget</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                  <input
+                    type="number"
+                    value={odcAmount}
+                    onChange={(e) => setOdcAmount(Number(e.target.value))}
+                    className="w-full pl-7 pr-3 py-2 rounded bg-slate-800 border border-slate-600 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex items-end">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeODCs}
+                    onChange={(e) => setIncludeODCs(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-800"
+                  />
+                  <span className="text-sm text-slate-300">Include ODCs</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* BOE Table */}
+          <div className="rounded-xl overflow-hidden border border-slate-700/50">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-800/80">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Period</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Labor</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">ODCs</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-cyan-400 uppercase tracking-wider">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {yearlyBreakdown.map((year, idx) => (
+                  <tr key={year.year} className="bg-slate-900/30 hover:bg-slate-800/50 transition-colors animate-fadeInUp" style={{ animationDelay: `${idx * 50}ms` }}>
+                    <td className="px-4 py-3 font-medium text-white">
+                      {year.year === 1 ? 'Base Year' : `Option Year ${year.year - 1}`}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-300 font-mono">{formatCurrency(year.labor)}</td>
+                    <td className="px-4 py-3 text-right text-slate-300 font-mono">{formatCurrency(year.odc)}</td>
+                    <td className="px-4 py-3 text-right text-white font-mono font-bold">{formatCurrency(year.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 border-t-2 border-cyan-500/50">
+                <tr>
+                  <td className="px-4 py-4 font-bold text-white text-base">TOTAL CONTRACT VALUE</td>
+                  <td className="px-4 py-4 text-right text-slate-200 font-mono font-bold">{formatCurrency(totals.labor)}</td>
+                  <td className="px-4 py-4 text-right text-slate-200 font-mono font-bold">{formatCurrency(totals.odc)}</td>
+                  <td className="px-4 py-4 text-right text-2xl font-bold text-cyan-400 font-mono">{formatCurrency(totals.total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // COMPONENT: Price-to-Win Analysis
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const PriceToWinAnalysis = ({ ourPrice }) => {
+      const [govEstimate, setGovEstimate] = useState(8500000);
+      const [targetWin, setTargetWin] = useState(0.65);
+
+      const competitorPrices = useMemo(() => {
+        return COMPETITOR_INTEL.map(comp => ({
+          ...comp,
+          estimatedPrice: govEstimate * (0.85 + Math.random() * 0.3) // Simulated
+        })).sort((a, b) => a.estimatedPrice - b.estimatedPrice);
+      }, [govEstimate]);
+
+      const pricePosition = useMemo(() => {
+        const sorted = [...competitorPrices.map(c => c.estimatedPrice), ourPrice].sort((a, b) => a - b);
+        const position = sorted.indexOf(ourPrice) + 1;
+        return { rank: position, total: sorted.length };
+      }, [competitorPrices, ourPrice]);
+
+      const priceVsIGCE = ((ourPrice / govEstimate) * 100 - 100).toFixed(1);
+      const avgCompetitor = competitorPrices.reduce((sum, c) => sum + c.estimatedPrice, 0) / competitorPrices.length;
+      const priceVsCompetitors = ((ourPrice / avgCompetitor) * 100 - 100).toFixed(1);
+
+      const suggestedPrice = govEstimate * targetWin + govEstimate * (1 - targetWin) * 0.85;
+
+      return (
+        <div className="space-y-4">
+          {/* Government Estimate Input */}
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <Icon name="target" className="w-4 h-4 text-red-400" />
+              Government Estimate (IGCE)
+            </h3>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                  <input
+                    type="number"
+                    value={govEstimate}
+                    onChange={(e) => setGovEstimate(Number(e.target.value))}
+                    className="w-full pl-7 pr-3 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white text-lg font-mono focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="text-sm text-slate-400">
+                Our Price: <span className={`font-bold ${priceVsIGCE > 10 ? 'text-red-400' : priceVsIGCE > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {priceVsIGCE > 0 ? '+' : ''}{priceVsIGCE}% vs IGCE
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Competitive Position */}
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard 
+              label="Price Rank" 
+              value={`#${pricePosition.rank} of ${pricePosition.total}`} 
+              subValue={pricePosition.rank <= 2 ? 'Competitive!' : 'Consider adjusting'} 
+              icon="barChart" 
+              color={pricePosition.rank <= 2 ? 'emerald' : 'amber'} 
+            />
+            <StatCard 
+              label="vs. Avg Competitor" 
+              value={`${priceVsCompetitors > 0 ? '+' : ''}${priceVsCompetitors}%`}
+              subValue={formatCurrency(avgCompetitor) + ' avg'}
+              icon="users" 
+              color={Math.abs(Number(priceVsCompetitors)) <= 5 ? 'emerald' : 'amber'} 
+            />
+            <StatCard 
+              label="Suggested PTW" 
+              value={formatCurrency(suggestedPrice)}
+              subValue={`Target: ${(targetWin * 100).toFixed(0)}% win prob`}
+              icon="target" 
+              color="purple" 
+            />
+          </div>
+
+          {/* Competitor Table */}
+          <div className="rounded-xl overflow-hidden border border-slate-700/50">
+            <div className="bg-slate-800/80 px-4 py-3 border-b border-slate-700/50">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Icon name="users" className="w-4 h-4 text-red-400" />
+                Competitive Landscape
+                <span className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400 ml-2">BLACK HAT INTEL</span>
+              </h3>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-400">Competitor</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-slate-400">Est. Price</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-slate-400">Avg Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-slate-400">Recent Wins</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-slate-400">Threat Level</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/30">
+                {competitorPrices.map((comp, idx) => (
+                  <tr key={comp.name} className="bg-slate-900/30 hover:bg-slate-800/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          idx === 0 ? 'bg-amber-500/30 text-amber-400' : 'bg-slate-700 text-slate-400'
+                        }`}>{idx + 1}</span>
+                        <span className="font-medium text-white">{comp.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-slate-300">{formatCurrency(comp.estimatedPrice)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-slate-400">${comp.avgRate}/hr</td>
+                    <td className="px-4 py-3 text-right text-slate-400">{comp.recentWins}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          comp.marketShare >= 20 ? 'bg-red-500/20 text-red-400' :
+                          comp.marketShare >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                          'bg-slate-500/20 text-slate-400'
+                        }`}>
+                          {comp.marketShare >= 20 ? 'HIGH' : comp.marketShare >= 15 ? 'MED' : 'LOW'}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {/* Our Position Row */}
+                <tr className="bg-cyan-500/10 border-t-2 border-cyan-500/50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-cyan-500/30 text-cyan-400">
+                        <Icon name="shield" className="w-3 h-3" />
+                      </span>
+                      <span className="font-bold text-cyan-400">Our Proposal</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-bold text-cyan-400">{formatCurrency(ourPrice)}</td>
+                  <td colSpan="3" className="px-4 py-3 text-center text-sm text-cyan-400">
+                    Position #{pricePosition.rank} of {pricePosition.total}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* AI Recommendation */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-500/10 to-emerald-500/10 border border-cyan-500/30">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                <Icon name="cpu" className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-cyan-400 mb-1">AI Pricing Recommendation</h4>
+                <p className="text-sm text-slate-300">
+                  Based on competitive analysis and historical win data, consider pricing at <strong className="text-emerald-400">{formatCurrency(suggestedPrice)}</strong> for optimal price-to-win positioning. 
+                  This represents a <strong className="text-cyan-400">{((suggestedPrice / govEstimate) * 100 - 100).toFixed(1)}%</strong> variance from IGCE while remaining competitive against incumbent {competitorPrices[0]?.name}.
+                </p>
+                <p className="text-xs text-slate-500 mt-2">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // MAIN COMPONENT: Pricing Engine
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const PricingEngine = () => {
+      const [activeTab, setActiveTab] = useState('lcat');
+      const [selectedLCATs, setSelectedLCATs] = useState([
+        { ...LABOR_CATEGORIES[0], rate: 215, fte: 1, hours: 2080 },
+        { ...LABOR_CATEGORIES[4], rate: 175, fte: 3, hours: 2080 },
+        { ...LABOR_CATEGORIES[5], rate: 135, fte: 5, hours: 2080 },
+        { ...LABOR_CATEGORIES[7], rate: 225, fte: 0.5, hours: 1040 },
+      ]);
+      const [wrapRates, setWrapRates] = useState({
+        fringe: 0.35,
+        overhead: 0.45,
+        gna: 0.12,
+        fee: 0.10
+      });
+      const [showExportModal, setShowExportModal] = useState(false);
+
+      // Calculate totals
+      const baseLabor = useMemo(() => selectedLCATs.reduce((sum, l) => sum + (l.rate * l.hours * l.fte), 0), [selectedLCATs]);
+      const totalMultiplier = useMemo(() => {
+        let m = 1;
+        m *= (1 + wrapRates.fringe);
+        m *= (1 + wrapRates.overhead);
+        m *= (1 + wrapRates.gna);
+        m *= (1 + wrapRates.fee);
+        return m;
+      }, [wrapRates]);
+      const fullyBurdenedCost = baseLabor * totalMultiplier;
+      const totalFTE = selectedLCATs.reduce((sum, l) => sum + l.fte, 0);
+      const fiveYearValue = fullyBurdenedCost * 5 * 1.03 + 750000; // 5 years + 3% escalation + ODCs
+
+      const handleExport = () => {
+        setShowExportModal(true);
+        setTimeout(() => setShowExportModal(false), 2500);
+      };
+
+      return (
+        <div className="min-h-screen bg-[#00050F] flex flex-col">
+          {/* Header */}
+          <header className="bg-slate-900/80 border-b border-slate-700/50 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/25">
+                  <Icon name="shield" className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <span className="font-bold text-white text-lg">MissionPulse</span>
+                  <span className="text-xs text-slate-500 ml-2">v12.0</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-1.5">
+                  <Icon name="dollarSign" className="w-3.5 h-3.5" />
+                  M8: Pricing Engine
+                </span>
+                <span className="px-2 py-1 rounded text-xs bg-amber-500/20 text-amber-400 flex items-center gap-1">
+                  <Icon name="lock" className="w-3 h-3" />
+                  FIN ACCESS
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors text-sm font-medium">
+                  <Icon name="download" className="w-4 h-4" />
+                  Export BOE
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Stats Bar */}
+          <div className="bg-slate-800/30 border-b border-slate-700/50 px-4 py-3">
+            <div className="grid grid-cols-4 gap-4">
+              <StatCard label="Base Labor Cost" value={formatCurrency(baseLabor)} subValue="Annual direct labor" icon="users" color="cyan" />
+              <StatCard label="Wrap Rate Multiplier" value={`${totalMultiplier.toFixed(2)}x`} subValue="Fully burdened" icon="calculator" color="purple" />
+              <StatCard label="Total Staff" value={totalFTE.toFixed(1)} subValue={`${selectedLCATs.length} categories`} icon="briefcase" color="amber" />
+              <StatCard label="5-Year Value" value={formatCurrency(fiveYearValue)} subValue="Est. total contract" icon="trendingUp" color="emerald" />
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="bg-slate-900/50 border-b border-slate-700/50 px-4 py-2">
+            <div className="flex items-center gap-2">
+              <NavTab id="lcat" title="Labor Categories" icon="users" isActive={activeTab === 'lcat'} onClick={setActiveTab} />
+              <NavTab id="wrap" title="Wrap Rates" icon="calculator" isActive={activeTab === 'wrap'} onClick={setActiveTab} />
+              <NavTab id="boe" title="Price Breakdown" icon="barChart" isActive={activeTab === 'boe'} onClick={setActiveTab} />
+              <NavTab id="ptw" title="Price-to-Win" icon="target" isActive={activeTab === 'ptw'} onClick={setActiveTab} isRestricted />
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <main className="flex-1 overflow-auto p-4">
+            <div className="max-w-5xl mx-auto animate-fadeIn">
+              {activeTab === 'lcat' && (
+                <LCATMappingPanel selectedLCATs={selectedLCATs} onUpdate={setSelectedLCATs} />
+              )}
+              {activeTab === 'wrap' && (
+                <WrapRateCalculator wrapRates={wrapRates} onUpdate={setWrapRates} baseLabor={baseLabor} />
+              )}
+              {activeTab === 'boe' && (
+                <BOEBuilder selectedLCATs={selectedLCATs} wrapRates={wrapRates} periodOfPerformance={5} />
+              )}
+              {activeTab === 'ptw' && (
+                <PriceToWinAnalysis ourPrice={fiveYearValue} />
+              )}
+            </div>
+          </main>
+
+          {/* Export Modal */}
+          {showExportModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
+              <div className="bg-slate-800 rounded-2xl p-6 shadow-2xl border border-slate-700 animate-successPop">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Icon name="checkCircle" className="w-8 h-8 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">BOE Export Initiated</h3>
+                    <p className="text-sm text-slate-400">Generating Excel workbook with pricing data...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer className="bg-slate-900/80 border-t border-slate-700/50 px-4 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">Mission Meets Tech • MissionPulse v12.0</span>
+              <span className="text-xs text-slate-600">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<PricingEngine />);
+  </script>
+</body>
+</html>
