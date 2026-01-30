@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Launch ROI</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .roi-positive { color: #10B981; }
+    .roi-negative { color: #EF4444; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Launch</span> ROI Calculator</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">Select Opportunity</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ROI Calculator Card -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Input Section -->
+    <div class="card p-6">
+      <h2 class="text-lg font-semibold text-cyan-400 mb-4">📊 Investment Inputs</h2>
+      
+      <form id="roiForm" onsubmit="calculateROI(event)">
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Contract Value ($)</label>
+          <input type="number" id="contractValue" placeholder="10000000" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-lg" oninput="calculateROI()">
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Win Probability (pWin %)</label>
+          <div class="flex items-center gap-3">
+            <input type="range" id="pwinSlider" min="0" max="100" value="50" class="flex-1" oninput="document.getElementById('pwin').value = this.value; calculateROI()">
+            <input type="number" id="pwin" min="0" max="100" value="50" class="w-20 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-center" oninput="document.getElementById('pwinSlider').value = this.value; calculateROI()">
+            <span class="text-gray-400">%</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Labor Hours</label>
+            <input type="number" id="laborHours" placeholder="500" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2" oninput="calculateROI()">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Hourly Rate ($)</label>
+            <input type="number" id="hourlyRate" placeholder="150" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2" oninput="calculateROI()">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Other Costs ($)</label>
+          <input type="number" id="otherCosts" placeholder="5000" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2" oninput="calculateROI()">
+        </div>
+
+        <button type="button" onclick="saveROI()" class="btn-primary w-full py-3 rounded-lg mt-4">💾 Save ROI Analysis</button>
+      </form>
+    </div>
+
+    <!-- Results Section -->
+    <div class="space-y-4">
+      <!-- Summary Stats -->
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-cyan-400 mb-4">📈 ROI Analysis</h2>
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-slate-800 rounded-lg p-4 text-center">
+            <div class="text-xs text-gray-400 mb-1">Total Investment</div>
+            <div id="totalInvestment" class="text-2xl font-bold text-amber-400">$0</div>
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 text-center">
+            <div class="text-xs text-gray-400 mb-1">Expected Value</div>
+            <div id="expectedValue" class="text-2xl font-bold text-cyan-400">$0</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-slate-800 rounded-lg p-4 text-center">
+            <div class="text-xs text-gray-400 mb-1">Expected ROI</div>
+            <div id="expectedROI" class="text-3xl font-bold">0%</div>
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 text-center">
+            <div class="text-xs text-gray-400 mb-1">Risk-Adjusted NPV</div>
+            <div id="riskAdjustedNPV" class="text-2xl font-bold">$0</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-lg p-4">
+          <div class="text-xs text-gray-400 mb-2">Decision Recommendation</div>
+          <div id="recommendation" class="text-lg font-semibold">Enter values to calculate</div>
+        </div>
+      </div>
+
+      <!-- Scenario Analysis -->
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-cyan-400 mb-4">🎯 Scenario Analysis</h2>
+        
+        <div class="space-y-3">
+          <div class="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
+            <span class="text-sm">Best Case (Win)</span>
+            <span id="bestCase" class="font-semibold text-green-400">$0</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-cyan-500/10 rounded-lg">
+            <span class="text-sm">Expected Value</span>
+            <span id="expectedCase" class="font-semibold text-cyan-400">$0</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-red-500/10 rounded-lg">
+            <span class="text-sm">Worst Case (Lose)</span>
+            <span id="worstCase" class="font-semibold text-red-400">$0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breakeven Analysis -->
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-cyan-400 mb-4">⚖️ Breakeven Analysis</h2>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-slate-800 rounded-lg p-4 text-center">
+            <div class="text-xs text-gray-400 mb-1">Breakeven pWin</div>
+            <div id="breakevenPwin" class="text-2xl font-bold text-purple-400">0%</div>
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 text-center">
+            <div class="text-xs text-gray-400 mb-1">Margin of Safety</div>
+            <div id="marginOfSafety" class="text-2xl font-bold">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    let supabase, opportunities = [], currentROI = null;
+
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      document.getElementById('connectionStatus').innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    async function loadOpportunities() {
+      try {
+        const { data } = await supabase.from('opportunities').select('id, title, name, contract_value, pwin, win_probability').order('title');
+        opportunities = data || [];
+        document.getElementById('opportunityFilter').innerHTML = `<option value="">Select Opportunity</option>` + 
+          opportunities.map(o => `<option value="${o.id}">${o.title || o.name}</option>`).join('');
+      } catch (err) { console.error('Failed to load opportunities:', err); }
+    }
+
+    async function loadROI() {
+      const oppId = document.getElementById('opportunityFilter').value;
+      if (!oppId) return;
+      
+      try {
+        // Load existing ROI data
+        const { data, error } = await supabase.from('launch_roi').select('*').eq('opportunity_id', oppId).single();
+        
+        if (data) {
+          currentROI = data;
+          document.getElementById('contractValue').value = data.contract_value || '';
+          document.getElementById('pwin').value = data.pwin || 50;
+          document.getElementById('pwinSlider').value = data.pwin || 50;
+          document.getElementById('laborHours').value = data.labor_hours || '';
+          document.getElementById('hourlyRate').value = data.hourly_rate || '';
+          document.getElementById('otherCosts').value = data.other_costs || '';
+          calculateROI();
+        } else {
+          // Try to pre-fill from opportunity
+          const opp = opportunities.find(o => o.id === oppId);
+          if (opp) {
+            document.getElementById('contractValue').value = opp.contract_value || '';
+            document.getElementById('pwin').value = opp.pwin || opp.win_probability || 50;
+            document.getElementById('pwinSlider').value = opp.pwin || opp.win_probability || 50;
+          }
+          currentROI = null;
+          calculateROI();
+        }
+      } catch (err) {
+        console.error('Failed to load ROI:', err);
+        currentROI = null;
+      }
+    }
+
+    function calculateROI(event) {
+      if (event) event.preventDefault();
+      
+      const contractValue = parseFloat(document.getElementById('contractValue').value) || 0;
+      const pwin = parseFloat(document.getElementById('pwin').value) || 0;
+      const laborHours = parseFloat(document.getElementById('laborHours').value) || 0;
+      const hourlyRate = parseFloat(document.getElementById('hourlyRate').value) || 0;
+      const otherCosts = parseFloat(document.getElementById('otherCosts').value) || 0;
+      
+      // Calculate totals
+      const laborCost = laborHours * hourlyRate;
+      const totalInvestment = laborCost + otherCosts;
+      const expectedValue = contractValue * (pwin / 100);
+      const expectedROI = totalInvestment > 0 ? ((expectedValue - totalInvestment) / totalInvestment) * 100 : 0;
+      const riskAdjustedNPV = expectedValue - totalInvestment;
+      
+      // Scenario analysis
+      const bestCase = contractValue - totalInvestment;
+      const worstCase = -totalInvestment;
+      
+      // Breakeven analysis
+      const breakevenPwin = totalInvestment > 0 && contractValue > 0 ? (totalInvestment / contractValue) * 100 : 0;
+      const marginOfSafety = pwin - breakevenPwin;
+      
+      // Update UI
+      document.getElementById('totalInvestment').textContent = formatCurrency(totalInvestment);
+      document.getElementById('expectedValue').textContent = formatCurrency(expectedValue);
+      document.getElementById('expectedROI').textContent = expectedROI.toFixed(0) + '%';
+      document.getElementById('expectedROI').className = 'text-3xl font-bold ' + (expectedROI >= 0 ? 'roi-positive' : 'roi-negative');
+      document.getElementById('riskAdjustedNPV').textContent = formatCurrency(riskAdjustedNPV);
+      document.getElementById('riskAdjustedNPV').className = 'text-2xl font-bold ' + (riskAdjustedNPV >= 0 ? 'roi-positive' : 'roi-negative');
+      
+      document.getElementById('bestCase').textContent = formatCurrency(bestCase);
+      document.getElementById('expectedCase').textContent = formatCurrency(riskAdjustedNPV);
+      document.getElementById('worstCase').textContent = formatCurrency(worstCase);
+      
+      document.getElementById('breakevenPwin').textContent = breakevenPwin.toFixed(1) + '%';
+      document.getElementById('marginOfSafety').textContent = marginOfSafety.toFixed(1) + '%';
+      document.getElementById('marginOfSafety').className = 'text-2xl font-bold ' + (marginOfSafety >= 10 ? 'roi-positive' : marginOfSafety >= 0 ? 'text-amber-400' : 'roi-negative');
+      
+      // Recommendation
+      let recommendation = '';
+      let recClass = '';
+      if (totalInvestment === 0) {
+        recommendation = '⏳ Enter investment details to get recommendation';
+        recClass = 'text-gray-400';
+      } else if (riskAdjustedNPV > 0 && marginOfSafety > 10) {
+        recommendation = '✅ GO - Strong positive expected value with good margin of safety';
+        recClass = 'text-green-400';
+      } else if (riskAdjustedNPV > 0 && marginOfSafety > 0) {
+        recommendation = '⚠️ CONDITIONAL GO - Positive but thin margin. Consider risk mitigation.';
+        recClass = 'text-amber-400';
+      } else if (riskAdjustedNPV > 0) {
+        recommendation = '⚠️ CAUTION - Below breakeven pWin. High risk pursuit.';
+        recClass = 'text-amber-400';
+      } else {
+        recommendation = '❌ NO-GO - Negative expected value. Investment not justified.';
+        recClass = 'text-red-400';
+      }
+      document.getElementById('recommendation').textContent = recommendation;
+      document.getElementById('recommendation').className = 'text-lg font-semibold ' + recClass;
+    }
+
+    function formatCurrency(value) {
+      if (Math.abs(value) >= 1000000) {
+        return '$' + (value / 1000000).toFixed(2) + 'M';
+      } else if (Math.abs(value) >= 1000) {
+        return '$' + (value / 1000).toFixed(1) + 'K';
+      }
+      return '$' + value.toFixed(0);
+    }
+
+    async function saveROI() {
+      const oppId = document.getElementById('opportunityFilter').value;
+      if (!oppId) {
+        alert('Please select an opportunity first');
+        return;
+      }
+      
+      const roiData = {
+        opportunity_id: oppId,
+        contract_value: parseFloat(document.getElementById('contractValue').value) || 0,
+        pwin: parseFloat(document.getElementById('pwin').value) || 0,
+        labor_hours: parseFloat(document.getElementById('laborHours').value) || 0,
+        hourly_rate: parseFloat(document.getElementById('hourlyRate').value) || 0,
+        other_costs: parseFloat(document.getElementById('otherCosts').value) || 0,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if (currentROI) {
+          const { error } = await supabase.from('launch_roi').update(roiData).eq('id', currentROI.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('launch_roi').insert([roiData]);
+          if (error) throw error;
+        }
+        alert('ROI analysis saved successfully!');
+        await loadROI();
+      } catch (err) {
+        console.error('Failed to save:', err);
+        alert('Failed to save: ' + err.message);
+      }
+    }
+
+    document.getElementById('opportunityFilter').addEventListener('change', loadROI);
+
+    async function init() {
+      if (!initSupabase()) { updateConnectionStatus(false); return; }
+      await loadOpportunities();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</body>
+</html>

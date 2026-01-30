@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Reports</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
+    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
+    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
+      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Reports</span> Center</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span class="text-gray-400">Connecting...</span>
+      </div>
+      <select id="typeFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
+        <option value="">All Types</option>
+        <option value="pipeline">Pipeline</option>
+        <option value="win_loss">Win/Loss</option>
+        <option value="compliance">Compliance</option>
+        <option value="executive">Executive</option>
+        <option value="capture">Capture</option>
+      </select>
+      <button onclick="openGenerateModal()" class="btn-primary px-4 py-2 rounded-lg">+ Generate Report</button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="card p-4 text-center">
+      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
+      <div class="text-gray-400 text-sm">Total Reports</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statThisMonth" class="text-3xl font-bold text-green-400">0</div>
+      <div class="text-gray-400 text-sm">This Month</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statPDF" class="text-3xl font-bold text-red-400">0</div>
+      <div class="text-gray-400 text-sm">PDF Exports</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div id="statExcel" class="text-3xl font-bold text-emerald-400">0</div>
+      <div class="text-gray-400 text-sm">Excel Exports</div>
+    </div>
+  </div>
+
+  <!-- Quick Generate Templates -->
+  <div class="card p-4 mb-6">
+    <h3 class="text-sm text-gray-400 mb-3">Quick Generate</h3>
+    <div class="flex gap-3 flex-wrap">
+      <button onclick="quickGenerate('pipeline')" class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm">📊 Pipeline Summary</button>
+      <button onclick="quickGenerate('win_loss')" class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 text-sm">📈 Win/Loss Analysis</button>
+      <button onclick="quickGenerate('compliance')" class="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 text-sm">✓ Compliance Status</button>
+      <button onclick="quickGenerate('executive')" class="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 text-sm">👔 Executive Brief</button>
+      <button onclick="quickGenerate('capture')" class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 text-sm">🎯 Capture Metrics</button>
+    </div>
+  </div>
+
+  <!-- Reports Grid -->
+  <div id="reportsContainer" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="card p-8 text-center text-gray-500 col-span-full">Loading reports...</div>
+  </div>
+
+  <!-- Generate Report Modal -->
+  <div id="generateModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-cyan-400">Generate Report</h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form id="generateForm" onsubmit="handleGenerate(event)">
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Report Name *</label>
+          <input type="text" id="reportName" required placeholder="Q1 Pipeline Analysis" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Report Type *</label>
+            <select id="reportType" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="pipeline">Pipeline Summary</option>
+              <option value="win_loss">Win/Loss Analysis</option>
+              <option value="compliance">Compliance Status</option>
+              <option value="executive">Executive Brief</option>
+              <option value="capture">Capture Metrics</option>
+              <option value="custom">Custom Report</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Export Format</label>
+            <select id="exportFormat" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+              <option value="pdf">PDF</option>
+              <option value="excel">Excel</option>
+              <option value="csv">CSV</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Date Range Start</label>
+            <input type="date" id="dateRangeStart" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Date Range End</label>
+            <input type="date" id="dateRangeEnd" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Generated By</label>
+          <input type="text" id="generatedBy" placeholder="Your name" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
+          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Generate Report</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- View Report Modal -->
+  <div id="viewModal" class="modal hidden">
+    <div class="card p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="viewTitle" class="text-xl font-bold text-cyan-400">Report Details</h2>
+        <button onclick="closeViewModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <div class="bg-slate-800 rounded p-3">
+          <div class="text-xs text-gray-400">Type</div>
+          <div id="viewType" class="font-semibold">-</div>
+        </div>
+        <div class="bg-slate-800 rounded p-3">
+          <div class="text-xs text-gray-400">Format</div>
+          <div id="viewFormat" class="font-semibold">-</div>
+        </div>
+        <div class="bg-slate-800 rounded p-3">
+          <div class="text-xs text-gray-400">Generated</div>
+          <div id="viewGenerated" class="font-semibold">-</div>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <div class="text-sm text-gray-400 mb-1">Date Range</div>
+        <div id="viewDateRange" class="bg-slate-800 rounded p-3">-</div>
+      </div>
+
+      <div class="mb-4">
+        <div class="text-sm text-gray-400 mb-1">Report Data</div>
+        <pre id="viewData" class="bg-slate-800 rounded p-4 text-sm overflow-x-auto max-h-64 overflow-y-auto font-mono text-gray-300">-</pre>
+      </div>
+
+      <div class="flex justify-between">
+        <button onclick="deleteReport()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg">🗑️ Delete</button>
+        <div class="flex gap-2">
+          <button onclick="closeViewModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Close</button>
+          <button id="downloadBtn" onclick="downloadReport()" class="btn-primary px-4 py-2 rounded-lg">📥 Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
+
+  <script>
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    let supabase, allReports = [], currentReportId = null;
+
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        updateConnectionStatus(true);
+        return true;
+      }
+      return false;
+    }
+
+    function updateConnectionStatus(connected) {
+      document.getElementById('connectionStatus').innerHTML = connected 
+        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
+        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
+    }
+
+    async function loadReports() {
+      try {
+        const typeFilter = document.getElementById('typeFilter').value;
+        let query = supabase.from('reports').select('*').order('generated_at', { ascending: false });
+        if (typeFilter) query = query.eq('report_type', typeFilter);
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allReports = data || [];
+        renderReports();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load reports:', err);
+        showEmptyState('Failed to load reports');
+      }
+    }
+
+    function renderReports() {
+      const container = document.getElementById('reportsContainer');
+      if (allReports.length === 0) {
+        showEmptyState('No reports found');
+        return;
+      }
+      
+      container.innerHTML = allReports.map(r => `
+        <div class="card p-4 hover:border-cyan-400/50 cursor-pointer" onclick="openViewModal('${r.id}')">
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg ${getTypeColor(r.report_type)} flex items-center justify-center text-lg">
+                ${getTypeIcon(r.report_type)}
+              </div>
+              <div>
+                <h3 class="font-semibold">${r.report_name || 'Untitled'}</h3>
+                <span class="text-xs text-gray-500">${formatType(r.report_type)}</span>
+              </div>
+            </div>
+            <span class="text-xs px-2 py-1 rounded ${getFormatClass(r.export_format)}">${(r.export_format || 'pdf').toUpperCase()}</span>
+          </div>
+          
+          ${r.date_range_start && r.date_range_end ? `<div class="text-xs text-gray-400 mb-2">📅 ${formatDate(r.date_range_start)} - ${formatDate(r.date_range_end)}</div>` : ''}
+          
+          ${r.generated_by ? `<div class="text-xs text-gray-500 mb-2">👤 ${r.generated_by}</div>` : ''}
+          
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
+            <span class="text-xs text-gray-500">${formatDateTime(r.generated_at)}</span>
+            ${r.file_url ? `<a href="${r.file_url}" target="_blank" onclick="event.stopPropagation()" class="text-cyan-400 hover:text-cyan-300 text-xs">📥 Download</a>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showEmptyState(message) {
+      document.getElementById('reportsContainer').innerHTML = `
+        <div class="card p-8 text-center text-gray-500 col-span-full">
+          <p>${message}</p>
+          <button onclick="openGenerateModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Generate First Report</button>
+        </div>`;
+    }
+
+    function getTypeColor(type) {
+      const colors = { pipeline: 'bg-blue-500/20', win_loss: 'bg-purple-500/20', compliance: 'bg-amber-500/20', executive: 'bg-cyan-500/20', capture: 'bg-green-500/20' };
+      return colors[type] || 'bg-gray-500/20';
+    }
+
+    function getTypeIcon(type) {
+      const icons = { pipeline: '📊', win_loss: '📈', compliance: '✓', executive: '👔', capture: '🎯' };
+      return icons[type] || '📄';
+    }
+
+    function formatType(type) {
+      const labels = { pipeline: 'Pipeline Summary', win_loss: 'Win/Loss Analysis', compliance: 'Compliance Status', executive: 'Executive Brief', capture: 'Capture Metrics' };
+      return labels[type] || type || 'Report';
+    }
+
+    function getFormatClass(format) {
+      return { pdf: 'bg-red-500/20 text-red-400', excel: 'bg-green-500/20 text-green-400', csv: 'bg-blue-500/20 text-blue-400', json: 'bg-purple-500/20 text-purple-400' }[format] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    function formatDate(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'; }
+    function formatDateTime(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'; }
+
+    function updateStats() {
+      const thisMonth = new Date();
+      thisMonth.setDate(1);
+      
+      document.getElementById('statTotal').textContent = allReports.length;
+      document.getElementById('statThisMonth').textContent = allReports.filter(r => new Date(r.generated_at) >= thisMonth).length;
+      document.getElementById('statPDF').textContent = allReports.filter(r => r.export_format === 'pdf').length;
+      document.getElementById('statExcel').textContent = allReports.filter(r => r.export_format === 'excel').length;
+    }
+
+    function openGenerateModal() {
+      document.getElementById('generateForm').reset();
+      // Set default dates
+      const today = new Date();
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      document.getElementById('dateRangeEnd').value = today.toISOString().split('T')[0];
+      document.getElementById('dateRangeStart').value = monthAgo.toISOString().split('T')[0];
+      document.getElementById('generateModal').classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('generateModal').classList.add('hidden'); }
+
+    function quickGenerate(type) {
+      document.getElementById('reportType').value = type;
+      document.getElementById('reportName').value = formatType(type) + ' - ' + new Date().toLocaleDateString();
+      openGenerateModal();
+    }
+
+    async function handleGenerate(event) {
+      event.preventDefault();
+      
+      const reportData = {
+        report_name: document.getElementById('reportName').value,
+        report_type: document.getElementById('reportType').value,
+        export_format: document.getElementById('exportFormat').value,
+        date_range_start: document.getElementById('dateRangeStart').value || null,
+        date_range_end: document.getElementById('dateRangeEnd').value || null,
+        generated_by: document.getElementById('generatedBy').value || null,
+        generated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        report_data: JSON.stringify({ generated: true, timestamp: new Date().toISOString() })
+      };
+
+      try {
+        const { error } = await supabase.from('reports').insert([reportData]);
+        if (error) throw error;
+        closeModal();
+        await loadReports();
+        alert('Report generated successfully!');
+      } catch (err) {
+        console.error('Failed to generate:', err);
+        alert('Failed to generate: ' + err.message);
+      }
+    }
+
+    function openViewModal(id) {
+      const report = allReports.find(r => r.id === id);
+      if (!report) return;
+      
+      currentReportId = id;
+      document.getElementById('viewTitle').textContent = report.report_name || 'Report Details';
+      document.getElementById('viewType').textContent = formatType(report.report_type);
+      document.getElementById('viewFormat').textContent = (report.export_format || 'pdf').toUpperCase();
+      document.getElementById('viewGenerated').textContent = report.generated_by || 'System';
+      document.getElementById('viewDateRange').textContent = report.date_range_start && report.date_range_end 
+        ? `${formatDate(report.date_range_start)} - ${formatDate(report.date_range_end)}` 
+        : 'No date range specified';
+      
+      try {
+        const data = JSON.parse(report.report_data || '{}');
+        document.getElementById('viewData').textContent = JSON.stringify(data, null, 2);
+      } catch {
+        document.getElementById('viewData').textContent = report.report_data || 'No data';
+      }
+      
+      document.getElementById('downloadBtn').style.display = report.file_url ? 'block' : 'none';
+      document.getElementById('viewModal').classList.remove('hidden');
+    }
+
+    function closeViewModal() { document.getElementById('viewModal').classList.add('hidden'); currentReportId = null; }
+
+    async function deleteReport() {
+      if (!currentReportId || !confirm('Delete this report?')) return;
+      try {
+        const { error } = await supabase.from('reports').delete().eq('id', currentReportId);
+        if (error) throw error;
+        closeViewModal();
+        await loadReports();
+      } catch (err) {
+        console.error('Failed to delete:', err);
+        alert('Failed to delete: ' + err.message);
+      }
+    }
+
+    function downloadReport() {
+      const report = allReports.find(r => r.id === currentReportId);
+      if (report?.file_url) window.open(report.file_url, '_blank');
+    }
+
+    function subscribeToChanges() {
+      supabase.channel('reports_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => loadReports()).subscribe();
+    }
+
+    document.getElementById('typeFilter').addEventListener('change', loadReports);
+
+    async function init() {
+      if (!initSupabase()) { updateConnectionStatus(false); return; }
+      await loadReports();
+      subscribeToChanges();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</body>
+</html>
