@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract Scanner | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a1628; }
+        ::-webkit-scrollbar-thumb { background: #00E5FA; border-radius: 3px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-pulse { animation: pulse 2s infinite; }
+    </style>
+</head>
+<body class="bg-[#00050F] text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        const CLAUSE_TYPES = ['FAR', 'DFARS', 'HHSAR', 'VAAR', 'Custom'];
+        const RISK_LEVELS = ['High', 'Medium', 'Low'];
+
+        const App = () => {
+            const [opportunities, setOpportunities] = useState([]);
+            const [selectedOpp, setSelectedOpp] = useState('');
+            const [clauses, setClauses] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [connected, setConnected] = useState(false);
+            const [search, setSearch] = useState('');
+            const [typeFilter, setTypeFilter] = useState('All');
+            const [showModal, setShowModal] = useState(false);
+            const [editingClause, setEditingClause] = useState(null);
+            const [formData, setFormData] = useState({});
+
+            const loadOpportunities = async () => {
+                try {
+                    const { data } = await supabase.from('opportunities').select('id, title').order('title');
+                    setOpportunities(data || []);
+                    if (data?.length) setSelectedOpp(data[0].id);
+                    setConnected(true);
+                } catch (e) {
+                    console.error(e);
+                    setConnected(false);
+                }
+            };
+
+            const loadClauses = async () => {
+                if (!selectedOpp) return;
+                setLoading(true);
+                try {
+                    const { data } = await supabase
+                        .from('contract_clauses')
+                        .select('*')
+                        .eq('opportunity_id', selectedOpp)
+                        .order('clause_number');
+                    setClauses(data || []);
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => { loadOpportunities(); }, []);
+            useEffect(() => { loadClauses(); }, [selectedOpp]);
+
+            const filtered = useMemo(() => {
+                return clauses.filter(c => {
+                    const matchesSearch = !search || 
+                        c.clause_number?.toLowerCase().includes(search.toLowerCase()) ||
+                        c.title?.toLowerCase().includes(search.toLowerCase());
+                    const matchesType = typeFilter === 'All' || c.clause_type === typeFilter;
+                    return matchesSearch && matchesType;
+                });
+            }, [clauses, search, typeFilter]);
+
+            const stats = useMemo(() => ({
+                total: clauses.length,
+                high: clauses.filter(c => c.risk_level === 'High').length,
+                medium: clauses.filter(c => c.risk_level === 'Medium').length,
+                far: clauses.filter(c => c.clause_type === 'FAR').length,
+                dfars: clauses.filter(c => c.clause_type === 'DFARS').length
+            }), [clauses]);
+
+            const openModal = (clause = null) => {
+                setEditingClause(clause);
+                setFormData(clause || {
+                    opportunity_id: selectedOpp,
+                    clause_number: '',
+                    title: '',
+                    clause_type: 'FAR',
+                    risk_level: 'Medium',
+                    full_text: '',
+                    analysis: '',
+                    compliance_notes: ''
+                });
+                setShowModal(true);
+            };
+
+            const saveClause = async () => {
+                try {
+                    if (editingClause) {
+                        await supabase.from('contract_clauses').update(formData).eq('id', editingClause.id);
+                    } else {
+                        await supabase.from('contract_clauses').insert([formData]);
+                    }
+                    setShowModal(false);
+                    loadClauses();
+                } catch (e) {
+                    alert('Error: ' + e.message);
+                }
+            };
+
+            const deleteClause = async (id) => {
+                if (!confirm('Delete this clause?')) return;
+                await supabase.from('contract_clauses').delete().eq('id', id);
+                loadClauses();
+            };
+
+            return (
+                <div className="min-h-screen bg-[#00050F] p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h1 className="text-2xl font-bold flex items-center gap-3">
+                                    <span className="text-3xl">📜</span>
+                                    Contract Scanner
+                                </h1>
+                                <p className="text-white/60 mt-1">FAR/DFARS clause analysis</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <select
+                                    value={selectedOpp}
+                                    onChange={(e) => setSelectedOpp(e.target.value)}
+                                    className="bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white min-w-[250px]"
+                                >
+                                    {opportunities.map(o => (
+                                        <option key={o.id} value={o.id}>{o.title}</option>
+                                    ))}
+                                </select>
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'} status-pulse`}></div>
+                                    {connected ? 'Connected' : 'Offline'}
+                                </div>
+                                <button onClick={() => openModal()} className="px-4 py-2 bg-[#00E5FA] text-[#00050F] rounded-lg font-medium hover:bg-[#00E5FA]/90">
+                                    + Add Clause
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-5 gap-4 mb-6">
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-[#00E5FA]">{stats.total}</div>
+                                <div className="text-white/60 text-sm">Total Clauses</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-red-400">{stats.high}</div>
+                                <div className="text-white/60 text-sm">High Risk</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-amber-400">{stats.medium}</div>
+                                <div className="text-white/60 text-sm">Medium Risk</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-blue-400">{stats.far}</div>
+                                <div className="text-white/60 text-sm">FAR</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-purple-400">{stats.dfars}</div>
+                                <div className="text-white/60 text-sm">DFARS</div>
+                            </div>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex gap-4 mb-6">
+                            <input
+                                type="text"
+                                placeholder="Search clauses..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="flex-1 bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/40"
+                            />
+                            <select
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
+                                className="bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white"
+                            >
+                                <option value="All">All Types</option>
+                                {CLAUSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Table */}
+                        <div className="bg-[#0d1f3c] rounded-xl border border-white/10 overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-[#00050F]/50">
+                                    <tr>
+                                        <th className="text-left p-4 text-white/60 font-medium">Clause #</th>
+                                        <th className="text-left p-4 text-white/60 font-medium">Title</th>
+                                        <th className="text-center p-4 text-white/60 font-medium">Type</th>
+                                        <th className="text-center p-4 text-white/60 font-medium">Risk</th>
+                                        <th className="text-left p-4 text-white/60 font-medium">Analysis</th>
+                                        <th className="text-center p-4 text-white/60 font-medium">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.map(clause => (
+                                        <tr key={clause.id} className="border-t border-white/5 hover:bg-white/5">
+                                            <td className="p-4 font-mono text-sm text-[#00E5FA]">{clause.clause_number}</td>
+                                            <td className="p-4">{clause.title}</td>
+                                            <td className="p-4 text-center">
+                                                <span className={`px-2 py-1 rounded text-xs ${clause.clause_type === 'FAR' ? 'bg-blue-500/20 text-blue-400' : clause.clause_type === 'DFARS' ? 'bg-purple-500/20 text-purple-400' : 'bg-white/10 text-white/60'}`}>
+                                                    {clause.clause_type}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <span className={`px-2 py-1 rounded text-xs ${clause.risk_level === 'High' ? 'bg-red-500/20 text-red-400' : clause.risk_level === 'Medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                                    {clause.risk_level}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-white/60 text-sm max-w-xs truncate">{clause.analysis || '-'}</td>
+                                            <td className="p-4 text-center">
+                                                <button onClick={() => openModal(clause)} className="p-1.5 hover:bg-white/10 rounded">✏️</button>
+                                                <button onClick={() => deleteClause(clause.id)} className="p-1.5 hover:bg-red-500/20 rounded ml-1">🗑️</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {filtered.length === 0 && (
+                                        <tr><td colSpan="6" className="p-8 text-center text-white/50">No clauses found</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Modal */}
+                        {showModal && (
+                            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                                <div className="bg-[#0d1f3c] rounded-xl p-6 w-full max-w-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
+                                    <h2 className="text-xl font-bold mb-4">{editingClause ? 'Edit' : 'Add'} Clause</h2>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-white/60 mb-1">Clause Number</label>
+                                            <input type="text" value={formData.clause_number || ''} onChange={(e) => setFormData({...formData, clause_number: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white" placeholder="52.212-4" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-white/60 mb-1">Type</label>
+                                            <select value={formData.clause_type || 'FAR'} onChange={(e) => setFormData({...formData, clause_type: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white">
+                                                {CLAUSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm text-white/60 mb-1">Title</label>
+                                            <input type="text" value={formData.title || ''} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-white/60 mb-1">Risk Level</label>
+                                            <select value={formData.risk_level || 'Medium'} onChange={(e) => setFormData({...formData, risk_level: e.target.value})} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white">
+                                                {RISK_LEVELS.map(r => <option key={r} value={r}>{r}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm text-white/60 mb-1">Full Text</label>
+                                            <textarea value={formData.full_text || ''} onChange={(e) => setFormData({...formData, full_text: e.target.value})} rows={4} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white"></textarea>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm text-white/60 mb-1">Analysis</label>
+                                            <textarea value={formData.analysis || ''} onChange={(e) => setFormData({...formData, analysis: e.target.value})} rows={3} className="w-full bg-[#00050F] border border-white/10 rounded-lg px-4 py-2 text-white"></textarea>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-3 mt-6">
+                                        <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">Cancel</button>
+                                        <button onClick={saveClause} className="px-4 py-2 bg-[#00E5FA] text-[#00050F] rounded-lg font-medium">Save</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="fixed bottom-0 left-0 right-0 bg-[#00050F]/90 border-t border-white/10 p-2 text-center text-xs text-white/40">
+                        AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026 Mission Meets Tech
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

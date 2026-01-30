@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post-Award | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a1628; }
+        ::-webkit-scrollbar-thumb { background: #00E5FA; border-radius: 3px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-pulse { animation: pulse 2s infinite; }
+    </style>
+</head>
+<body class="bg-[#00050F] text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        const TRANSITION_PHASES = [
+            { id: 'award', name: 'Award Notification', icon: '🏆', days: 0 },
+            { id: 'kickoff', name: 'Kickoff Meeting', icon: '🚀', days: 14 },
+            { id: 'transition', name: 'Transition Plan', icon: '📋', days: 30 },
+            { id: 'staffing', name: 'Team Onboarding', icon: '👥', days: 45 },
+            { id: 'systems', name: 'Systems Access', icon: '🔐', days: 60 },
+            { id: 'operations', name: 'Full Operations', icon: '⚡', days: 90 }
+        ];
+
+        const CHECKLIST_ITEMS = [
+            { id: 1, category: 'Legal', item: 'Contract signed', required: true },
+            { id: 2, category: 'Legal', item: 'NDA executed with subs', required: true },
+            { id: 3, category: 'Legal', item: 'Teaming agreements finalized', required: true },
+            { id: 4, category: 'Finance', item: 'WAWF/Invoice setup', required: true },
+            { id: 5, category: 'Finance', item: 'Budget baseline established', required: true },
+            { id: 6, category: 'Finance', item: 'EVM setup (if required)', required: false },
+            { id: 7, category: 'HR', item: 'Key personnel onboarded', required: true },
+            { id: 8, category: 'HR', item: 'Clearance transfers initiated', required: true },
+            { id: 9, category: 'HR', item: 'Badging requests submitted', required: true },
+            { id: 10, category: 'IT', item: 'Network access requests', required: true },
+            { id: 11, category: 'IT', item: 'GFE received', required: false },
+            { id: 12, category: 'IT', item: 'VPN/Remote access setup', required: true },
+            { id: 13, category: 'Program', item: 'Kickoff meeting scheduled', required: true },
+            { id: 14, category: 'Program', item: 'Transition plan submitted', required: true },
+            { id: 15, category: 'Program', item: 'PMP baseline approved', required: true }
+        ];
+
+        const App = () => {
+            const [wonOpportunities, setWonOpportunities] = useState([]);
+            const [selectedOpp, setSelectedOpp] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [connected, setConnected] = useState(false);
+            const [checklist, setChecklist] = useState({});
+            const [milestones, setMilestones] = useState({});
+
+            const loadWonOpportunities = async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('opportunities')
+                        .select('*')
+                        .eq('stage', 'Won')
+                        .order('updated_at', { ascending: false });
+                    
+                    if (error) throw error;
+                    setWonOpportunities(data || []);
+                    setConnected(true);
+                    if (data?.length && !selectedOpp) {
+                        setSelectedOpp(data[0]);
+                    }
+                } catch (e) {
+                    console.error('Load error:', e);
+                    setConnected(false);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                loadWonOpportunities();
+            }, []);
+
+            useEffect(() => {
+                if (selectedOpp?.id) {
+                    // Load checklist state from localStorage (would be Supabase in production)
+                    const saved = localStorage.getItem(`postaward_${selectedOpp.id}`);
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        setChecklist(parsed.checklist || {});
+                        setMilestones(parsed.milestones || {});
+                    } else {
+                        setChecklist({});
+                        setMilestones({});
+                    }
+                }
+            }, [selectedOpp?.id]);
+
+            const saveProgress = () => {
+                if (selectedOpp?.id) {
+                    localStorage.setItem(`postaward_${selectedOpp.id}`, JSON.stringify({ checklist, milestones }));
+                }
+            };
+
+            useEffect(() => {
+                saveProgress();
+            }, [checklist, milestones]);
+
+            const toggleChecklistItem = (itemId) => {
+                setChecklist(prev => ({
+                    ...prev,
+                    [itemId]: !prev[itemId]
+                }));
+            };
+
+            const toggleMilestone = (phaseId) => {
+                setMilestones(prev => ({
+                    ...prev,
+                    [phaseId]: prev[phaseId] ? null : new Date().toISOString()
+                }));
+            };
+
+            const formatCurrency = (val) => {
+                const num = parseFloat(val) || 0;
+                if (num >= 1000000) return `$${(num/1000000).toFixed(1)}M`;
+                return `$${num.toFixed(0)}`;
+            };
+
+            const completedCount = Object.values(checklist).filter(Boolean).length;
+            const totalRequired = CHECKLIST_ITEMS.filter(i => i.required).length;
+            const completedRequired = CHECKLIST_ITEMS.filter(i => i.required && checklist[i.id]).length;
+            const progressPct = totalRequired > 0 ? Math.round((completedRequired / totalRequired) * 100) : 0;
+
+            const groupedChecklist = CHECKLIST_ITEMS.reduce((acc, item) => {
+                if (!acc[item.category]) acc[item.category] = [];
+                acc[item.category].push(item);
+                return acc;
+            }, {});
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-[#00E5FA]/20 border-t-[#00E5FA] rounded-full animate-spin mx-auto mb-4"></div>
+                            <div className="text-white/60">Loading Post-Award...</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-[#00050F] p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h1 className="text-2xl font-bold flex items-center gap-3">
+                                    <span className="text-3xl">🏁</span>
+                                    Post-Award Transition
+                                </h1>
+                                <p className="text-white/60 mt-1">Contract kickoff and transition tracking</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {wonOpportunities.length > 0 && (
+                                    <select
+                                        value={selectedOpp?.id || ''}
+                                        onChange={(e) => {
+                                            const opp = wonOpportunities.find(o => o.id === e.target.value);
+                                            setSelectedOpp(opp);
+                                        }}
+                                        className="bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white min-w-[300px]"
+                                    >
+                                        {wonOpportunities.map(o => (
+                                            <option key={o.id} value={o.id}>{o.title}</option>
+                                        ))}
+                                    </select>
+                                )}
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'} status-pulse`}></div>
+                                    {connected ? 'Connected' : 'Offline'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {wonOpportunities.length === 0 ? (
+                            <div className="bg-[#0d1f3c] rounded-xl p-12 border border-white/10 text-center">
+                                <div className="text-4xl mb-4">🏆</div>
+                                <h2 className="text-xl font-semibold mb-2">No Won Opportunities Yet</h2>
+                                <p className="text-white/60">When opportunities are marked as "Won", they'll appear here for post-award tracking.</p>
+                            </div>
+                        ) : selectedOpp && (
+                            <>
+                                {/* Contract Summary */}
+                                <div className="bg-gradient-to-r from-emerald-500/10 to-transparent rounded-xl p-6 mb-6 border border-emerald-500/20">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-bold">{selectedOpp.title}</h2>
+                                            <div className="flex items-center gap-4 mt-2 text-sm text-white/60">
+                                                <span>🏢 {selectedOpp.customer}</span>
+                                                <span>💰 {formatCurrency(selectedOpp.contract_value)}</span>
+                                                <span className="text-emerald-400">✅ Won</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-3xl font-bold text-emerald-400">{progressPct}%</div>
+                                            <div className="text-sm text-white/60">Transition Complete</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 bg-[#00050F] rounded-full h-2 overflow-hidden">
+                                        <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${progressPct}%` }}></div>
+                                    </div>
+                                </div>
+
+                                {/* Transition Phases */}
+                                <div className="bg-[#0d1f3c] rounded-xl p-6 border border-white/10 mb-6">
+                                    <h3 className="font-semibold mb-4">Transition Milestones</h3>
+                                    <div className="flex gap-4">
+                                        {TRANSITION_PHASES.map((phase, idx) => (
+                                            <div 
+                                                key={phase.id}
+                                                onClick={() => toggleMilestone(phase.id)}
+                                                className={`flex-1 text-center p-4 rounded-lg border-2 cursor-pointer transition-all ${milestones[phase.id] ? 'bg-emerald-500/20 border-emerald-500' : 'bg-white/5 border-white/10 hover:border-white/30'}`}
+                                            >
+                                                <div className="text-2xl mb-2">{milestones[phase.id] ? '✅' : phase.icon}</div>
+                                                <div className="font-medium text-sm">{phase.name}</div>
+                                                <div className="text-xs text-white/50 mt-1">Day {phase.days}</div>
+                                                {milestones[phase.id] && (
+                                                    <div className="text-xs text-emerald-400 mt-1">
+                                                        {new Date(milestones[phase.id]).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Checklist */}
+                                <div className="grid grid-cols-2 gap-6">
+                                    {Object.entries(groupedChecklist).map(([category, items]) => (
+                                        <div key={category} className="bg-[#0d1f3c] rounded-xl border border-white/10 overflow-hidden">
+                                            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                                                <h3 className="font-semibold">{category}</h3>
+                                                <span className="text-sm text-white/50">
+                                                    {items.filter(i => checklist[i.id]).length}/{items.length}
+                                                </span>
+                                            </div>
+                                            <div className="p-4 space-y-2">
+                                                {items.map(item => (
+                                                    <label 
+                                                        key={item.id}
+                                                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checklist[item.id] || false}
+                                                            onChange={() => toggleChecklistItem(item.id)}
+                                                            className="w-5 h-5 rounded border-white/30 bg-transparent checked:bg-[#00E5FA] checked:border-[#00E5FA]"
+                                                        />
+                                                        <span className={checklist[item.id] ? 'line-through text-white/50' : ''}>
+                                                            {item.item}
+                                                        </span>
+                                                        {item.required && !checklist[item.id] && (
+                                                            <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">Required</span>
+                                                        )}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Stats */}
+                                <div className="mt-6 grid grid-cols-4 gap-4">
+                                    <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10 text-center">
+                                        <div className="text-2xl font-bold text-[#00E5FA]">{completedCount}</div>
+                                        <div className="text-sm text-white/60">Items Complete</div>
+                                    </div>
+                                    <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10 text-center">
+                                        <div className="text-2xl font-bold text-amber-400">{CHECKLIST_ITEMS.length - completedCount}</div>
+                                        <div className="text-sm text-white/60">Items Remaining</div>
+                                    </div>
+                                    <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10 text-center">
+                                        <div className="text-2xl font-bold text-emerald-400">
+                                            {Object.values(milestones).filter(Boolean).length}/{TRANSITION_PHASES.length}
+                                        </div>
+                                        <div className="text-sm text-white/60">Milestones Hit</div>
+                                    </div>
+                                    <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10 text-center">
+                                        <div className="text-2xl font-bold text-purple-400">{completedRequired}/{totalRequired}</div>
+                                        <div className="text-sm text-white/60">Required Complete</div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div className="fixed bottom-0 left-0 right-0 bg-[#00050F]/90 border-t border-white/10 p-2 text-center text-xs text-white/40">
+                        AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026 Mission Meets Tech
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

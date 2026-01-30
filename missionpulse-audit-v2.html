@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Log | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a1628; }
+        ::-webkit-scrollbar-thumb { background: #00E5FA; border-radius: 3px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-pulse { animation: pulse 2s infinite; }
+    </style>
+</head>
+<body class="bg-[#00050F] text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        const ACTION_ICONS = {
+            'create': '➕',
+            'update': '✏️',
+            'delete': '🗑️',
+            'login': '🔐',
+            'logout': '🚪',
+            'view': '👁️',
+            'export': '📤',
+            'approve': '✅',
+            'reject': '❌',
+            'ai_request': '🤖'
+        };
+
+        const ACTION_COLORS = {
+            'create': 'bg-emerald-500/20 text-emerald-400',
+            'update': 'bg-blue-500/20 text-blue-400',
+            'delete': 'bg-red-500/20 text-red-400',
+            'login': 'bg-purple-500/20 text-purple-400',
+            'logout': 'bg-gray-500/20 text-gray-400',
+            'view': 'bg-white/10 text-white/60',
+            'export': 'bg-amber-500/20 text-amber-400',
+            'approve': 'bg-emerald-500/20 text-emerald-400',
+            'reject': 'bg-red-500/20 text-red-400',
+            'ai_request': 'bg-cyan-500/20 text-cyan-400'
+        };
+
+        const App = () => {
+            const [logs, setLogs] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [connected, setConnected] = useState(false);
+            const [search, setSearch] = useState('');
+            const [actionFilter, setActionFilter] = useState('All');
+            const [dateFilter, setDateFilter] = useState('7d');
+
+            const loadLogs = async () => {
+                try {
+                    // Calculate date range
+                    const now = new Date();
+                    let startDate;
+                    switch (dateFilter) {
+                        case '24h': startDate = new Date(now - 24*60*60*1000); break;
+                        case '7d': startDate = new Date(now - 7*24*60*60*1000); break;
+                        case '30d': startDate = new Date(now - 30*24*60*60*1000); break;
+                        default: startDate = new Date(now - 7*24*60*60*1000);
+                    }
+
+                    const { data, error } = await supabase
+                        .from('audit_logs')
+                        .select('*')
+                        .gte('created_at', startDate.toISOString())
+                        .order('created_at', { ascending: false })
+                        .limit(500);
+                    
+                    if (error) throw error;
+                    setLogs(data || []);
+                    setConnected(true);
+                } catch (e) {
+                    console.error('Load error:', e);
+                    // If table doesn't exist, show empty state
+                    setLogs([]);
+                    setConnected(true);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                loadLogs();
+                const channel = supabase
+                    .channel('audit_changes')
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_logs' }, loadLogs)
+                    .subscribe();
+                return () => supabase.removeChannel(channel);
+            }, [dateFilter]);
+
+            const filtered = useMemo(() => {
+                return logs.filter(log => {
+                    const matchesSearch = !search ||
+                        log.action?.toLowerCase().includes(search.toLowerCase()) ||
+                        log.entity_type?.toLowerCase().includes(search.toLowerCase()) ||
+                        log.user_email?.toLowerCase().includes(search.toLowerCase()) ||
+                        JSON.stringify(log.details).toLowerCase().includes(search.toLowerCase());
+                    const matchesAction = actionFilter === 'All' || log.action === actionFilter;
+                    return matchesSearch && matchesAction;
+                });
+            }, [logs, search, actionFilter]);
+
+            const stats = useMemo(() => ({
+                total: logs.length,
+                creates: logs.filter(l => l.action === 'create').length,
+                updates: logs.filter(l => l.action === 'update').length,
+                deletes: logs.filter(l => l.action === 'delete').length,
+                aiRequests: logs.filter(l => l.action === 'ai_request').length
+            }), [logs]);
+
+            const uniqueActions = useMemo(() => {
+                const actions = [...new Set(logs.map(l => l.action))];
+                return actions.filter(Boolean);
+            }, [logs]);
+
+            const formatTime = (timestamp) => {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diff = now - date;
+                
+                if (diff < 60000) return 'Just now';
+                if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+                if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-[#00E5FA]/20 border-t-[#00E5FA] rounded-full animate-spin mx-auto mb-4"></div>
+                            <div className="text-white/60">Loading Audit Log...</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-[#00050F] p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h1 className="text-2xl font-bold flex items-center gap-3">
+                                    <span className="text-3xl">📝</span>
+                                    Audit Log
+                                </h1>
+                                <p className="text-white/60 mt-1">System activity and compliance tracking</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <button 
+                                    onClick={loadLogs}
+                                    className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 text-sm"
+                                >
+                                    🔄 Refresh
+                                </button>
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'} status-pulse`}></div>
+                                    {connected ? 'Connected' : 'Offline'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-5 gap-4 mb-6">
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-[#00E5FA]">{stats.total}</div>
+                                <div className="text-white/60 text-sm">Total Events</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-emerald-400">{stats.creates}</div>
+                                <div className="text-white/60 text-sm">Created</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-blue-400">{stats.updates}</div>
+                                <div className="text-white/60 text-sm">Updated</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-red-400">{stats.deletes}</div>
+                                <div className="text-white/60 text-sm">Deleted</div>
+                            </div>
+                            <div className="bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                                <div className="text-2xl font-bold text-cyan-400">{stats.aiRequests}</div>
+                                <div className="text-white/60 text-sm">AI Requests</div>
+                            </div>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex gap-4 mb-6">
+                            <input
+                                type="text"
+                                placeholder="Search logs..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="flex-1 bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:border-[#00E5FA] focus:outline-none"
+                            />
+                            <select
+                                value={actionFilter}
+                                onChange={(e) => setActionFilter(e.target.value)}
+                                className="bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#00E5FA] focus:outline-none"
+                            >
+                                <option value="All">All Actions</option>
+                                {uniqueActions.map(a => (
+                                    <option key={a} value={a}>{a}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={dateFilter}
+                                onChange={(e) => setDateFilter(e.target.value)}
+                                className="bg-[#0d1f3c] border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#00E5FA] focus:outline-none"
+                            >
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                            </select>
+                        </div>
+
+                        {/* Log Table */}
+                        <div className="bg-[#0d1f3c] rounded-xl border border-white/10 overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-[#00050F]/50">
+                                    <tr>
+                                        <th className="text-left p-4 text-white/60 font-medium">Timestamp</th>
+                                        <th className="text-left p-4 text-white/60 font-medium">User</th>
+                                        <th className="text-center p-4 text-white/60 font-medium">Action</th>
+                                        <th className="text-left p-4 text-white/60 font-medium">Entity</th>
+                                        <th className="text-left p-4 text-white/60 font-medium">Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="p-8 text-center text-white/50">
+                                                {logs.length === 0 ? (
+                                                    <div>
+                                                        <p className="mb-2">No audit logs recorded yet.</p>
+                                                        <p className="text-sm">Logs will appear here as users interact with the system.</p>
+                                                    </div>
+                                                ) : (
+                                                    'No matching logs found'
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filtered.map(log => (
+                                            <tr key={log.id} className="border-t border-white/5 hover:bg-white/5">
+                                                <td className="p-4">
+                                                    <div className="text-sm">{formatTime(log.created_at)}</div>
+                                                    <div className="text-xs text-white/40">{new Date(log.created_at).toISOString().split('T')[0]}</div>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="text-sm">{log.user_email || 'System'}</div>
+                                                    {log.user_role && <div className="text-xs text-white/40">{log.user_role}</div>}
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${ACTION_COLORS[log.action] || 'bg-white/10 text-white/60'}`}>
+                                                        <span>{ACTION_ICONS[log.action] || '📌'}</span>
+                                                        {log.action}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="text-sm">{log.entity_type}</div>
+                                                    {log.entity_id && <div className="text-xs text-white/40 font-mono">{log.entity_id.substring(0, 8)}...</div>}
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="text-sm text-white/70 max-w-xs truncate">
+                                                        {typeof log.details === 'object' ? JSON.stringify(log.details) : log.details || '-'}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* CMMC Compliance Notice */}
+                        <div className="mt-6 bg-[#0d1f3c] rounded-xl p-4 border border-white/10">
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl">🛡️</span>
+                                <div>
+                                    <div className="font-medium">CMMC 2.0 Compliance</div>
+                                    <div className="text-sm text-white/60">Audit logging supports AU.L2-3.3.1 (System Audit) and AU.L2-3.3.2 (Audit Content)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="fixed bottom-0 left-0 right-0 bg-[#00050F]/90 border-t border-white/10 p-2 text-center text-xs text-white/40">
+                        AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026 Mission Meets Tech
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

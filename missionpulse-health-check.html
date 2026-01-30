@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Health Check | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a1628; }
+        ::-webkit-scrollbar-thumb { background: #00E5FA; border-radius: 3px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-pulse { animation: pulse 2s infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body class="bg-[#00050F] text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Supabase Client
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        // All V2 Modules to Test
+        const V2_MODULES = [
+            { name: 'Pricing', file: 'missionpulse-pricing-v2.html', table: 'pricing_items' },
+            { name: 'Iron Dome', file: 'missionpulse-irondome-v2.html', table: 'proposal_sections' },
+            { name: 'RFP Shredder', file: 'missionpulse-rfpshredder-v2.html', table: 'rfp_requirements' },
+            { name: 'Frenemy', file: 'missionpulse-frenemy-v2.html', table: 'frenemy_entities' },
+            { name: 'Lessons', file: 'missionpulse-lessons-v2.html', table: 'lessons_learned' },
+            { name: 'Orals', file: 'missionpulse-orals-v2.html', table: 'orals_sessions' },
+            { name: 'Past Performance', file: 'missionpulse-pastperf-v2.html', table: 'past_performance' },
+            { name: 'Teaming', file: 'missionpulse-teaming-v2.html', table: 'teaming_partners' },
+            { name: 'Clauses', file: 'missionpulse-clauses-v2.html', table: 'contract_clauses' },
+            { name: 'Compliance', file: 'missionpulse-compliance-v2.html', table: 'compliance_items' },
+            { name: 'HITL', file: 'missionpulse-hitl-v2.html', table: 'ai_approvals' },
+            { name: 'Black Hat', file: 'missionpulse-blackhat-v2.html', table: 'competitors' },
+            { name: 'Win Themes', file: 'missionpulse-winthemes-v2.html', table: 'win_themes' },
+            { name: 'Launch ROI', file: 'missionpulse-launchroi-v2.html', table: 'launch_roi' },
+            { name: 'Reports', file: 'missionpulse-reports-v2.html', table: 'reports' },
+        ];
+
+        // Core Tables
+        const CORE_TABLES = [
+            'opportunities', 'profiles', 'companies', 'team_assignments',
+            'pricing_items', 'proposal_sections', 'rfp_requirements', 'competitors',
+            'win_themes', 'compliance_items', 'contract_clauses', 'ai_approvals',
+            'lessons_learned', 'orals_sessions', 'past_performance', 'teaming_partners',
+            'frenemy_entities', 'launch_roi', 'reports', 'audit_logs'
+        ];
+
+        const App = () => {
+            const [running, setRunning] = useState(false);
+            const [results, setResults] = useState({ modules: [], tables: [], summary: null });
+            const [lastRun, setLastRun] = useState(null);
+
+            const checkSupabaseConnection = async () => {
+                try {
+                    const start = performance.now();
+                    const { data, error } = await supabase.from('opportunities').select('id').limit(1);
+                    const latency = Math.round(performance.now() - start);
+                    return { connected: !error, latency, error: error?.message };
+                } catch (e) {
+                    return { connected: false, latency: 0, error: e.message };
+                }
+            };
+
+            const checkTable = async (tableName) => {
+                try {
+                    const start = performance.now();
+                    const { data, error, count } = await supabase
+                        .from(tableName)
+                        .select('*', { count: 'exact', head: false })
+                        .limit(1);
+                    const latency = Math.round(performance.now() - start);
+                    
+                    if (error) {
+                        return { table: tableName, status: 'error', error: error.message, count: 0, latency };
+                    }
+                    
+                    // Get actual count
+                    const { count: actualCount } = await supabase
+                        .from(tableName)
+                        .select('*', { count: 'exact', head: true });
+                    
+                    return { table: tableName, status: 'ok', count: actualCount || 0, latency };
+                } catch (e) {
+                    return { table: tableName, status: 'error', error: e.message, count: 0, latency: 0 };
+                }
+            };
+
+            const checkModuleFile = async (module) => {
+                try {
+                    const response = await fetch(module.file, { method: 'HEAD' });
+                    const tableResult = await checkTable(module.table);
+                    
+                    return {
+                        name: module.name,
+                        file: module.file,
+                        fileStatus: response.ok ? 'ok' : 'missing',
+                        tableStatus: tableResult.status,
+                        tableCount: tableResult.count,
+                        tableError: tableResult.error
+                    };
+                } catch (e) {
+                    const tableResult = await checkTable(module.table);
+                    return {
+                        name: module.name,
+                        file: module.file,
+                        fileStatus: 'error',
+                        tableStatus: tableResult.status,
+                        tableCount: tableResult.count,
+                        fileError: e.message
+                    };
+                }
+            };
+
+            const runHealthCheck = async () => {
+                setRunning(true);
+                setResults({ modules: [], tables: [], summary: null });
+
+                // Check Supabase connection
+                const connection = await checkSupabaseConnection();
+                
+                // Check all tables
+                const tableResults = [];
+                for (const table of CORE_TABLES) {
+                    const result = await checkTable(table);
+                    tableResults.push(result);
+                    setResults(prev => ({ ...prev, tables: [...prev.tables, result] }));
+                }
+
+                // Check all V2 modules
+                const moduleResults = [];
+                for (const module of V2_MODULES) {
+                    const result = await checkModuleFile(module);
+                    moduleResults.push(result);
+                    setResults(prev => ({ ...prev, modules: [...prev.modules, result] }));
+                }
+
+                // Calculate summary
+                const summary = {
+                    connection,
+                    tablesOk: tableResults.filter(t => t.status === 'ok').length,
+                    tablesError: tableResults.filter(t => t.status === 'error').length,
+                    totalRecords: tableResults.reduce((sum, t) => sum + (t.count || 0), 0),
+                    modulesOk: moduleResults.filter(m => m.fileStatus === 'ok').length,
+                    modulesError: moduleResults.filter(m => m.fileStatus !== 'ok').length,
+                    moduleDBOk: moduleResults.filter(m => m.tableStatus === 'ok').length,
+                };
+
+                setResults(prev => ({ ...prev, summary }));
+                setLastRun(new Date().toISOString());
+                setRunning(false);
+            };
+
+            const StatusBadge = ({ status }) => {
+                const colors = {
+                    ok: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                    error: 'bg-red-500/20 text-red-400 border-red-500/30',
+                    missing: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                    pending: 'bg-white/10 text-white/50 border-white/20'
+                };
+                return (
+                    <span className={`px-2 py-0.5 text-xs rounded border ${colors[status] || colors.pending}`}>
+                        {status?.toUpperCase() || 'PENDING'}
+                    </span>
+                );
+            };
+
+            return (
+                <div className="min-h-screen bg-[#00050F] p-6">
+                    {/* Header */}
+                    <div className="max-w-7xl mx-auto">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h1 className="text-3xl font-bold flex items-center gap-3">
+                                    <span className="text-4xl">🏥</span>
+                                    System Health Check
+                                </h1>
+                                <p className="text-white/60 mt-1">Verify all V2 modules and database connections</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {lastRun && (
+                                    <span className="text-sm text-white/50">
+                                        Last run: {new Date(lastRun).toLocaleTimeString()}
+                                    </span>
+                                )}
+                                <button
+                                    onClick={runHealthCheck}
+                                    disabled={running}
+                                    className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 ${running ? 'bg-white/10 text-white/50' : 'bg-[#00E5FA] text-[#00050F] hover:bg-[#00E5FA]/90'}`}
+                                >
+                                    {running ? (
+                                        <>
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full spinner"></div>
+                                            Running Tests...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>▶️</span>
+                                            Run Health Check
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Summary Cards */}
+                        {results.summary && (
+                            <div className="grid grid-cols-5 gap-4 mb-8">
+                                <div className={`p-4 rounded-xl border ${results.summary.connection.connected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                                    <div className="text-sm text-white/60 mb-1">Supabase</div>
+                                    <div className={`text-2xl font-bold ${results.summary.connection.connected ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {results.summary.connection.connected ? 'Connected' : 'Offline'}
+                                    </div>
+                                    <div className="text-xs text-white/40 mt-1">{results.summary.connection.latency}ms latency</div>
+                                </div>
+                                <div className="bg-[#0d1f3c] p-4 rounded-xl border border-white/10">
+                                    <div className="text-sm text-white/60 mb-1">Tables OK</div>
+                                    <div className="text-2xl font-bold text-[#00E5FA]">{results.summary.tablesOk}/{CORE_TABLES.length}</div>
+                                    <div className="text-xs text-white/40 mt-1">{results.summary.totalRecords.toLocaleString()} total records</div>
+                                </div>
+                                <div className="bg-[#0d1f3c] p-4 rounded-xl border border-white/10">
+                                    <div className="text-sm text-white/60 mb-1">V2 Files Found</div>
+                                    <div className="text-2xl font-bold text-emerald-400">{results.summary.modulesOk}/{V2_MODULES.length}</div>
+                                </div>
+                                <div className="bg-[#0d1f3c] p-4 rounded-xl border border-white/10">
+                                    <div className="text-sm text-white/60 mb-1">DB Wired</div>
+                                    <div className="text-2xl font-bold text-purple-400">{results.summary.moduleDBOk}/{V2_MODULES.length}</div>
+                                </div>
+                                <div className={`p-4 rounded-xl border ${results.summary.tablesError === 0 && results.summary.modulesError === 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                                    <div className="text-sm text-white/60 mb-1">Overall Status</div>
+                                    <div className={`text-2xl font-bold ${results.summary.tablesError === 0 && results.summary.modulesError === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                        {results.summary.tablesError === 0 && results.summary.modulesError === 0 ? '✅ HEALTHY' : '⚠️ ISSUES'}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-6">
+                            {/* V2 Modules */}
+                            <div className="bg-[#0d1f3c] rounded-xl border border-white/10 overflow-hidden">
+                                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                                    <h2 className="font-semibold flex items-center gap-2">
+                                        <span>📦</span> V2 Modules ({V2_MODULES.length})
+                                    </h2>
+                                </div>
+                                <div className="max-h-[500px] overflow-y-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-[#00050F]/50 sticky top-0">
+                                            <tr>
+                                                <th className="text-left p-3 text-white/60">Module</th>
+                                                <th className="text-center p-3 text-white/60">File</th>
+                                                <th className="text-center p-3 text-white/60">DB</th>
+                                                <th className="text-right p-3 text-white/60">Records</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(results.modules.length > 0 ? results.modules : V2_MODULES).map((m, i) => (
+                                                <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                                                    <td className="p-3">
+                                                        <div className="font-medium">{m.name}</div>
+                                                        <div className="text-xs text-white/40">{m.file}</div>
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <StatusBadge status={m.fileStatus} />
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <StatusBadge status={m.tableStatus} />
+                                                    </td>
+                                                    <td className="p-3 text-right text-white/60">
+                                                        {m.tableCount !== undefined ? m.tableCount : '-'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Database Tables */}
+                            <div className="bg-[#0d1f3c] rounded-xl border border-white/10 overflow-hidden">
+                                <div className="p-4 border-b border-white/10">
+                                    <h2 className="font-semibold flex items-center gap-2">
+                                        <span>🗄️</span> Core Database Tables ({CORE_TABLES.length})
+                                    </h2>
+                                </div>
+                                <div className="max-h-[500px] overflow-y-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-[#00050F]/50 sticky top-0">
+                                            <tr>
+                                                <th className="text-left p-3 text-white/60">Table</th>
+                                                <th className="text-center p-3 text-white/60">Status</th>
+                                                <th className="text-right p-3 text-white/60">Records</th>
+                                                <th className="text-right p-3 text-white/60">Latency</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(results.tables.length > 0 ? results.tables : CORE_TABLES.map(t => ({ table: t }))).map((t, i) => (
+                                                <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                                                    <td className="p-3 font-mono text-sm">{t.table}</td>
+                                                    <td className="p-3 text-center">
+                                                        <StatusBadge status={t.status} />
+                                                    </td>
+                                                    <td className="p-3 text-right text-white/60">
+                                                        {t.count !== undefined ? t.count.toLocaleString() : '-'}
+                                                    </td>
+                                                    <td className="p-3 text-right text-white/40">
+                                                        {t.latency !== undefined ? `${t.latency}ms` : '-'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="mt-8 bg-[#0d1f3c] rounded-xl p-6 border border-white/10">
+                            <h2 className="font-semibold mb-4">Quick Actions</h2>
+                            <div className="flex gap-4">
+                                <a href="missionpulse-v12-PRODUCTION-COMPLETE.html" className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg flex items-center gap-2">
+                                    <span>📊</span> Production Dashboard
+                                </a>
+                                <a href="admin-users.html" className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg flex items-center gap-2">
+                                    <span>👥</span> User Management
+                                </a>
+                                <a href="missionpulse-agent-hub.html" className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg flex items-center gap-2">
+                                    <span>🤖</span> AI Agent Hub
+                                </a>
+                                <a href="login.html" className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg flex items-center gap-2">
+                                    <span>🔐</span> Login Page
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-[#00050F]/90 border-t border-white/10 p-2 text-center text-xs text-white/40">
+                        AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026 Mission Meets Tech
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
