@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse - AI Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .typing-indicator span { animation: bounce 1.4s infinite ease-in-out; }
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+        .message-appear { animation: fadeSlide 0.3s ease-out; }
+        @keyframes fadeSlide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // =========================================================================
+        // CONFIGURATION
+        // =========================================================================
+        const API_URL = 'https://missionpulse-api.onrender.com';
+
+        // =========================================================================
+        // AGENT CONFIGURATIONS WITH SUGGESTED PROMPTS
+        // =========================================================================
+        const AGENTS = {
+            capture: {
+                id: 'capture',
+                name: 'Capture Agent',
+                icon: '🎯',
+                color: 'cyan',
+                description: 'Win strategy and capture planning',
+                prompts: [
+                    'Analyze the competitive landscape for this opportunity',
+                    'What are the key win themes we should emphasize?',
+                    'Help me build a capture plan for this RFP',
+                    'What discriminators should we highlight?',
+                    'Assess our probability of win (pWin)'
+                ]
+            },
+            strategy: {
+                id: 'strategy',
+                name: 'Strategy Agent',
+                icon: '♟️',
+                color: 'purple',
+                description: 'Proposal strategy and positioning',
+                prompts: [
+                    'How should we position against the incumbent?',
+                    'What ghost strategies can we use?',
+                    'Develop a price-to-win strategy',
+                    'Identify customer hot buttons',
+                    'Create our executive summary themes'
+                ]
+            },
+            blackhat: {
+                id: 'blackhat',
+                name: 'Black Hat Agent',
+                icon: '🎩',
+                color: 'red',
+                description: 'Competitive intelligence',
+                prompts: [
+                    'Analyze competitor strengths and weaknesses',
+                    'What will competitors propose?',
+                    'How can we ghost the incumbent?',
+                    'Identify competitor pricing strategies',
+                    'Find vulnerabilities in competitor approach'
+                ]
+            },
+            pricing: {
+                id: 'pricing',
+                name: 'Pricing Agent',
+                icon: '💰',
+                color: 'emerald',
+                description: 'BOE and pricing analysis',
+                prompts: [
+                    'Help me build a basis of estimate',
+                    'Calculate labor rates for this contract',
+                    'Analyze price-to-win scenarios',
+                    'Review indirect rate structure',
+                    'Optimize our pricing strategy'
+                ]
+            },
+            compliance: {
+                id: 'compliance',
+                name: 'Compliance Agent',
+                icon: '📋',
+                color: 'amber',
+                description: 'RFP compliance verification',
+                prompts: [
+                    'Create a compliance matrix from this RFP',
+                    'Check Section L/M requirements',
+                    'Identify mandatory certifications needed',
+                    'Review FAR/DFARS clauses',
+                    'Verify page count and format requirements'
+                ]
+            },
+            writer: {
+                id: 'writer',
+                name: 'Writer Agent',
+                icon: '✍️',
+                color: 'blue',
+                description: 'Proposal content generation',
+                prompts: [
+                    'Draft an executive summary',
+                    'Write a technical approach section',
+                    'Generate past performance narrative',
+                    'Create management approach content',
+                    'Write transition plan section'
+                ]
+            },
+            contracts: {
+                id: 'contracts',
+                name: 'Contracts Agent',
+                icon: '📜',
+                color: 'rose',
+                description: 'Contract terms analysis',
+                prompts: [
+                    'Analyze the contract type implications',
+                    'Review terms and conditions',
+                    'Identify risky contract clauses',
+                    'Explain IDIQ task order requirements',
+                    'Assess teaming agreement needs'
+                ]
+            },
+            orals: {
+                id: 'orals',
+                name: 'Orals Agent',
+                icon: '🎤',
+                color: 'indigo',
+                description: 'Orals preparation',
+                prompts: [
+                    'Generate likely orals questions',
+                    'Create presentation talking points',
+                    'Prepare Q&A responses',
+                    'Review orals evaluation criteria',
+                    'Build orals practice scenarios'
+                ]
+            }
+        };
+
+        // =========================================================================
+        // COMPONENTS
+        // =========================================================================
+
+        // Agent Selector
+        function AgentSelector({ agents, selectedAgent, onSelect }) {
+            return (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                    {Object.values(agents).map(agent => (
+                        <button
+                            key={agent.id}
+                            onClick={() => onSelect(agent)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all ${
+                                selectedAgent.id === agent.id
+                                    ? `bg-${agent.color}-500/20 border border-${agent.color}-500/50 text-${agent.color}-400`
+                                    : 'bg-slate-800 border border-slate-700 text-slate-400 hover:border-slate-600'
+                            }`}
+                            style={{
+                                backgroundColor: selectedAgent.id === agent.id ? `rgba(var(--${agent.color}), 0.2)` : undefined,
+                                borderColor: selectedAgent.id === agent.id ? `rgba(var(--${agent.color}), 0.5)` : undefined
+                            }}
+                        >
+                            <span>{agent.icon}</span>
+                            <span className="text-sm font-medium">{agent.name}</span>
+                        </button>
+                    ))}
+                </div>
+            );
+        }
+
+        // Suggested Prompts
+        function SuggestedPrompts({ prompts, onSelect }) {
+            return (
+                <div className="space-y-2">
+                    <div className="text-xs text-slate-500 uppercase tracking-wide">Suggested Prompts</div>
+                    <div className="flex flex-wrap gap-2">
+                        {prompts.map((prompt, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => onSelect(prompt)}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-lg text-sm text-slate-300 transition-all"
+                            >
+                                {prompt}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Message Bubble
+        function MessageBubble({ message, agent }) {
+            const isUser = message.role === 'user';
+            
+            return (
+                <div className={`flex gap-3 message-appear ${isUser ? 'flex-row-reverse' : ''}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        isUser 
+                            ? 'bg-cyan-500 text-slate-900' 
+                            : 'bg-slate-700 text-white'
+                    }`}>
+                        {isUser ? '👤' : agent.icon}
+                    </div>
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        isUser 
+                            ? 'bg-cyan-500 text-slate-900' 
+                            : 'bg-slate-800 text-white'
+                    }`}>
+                        <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                        <div className={`text-xs mt-1 ${isUser ? 'text-cyan-800' : 'text-slate-500'}`}>
+                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Typing Indicator
+        function TypingIndicator({ agent }) {
+            return (
+                <div className="flex gap-3 message-appear">
+                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                        {agent.icon}
+                    </div>
+                    <div className="bg-slate-800 rounded-2xl px-4 py-3">
+                        <div className="typing-indicator flex gap-1">
+                            <span className="w-2 h-2 bg-slate-500 rounded-full"></span>
+                            <span className="w-2 h-2 bg-slate-500 rounded-full"></span>
+                            <span className="w-2 h-2 bg-slate-500 rounded-full"></span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Chat Input
+        function ChatInput({ value, onChange, onSend, isLoading, placeholder }) {
+            const textareaRef = useRef(null);
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (value.trim() && !isLoading) {
+                        onSend();
+                    }
+                }
+            };
+
+            // Auto-resize textarea
+            useEffect(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto';
+                    textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + 'px';
+                }
+            }, [value]);
+
+            return (
+                <div className="flex gap-3 items-end">
+                    <div className="flex-1 relative">
+                        <textarea
+                            ref={textareaRef}
+                            value={value}
+                            onChange={(e) => onChange(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder={placeholder}
+                            rows={1}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 resize-none focus:border-cyan-500 focus:outline-none"
+                            style={{ minHeight: '48px', maxHeight: '150px' }}
+                        />
+                        <div className="absolute bottom-2 right-3 text-xs text-slate-600">
+                            Enter to send • Shift+Enter for new line
+                        </div>
+                    </div>
+                    <button
+                        onClick={onSend}
+                        disabled={!value.trim() || isLoading}
+                        className={`p-3 rounded-xl transition-all ${
+                            value.trim() && !isLoading
+                                ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-900'
+                                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                        }`}
+                    >
+                        {isLoading ? '⏳' : '➤'}
+                    </button>
+                </div>
+            );
+        }
+
+        // =========================================================================
+        // MAIN APP
+        // =========================================================================
+        function App() {
+            const [selectedAgent, setSelectedAgent] = useState(AGENTS.capture);
+            const [messages, setMessages] = useState([]);
+            const [inputValue, setInputValue] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [isOnline, setIsOnline] = useState(true);
+            const messagesEndRef = useRef(null);
+
+            // Scroll to bottom on new messages
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [messages, isLoading]);
+
+            // Send message
+            const handleSend = async () => {
+                if (!inputValue.trim() || isLoading) return;
+
+                const userMessage = {
+                    role: 'user',
+                    content: inputValue.trim(),
+                    timestamp: new Date().toISOString()
+                };
+
+                setMessages(prev => [...prev, userMessage]);
+                setInputValue('');
+                setIsLoading(true);
+
+                try {
+                    // Call API
+                    const response = await fetch(`${API_URL}/chat`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agent: selectedAgent.id,
+                            message: userMessage.content,
+                            history: messages.slice(-10)
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('API error');
+
+                    const data = await response.json();
+
+                    const aiMessage = {
+                        role: 'assistant',
+                        content: data.response || data.message || 'I apologize, but I encountered an issue processing your request.',
+                        timestamp: new Date().toISOString()
+                    };
+
+                    setMessages(prev => [...prev, aiMessage]);
+                } catch (error) {
+                    console.error('Chat error:', error);
+                    
+                    // Demo fallback response
+                    const demoResponse = {
+                        role: 'assistant',
+                        content: `[Demo Mode] As your ${selectedAgent.name}, I would analyze "${userMessage.content}" and provide strategic insights based on Shipley methodology and federal contracting best practices.\n\nKey considerations:\n• Competitive positioning\n• Customer requirements alignment\n• Technical feasibility\n• Price competitiveness\n\nWould you like me to elaborate on any of these areas?`,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    setMessages(prev => [...prev, demoResponse]);
+                    setIsOnline(false);
+                }
+
+                setIsLoading(false);
+            };
+
+            // Handle suggested prompt click
+            const handlePromptSelect = (prompt) => {
+                setInputValue(prompt);
+            };
+
+            // Clear chat when agent changes
+            const handleAgentChange = (agent) => {
+                setSelectedAgent(agent);
+                setMessages([]);
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Header */}
+                    <header className="glass border-b border-slate-700 px-6 py-4">
+                        <div className="max-w-4xl mx-auto flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="missionpulse-dashboard-hub.html" className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center">
+                                        <span className="text-xl">🤖</span>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold text-white">AI Chat</h1>
+                                        <p className="text-xs text-slate-500">Proposal Intelligence Assistant</p>
+                                    </div>
+                                </a>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${
+                                    isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                                }`}>
+                                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                    {isOnline ? 'Online' : 'Demo Mode'}
+                                </div>
+                                <a 
+                                    href="missionpulse-agent-hub-v2.html"
+                                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-white transition-colors"
+                                >
+                                    Agent Hub
+                                </a>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Agent Selector */}
+                    <div className="border-b border-slate-800 px-6 py-3">
+                        <div className="max-w-4xl mx-auto">
+                            <AgentSelector 
+                                agents={AGENTS} 
+                                selectedAgent={selectedAgent}
+                                onSelect={handleAgentChange}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Chat Area */}
+                    <div className="flex-1 overflow-y-auto px-6 py-6">
+                        <div className="max-w-4xl mx-auto space-y-4">
+                            {messages.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <div className="text-6xl mb-4">{selectedAgent.icon}</div>
+                                    <h2 className="text-xl font-bold text-white mb-2">{selectedAgent.name}</h2>
+                                    <p className="text-slate-400 mb-8">{selectedAgent.description}</p>
+                                    <SuggestedPrompts 
+                                        prompts={selectedAgent.prompts} 
+                                        onSelect={handlePromptSelect}
+                                    />
+                                </div>
+                            ) : (
+                                <>
+                                    {messages.map((msg, idx) => (
+                                        <MessageBubble key={idx} message={msg} agent={selectedAgent} />
+                                    ))}
+                                    {isLoading && <TypingIndicator agent={selectedAgent} />}
+                                    <div ref={messagesEndRef} />
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Suggested Prompts (when chat has messages) */}
+                    {messages.length > 0 && (
+                        <div className="border-t border-slate-800 px-6 py-3">
+                            <div className="max-w-4xl mx-auto">
+                                <div className="flex gap-2 overflow-x-auto">
+                                    {selectedAgent.prompts.slice(0, 3).map((prompt, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handlePromptSelect(prompt)}
+                                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs text-slate-400 whitespace-nowrap transition-all"
+                                        >
+                                            {prompt}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Input Area */}
+                    <div className="glass border-t border-slate-700 px-6 py-4">
+                        <div className="max-w-4xl mx-auto">
+                            <ChatInput
+                                value={inputValue}
+                                onChange={setInputValue}
+                                onSend={handleSend}
+                                isLoading={isLoading}
+                                placeholder={`Ask ${selectedAgent.name}...`}
+                            />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

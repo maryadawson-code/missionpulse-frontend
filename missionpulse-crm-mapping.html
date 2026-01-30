@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse - CRM Mapping</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .mapping-line { position: relative; }
+        .mapping-line::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 40px; height: 2px; background: linear-gradient(90deg, #06b6d4, #10b981); }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // =========================================================================
+        // FIELD DEFINITIONS
+        // =========================================================================
+        const MISSIONPULSE_FIELDS = [
+            { id: 'title', name: 'Opportunity Title', type: 'text', required: true },
+            { id: 'solicitation_number', name: 'Solicitation Number', type: 'text', required: true },
+            { id: 'agency', name: 'Agency/Customer', type: 'text', required: true },
+            { id: 'value', name: 'Estimated Value', type: 'currency', required: true },
+            { id: 'stage', name: 'Proposal Stage', type: 'select', required: true },
+            { id: 'pwin', name: 'Win Probability', type: 'percent', required: false },
+            { id: 'due_date', name: 'Due Date', type: 'date', required: true },
+            { id: 'award_date', name: 'Expected Award Date', type: 'date', required: false },
+            { id: 'naics', name: 'NAICS Code', type: 'text', required: false },
+            { id: 'set_aside', name: 'Set-Aside Type', type: 'select', required: false },
+            { id: 'contract_type', name: 'Contract Type', type: 'select', required: false },
+            { id: 'contract_vehicle', name: 'Contract Vehicle', type: 'text', required: false },
+            { id: 'pop', name: 'Period of Performance', type: 'text', required: false },
+            { id: 'incumbent', name: 'Incumbent', type: 'text', required: false },
+            { id: 'capture_manager', name: 'Capture Manager', type: 'user', required: true },
+            { id: 'proposal_manager', name: 'Proposal Manager', type: 'user', required: false },
+            { id: 'bd_investment', name: 'BD Investment', type: 'currency', required: false },
+            { id: 'notes', name: 'Notes', type: 'textarea', required: false }
+        ];
+
+        const HUBSPOT_FIELDS = [
+            { id: 'dealname', name: 'Deal Name', type: 'text' },
+            { id: 'pipeline', name: 'Pipeline', type: 'select' },
+            { id: 'dealstage', name: 'Deal Stage', type: 'select' },
+            { id: 'amount', name: 'Amount', type: 'currency' },
+            { id: 'closedate', name: 'Close Date', type: 'date' },
+            { id: 'hubspot_owner_id', name: 'Deal Owner', type: 'user' },
+            { id: 'description', name: 'Description', type: 'textarea' },
+            { id: 'hs_probability', name: 'Probability', type: 'percent' },
+            { id: 'hs_forecast_amount', name: 'Forecast Amount', type: 'currency' },
+            { id: 'hs_next_step', name: 'Next Step', type: 'text' },
+            { id: 'solicitation_number', name: 'Solicitation # (Custom)', type: 'text', custom: true },
+            { id: 'agency_customer', name: 'Agency/Customer (Custom)', type: 'text', custom: true },
+            { id: 'naics_code', name: 'NAICS Code (Custom)', type: 'text', custom: true },
+            { id: 'set_aside_type', name: 'Set-Aside Type (Custom)', type: 'select', custom: true },
+            { id: 'contract_vehicle', name: 'Contract Vehicle (Custom)', type: 'text', custom: true },
+            { id: 'period_of_performance', name: 'Period of Performance (Custom)', type: 'text', custom: true },
+            { id: 'incumbent_name', name: 'Incumbent (Custom)', type: 'text', custom: true },
+            { id: 'bd_investment', name: 'BD Investment (Custom)', type: 'currency', custom: true }
+        ];
+
+        const DEFAULT_MAPPINGS = [
+            { source: 'title', target: 'dealname' },
+            { source: 'value', target: 'amount' },
+            { source: 'stage', target: 'dealstage' },
+            { source: 'due_date', target: 'closedate' },
+            { source: 'pwin', target: 'hs_probability' },
+            { source: 'capture_manager', target: 'hubspot_owner_id' },
+            { source: 'notes', target: 'description' },
+            { source: 'solicitation_number', target: 'solicitation_number' },
+            { source: 'agency', target: 'agency_customer' },
+            { source: 'naics', target: 'naics_code' },
+            { source: 'set_aside', target: 'set_aside_type' },
+            { source: 'contract_vehicle', target: 'contract_vehicle' },
+            { source: 'pop', target: 'period_of_performance' },
+            { source: 'incumbent', target: 'incumbent_name' },
+            { source: 'bd_investment', target: 'bd_investment' }
+        ];
+
+        const STAGE_MAPPINGS = {
+            'capture': 'appointmentscheduled',
+            'qualify': 'qualifiedtobuy',
+            'pursuit': 'presentationscheduled',
+            'proposal': 'decisionmakerboughtin',
+            'submitted': 'contractsent',
+            'evaluation': 'contractsent',
+            'awarded': 'closedwon',
+            'lost': 'closedlost'
+        };
+
+        // =========================================================================
+        // COMPONENTS
+        // =========================================================================
+
+        function MappingRow({ mapping, missionPulseFields, hubspotFields, onUpdate, onRemove }) {
+            const sourceField = missionPulseFields.find(f => f.id === mapping.source);
+            const targetField = hubspotFields.find(f => f.id === mapping.target);
+
+            return (
+                <div className="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                    {/* Source Field */}
+                    <div className="flex-1">
+                        <select
+                            value={mapping.source}
+                            onChange={(e) => onUpdate({ ...mapping, source: e.target.value })}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                        >
+                            <option value="">Select MissionPulse field...</option>
+                            {missionPulseFields.map(f => (
+                                <option key={f.id} value={f.id}>{f.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Arrow */}
+                    <div className="text-cyan-400 text-xl">→</div>
+
+                    {/* Target Field */}
+                    <div className="flex-1">
+                        <select
+                            value={mapping.target}
+                            onChange={(e) => onUpdate({ ...mapping, target: e.target.value })}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                        >
+                            <option value="">Select HubSpot field...</option>
+                            {hubspotFields.map(f => (
+                                <option key={f.id} value={f.id}>
+                                    {f.name} {f.custom ? '(Custom)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Type Match Indicator */}
+                    <div className="w-8">
+                        {sourceField && targetField && sourceField.type === targetField.type ? (
+                            <span className="text-emerald-400" title="Types match">✓</span>
+                        ) : sourceField && targetField ? (
+                            <span className="text-amber-400" title="Type mismatch - may need conversion">⚠</span>
+                        ) : null}
+                    </div>
+
+                    {/* Remove */}
+                    <button
+                        onClick={onRemove}
+                        className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                    >
+                        🗑️
+                    </button>
+                </div>
+            );
+        }
+
+        function StageMapping({ stageMappings, onUpdate }) {
+            const missionPulseStages = ['capture', 'qualify', 'pursuit', 'proposal', 'submitted', 'evaluation', 'awarded', 'lost'];
+            const hubspotStages = [
+                { id: 'appointmentscheduled', name: 'Appointment Scheduled' },
+                { id: 'qualifiedtobuy', name: 'Qualified to Buy' },
+                { id: 'presentationscheduled', name: 'Presentation Scheduled' },
+                { id: 'decisionmakerboughtin', name: 'Decision Maker Bought-In' },
+                { id: 'contractsent', name: 'Contract Sent' },
+                { id: 'closedwon', name: 'Closed Won' },
+                { id: 'closedlost', name: 'Closed Lost' }
+            ];
+
+            return (
+                <div className="glass rounded-xl p-6">
+                    <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                        <span>📊</span> Stage Mapping
+                    </h3>
+                    <p className="text-sm text-slate-400 mb-4">
+                        Map MissionPulse proposal stages to HubSpot deal stages.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {missionPulseStages.map(stage => (
+                            <div key={stage} className="flex items-center gap-2">
+                                <div className="flex-1 px-3 py-2 bg-slate-800 rounded-lg text-sm text-slate-300 capitalize">
+                                    {stage}
+                                </div>
+                                <span className="text-cyan-400">→</span>
+                                <select
+                                    value={stageMappings[stage] || ''}
+                                    onChange={(e) => onUpdate({ ...stageMappings, [stage]: e.target.value })}
+                                    className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                                >
+                                    <option value="">Not mapped</option>
+                                    {hubspotStages.map(hs => (
+                                        <option key={hs.id} value={hs.id}>{hs.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function SyncSettings({ settings, onUpdate }) {
+            return (
+                <div className="glass rounded-xl p-6">
+                    <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                        <span>⚙️</span> Sync Settings
+                    </h3>
+
+                    <div className="space-y-4">
+                        <label className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg cursor-pointer">
+                            <div>
+                                <div className="font-medium text-white">Auto-sync to HubSpot</div>
+                                <div className="text-sm text-slate-400">Automatically push changes to HubSpot</div>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={settings.autoSync}
+                                onChange={(e) => onUpdate({ ...settings, autoSync: e.target.checked })}
+                                className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
+                            />
+                        </label>
+
+                        <label className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg cursor-pointer">
+                            <div>
+                                <div className="font-medium text-white">Pull from HubSpot</div>
+                                <div className="text-sm text-slate-400">Import new deals from HubSpot</div>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={settings.pullFromHubspot}
+                                onChange={(e) => onUpdate({ ...settings, pullFromHubspot: e.target.checked })}
+                                className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
+                            />
+                        </label>
+
+                        <label className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg cursor-pointer">
+                            <div>
+                                <div className="font-medium text-white">Create custom properties</div>
+                                <div className="text-sm text-slate-400">Auto-create missing HubSpot custom properties</div>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={settings.createCustomProps}
+                                onChange={(e) => onUpdate({ ...settings, createCustomProps: e.target.checked })}
+                                className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
+                            />
+                        </label>
+
+                        <div className="p-3 bg-slate-800/50 rounded-lg">
+                            <div className="font-medium text-white mb-2">Sync frequency</div>
+                            <select
+                                value={settings.syncFrequency}
+                                onChange={(e) => onUpdate({ ...settings, syncFrequency: e.target.value })}
+                                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+                            >
+                                <option value="realtime">Real-time</option>
+                                <option value="hourly">Hourly</option>
+                                <option value="daily">Daily</option>
+                                <option value="manual">Manual only</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // =========================================================================
+        // MAIN APP
+        // =========================================================================
+        function App() {
+            const [mappings, setMappings] = useState(DEFAULT_MAPPINGS);
+            const [stageMappings, setStageMappings] = useState(STAGE_MAPPINGS);
+            const [settings, setSettings] = useState({
+                autoSync: true,
+                pullFromHubspot: false,
+                createCustomProps: true,
+                syncFrequency: 'realtime'
+            });
+            const [isSaving, setIsSaving] = useState(false);
+            const [lastSaved, setLastSaved] = useState(null);
+
+            const handleAddMapping = () => {
+                setMappings(prev => [...prev, { source: '', target: '' }]);
+            };
+
+            const handleUpdateMapping = (index, updated) => {
+                setMappings(prev => prev.map((m, i) => i === index ? updated : m));
+            };
+
+            const handleRemoveMapping = (index) => {
+                setMappings(prev => prev.filter((_, i) => i !== index));
+            };
+
+            const handleSave = () => {
+                setIsSaving(true);
+                setTimeout(() => {
+                    setIsSaving(false);
+                    setLastSaved(new Date().toLocaleTimeString());
+                }, 1500);
+            };
+
+            const validMappings = mappings.filter(m => m.source && m.target).length;
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="glass border-b border-slate-700 px-6 py-4 sticky top-0 z-20">
+                        <div className="max-w-5xl mx-auto flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="missionpulse-integration-hub.html" className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                                        <span className="text-xl">🔶</span>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold text-white">HubSpot Field Mapping</h1>
+                                        <p className="text-xs text-slate-500">Configure CRM sync</p>
+                                    </div>
+                                </a>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {lastSaved && (
+                                    <span className="text-sm text-slate-400">Last saved: {lastSaved}</span>
+                                )}
+                                <button
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                        isSaving 
+                                            ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-900'
+                                    }`}
+                                >
+                                    {isSaving ? '⏳ Saving...' : '💾 Save Configuration'}
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-5xl mx-auto px-6 py-8">
+                        {/* Stats */}
+                        <div className="grid grid-cols-3 gap-4 mb-8">
+                            <div className="glass p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-cyan-400">{validMappings}</div>
+                                <div className="text-sm text-slate-400">Field Mappings</div>
+                            </div>
+                            <div className="glass p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-emerald-400">{Object.keys(stageMappings).filter(k => stageMappings[k]).length}</div>
+                                <div className="text-sm text-slate-400">Stage Mappings</div>
+                            </div>
+                            <div className="glass p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-amber-400">{settings.autoSync ? '●' : '○'}</div>
+                                <div className="text-sm text-slate-400">Auto-Sync {settings.autoSync ? 'On' : 'Off'}</div>
+                            </div>
+                        </div>
+
+                        {/* Field Mappings */}
+                        <div className="glass rounded-xl p-6 mb-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold text-white flex items-center gap-2">
+                                    <span>🔗</span> Field Mappings
+                                </h3>
+                                <button
+                                    onClick={handleAddMapping}
+                                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors"
+                                >
+                                    + Add Mapping
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-4 mb-4 px-3 text-sm text-slate-500">
+                                <div className="flex-1">MissionPulse Field</div>
+                                <div className="w-8"></div>
+                                <div className="flex-1">HubSpot Field</div>
+                                <div className="w-8"></div>
+                                <div className="w-8"></div>
+                            </div>
+
+                            <div className="space-y-2">
+                                {mappings.map((mapping, idx) => (
+                                    <MappingRow
+                                        key={idx}
+                                        mapping={mapping}
+                                        missionPulseFields={MISSIONPULSE_FIELDS}
+                                        hubspotFields={HUBSPOT_FIELDS}
+                                        onUpdate={(updated) => handleUpdateMapping(idx, updated)}
+                                        onRemove={() => handleRemoveMapping(idx)}
+                                    />
+                                ))}
+                            </div>
+
+                            {mappings.length === 0 && (
+                                <div className="text-center py-8 text-slate-400">
+                                    No field mappings configured. Click "Add Mapping" to start.
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Stage Mapping & Sync Settings Grid */}
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <StageMapping 
+                                stageMappings={stageMappings}
+                                onUpdate={setStageMappings}
+                            />
+                            <SyncSettings 
+                                settings={settings}
+                                onUpdate={setSettings}
+                            />
+                        </div>
+
+                        {/* Test Connection */}
+                        <div className="glass rounded-xl p-6 mt-6">
+                            <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                                <span>🧪</span> Test Configuration
+                            </h3>
+                            <p className="text-sm text-slate-400 mb-4">
+                                Test your field mappings by syncing a sample opportunity.
+                            </p>
+                            <div className="flex gap-3">
+                                <button className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+                                    🔄 Test Sync (Dry Run)
+                                </button>
+                                <button className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition-colors">
+                                    ✓ Validate Mappings
+                                </button>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-800 mt-8">
+                        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <span className="text-slate-500 text-sm">© 2026 Mission Meets Tech</span>
+                            <span className="text-slate-600 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

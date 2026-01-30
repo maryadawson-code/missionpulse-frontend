@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse - Partner Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .cui-banner { background: repeating-linear-gradient(45deg, #78350f, #78350f 10px, #92400e 10px, #92400e 20px); }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // =========================================================================
+        // CONFIGURATION
+        // =========================================================================
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNTAsImV4cCI6MjA1MzE0MzI1MH0.gVLpPz-EdNICBxkSh6l4_dlUHgfmwHcGLgv-OL1gkIA';
+
+        // =========================================================================
+        // DEMO DATA
+        // =========================================================================
+        const DEMO_PARTNERS = [
+            {
+                id: 'p1',
+                company_name: 'TechForce Solutions',
+                contact_name: 'David Kim',
+                contact_email: 'dkim@techforce.com',
+                type: 'subcontractor',
+                status: 'active',
+                nda_signed: true,
+                ta_signed: true,
+                cui_cleared: true,
+                opportunities: ['DHA EHR Modernization', 'VA Claims Processing'],
+                access_expires: '2026-03-15',
+                created_at: '2025-11-01'
+            },
+            {
+                id: 'p2',
+                company_name: 'CloudGov Partners',
+                contact_name: 'Sarah Martinez',
+                contact_email: 'smartinez@cloudgov.com',
+                type: 'teaming',
+                status: 'active',
+                nda_signed: true,
+                ta_signed: true,
+                cui_cleared: false,
+                opportunities: ['CMS Data Lake'],
+                access_expires: '2026-02-28',
+                created_at: '2025-12-15'
+            },
+            {
+                id: 'p3',
+                company_name: 'SecureNet Federal',
+                contact_name: 'Mike Chen',
+                contact_email: 'mchen@securenetfed.com',
+                type: 'mentor',
+                status: 'pending',
+                nda_signed: true,
+                ta_signed: false,
+                cui_cleared: false,
+                opportunities: ['IHS Telehealth'],
+                access_expires: null,
+                created_at: '2026-01-10'
+            },
+            {
+                id: 'p4',
+                company_name: 'DataBridge LLC',
+                contact_name: 'Jennifer Lee',
+                contact_email: 'jlee@databridge.io',
+                type: 'subcontractor',
+                status: 'revoked',
+                nda_signed: true,
+                ta_signed: true,
+                cui_cleared: true,
+                opportunities: ['VA Claims Processing'],
+                access_expires: '2026-01-15',
+                revoked_reason: 'Proposal submitted - auto-revoked',
+                created_at: '2025-09-20'
+            }
+        ];
+
+        const DEMO_OPPORTUNITIES = [
+            { id: 'o1', name: 'DHA EHR Modernization', status: 'active' },
+            { id: 'o2', name: 'VA Claims Processing', status: 'submitted' },
+            { id: 'o3', name: 'CMS Data Lake', status: 'active' },
+            { id: 'o4', name: 'IHS Telehealth', status: 'capture' }
+        ];
+
+        const PARTNER_TYPES = [
+            { id: 'subcontractor', name: 'Subcontractor', icon: '🔧' },
+            { id: 'teaming', name: 'Teaming Partner', icon: '🤝' },
+            { id: 'mentor', name: 'Mentor-Protégé', icon: '🎓' },
+            { id: 'jv', name: 'Joint Venture', icon: '⚖️' },
+            { id: 'consultant', name: 'Consultant', icon: '💼' }
+        ];
+
+        // =========================================================================
+        // COMPONENTS
+        // =========================================================================
+
+        // Partner Card
+        function PartnerCard({ partner, onEdit, onRevoke, onRestore }) {
+            const type = PARTNER_TYPES.find(t => t.id === partner.type) || PARTNER_TYPES[0];
+            const isExpiringSoon = partner.access_expires && 
+                new Date(partner.access_expires) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+            return (
+                <div className={`glass rounded-xl overflow-hidden ${partner.status === 'revoked' ? 'opacity-60' : ''}`}>
+                    {/* CUI Warning for cleared partners */}
+                    {partner.cui_cleared && partner.status === 'active' && (
+                        <div className="cui-banner px-4 py-1 text-center">
+                            <span className="text-xs font-bold text-amber-100">CUI // SP-PROPIN ACCESS GRANTED</span>
+                        </div>
+                    )}
+
+                    <div className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-slate-700 flex items-center justify-center text-2xl">
+                                    {type.icon}
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-white">{partner.company_name}</h3>
+                                    <p className="text-sm text-slate-400">{partner.contact_name}</p>
+                                </div>
+                            </div>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                partner.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
+                                partner.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                                'bg-red-500/20 text-red-400'
+                            }`}>
+                                {partner.status === 'active' ? '● Active' :
+                                 partner.status === 'pending' ? '◐ Pending' : '○ Revoked'}
+                            </span>
+                        </div>
+
+                        {/* Contact & Type */}
+                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                            <div>
+                                <span className="text-slate-500">Email</span>
+                                <div className="text-slate-300">{partner.contact_email}</div>
+                            </div>
+                            <div>
+                                <span className="text-slate-500">Type</span>
+                                <div className="text-slate-300">{type.name}</div>
+                            </div>
+                        </div>
+
+                        {/* Compliance Status */}
+                        <div className="flex gap-2 mb-4">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                                partner.nda_signed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-500'
+                            }`}>
+                                {partner.nda_signed ? '✓ NDA' : '○ NDA'}
+                            </span>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                                partner.ta_signed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-500'
+                            }`}>
+                                {partner.ta_signed ? '✓ TA' : '○ TA'}
+                            </span>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                                partner.cui_cleared ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-500'
+                            }`}>
+                                {partner.cui_cleared ? '🔐 CUI' : '○ CUI'}
+                            </span>
+                        </div>
+
+                        {/* Opportunities */}
+                        <div className="mb-4">
+                            <span className="text-xs text-slate-500 block mb-2">Assigned Opportunities</span>
+                            <div className="flex flex-wrap gap-1">
+                                {partner.opportunities.map((opp, idx) => (
+                                    <span key={idx} className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">
+                                        {opp}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Access Expiry Warning */}
+                        {isExpiringSoon && partner.status === 'active' && (
+                            <div className="mb-4 p-2 bg-amber-500/20 border border-amber-500/30 rounded-lg">
+                                <span className="text-xs text-amber-400">
+                                    ⚠️ Access expires {new Date(partner.access_expires).toLocaleDateString()}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Revoked Reason */}
+                        {partner.status === 'revoked' && partner.revoked_reason && (
+                            <div className="mb-4 p-2 bg-red-500/20 border border-red-500/30 rounded-lg">
+                                <span className="text-xs text-red-400">
+                                    🚫 {partner.revoked_reason}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-2 pt-3 border-t border-slate-700">
+                            <button
+                                onClick={() => onEdit(partner)}
+                                className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors"
+                            >
+                                ✏️ Edit
+                            </button>
+                            {partner.status === 'active' ? (
+                                <button
+                                    onClick={() => onRevoke(partner)}
+                                    className="flex-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm rounded-lg transition-colors"
+                                >
+                                    🚫 Revoke
+                                </button>
+                            ) : partner.status === 'revoked' ? (
+                                <button
+                                    onClick={() => onRestore(partner)}
+                                    className="flex-1 px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm rounded-lg transition-colors"
+                                >
+                                    ✓ Restore
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => onEdit(partner)}
+                                    className="flex-1 px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-sm rounded-lg transition-colors"
+                                >
+                                    ✓ Approve
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Add Partner Modal
+        function AddPartnerModal({ isOpen, onClose, onAdd, opportunities }) {
+            const [formData, setFormData] = useState({
+                company_name: '',
+                contact_name: '',
+                contact_email: '',
+                type: 'subcontractor',
+                opportunities: [],
+                nda_signed: false,
+                ta_signed: false,
+                cui_cleared: false
+            });
+
+            const handleSubmit = () => {
+                if (!formData.company_name || !formData.contact_email) return;
+                onAdd({
+                    ...formData,
+                    id: `p${Date.now()}`,
+                    status: 'pending',
+                    access_expires: null,
+                    created_at: new Date().toISOString()
+                });
+                setFormData({
+                    company_name: '',
+                    contact_name: '',
+                    contact_email: '',
+                    type: 'subcontractor',
+                    opportunities: [],
+                    nda_signed: false,
+                    ta_signed: false,
+                    cui_cleared: false
+                });
+                onClose();
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="glass rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-xl font-bold text-white">Add Partner</h2>
+                            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">×</button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-sm text-slate-400 block mb-2">Company Name *</label>
+                                <input
+                                    type="text"
+                                    value={formData.company_name}
+                                    onChange={(e) => setFormData({...formData, company_name: e.target.value})}
+                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:outline-none"
+                                    placeholder="Partner Company LLC"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-sm text-slate-400 block mb-2">Contact Name</label>
+                                    <input
+                                        type="text"
+                                        value={formData.contact_name}
+                                        onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:outline-none"
+                                        placeholder="John Smith"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-sm text-slate-400 block mb-2">Contact Email *</label>
+                                    <input
+                                        type="email"
+                                        value={formData.contact_email}
+                                        onChange={(e) => setFormData({...formData, contact_email: e.target.value})}
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:outline-none"
+                                        placeholder="john@partner.com"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-sm text-slate-400 block mb-2">Partner Type</label>
+                                <select
+                                    value={formData.type}
+                                    onChange={(e) => setFormData({...formData, type: e.target.value})}
+                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:outline-none"
+                                >
+                                    {PARTNER_TYPES.map(t => (
+                                        <option key={t.id} value={t.id}>{t.icon} {t.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-sm text-slate-400 block mb-2">Assign to Opportunities</label>
+                                <div className="space-y-2">
+                                    {opportunities.map(opp => (
+                                        <label key={opp.id} className="flex items-center gap-2 p-2 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.opportunities.includes(opp.name)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setFormData({...formData, opportunities: [...formData.opportunities, opp.name]});
+                                                    } else {
+                                                        setFormData({...formData, opportunities: formData.opportunities.filter(o => o !== opp.name)});
+                                                    }
+                                                }}
+                                                className="rounded border-slate-600 bg-slate-700 text-cyan-500"
+                                            />
+                                            <span className="text-white">{opp.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-sm text-slate-400 block mb-2">Compliance Status</label>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.nda_signed}
+                                            onChange={(e) => setFormData({...formData, nda_signed: e.target.checked})}
+                                            className="rounded border-slate-600 bg-slate-700 text-emerald-500"
+                                        />
+                                        <span className="text-slate-300">NDA Signed</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.ta_signed}
+                                            onChange={(e) => setFormData({...formData, ta_signed: e.target.checked})}
+                                            className="rounded border-slate-600 bg-slate-700 text-emerald-500"
+                                        />
+                                        <span className="text-slate-300">TA Signed</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.cui_cleared}
+                                            onChange={(e) => setFormData({...formData, cui_cleared: e.target.checked})}
+                                            className="rounded border-slate-600 bg-slate-700 text-amber-500"
+                                        />
+                                        <span className="text-slate-300">CUI Cleared</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    onClick={onClose}
+                                    className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={!formData.company_name || !formData.contact_email}
+                                    className="flex-1 px-4 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg font-medium transition-colors disabled:opacity-50"
+                                >
+                                    Add Partner
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // =========================================================================
+        // MAIN APP
+        // =========================================================================
+        function App() {
+            const [partners, setPartners] = useState(DEMO_PARTNERS);
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [filterType, setFilterType] = useState('all');
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [isOnline, setIsOnline] = useState(true);
+
+            // Filter partners
+            const filteredPartners = partners.filter(p => {
+                const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
+                const matchesType = filterType === 'all' || p.type === filterType;
+                return matchesStatus && matchesType;
+            });
+
+            // Add partner
+            const handleAdd = (partner) => {
+                setPartners(prev => [...prev, partner]);
+            };
+
+            // Revoke access
+            const handleRevoke = (partner) => {
+                if (confirm(`Revoke access for ${partner.company_name}?\n\nThis will immediately remove their access to all assigned opportunities.`)) {
+                    setPartners(prev => prev.map(p => 
+                        p.id === partner.id 
+                            ? {...p, status: 'revoked', revoked_reason: 'Manually revoked by admin'} 
+                            : p
+                    ));
+                }
+            };
+
+            // Restore access
+            const handleRestore = (partner) => {
+                setPartners(prev => prev.map(p => 
+                    p.id === partner.id 
+                        ? {...p, status: 'active', revoked_reason: null} 
+                        : p
+                ));
+            };
+
+            // Stats
+            const activeCount = partners.filter(p => p.status === 'active').length;
+            const pendingCount = partners.filter(p => p.status === 'pending').length;
+            const cuiCount = partners.filter(p => p.cui_cleared && p.status === 'active').length;
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="glass border-b border-slate-700 px-6 py-4 sticky top-0 z-20">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="missionpulse-dashboard-hub.html" className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                                        <span className="text-xl">🤝</span>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold text-white">Partner Management</h1>
+                                        <p className="text-xs text-slate-500">Teaming & access control</p>
+                                    </div>
+                                </a>
+                            </div>
+                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${
+                                isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                            }`}>
+                                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                {isOnline ? 'Online' : 'Demo Mode'}
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-7xl mx-auto px-6 py-8">
+                        {/* Stats */}
+                        <div className="grid grid-cols-4 gap-4 mb-8">
+                            <div className="glass p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-cyan-400">{partners.length}</div>
+                                <div className="text-sm text-slate-400">Total Partners</div>
+                            </div>
+                            <div className="glass p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-emerald-400">{activeCount}</div>
+                                <div className="text-sm text-slate-400">Active</div>
+                            </div>
+                            <div className="glass p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-amber-400">{pendingCount}</div>
+                                <div className="text-sm text-slate-400">Pending</div>
+                            </div>
+                            <div className="glass p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-red-400">{cuiCount}</div>
+                                <div className="text-sm text-slate-400">CUI Cleared</div>
+                            </div>
+                        </div>
+
+                        {/* Auto-Revoke Notice */}
+                        <div className="glass rounded-xl p-4 mb-6 border-l-4 border-amber-500">
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl">⚠️</span>
+                                <div>
+                                    <h3 className="font-medium text-white">Auto-Revoke Enabled</h3>
+                                    <p className="text-sm text-slate-400">
+                                        Partner access is automatically revoked when a proposal is submitted. 
+                                        This protects proprietary pricing and strategy data.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Filters & Actions */}
+                        <div className="glass rounded-xl p-4 mb-6">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <select
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none"
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="revoked">Revoked</option>
+                                </select>
+
+                                <select
+                                    value={filterType}
+                                    onChange={(e) => setFilterType(e.target.value)}
+                                    className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none"
+                                >
+                                    <option value="all">All Types</option>
+                                    {PARTNER_TYPES.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                </select>
+
+                                <div className="flex-1" />
+
+                                <button
+                                    onClick={() => setShowAddModal(true)}
+                                    className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg font-medium transition-colors flex items-center gap-2"
+                                >
+                                    ➕ Add Partner
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Partner Grid */}
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredPartners.map(partner => (
+                                <PartnerCard
+                                    key={partner.id}
+                                    partner={partner}
+                                    onEdit={() => {}}
+                                    onRevoke={handleRevoke}
+                                    onRestore={handleRestore}
+                                />
+                            ))}
+                        </div>
+
+                        {filteredPartners.length === 0 && (
+                            <div className="text-center py-12 text-slate-400">
+                                No partners found matching your filters.
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Add Modal */}
+                    <AddPartnerModal
+                        isOpen={showAddModal}
+                        onClose={() => setShowAddModal(false)}
+                        onAdd={handleAdd}
+                        opportunities={DEMO_OPPORTUNITIES}
+                    />
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-800 mt-8">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <span className="text-slate-500 text-sm">© 2026 Mission Meets Tech</span>
+                            <span className="text-slate-600 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
