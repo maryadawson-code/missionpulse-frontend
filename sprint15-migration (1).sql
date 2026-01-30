@@ -1,4 +1,4 @@
--- MissionPulse Sprint 15 Migration (Fixed)
+-- MissionPulse Sprint 15 Migration
 -- Tables: notifications, saved_filters
 -- Run this in Supabase SQL Editor
 
@@ -16,16 +16,15 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at timestamptz DEFAULT now()
 );
 
--- Index for efficient queries (created AFTER table exists)
+-- Index for efficient queries
 CREATE INDEX IF NOT EXISTS idx_notifications_opportunity_id ON notifications(opportunity_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read) WHERE NOT dismissed;
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 
 -- Enable RLS
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy (allow all for now - update for production)
-DROP POLICY IF EXISTS "Allow all notifications operations" ON notifications;
 CREATE POLICY "Allow all notifications operations" ON notifications
   FOR ALL USING (true) WITH CHECK (true);
 
@@ -41,13 +40,12 @@ CREATE TABLE IF NOT EXISTS saved_filters (
 );
 
 -- Index for efficient queries
-CREATE INDEX IF NOT EXISTS idx_saved_filters_is_default ON saved_filters(is_default);
+CREATE INDEX IF NOT EXISTS idx_saved_filters_is_default ON saved_filters(is_default) WHERE is_default = true;
 
 -- Enable RLS
 ALTER TABLE saved_filters ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy (allow all for now - update for production)
-DROP POLICY IF EXISTS "Allow all saved_filters operations" ON saved_filters;
 CREATE POLICY "Allow all saved_filters operations" ON saved_filters
   FOR ALL USING (true) WITH CHECK (true);
 
@@ -75,8 +73,18 @@ CREATE TRIGGER trigger_ensure_single_default_filter
   EXECUTE FUNCTION ensure_single_default_filter();
 
 -- ============================================================
+-- SEED DATA: Built-in Quick Presets
+-- ============================================================
+INSERT INTO saved_filters (name, filters, is_default) VALUES
+  ('Due This Week', '{"dueDateEnd": "7_days_from_now"}', false),
+  ('High Priority', '{"priorities": ["P-0", "P-1"]}', false),
+  ('Active Pipeline', '{"excludePhases": ["submitted", "awarded", "lost"]}', false)
+ON CONFLICT DO NOTHING;
+
+-- ============================================================
 -- VERIFICATION
 -- ============================================================
+-- Check tables were created
 SELECT 'notifications' as table_name, COUNT(*) as row_count FROM notifications
 UNION ALL
 SELECT 'saved_filters' as table_name, COUNT(*) as row_count FROM saved_filters;
