@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v1.1 - Training Data Admin</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--deep-navy); min-height: 100vh; color: #fff; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+    .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+    .glass-nav { background: rgba(0, 5, 15, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(0, 229, 250, 0.1); }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0A1628; }
+    ::-webkit-scrollbar-thumb { background: rgba(0, 229, 250, 0.3); border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, createContext, useContext, useCallback } = React;
+
+    // Shared Config
+    const ROLES = {
+      executive: { id: 'executive', name: 'Executive / Admin', icon: 'crown', canAccessAdmin: true },
+      capture_manager: { id: 'capture_manager', name: 'Capture Manager', icon: 'target', canAccessAdmin: false },
+      proposal_manager: { id: 'proposal_manager', name: 'Proposal Manager', icon: 'clipboard', canAccessAdmin: false },
+    };
+
+    const NAV_ITEMS = [
+      { id: 'dashboard', name: 'Dashboard', icon: 'dashboard', href: 'index.html', roles: ['all'] },
+      { id: 'agents', name: 'AI Agents', icon: 'cpu', href: 'agent-hub.html', roles: ['all'] },
+      { id: 'pipeline', name: 'Pipeline', icon: 'kanban', href: '#pipeline', roles: ['internal'] },
+      { id: 'training', name: 'Training Data', icon: 'database', href: 'training-admin.html', roles: ['admin', 'capture_manager', 'proposal_manager'] },
+      { id: 'playbook', name: 'Playbook', icon: 'book', href: 'playbook-manager.html', roles: ['admin', 'capture_manager', 'proposal_manager'] },
+      { id: 'analytics', name: 'Analytics', icon: 'chart', href: 'analytics.html', roles: ['admin', 'capture_manager'] },
+    ];
+
+    const TRAINING_CATEGORIES = [
+      { id: 'company_profile', name: 'Company Profile', icon: 'building', color: '#00E5FA', description: 'Core company information, certifications, capabilities' },
+      { id: 'win_themes', name: 'Win Themes', icon: 'star', color: '#8B5CF6', description: 'Discriminators, value propositions, competitive advantages' },
+      { id: 'competitors', name: 'Competitor Intel', icon: 'eye', color: '#EF4444', description: 'Competitor strengths, weaknesses, pricing intel', restricted: true },
+      { id: 'labor_rates', name: 'Labor Categories', icon: 'calculator', color: '#F59E0B', description: 'Labor rates, categories, wrap rates', restricted: true },
+      { id: 'past_performance', name: 'Past Performance', icon: 'clipboard', color: '#10B981', description: 'Contract history, CPARS, references' },
+      { id: 'teaming', name: 'Teaming Partners', icon: 'users', color: '#6366F1', description: 'Partner capabilities, MOUs, agreements' },
+    ];
+
+    const Icons = {
+      dashboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>,
+      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
+      kanban: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>,
+      book: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
+      chart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      menu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      bell: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      building: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+      star: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      calculator: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+      upload: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+      crown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l3.5 7L12 6l3.5 4L19 3m-14 8v8h14v-8M5 15h14" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+    };
+
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-flex items-center justify-center ${className}`}><IconComponent /></span> : null;
+    };
+
+    // Auth Context
+    const AuthContext = createContext(null);
+    const useAuth = () => useContext(AuthContext);
+
+    const AuthProvider = ({ children }) => {
+      const [currentRole, setCurrentRole] = useState('executive');
+      const [user] = useState({ name: 'Mary Womack', email: 'mary@missionpulse.io' });
+      const hasAccess = useCallback((allowedRoles) => {
+        if (allowedRoles.includes('all')) return true;
+        if (allowedRoles.includes('admin') && ROLES[currentRole]?.canAccessAdmin) return true;
+        if (allowedRoles.includes('internal')) return true;
+        return allowedRoles.includes(currentRole);
+      }, [currentRole]);
+      return (
+        <AuthContext.Provider value={{ currentRole, setCurrentRole, user, hasAccess, roleInfo: ROLES[currentRole] }}>
+          {children}
+        </AuthContext.Provider>
+      );
+    };
+
+    // UI Components
+    const Badge = ({ children, variant = 'default', size = 'sm', icon }) => {
+      const variants = {
+        default: 'bg-slate-700/50 text-slate-300 border-slate-600/50',
+        primary: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border-red-500/30',
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full font-medium border ${variants[variant]} ${sizes[size]}`}>
+          {icon && <Icon name={icon} className="w-3 h-3" />}
+          {children}
+        </span>
+      );
+    };
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, disabled, loading, className = '', ...props }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400 shadow-lg shadow-cyan-500/25',
+        secondary: 'bg-slate-700/50 text-white hover:bg-slate-600/50 border border-slate-600/50',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50',
+        danger: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30',
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button className={`inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`} disabled={disabled || loading} {...props}>
+          {icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    const Card = ({ children, className = '', glow = false, onClick }) => (
+      <div onClick={onClick} className={`bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl transition-all duration-300 ${onClick ? 'cursor-pointer hover:border-cyan-500/50' : ''} ${glow ? 'shadow-lg shadow-cyan-500/20 border-cyan-500/30' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    // Navigation Header
+    const NavigationHeader = ({ currentPage = 'training' }) => {
+      const { currentRole, setCurrentRole, user, hasAccess, roleInfo } = useAuth();
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+      const [profileOpen, setProfileOpen] = useState(false);
+      const accessibleNavItems = NAV_ITEMS.filter(item => hasAccess(item.roles));
+
+      return (
+        <>
+          <nav className="glass-nav fixed top-0 left-0 right-0 z-50 px-4 lg:px-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center justify-between h-16">
+                <a href="index.html" className="flex items-center gap-3 group">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                      <Icon name="shield" className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900"></div>
+                  </div>
+                  <div className="hidden sm:block">
+                    <div className="text-lg font-bold text-white">MissionPulse</div>
+                    <div className="text-xs text-cyan-400 -mt-0.5">v1.1 Production</div>
+                  </div>
+                </a>
+
+                <div className="hidden lg:flex items-center gap-1">
+                  {accessibleNavItems.map(item => (
+                    <a key={item.id} href={item.href} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${currentPage === item.id ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}>
+                      <Icon name={item.icon} className="w-4 h-4" />
+                      {item.name}
+                    </a>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/50">
+                    <Icon name="search" className="w-5 h-5" />
+                  </button>
+                  <button className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/50">
+                    <Icon name="bell" className="w-5 h-5" />
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-cyan-500 rounded-full"></span>
+                  </button>
+                  <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-700/50 border border-slate-600/50">
+                    <Icon name="dollar" className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-mono text-slate-300">$0.0234</span>
+                  </div>
+                  <div className="relative">
+                    <button onClick={() => setProfileOpen(!profileOpen)} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-700/50">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold">
+                        {user.name.charAt(0)}
+                      </div>
+                    </button>
+                    {profileOpen && (
+                      <div className="absolute right-0 top-full mt-2 w-72 py-3 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl animate-fade-in z-50">
+                        <div className="px-4 pb-3 border-b border-slate-700">
+                          <div className="font-semibold text-white">{user.name}</div>
+                          <div className="text-sm text-slate-400">{user.email}</div>
+                        </div>
+                        <div className="px-4 py-3">
+                          <div className="text-xs text-slate-500 uppercase mb-2">Switch Role</div>
+                          <select value={currentRole} onChange={(e) => setCurrentRole(e.target.value)} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white">
+                            {Object.entries(ROLES).map(([id, role]) => (
+                              <option key={id} value={id}>{role.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/50">
+                    <Icon name={mobileMenuOpen ? 'x' : 'menu'} className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </nav>
+
+          {mobileMenuOpen && (
+            <div className="lg:hidden fixed inset-0 z-40 pt-16">
+              <div className="absolute inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
+              <div className="relative bg-slate-900 border-t border-slate-800 p-4 space-y-1 animate-fade-in">
+                {accessibleNavItems.map(item => (
+                  <a key={item.id} href={item.href} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${currentPage === item.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}>
+                    <Icon name={item.icon} className="w-5 h-5" />
+                    {item.name}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {profileOpen && <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />}
+        </>
+      );
+    };
+
+    // Liability Footer
+    const LiabilityFooter = () => (
+      <div className="fixed bottom-0 left-0 right-0 py-2 px-4 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 z-30">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs">
+          <span className="text-amber-400 font-medium">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+          <span className="text-cyan-500 hidden sm:block">Mission. Technology. Transformation.</span>
+        </div>
+      </div>
+    );
+
+    // Training Data Admin Content
+    const TrainingAdminContent = () => {
+      const [activeCategory, setActiveCategory] = useState('company_profile');
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [entries, setEntries] = useState({
+        company_profile: [
+          { id: 1, key: 'Company Name', value: 'Mission Meets Tech (MMT)', lastUpdated: '2026-01-15' },
+          { id: 2, key: 'CAGE Code', value: '9ABC1', lastUpdated: '2026-01-15' },
+          { id: 3, key: 'DUNS Number', value: '123456789', lastUpdated: '2026-01-15' },
+          { id: 4, key: 'Primary NAICS', value: '541512 - Computer Systems Design', lastUpdated: '2026-01-15' },
+          { id: 5, key: 'Set-Aside Status', value: 'SDVOSB, WOSB', lastUpdated: '2026-01-15' },
+        ],
+        win_themes: [
+          { id: 1, key: 'Theme 1', value: 'Proven DHA Partnership - 10+ years supporting healthcare IT modernization', lastUpdated: '2026-01-14' },
+          { id: 2, key: 'Theme 2', value: 'Risk Mitigation - CMMI Level 3 processes with 99.9% uptime', lastUpdated: '2026-01-14' },
+        ],
+        competitors: [
+          { id: 1, key: 'Primary Competitor', value: 'TechHealth Partners - Strength: Incumbent. Weakness: Recent turnover', lastUpdated: '2026-01-10' },
+        ],
+        labor_rates: [
+          { id: 1, key: 'Program Manager', value: '$185/hr (GSA rate: $178/hr)', lastUpdated: '2026-01-12' },
+          { id: 2, key: 'Senior Developer', value: '$165/hr (GSA rate: $160/hr)', lastUpdated: '2026-01-12' },
+        ],
+        past_performance: [
+          { id: 1, key: 'DHA DHITS', value: 'Contract #FA8773-21-C-0045 | $24M | CPARS: Exceptional', lastUpdated: '2026-01-08' },
+        ],
+        teaming: [
+          { id: 1, key: 'HealthTech Solutions', value: 'MOU signed | HIPAA expertise | 8(a) partner', lastUpdated: '2026-01-05' },
+        ],
+      });
+
+      const currentCategory = TRAINING_CATEGORIES.find(c => c.id === activeCategory);
+      const currentEntries = entries[activeCategory] || [];
+
+      const handleAddEntry = (key, value) => {
+        setEntries(prev => ({
+          ...prev,
+          [activeCategory]: [
+            ...prev[activeCategory],
+            { id: Date.now(), key, value, lastUpdated: new Date().toISOString().split('T')[0] }
+          ]
+        }));
+        setShowAddModal(false);
+      };
+
+      const handleDeleteEntry = (id) => {
+        setEntries(prev => ({
+          ...prev,
+          [activeCategory]: prev[activeCategory].filter(e => e.id !== id)
+        }));
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-white mb-1">Training Data Admin</h1>
+              <p className="text-slate-400">Manage company data for AI context injection</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="secondary" icon="upload">Import CSV</Button>
+              <Button variant="primary" icon="plus" onClick={() => setShowAddModal(true)}>Add Entry</Button>
+            </div>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="flex flex-wrap gap-2">
+            {TRAINING_CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeCategory === cat.id ? 'text-white border' : 'text-slate-400 hover:text-white hover:bg-slate-700/50 border border-transparent'}`}
+                style={activeCategory === cat.id ? { backgroundColor: `${cat.color}20`, borderColor: `${cat.color}50`, color: cat.color } : {}}
+              >
+                <Icon name={cat.icon} className="w-4 h-4" />
+                {cat.name}
+                {cat.restricted && <Icon name="lock" className="w-3 h-3 text-amber-400" />}
+              </button>
+            ))}
+          </div>
+
+          {/* Category Info Card */}
+          <Card className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl" style={{ backgroundColor: `${currentCategory?.color}20` }}>
+                <Icon name={currentCategory?.icon} className="w-6 h-6" style={{ color: currentCategory?.color }} />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-white">{currentCategory?.name}</h2>
+                <p className="text-sm text-slate-400">{currentCategory?.description}</p>
+              </div>
+              <Badge variant={currentCategory?.restricted ? 'warning' : 'success'} icon={currentCategory?.restricted ? 'lock' : 'check'}>
+                {currentCategory?.restricted ? 'Restricted' : 'Public'}
+              </Badge>
+            </div>
+          </Card>
+
+          {/* Data Table */}
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-white">{currentEntries.length} Entries</h3>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search entries..."
+                    className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-48"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="divide-y divide-slate-700">
+              {currentEntries.map((entry, index) => (
+                <div key={entry.id} className="p-4 hover:bg-slate-700/30 transition-colors animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-cyan-400 mb-1">{entry.key}</div>
+                      <div className="text-sm text-slate-300 break-words">{entry.value}</div>
+                      <div className="text-xs text-slate-500 mt-2">Last updated: {entry.lastUpdated}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="xs" icon="edit">Edit</Button>
+                      <Button variant="ghost" size="xs" icon="trash" onClick={() => handleDeleteEntry(entry.id)} className="text-red-400 hover:text-red-300">Delete</Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {currentEntries.length === 0 && (
+                <div className="p-8 text-center">
+                  <Icon name={currentCategory?.icon} className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400">No entries yet. Click "Add Entry" to get started.</p>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Add Entry Modal */}
+          {showAddModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+              <div className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl animate-fade-in">
+                <div className="p-4 border-b border-slate-700">
+                  <h3 className="text-lg font-semibold text-white">Add New Entry</h3>
+                  <p className="text-sm text-slate-400">Add data to {currentCategory?.name}</p>
+                </div>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  handleAddEntry(formData.get('key'), formData.get('value'));
+                }} className="p-4 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Key / Label</label>
+                    <input
+                      name="key"
+                      type="text"
+                      required
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                      placeholder="e.g., Company Name, Theme 1, etc."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Value / Content</label>
+                    <textarea
+                      name="value"
+                      required
+                      rows={4}
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none"
+                      placeholder="Enter the data value..."
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <Button variant="ghost" type="button" onClick={() => setShowAddModal(false)}>Cancel</Button>
+                    <Button variant="primary" type="submit" icon="check">Save Entry</Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // Main App
+    const App = () => (
+      <AuthProvider>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
+          <NavigationHeader currentPage="training" />
+          <main className="pt-20 pb-16 px-4 lg:px-6">
+            <div className="max-w-7xl mx-auto">
+              <TrainingAdminContent />
+            </div>
+          </main>
+          <LiabilityFooter />
+        </div>
+      </AuthProvider>
+    );
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

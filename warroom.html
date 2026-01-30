@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>War Room | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; --success: #10B981; --warning: #F59E0B; --danger: #EF4444; }
+        * { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        body { background: linear-gradient(135deg, #00050F 0%, #0a1628 50%, #00050F 100%); min-height: 100vh; }
+        .glass-nav { background: rgba(0, 5, 15, 0.85); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(0, 229, 250, 0.15); }
+        .glass-card { background: rgba(0, 20, 40, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.2); border-radius: 12px; }
+        .glass-panel { background: rgba(0, 15, 30, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.15); border-radius: 12px; }
+        .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+        .pulse-urgent { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } }
+        .countdown-critical { animation: flash 1s infinite; }
+        @keyframes flash { 0%, 50%, 100% { opacity: 1; } 25%, 75% { opacity: 0.5; } }
+        .gate-active { border-left: 4px solid #00E5FA; background: rgba(0, 229, 250, 0.1); }
+        .gate-complete { border-left: 4px solid #10B981; }
+        .gate-pending { border-left: 4px solid #374151; opacity: 0.6; }
+        .priority-p0 { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: rgba(0, 229, 250, 0.05); border-radius: 3px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0, 229, 250, 0.2); border-radius: 3px; }
+        .ghost-bar { background: rgba(239, 68, 68, 0.2); }
+        .task-card { transition: all 0.2s ease; }
+        .task-card:hover { transform: translateX(2px); }
+        .task-card.dragging { opacity: 0.5; }
+        .swimlane-drop { transition: all 0.2s ease; }
+        .swimlane-drop.drag-over { background: rgba(0, 229, 250, 0.1); border: 2px dashed rgba(0, 229, 250, 0.5); }
+    </style>
+</head>
+<body class="text-white">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Active Proposal Data
+        const activeProposal = {
+            id: 'prop-001', title: 'DHA MHS Genesis Phase 4 - Health IT Modernization', solicitation: 'HT0015-24-R-0042',
+            agency: 'DHA', naics: '541512', setAside: 'SDVOSB', value: 45000000, pWin: 78, priority: 'P-0',
+            dueDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000), currentGate: 'Red Team',
+            pm: 'Sarah Chen', captureManager: 'Mike Torres',
+            description: 'Modernization of the Military Health System Genesis platform including cloud migration, interoperability enhancements, and AI-driven clinical decision support.'
+        };
+
+        // Shipley Gates with Progress
+        const shipleyGates = [
+            { id: 'gate1', name: 'Gate 1', shortName: 'G1', status: 'complete', date: '2024-12-01', decision: 'GO', progress: 100 },
+            { id: 'blue', name: 'Blue Team', shortName: 'BT', status: 'complete', date: '2024-12-15', decision: 'GO', progress: 100 },
+            { id: 'kickoff', name: 'Kickoff', shortName: 'KO', status: 'complete', date: '2025-01-02', decision: 'GO', progress: 100 },
+            { id: 'pink', name: 'Pink Team', shortName: 'PT', status: 'complete', date: '2025-01-10', decision: 'COND GO', progress: 100 },
+            { id: 'red', name: 'Red Team', shortName: 'RT', status: 'active', date: '2025-01-25', decision: 'In Progress', progress: 65 },
+            { id: 'gold', name: 'Gold Team', shortName: 'GT', status: 'pending', date: '2025-02-01', decision: '-', progress: 0 },
+            { id: 'white', name: 'White Glove', shortName: 'WG', status: 'pending', date: '2025-02-05', decision: '-', progress: 0 },
+            { id: 'submit', name: 'Submit', shortName: 'FS', status: 'pending', date: '2025-02-06', decision: '-', progress: 0 }
+        ];
+
+        // Win Themes
+        const winThemes = [
+            { id: 'W1', title: 'FedRAMP High Authorization', description: 'Only bidder with existing FedRAMP High ATO for healthcare workloads', score: 95, icon: '🛡️', color: '#10B981' },
+            { id: 'W2', title: 'Zero Downtime Migration', description: 'Proven 99.999% uptime during VA cloud transitions', score: 92, icon: '⚡', color: '#3B82F6' },
+            { id: 'W3', title: 'Local Hiring Commitment', description: '85% workforce within 50mi of DHA facilities', score: 88, icon: '🏠', color: '#8B5CF6' },
+            { id: 'W4', title: 'AI-Powered Analytics', description: 'MissionPulse platform for real-time health data insights', score: 90, icon: '🤖', color: '#EC4899' }
+        ];
+
+        // Ghost Team (Competitors)
+        const ghostTeam = [
+            { id: 'C1', name: 'Leidos', pWin: 75, threat: 'high', strengths: ['Incumbent', 'Scale', 'DHA relationships'], weaknesses: ['Higher pricing', 'Recent delays'] },
+            { id: 'C2', name: 'GDIT', pWin: 45, threat: 'medium', strengths: ['VA experience', 'Cerner partnership'], weaknesses: ['No MHS Genesis exp', 'Smaller health IT team'] },
+            { id: 'C3', name: 'Booz Allen', pWin: 35, threat: 'medium', strengths: ['Analytics expertise', 'DoD clearances'], weaknesses: ['Less healthcare focus', 'Premium rates'] }
+        ];
+
+        // Key Dates
+        const keyDates = [
+            { id: 'rfp', label: 'RFP Release', date: '2024-12-15', status: 'complete', icon: '📄' },
+            { id: 'qa', label: 'Q&A Deadline', date: '2025-01-28', status: 'upcoming', icon: '❓' },
+            { id: 'proposal', label: 'Proposal Due', date: '2025-02-06', status: 'future', icon: '🚀' }
+        ];
+
+        // Team Roster
+        const teamRoster = [
+            { id: 'CEO', name: 'Michael Chen', role: 'CEO', initials: 'MC', status: 'active', color: '#6366F1' },
+            { id: 'COO', name: 'Sarah Williams', role: 'COO', initials: 'SW', status: 'active', color: '#8B5CF6' },
+            { id: 'CAP', name: 'Mary Womack', role: 'Capture Lead', initials: 'MW', status: 'active', color: '#EC4899' },
+            { id: 'PM', name: 'Brandon Miller', role: 'Proposal Mgr', initials: 'BM', status: 'active', color: '#3B82F6' },
+            { id: 'SA', name: 'Alex Johnson', role: 'Solution Arch', initials: 'AJ', status: 'busy', color: '#F59E0B' },
+            { id: 'FIN', name: 'Lisa Park', role: 'Pricing Lead', initials: 'LP', status: 'active', color: '#10B981' },
+            { id: 'CON', name: 'Tom Wilson', role: 'Contracts', initials: 'TW', status: 'away', color: '#EF4444' },
+            { id: 'WRT', name: 'Emma Davis', role: 'Writer', initials: 'ED', status: 'active', color: '#14B8A6' }
+        ];
+
+        // Tasks with Swimlanes
+        const initialTasks = [
+            { id: 'T001', title: 'Section L Response Draft', section: 'Vol I Tech', status: 'in-progress', priority: 'high', owner: 'SA', phase: 'red', progress: 65, assignee: 'Alex Johnson' },
+            { id: 'T002', title: 'Compliance Matrix Update', section: 'All Volumes', status: 'review', priority: 'critical', owner: 'CON', phase: 'red', progress: 90, assignee: 'Tom Wilson' },
+            { id: 'T003', title: 'BOE Pricing Model', section: 'Vol IV', status: 'draft', priority: 'high', owner: 'FIN', phase: 'pink', progress: 45, assignee: 'Lisa Park' },
+            { id: 'T004', title: 'Past Performance Narratives', section: 'Vol III', status: 'complete', priority: 'medium', owner: 'PM', phase: 'red', progress: 100, assignee: 'Brandon Miller' },
+            { id: 'T005', title: 'Technical Approach Diagrams', section: 'Vol I', status: 'in-progress', priority: 'high', owner: 'SA', phase: 'red', progress: 70, assignee: 'Alex Johnson' },
+            { id: 'T006', title: 'Orals Prep Slides', section: 'Orals', status: 'pending', priority: 'medium', owner: 'CAP', phase: 'gold', progress: 0, assignee: 'Mary Womack' }
+        ];
+
+        // AI Agents
+        const aiAgents = [
+            { id: 'capture', name: 'Capture Intel', icon: '🎯', description: 'Win themes & analysis' },
+            { id: 'strategy', name: 'Strategy', icon: '♟️', description: 'Competitive positioning' },
+            { id: 'blackhat', name: 'Black Hat', icon: '🎭', description: 'Competitor analysis' },
+            { id: 'pricing', name: 'Pricing', icon: '💰', description: 'Cost strategy' },
+            { id: 'compliance', name: 'Compliance', icon: '🛡️', description: 'FAR/DFARS' },
+            { id: 'writer', name: 'Writer', icon: '✍️', description: 'Section drafting' },
+            { id: 'orals', name: 'Orals Coach', icon: '🎤', description: 'Presentation prep' }
+        ];
+
+        // Navigation
+        const NavigationHeader = ({ currentPage }) => {
+            const navItems = [
+                { id: 'dashboard', label: 'Dashboard', href: 'index.html', icon: '🏠' },
+                { id: 'pipeline', label: 'Pipeline', href: 'pipeline.html', icon: '📊' },
+                { id: 'warroom', label: 'War Room', href: 'warroom.html', icon: '⚔️' },
+                { id: 'agents', label: 'AI Agents', href: 'agent-hub.html', icon: '🤖' },
+                { id: 'training', label: 'Training Data', href: 'training-admin.html', icon: '📚' },
+                { id: 'playbook', label: 'Playbook', href: 'playbook-manager.html', icon: '📖' },
+                { id: 'analytics', label: 'Analytics', href: 'analytics.html', icon: '📈' }
+            ];
+            return (
+                <nav className="glass-nav sticky top-0 z-50">
+                    <div className="max-w-full mx-auto px-4">
+                        <div className="flex items-center justify-between h-16">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center"><span className="text-xl">🛡️</span></div>
+                                <div><span className="text-xl font-bold glow-text" style={{color: '#00E5FA'}}>MissionPulse</span><span className="text-xs text-gray-400 block">by Mission Meets Tech</span></div>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                                {navItems.map(item => (
+                                    <a key={item.id} href={item.href} className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${currentPage === item.id ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-gray-300 hover:text-white hover:bg-white/5'}`}>
+                                        <span>{item.icon}</span><span className="hidden lg:inline">{item.label}</span>
+                                    </a>
+                                ))}
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <div className="text-right hidden md:block"><div className="text-sm font-medium">Mary Womack</div><div className="text-xs text-cyan-400">Capture Manager</div></div>
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-sm font-bold">MW</div>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            );
+        };
+
+        // Countdown Timer
+        const CountdownTimer = ({ dueDate }) => {
+            const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    const diff = dueDate - new Date();
+                    if (diff > 0) setTimeLeft({ days: Math.floor(diff / (1000 * 60 * 60 * 24)), hours: Math.floor((diff / (1000 * 60 * 60)) % 24), minutes: Math.floor((diff / (1000 * 60)) % 60), seconds: Math.floor((diff / 1000) % 60) });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, [dueDate]);
+            const isCritical = timeLeft.days <= 3, isUrgent = timeLeft.days <= 7;
+            const colorClass = isCritical ? 'text-red-400' : isUrgent ? 'text-yellow-400' : 'text-cyan-400';
+            return (
+                <div className={`glass-card p-6 ${isCritical ? 'pulse-urgent border-red-500/50' : isUrgent ? 'border-yellow-500/30' : ''}`}>
+                    <div className="text-center">
+                        <div className="text-gray-400 text-sm mb-2">⏱️ TIME TO SUBMISSION</div>
+                        <div className={`flex justify-center space-x-4 ${isCritical ? 'countdown-critical' : ''}`}>
+                            {['days', 'hours', 'minutes', 'seconds'].map((unit, i) => (
+                                <React.Fragment key={unit}>
+                                    {i > 0 && <div className="text-4xl text-gray-600">:</div>}
+                                    <div className="text-center">
+                                        <div className={`font-mono text-4xl font-bold ${colorClass}`}>{String(timeLeft[unit]).padStart(2, '0')}</div>
+                                        <div className="text-xs text-gray-500">{unit.toUpperCase().slice(0, 3)}</div>
+                                    </div>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                        <div className="mt-3 text-sm text-gray-400">Due: {dueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Proposal Header
+        const ProposalHeader = ({ proposal }) => {
+            const formatCurrency = (v) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`;
+            return (
+                <div className="glass-card p-6 mb-6">
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                                <span className="px-3 py-1 priority-p0 rounded text-sm font-bold">P-0 MUST WIN</span>
+                                <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded text-sm">{proposal.agency}</span>
+                                <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded text-sm">{proposal.setAside}</span>
+                            </div>
+                            <h1 className="text-2xl font-bold mb-2">{proposal.title}</h1>
+                            <p className="text-gray-400 text-sm mb-3">{proposal.description}</p>
+                            <div className="flex items-center space-x-6 text-sm">
+                                <div><span className="text-gray-500">Solicitation:</span> <span className="font-mono text-cyan-400">{proposal.solicitation}</span></div>
+                                <div><span className="text-gray-500">NAICS:</span> <span className="font-mono">{proposal.naics}</span></div>
+                                <div><span className="text-gray-500">PM:</span> {proposal.pm}</div>
+                                <div><span className="text-gray-500">Capture:</span> {proposal.captureManager}</div>
+                            </div>
+                        </div>
+                        <div className="text-right ml-6">
+                            <div className="text-gray-400 text-xs mb-1">Contract Value</div>
+                            <div className="font-mono text-3xl font-bold text-green-400">{formatCurrency(proposal.value)}</div>
+                            <div className="mt-3">
+                                <div className="text-gray-400 text-xs mb-1">Win Probability</div>
+                                <div className="flex items-center justify-end space-x-2">
+                                    <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-cyan-500 to-green-500 rounded-full" style={{ width: `${proposal.pWin}%` }}></div></div>
+                                    <span className="font-mono text-xl font-bold text-green-400">{proposal.pWin}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Shipley Gate Tracker with Progress
+        const ShipleyGateTracker = ({ gates }) => (
+            <div className="glass-panel p-4 mb-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center"><span className="mr-2">📍</span>Shipley Gate Progress</h3>
+                <div className="flex items-center space-x-1 overflow-x-auto pb-2">
+                    {gates.map((gate, i) => (
+                        <React.Fragment key={gate.id}>
+                            <div className={`flex-shrink-0 p-3 rounded-lg ${gate.status === 'active' ? 'gate-active' : gate.status === 'complete' ? 'gate-complete bg-green-500/10' : 'gate-pending bg-gray-800/50'}`}>
+                                <div className="text-center min-w-[80px]">
+                                    <div className={`text-xs font-bold mb-1 ${gate.status === 'active' ? 'text-cyan-400' : gate.status === 'complete' ? 'text-green-400' : 'text-gray-500'}`}>{gate.shortName}</div>
+                                    <div className="text-xs text-gray-400 mb-1">{gate.name}</div>
+                                    {/* Progress Bar */}
+                                    <div className="w-full h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
+                                        <div className={`h-full rounded-full transition-all ${gate.status === 'complete' ? 'bg-green-500' : gate.status === 'active' ? 'bg-cyan-500' : 'bg-gray-600'}`} style={{ width: `${gate.progress}%` }}></div>
+                                    </div>
+                                    <div className="text-xs text-gray-500 font-mono">{gate.progress}%</div>
+                                    <div className={`text-xs font-semibold mt-1 ${gate.decision === 'GO' ? 'text-green-400' : gate.decision === 'COND GO' ? 'text-yellow-400' : gate.decision === 'In Progress' ? 'text-cyan-400' : 'text-gray-500'}`}>
+                                        {gate.status === 'complete' && '✓ '}{gate.decision}
+                                    </div>
+                                </div>
+                            </div>
+                            {i < gates.length - 1 && <div className={`flex-shrink-0 w-6 h-0.5 ${gate.status === 'complete' ? 'bg-green-500' : 'bg-gray-700'}`}></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // Win Themes Panel
+        const WinThemesPanel = ({ themes }) => (
+            <div className="glass-panel p-4">
+                <h3 className="text-lg font-semibold mb-4 flex items-center"><span className="mr-2">🏆</span>Win Themes</h3>
+                <div className="space-y-3">
+                    {themes.map(theme => (
+                        <div key={theme.id} className="p-3 bg-white/5 rounded-lg border border-gray-700/50">
+                            <div className="flex items-start justify-between mb-1">
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-lg">{theme.icon}</span>
+                                    <span className="font-medium text-sm">{theme.title}</span>
+                                </div>
+                                <span className="font-mono text-sm font-bold" style={{ color: theme.color }}>{theme.score}</span>
+                            </div>
+                            <p className="text-xs text-gray-400">{theme.description}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // Ghost Team Panel (Competitors)
+        const GhostTeamPanel = ({ competitors }) => (
+            <div className="glass-panel p-4">
+                <h3 className="text-lg font-semibold mb-4 flex items-center"><span className="mr-2">👻</span>Ghost Team</h3>
+                <div className="space-y-3">
+                    {competitors.map(comp => (
+                        <div key={comp.id} className="p-3 bg-white/5 rounded-lg border border-gray-700/50">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium">{comp.name}</span>
+                                <div className="flex items-center space-x-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${comp.threat === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{comp.threat.toUpperCase()}</span>
+                                    <span className="font-mono text-sm text-red-400">{comp.pWin}%</span>
+                                </div>
+                            </div>
+                            <div className="w-full h-2 ghost-bar rounded-full overflow-hidden mb-2">
+                                <div className="h-full bg-red-500 rounded-full" style={{ width: `${comp.pWin}%` }}></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div><span className="text-gray-500">Strengths:</span><ul className="text-green-400">{comp.strengths.slice(0, 2).map((s, i) => <li key={i}>• {s}</li>)}</ul></div>
+                                <div><span className="text-gray-500">Weaknesses:</span><ul className="text-red-400">{comp.weaknesses.slice(0, 2).map((w, i) => <li key={i}>• {w}</li>)}</ul></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // Key Dates Panel
+        const KeyDatesPanel = ({ dates }) => (
+            <div className="glass-panel p-4">
+                <h3 className="text-lg font-semibold mb-4 flex items-center"><span className="mr-2">📅</span>Key Dates</h3>
+                <div className="space-y-2">
+                    {dates.map(d => (
+                        <div key={d.id} className={`flex items-center justify-between p-3 rounded-lg ${d.status === 'complete' ? 'bg-green-500/10 border border-green-500/30' : d.status === 'upcoming' ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-white/5 border border-gray-700/50'}`}>
+                            <div className="flex items-center space-x-3">
+                                <span className="text-lg">{d.icon}</span>
+                                <span className="text-sm">{d.label}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <span className="font-mono text-sm">{d.date}</span>
+                                {d.status === 'complete' && <span className="text-green-400">✓</span>}
+                                {d.status === 'upcoming' && <span className="text-yellow-400 text-xs">SOON</span>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // Team Panel
+        const TeamPanel = ({ members }) => (
+            <div className="glass-panel p-4">
+                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between"><span><span className="mr-2">👥</span>Team</span><span className="text-sm font-normal text-gray-400">{members.length}</span></h3>
+                <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-thin">
+                    {members.map(m => (
+                        <div key={m.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5">
+                            <div className="flex items-center space-x-3">
+                                <div className="relative">
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: m.color }}>{m.initials}</div>
+                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900 ${m.status === 'active' ? 'bg-green-500' : m.status === 'busy' ? 'bg-yellow-500' : 'bg-gray-500'}`}></div>
+                                </div>
+                                <div><div className="text-sm font-medium">{m.name}</div><div className="text-xs text-gray-400">{m.role}</div></div>
+                            </div>
+                            <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: `${m.color}30`, color: m.color }}>{m.id}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // Task Swimlanes
+        const TaskSwimlanes = ({ tasks, setTasks }) => {
+            const [draggedTask, setDraggedTask] = useState(null);
+            const [dragOverLane, setDragOverLane] = useState(null);
+            const lanes = [
+                { id: 'pending', name: 'Pending', color: '#6B7280' },
+                { id: 'draft', name: 'Draft', color: '#8B5CF6' },
+                { id: 'in-progress', name: 'In Progress', color: '#F59E0B' },
+                { id: 'review', name: 'Review', color: '#00E5FA' },
+                { id: 'complete', name: 'Complete', color: '#10B981' }
+            ];
+            const priorityColors = { critical: 'bg-red-500/20 text-red-400 border-red-500/30', high: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', medium: 'bg-blue-500/20 text-blue-400 border-blue-500/30' };
+            
+            const handleDragStart = (e, task) => { setDraggedTask(task); e.dataTransfer.effectAllowed = 'move'; };
+            const handleDragEnd = () => { setDraggedTask(null); setDragOverLane(null); };
+            const handleDragOver = (e, laneId) => { e.preventDefault(); setDragOverLane(laneId); };
+            const handleDragLeave = () => setDragOverLane(null);
+            const handleDrop = (e, laneId) => {
+                e.preventDefault();
+                if (draggedTask) setTasks(prev => prev.map(t => t.id === draggedTask.id ? { ...t, status: laneId } : t));
+                setDragOverLane(null);
+            };
+
+            return (
+                <div className="glass-panel p-4">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center"><span className="mr-2">📋</span>Task Board</h3>
+                    <div className="flex space-x-3 overflow-x-auto pb-2">
+                        {lanes.map(lane => {
+                            const laneTasks = tasks.filter(t => t.status === lane.id);
+                            return (
+                                <div key={lane.id} className={`flex-shrink-0 w-[200px] swimlane-drop ${dragOverLane === lane.id ? 'drag-over' : ''}`}
+                                    onDrop={(e) => handleDrop(e, lane.id)} onDragOver={(e) => handleDragOver(e, lane.id)} onDragLeave={handleDragLeave}>
+                                    <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-700/50">
+                                        <span className="text-sm font-medium" style={{ color: lane.color }}>{lane.name}</span>
+                                        <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">{laneTasks.length}</span>
+                                    </div>
+                                    <div className="space-y-2 min-h-[150px]">
+                                        {laneTasks.map(task => (
+                                            <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} onDragEnd={handleDragEnd}
+                                                className={`task-card p-2 bg-white/5 rounded-lg border border-gray-700/50 cursor-grab ${draggedTask?.id === task.id ? 'dragging' : ''}`}>
+                                                <div className="flex items-start justify-between mb-1">
+                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${priorityColors[task.priority]}`}>{task.priority.toUpperCase()}</span>
+                                                    <span className="text-[10px] text-gray-500">{task.progress}%</span>
+                                                </div>
+                                                <div className="text-xs font-medium mb-1">{task.title}</div>
+                                                <div className="text-[10px] text-gray-500">{task.assignee}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        // AI Agents Panel
+        const AIAgentsPanel = ({ agents }) => (
+            <div className="glass-panel p-4">
+                <h3 className="text-lg font-semibold mb-4 flex items-center"><span className="mr-2">🤖</span>Quick Agents</h3>
+                <div className="grid grid-cols-2 gap-2">
+                    {agents.map(a => (
+                        <a key={a.id} href="agent-hub.html" className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500/10 border border-gray-700/50 hover:border-cyan-500/30 transition-all group">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-lg group-hover:scale-110 transition-transform">{a.icon}</span>
+                                <div><div className="text-xs font-medium">{a.name}</div><div className="text-[10px] text-gray-500">{a.description}</div></div>
+                            </div>
+                        </a>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // Main App
+        const App = () => {
+            const [tasks, setTasks] = useState(initialTasks);
+            return (
+                <div className="min-h-screen">
+                    <NavigationHeader currentPage="warroom" />
+                    <main className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h1 className="text-3xl font-bold flex items-center"><span className="mr-3">⚔️</span>War Room</h1>
+                                <p className="text-gray-400">Active proposal command center</p>
+                            </div>
+                            <button className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg border border-purple-500/30 text-sm">Switch Proposal ▼</button>
+                        </div>
+
+                        <ProposalHeader proposal={activeProposal} />
+
+                        <div className="grid grid-cols-3 gap-6 mb-6">
+                            <div className="col-span-2"><CountdownTimer dueDate={activeProposal.dueDate} /></div>
+                            <div className="glass-card p-6 text-center">
+                                <div className="text-gray-400 text-sm mb-2">🎯 CURRENT GATE</div>
+                                <div className="text-3xl font-bold text-cyan-400 glow-text">{activeProposal.currentGate}</div>
+                                <div className="text-sm text-gray-400 mt-2">Review: Today 2:00 PM EST</div>
+                            </div>
+                        </div>
+
+                        <ShipleyGateTracker gates={shipleyGates} />
+
+                        {/* Key Metrics */}
+                        <div className="grid grid-cols-4 gap-4 mb-6">
+                            <div className="glass-card p-4"><div className="text-gray-400 text-xs mb-1">Sections Complete</div><div className="flex items-end space-x-1"><span className="font-mono text-2xl font-bold text-cyan-400">8</span><span className="text-gray-500">/12</span></div><div className="w-full h-1.5 bg-gray-700 rounded-full mt-2"><div className="h-full bg-cyan-500 rounded-full" style={{ width: '67%' }}></div></div></div>
+                            <div className="glass-card p-4"><div className="text-gray-400 text-xs mb-1">Compliance Items</div><div className="flex items-end space-x-1"><span className="font-mono text-2xl font-bold text-green-400">45</span><span className="text-gray-500">/52</span></div><div className="w-full h-1.5 bg-gray-700 rounded-full mt-2"><div className="h-full bg-green-500 rounded-full" style={{ width: '87%' }}></div></div></div>
+                            <div className="glass-card p-4"><div className="text-gray-400 text-xs mb-1">Review Comments</div><div className="font-mono text-2xl font-bold text-yellow-400">23</div><div className="text-xs text-gray-500 mt-1">Open items</div></div>
+                            <div className="glass-card p-4"><div className="text-gray-400 text-xs mb-1">Page Count</div><div className="flex items-end space-x-1"><span className="font-mono text-2xl font-bold text-purple-400">156</span><span className="text-gray-500">/180 max</span></div><div className="w-full h-1.5 bg-gray-700 rounded-full mt-2"><div className="h-full bg-purple-500 rounded-full" style={{ width: '87%' }}></div></div></div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-6 mb-6">
+                            <WinThemesPanel themes={winThemes} />
+                            <GhostTeamPanel competitors={ghostTeam} />
+                            <KeyDatesPanel dates={keyDates} />
+                            <TeamPanel members={teamRoster} />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-6">
+                            <div className="col-span-2"><TaskSwimlanes tasks={tasks} setTasks={setTasks} /></div>
+                            <AIAgentsPanel agents={aiAgents} />
+                        </div>
+                    </main>
+
+                    <footer className="border-t border-gray-800 mt-8 py-4 px-6">
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <div>© 2025 Mission Meets Tech • MissionPulse v1.1</div>
+                            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded">⚠️ AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

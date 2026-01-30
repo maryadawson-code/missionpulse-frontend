@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse - Solo Proposal Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .phase-line { height: 2px; background: linear-gradient(90deg, #10b981, #06b6d4); }
+        .task-pulse { animation: taskPulse 2s ease-in-out infinite; }
+        @keyframes taskPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .progress-glow { box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        // =========================================================================
+        // CONFIGURATION
+        // =========================================================================
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNTAsImV4cCI6MjA1MzE0MzI1MH0.gVLpPz-EdNICBxkSh6l4_dlUHgfmwHcGLgv-OL1gkIA';
+        const API_URL = 'https://missionpulse-api.onrender.com';
+
+        // =========================================================================
+        // SHIPLEY PHASES - Solo Mode
+        // =========================================================================
+        const SOLO_PHASES = [
+            {
+                id: 0,
+                name: 'Opportunity Discovery',
+                shipleyPhase: 'Phase 0',
+                description: 'Identify and qualify the opportunity',
+                icon: '🔍',
+                duration: '1-2 days',
+                aiRole: 'Capture Agent',
+                tasks: [
+                    { id: 'opp-import', title: 'Import Opportunity', description: 'Import from SAM.gov or enter manually', ai: true, required: true },
+                    { id: 'initial-review', title: 'RFP/Sources Sought Analysis', description: 'AI reviews solicitation documents', ai: true, required: true },
+                    { id: 'fit-assessment', title: 'Capability Fit Assessment', description: 'Match requirements to your capabilities', ai: true, required: true },
+                    { id: 'go-nogo-0', title: 'Go/No-Go Decision', description: 'Decide whether to pursue', gate: true, required: true }
+                ]
+            },
+            {
+                id: 1,
+                name: 'Capture Planning',
+                shipleyPhase: 'Phase 1',
+                description: 'Develop win strategy and understand customer',
+                icon: '🎯',
+                duration: '3-5 days',
+                aiRole: 'Strategy Agent',
+                tasks: [
+                    { id: 'customer-intel', title: 'Customer Intelligence', description: 'Gather intel on the agency and decision makers', ai: true, required: true },
+                    { id: 'competitor-analysis', title: 'Black Hat Analysis', description: 'Analyze competitor strengths and weaknesses', ai: true, required: true },
+                    { id: 'win-themes', title: 'Win Themes & Discriminators', description: 'Generate compelling differentiators', ai: true, required: true },
+                    { id: 'teaming-analysis', title: 'Teaming Recommendations', description: 'Identify potential partners and gaps', ai: true, required: false },
+                    { id: 'capture-plan', title: 'Draft Capture Plan', description: 'AI generates capture plan document', ai: true, required: true },
+                    { id: 'gate-1', title: 'Capture Readiness Review', description: 'Approve strategy before proceeding', gate: true, required: true }
+                ]
+            },
+            {
+                id: 2,
+                name: 'RFP Analysis',
+                shipleyPhase: 'Phase 2',
+                description: 'Shred the RFP and build compliance matrix',
+                icon: '📋',
+                duration: '2-3 days',
+                aiRole: 'Compliance Agent',
+                tasks: [
+                    { id: 'rfp-shred', title: 'RFP Shredding', description: 'Extract all requirements from solicitation', ai: true, required: true },
+                    { id: 'compliance-matrix', title: 'Compliance Matrix', description: 'Build L/M/Section/Volume mapping', ai: true, required: true },
+                    { id: 'eval-criteria', title: 'Evaluation Criteria Analysis', description: 'Understand how you will be scored', ai: true, required: true },
+                    { id: 'questions-log', title: 'Questions for Government', description: 'Generate clarifying questions', ai: true, required: false },
+                    { id: 'gate-2', title: 'RFP Analysis Review', description: 'Confirm understanding before writing', gate: true, required: true }
+                ]
+            },
+            {
+                id: 3,
+                name: 'Solution Development',
+                shipleyPhase: 'Phase 3',
+                description: 'Design technical and management approach',
+                icon: '⚙️',
+                duration: '5-7 days',
+                aiRole: 'Writer Agent',
+                tasks: [
+                    { id: 'tech-approach', title: 'Technical Approach', description: 'AI drafts technical solution', ai: true, required: true },
+                    { id: 'mgmt-approach', title: 'Management Approach', description: 'AI drafts management plan', ai: true, required: true },
+                    { id: 'staffing-plan', title: 'Staffing Plan', description: 'Define key personnel and org chart', ai: true, required: true },
+                    { id: 'past-perf', title: 'Past Performance', description: 'Select and draft references', ai: true, required: true },
+                    { id: 'sme-review-1', title: 'SME Technical Review', description: 'Get expert feedback on approach', sme: true, required: false },
+                    { id: 'gate-3', title: 'Solution Review', description: 'Approve solution before pricing', gate: true, required: true }
+                ]
+            },
+            {
+                id: 4,
+                name: 'Pricing',
+                shipleyPhase: 'Phase 4',
+                description: 'Develop cost proposal and BOE',
+                icon: '💰',
+                duration: '3-5 days',
+                aiRole: 'Pricing Agent',
+                cui: true,
+                tasks: [
+                    { id: 'labor-rates', title: 'Labor Category Rates', description: 'Define rates by labor category', ai: true, required: true, cui: true },
+                    { id: 'boe-build', title: 'Basis of Estimate', description: 'Build detailed BOE with rationale', ai: true, required: true, cui: true },
+                    { id: 'price-to-win', title: 'Price to Win Analysis', description: 'Competitive pricing analysis', ai: true, required: true, cui: true },
+                    { id: 'cost-volume', title: 'Cost Volume Draft', description: 'Generate cost proposal narrative', ai: true, required: true, cui: true },
+                    { id: 'gate-4', title: 'Pricing Approval', description: 'Final approval on pricing', gate: true, required: true }
+                ]
+            },
+            {
+                id: 5,
+                name: 'Proposal Writing',
+                shipleyPhase: 'Phase 5',
+                description: 'Write and assemble proposal volumes',
+                icon: '✍️',
+                duration: '7-14 days',
+                aiRole: 'Writer Agent',
+                tasks: [
+                    { id: 'exec-summary', title: 'Executive Summary', description: 'Compelling overview of your solution', ai: true, required: true },
+                    { id: 'vol-1-tech', title: 'Volume I: Technical', description: 'Complete technical volume', ai: true, required: true },
+                    { id: 'vol-2-mgmt', title: 'Volume II: Management', description: 'Complete management volume', ai: true, required: true },
+                    { id: 'vol-3-past', title: 'Volume III: Past Performance', description: 'Past performance volume', ai: true, required: true },
+                    { id: 'vol-4-cost', title: 'Volume IV: Cost', description: 'Cost/price volume', ai: true, required: true, cui: true },
+                    { id: 'compliance-check', title: 'Compliance Verification', description: 'Verify all requirements addressed', ai: true, required: true },
+                    { id: 'gate-5', title: 'Pink Team Review', description: 'First complete draft review', gate: true, required: true }
+                ]
+            },
+            {
+                id: 6,
+                name: 'Review & Refinement',
+                shipleyPhase: 'Phase 6',
+                description: 'Iterate based on reviews',
+                icon: '🔄',
+                duration: '3-5 days',
+                aiRole: 'QA Agent',
+                tasks: [
+                    { id: 'red-team-sim', title: 'Red Team Simulation', description: 'AI evaluates as government evaluator', ai: true, required: true },
+                    { id: 'weakness-fix', title: 'Address Weaknesses', description: 'Fix identified issues', ai: true, required: true },
+                    { id: 'sme-review-2', title: 'Final SME Review', description: 'Expert validation of content', sme: true, required: false },
+                    { id: 'gate-6', title: 'Red Team Approval', description: 'Approve for final production', gate: true, required: true }
+                ]
+            },
+            {
+                id: 7,
+                name: 'Production',
+                shipleyPhase: 'Phase 7',
+                description: 'Final formatting and assembly',
+                icon: '📦',
+                duration: '1-2 days',
+                aiRole: 'Writer Agent',
+                tasks: [
+                    { id: 'format-check', title: 'Format Compliance', description: 'Verify page limits, fonts, margins', ai: true, required: true },
+                    { id: 'graphics-final', title: 'Finalize Graphics', description: 'Polish all figures and tables', ai: true, required: false },
+                    { id: 'assemble', title: 'Assemble Volumes', description: 'Create final PDF packages', ai: true, required: true },
+                    { id: 'gate-7', title: 'Gold Team Final Review', description: 'Final executive sign-off', gate: true, required: true }
+                ]
+            },
+            {
+                id: 8,
+                name: 'Submission',
+                shipleyPhase: 'Phase 8',
+                description: 'Submit and prepare for orals',
+                icon: '🚀',
+                duration: '1 day',
+                aiRole: 'Capture Agent',
+                tasks: [
+                    { id: 'submit-prep', title: 'Submission Package', description: 'Prepare all submission materials', ai: true, required: true },
+                    { id: 'submit-confirm', title: 'Confirm Submission', description: 'Verify successful upload', gate: true, required: true },
+                    { id: 'orals-prep', title: 'Orals Preparation', description: 'Prepare for potential oral presentations', ai: true, required: false },
+                    { id: 'lessons-capture', title: 'Capture Lessons Learned', description: 'Document what worked and what didn\'t', ai: true, required: true }
+                ]
+            }
+        ];
+
+        // =========================================================================
+        // DEMO DATA
+        // =========================================================================
+        const DEMO_OPPORTUNITY = {
+            id: 'demo-opp-1',
+            name: 'DHA Healthcare IT Modernization',
+            agency: 'Defense Health Agency',
+            contract_value: 45000000,
+            due_date: '2026-03-15',
+            naics: '541512',
+            set_aside: 'SDVOSB',
+            shipley_phase: 'capture'
+        };
+
+        const DEMO_TASK_OUTPUTS = {
+            'opp-import': { status: 'complete', content: 'Opportunity imported from SAM.gov. Contract value: $45M over 5 years. Set-aside: SDVOSB. NAICS: 541512.', confidence: 95 },
+            'initial-review': { status: 'complete', content: 'RFP Analysis Complete. Key requirements: FedRAMP High compliance, 24/7 support, CMMC Level 2. Evaluation: LPTA with technical acceptability threshold.', confidence: 88 },
+            'fit-assessment': { status: 'complete', content: 'Capability Fit: 85% match. Gaps: Need FedRAMP ATO (can partner), 24/7 NOC staffing (can hire). Strengths: CMMC Level 2 certified, strong DHA past performance.', confidence: 82 },
+            'customer-intel': { status: 'complete', content: 'Customer: Defense Health Agency (DHA). Primary pain point: Legacy system modernization. Budget cycle: Q4 FY26. Incumbent: Leidos (contract ends Sep 2026).', confidence: 82 },
+            'competitor-analysis': { status: 'complete', content: 'Primary competitors: Leidos (incumbent), SAIC, Booz Allen. Leidos weakness: Recent data breach, slow modernization. Our advantage: Agile methodology, faster deployment.', confidence: 78 },
+            'win-themes': { status: 'complete', content: 'Win Themes:\n1) Mission-First Healthcare IT\n2) Zero-Trust Security Architecture\n3) 50% Faster Implementation Timeline\n4) Veteran-Owned Small Business Commitment', confidence: 85 }
+        };
+
+        const DEMO_GATE_APPROVALS = {
+            'go-nogo-0': { approved: true, notes: 'Strong fit with our capabilities. SDVOSB set-aside is a good match.', decision_at: '2026-01-27' },
+            'gate-1': { approved: true, notes: 'Win themes are solid. Proceed to RFP analysis.', decision_at: '2026-01-29' }
+        };
+
+        // =========================================================================
+        // COMPONENTS
+        // =========================================================================
+        
+        // Phase Progress Bar
+        function PhaseProgress({ phases, currentPhase, taskOutputs, gateApprovals }) {
+            return (
+                <div className="glass rounded-xl p-4 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-white">Proposal Progress</h3>
+                        <span className="text-sm text-slate-400">
+                            Phase {currentPhase + 1} of {phases.length}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        {phases.map((phase, idx) => {
+                            const isComplete = idx < currentPhase;
+                            const isCurrent = idx === currentPhase;
+                            const phaseGates = phase.tasks.filter(t => t.gate);
+                            const gatesApproved = phaseGates.every(g => gateApprovals[g.id]?.approved);
+                            
+                            return (
+                                <React.Fragment key={phase.id}>
+                                    <div 
+                                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
+                                            isComplete ? 'bg-emerald-500 text-white' :
+                                            isCurrent ? 'bg-cyan-500 text-white ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-900' :
+                                            'bg-slate-700 text-slate-400'
+                                        }`}
+                                        title={phase.name}
+                                    >
+                                        {isComplete ? '✓' : phase.icon}
+                                    </div>
+                                    {idx < phases.length - 1 && (
+                                        <div className={`flex-1 h-1 rounded ${
+                                            isComplete ? 'bg-emerald-500' : 'bg-slate-700'
+                                        }`} />
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
+                    </div>
+                    <div className="flex justify-between mt-2 text-xs text-slate-500">
+                        <span>Discovery</span>
+                        <span>Submission</span>
+                    </div>
+                </div>
+            );
+        }
+
+        // Task Card
+        function TaskCard({ task, phase, output, onExecute, onApprove, gateApproval }) {
+            const [isExpanded, setIsExpanded] = useState(false);
+            const [notes, setNotes] = useState('');
+            
+            const isComplete = output?.status === 'complete' || output?.status === 'approved';
+            const isProcessing = output?.status === 'processing';
+            const isGateApproved = gateApproval?.approved;
+            
+            return (
+                <div className={`rounded-xl border transition-all ${
+                    isComplete ? 'border-emerald-500/30 bg-emerald-500/5' :
+                    isProcessing ? 'border-cyan-500/50 bg-cyan-500/10' :
+                    task.gate ? 'border-amber-500/30 bg-amber-500/5' :
+                    'border-slate-700 bg-slate-800/50'
+                }`}>
+                    <div 
+                        className="p-4 cursor-pointer flex items-start justify-between"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                    >
+                        <div className="flex items-start gap-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                isComplete || isGateApproved ? 'bg-emerald-500/20 text-emerald-400' :
+                                isProcessing ? 'bg-cyan-500/20 text-cyan-400 task-pulse' :
+                                task.gate ? 'bg-amber-500/20 text-amber-400' :
+                                task.sme ? 'bg-purple-500/20 text-purple-400' :
+                                'bg-slate-700 text-slate-400'
+                            }`}>
+                                {isComplete || isGateApproved ? '✓' :
+                                 isProcessing ? '⟳' :
+                                 task.gate ? '🚦' :
+                                 task.sme ? '👤' :
+                                 task.ai ? '🤖' : '📝'}
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h4 className="font-medium text-white">{task.title}</h4>
+                                    {task.required && (
+                                        <span className="text-red-400 text-xs">*</span>
+                                    )}
+                                    {task.cui && (
+                                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
+                                            CUI
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-sm text-slate-400">{task.description}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {output?.confidence && (
+                                <span className={`text-xs px-2 py-1 rounded ${
+                                    output.confidence >= 80 ? 'bg-emerald-500/20 text-emerald-400' :
+                                    output.confidence >= 60 ? 'bg-amber-500/20 text-amber-400' :
+                                    'bg-red-500/20 text-red-400'
+                                }`}>
+                                    {output.confidence}% confident
+                                </span>
+                            )}
+                            <span className="text-slate-400">{isExpanded ? '▲' : '▼'}</span>
+                        </div>
+                    </div>
+                    
+                    {isExpanded && (
+                        <div className="px-4 pb-4 border-t border-slate-700/50 pt-4">
+                            {/* AI Output */}
+                            {output?.content && (
+                                <div className="mb-4">
+                                    <label className="text-xs text-slate-500 uppercase mb-2 block">AI Output</label>
+                                    <div className="bg-slate-900/50 rounded-lg p-3 text-sm text-slate-300 whitespace-pre-wrap">
+                                        {output.content}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Gate Approval UI */}
+                            {task.gate && !isGateApproved && (
+                                <div className="space-y-3">
+                                    <textarea
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        placeholder="Add approval notes or conditions..."
+                                        className="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-3 text-sm text-white placeholder-slate-500 resize-none"
+                                        rows={2}
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => onApprove(task.id, true, notes)}
+                                            className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg font-medium transition-colors"
+                                        >
+                                            ✓ Approve & Continue
+                                        </button>
+                                        <button
+                                            onClick={() => onApprove(task.id, false, notes)}
+                                            className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg font-medium transition-colors"
+                                        >
+                                            ✗ Reject
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Gate Approved Status */}
+                            {task.gate && isGateApproved && (
+                                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                                    <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                                        <span>✓</span>
+                                        <span>Approved on {gateApproval.decision_at}</span>
+                                    </div>
+                                    {gateApproval.notes && (
+                                        <p className="text-sm text-slate-400 mt-1">{gateApproval.notes}</p>
+                                    )}
+                                </div>
+                            )}
+                            
+                            {/* AI Task Execution */}
+                            {task.ai && !isComplete && !isProcessing && (
+                                <button
+                                    onClick={() => onExecute(task)}
+                                    className="w-full px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg font-medium transition-colors"
+                                >
+                                    🤖 Run AI Analysis
+                                </button>
+                            )}
+                            
+                            {/* Processing State */}
+                            {isProcessing && (
+                                <div className="flex items-center justify-center gap-2 py-2 text-cyan-400">
+                                    <span className="task-pulse">⟳</span>
+                                    <span>AI is analyzing...</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // AI Tips Panel
+        function AITipsPanel({ phase, completedTasks, totalTasks }) {
+            const tips = {
+                0: "Start by importing your opportunity from SAM.gov or entering details manually. The AI will analyze the solicitation to help you make a Go/No-Go decision.",
+                1: "Focus on understanding your customer and competitors. Strong win themes at this stage significantly increase your probability of winning.",
+                2: "Thoroughly shred the RFP to ensure you don't miss any requirements. A solid compliance matrix is the foundation of a winning proposal.",
+                3: "Let the AI draft your technical approach, then refine with your domain expertise. Consider getting SME feedback on complex technical sections.",
+                4: "Pricing is critical - use Price-to-Win analysis to stay competitive while maintaining profitability. All pricing data is CUI-marked for protection.",
+                5: "Write to the evaluation criteria. Every sentence should either satisfy a requirement or reinforce a win theme.",
+                6: "The Red Team simulation helps identify weaknesses before the government sees them. Address all issues before final production.",
+                7: "Triple-check compliance with page limits, fonts, and formatting. Many proposals are rejected for simple formatting errors.",
+                8: "Submit early! Technical issues happen. After submission, start preparing for potential oral presentations."
+            };
+            
+            return (
+                <div className="glass rounded-xl p-4 mb-6">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center flex-shrink-0">
+                            <span className="text-xl">💡</span>
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-white mb-1">AI Guidance</h3>
+                            <p className="text-sm text-slate-400">{tips[phase.id]}</p>
+                            <div className="mt-2 text-xs text-slate-500">
+                                {completedTasks} of {totalTasks} tasks complete in this phase
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // =========================================================================
+        // MAIN APP
+        // =========================================================================
+        function App() {
+            const [opportunity, setOpportunity] = useState(DEMO_OPPORTUNITY);
+            const [currentPhase, setCurrentPhase] = useState(2); // Demo: Phase 2 (RFP Analysis)
+            const [taskOutputs, setTaskOutputs] = useState(DEMO_TASK_OUTPUTS);
+            const [gateApprovals, setGateApprovals] = useState(DEMO_GATE_APPROVALS);
+            const [isOnline, setIsOnline] = useState(true);
+
+            // Execute AI task
+            const executeTask = async (task) => {
+                setTaskOutputs(prev => ({
+                    ...prev,
+                    [task.id]: { status: 'processing' }
+                }));
+
+                // Simulate AI processing
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Generate demo response
+                const responses = {
+                    'rfp-shred': 'Extracted 47 requirements across 5 sections. Key requirements: Section L (Instructions), Section M (Evaluation Factors), PWS (Performance Work Statement). Critical: Page limit 50 pages for technical volume.',
+                    'compliance-matrix': 'Compliance matrix generated with 47 requirements mapped to proposal sections. 12 requirements for Volume I, 8 for Volume II, 15 for Volume III, 12 for Volume IV.',
+                    'eval-criteria': 'Evaluation: Best Value Trade-Off. Factors: (1) Technical Approach - Most Important, (2) Past Performance - Important, (3) Price - Less Important. Technical/Past Performance combined more important than Price.',
+                    'questions-log': 'Generated 8 clarifying questions for Industry Day:\n1. Is partial FedRAMP ATO acceptable with full ATO within 6 months?\n2. Can incumbent past performance be cited by subcontractors?\n3. What is the expected transition period?'
+                };
+
+                setTaskOutputs(prev => ({
+                    ...prev,
+                    [task.id]: {
+                        status: 'complete',
+                        content: responses[task.id] || `AI analysis complete for ${task.title}. Review the output and proceed to the next task.`,
+                        confidence: Math.floor(Math.random() * 20) + 75
+                    }
+                }));
+            };
+
+            // Handle gate approval
+            const handleGateApproval = (taskId, approved, notes) => {
+                setGateApprovals(prev => ({
+                    ...prev,
+                    [taskId]: {
+                        approved,
+                        notes,
+                        decision_at: new Date().toISOString().split('T')[0]
+                    }
+                }));
+
+                // If approved, advance to next phase
+                if (approved) {
+                    const phase = SOLO_PHASES[currentPhase];
+                    const gateTask = phase.tasks.find(t => t.id === taskId);
+                    const isLastGate = phase.tasks.filter(t => t.gate).slice(-1)[0]?.id === taskId;
+                    
+                    if (isLastGate && currentPhase < SOLO_PHASES.length - 1) {
+                        setCurrentPhase(p => p + 1);
+                    }
+                }
+            };
+
+            const phase = SOLO_PHASES[currentPhase];
+            const completedTasks = phase.tasks.filter(t => 
+                taskOutputs[t.id]?.status === 'complete' || 
+                gateApprovals[t.id]?.approved
+            ).length;
+
+            // Calculate overall progress
+            const totalTasks = SOLO_PHASES.reduce((sum, p) => sum + p.tasks.length, 0);
+            const completedTotal = Object.values(taskOutputs).filter(o => o.status === 'complete').length +
+                                   Object.values(gateApprovals).filter(g => g.approved).length;
+            const progressPercent = Math.round((completedTotal / totalTasks) * 100);
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="glass border-b border-slate-700 px-6 py-4 sticky top-0 z-20">
+                        <div className="max-w-6xl mx-auto flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="missionpulse-dashboard-hub.html" className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center">
+                                        <span className="text-xl">🎯</span>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold text-white">Solo Proposal Manager</h1>
+                                        <p className="text-xs text-slate-500">Guided Shipley Workflow</p>
+                                    </div>
+                                </a>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <div className="text-sm font-medium text-white">{opportunity.name}</div>
+                                    <div className="text-xs text-slate-400">Due: {opportunity.due_date}</div>
+                                </div>
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${
+                                    isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                                }`}>
+                                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                    {isOnline ? 'Online' : 'Demo Mode'}
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Progress Banner */}
+                    <div className="bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 border-b border-slate-800">
+                        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="text-4xl">{phase.icon}</div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-cyan-400">{phase.shipleyPhase}</span>
+                                        <span className="text-slate-500">•</span>
+                                        <span className="font-semibold text-white">{phase.name}</span>
+                                    </div>
+                                    <p className="text-sm text-slate-400">{phase.description}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-2xl font-bold text-white">{progressPercent}%</div>
+                                <div className="text-xs text-slate-400">Overall Progress</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <main className="max-w-6xl mx-auto px-6 py-8">
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Left: Tasks */}
+                            <div className="lg:col-span-2 space-y-4">
+                                <PhaseProgress 
+                                    phases={SOLO_PHASES} 
+                                    currentPhase={currentPhase}
+                                    taskOutputs={taskOutputs}
+                                    gateApprovals={gateApprovals}
+                                />
+                                
+                                <AITipsPanel 
+                                    phase={phase}
+                                    completedTasks={completedTasks}
+                                    totalTasks={phase.tasks.length}
+                                />
+
+                                <div className="space-y-3">
+                                    {phase.tasks.map(task => (
+                                        <TaskCard
+                                            key={task.id}
+                                            task={task}
+                                            phase={phase}
+                                            output={taskOutputs[task.id]}
+                                            gateApproval={gateApprovals[task.id]}
+                                            onExecute={executeTask}
+                                            onApprove={handleGateApproval}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Right: Sidebar */}
+                            <div className="space-y-4">
+                                {/* Opportunity Summary */}
+                                <div className="glass rounded-xl p-4">
+                                    <h3 className="font-semibold text-white mb-3">Opportunity</h3>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">Agency</span>
+                                            <span className="text-white">{opportunity.agency}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">Value</span>
+                                            <span className="text-emerald-400">${(opportunity.contract_value / 1000000).toFixed(0)}M</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">Set-Aside</span>
+                                            <span className="text-cyan-400">{opportunity.set_aside}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">NAICS</span>
+                                            <span className="text-white">{opportunity.naics}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Phase Timeline */}
+                                <div className="glass rounded-xl p-4">
+                                    <h3 className="font-semibold text-white mb-3">Phase Timeline</h3>
+                                    <div className="space-y-2">
+                                        {SOLO_PHASES.slice(Math.max(0, currentPhase - 1), currentPhase + 3).map((p, idx) => (
+                                            <div 
+                                                key={p.id}
+                                                className={`flex items-center gap-3 p-2 rounded-lg ${
+                                                    p.id === currentPhase ? 'bg-cyan-500/10 border border-cyan-500/30' : ''
+                                                }`}
+                                            >
+                                                <span className={`text-lg ${
+                                                    p.id < currentPhase ? 'opacity-50' : ''
+                                                }`}>{p.icon}</span>
+                                                <div className="flex-1">
+                                                    <div className={`text-sm ${
+                                                        p.id === currentPhase ? 'text-white font-medium' : 'text-slate-400'
+                                                    }`}>{p.name}</div>
+                                                    <div className="text-xs text-slate-500">{p.duration}</div>
+                                                </div>
+                                                {p.id < currentPhase && (
+                                                    <span className="text-emerald-400">✓</span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* AI Agent */}
+                                <div className="glass rounded-xl p-4">
+                                    <h3 className="font-semibold text-white mb-3">Active AI Agent</h3>
+                                    <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+                                        <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                                            <span className="text-xl">🤖</span>
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-white">{phase.aiRole}</div>
+                                            <div className="text-xs text-slate-400">Ready to assist</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Quick Actions */}
+                                <div className="glass rounded-xl p-4">
+                                    <h3 className="font-semibold text-white mb-3">Quick Actions</h3>
+                                    <div className="space-y-2">
+                                        <a 
+                                            href="missionpulse-agent-hub-v2.html"
+                                            className="flex items-center gap-2 p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors text-sm"
+                                        >
+                                            <span>💬</span>
+                                            <span className="text-slate-300">Chat with AI</span>
+                                        </a>
+                                        <a 
+                                            href="missionpulse-m8-pricing.html"
+                                            className="flex items-center gap-2 p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors text-sm"
+                                        >
+                                            <span>💰</span>
+                                            <span className="text-slate-300">Pricing Engine</span>
+                                        </a>
+                                        <a 
+                                            href="missionpulse-orals-v2.html"
+                                            className="flex items-center gap-2 p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors text-sm"
+                                        >
+                                            <span>🎤</span>
+                                            <span className="text-slate-300">Orals Practice</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-800 mt-8">
+                        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <span className="text-slate-500 text-sm">© 2026 Mission Meets Tech</span>
+                            <span className="text-slate-600 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

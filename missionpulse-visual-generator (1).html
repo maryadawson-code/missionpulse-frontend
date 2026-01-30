@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse - AI Visual Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .mermaid { background: white; border-radius: 8px; padding: 20px; }
+        .generating { animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // =========================================================================
+        // CONFIGURATION
+        // =========================================================================
+        const API_URL = 'https://missionpulse-api.onrender.com';
+
+        // =========================================================================
+        // DIAGRAM TEMPLATES
+        // =========================================================================
+        const TEMPLATES = [
+            {
+                id: 'org-chart',
+                name: 'Org Chart',
+                icon: '👥',
+                description: 'Team structure and reporting',
+                prompt: 'Create an org chart for',
+                example: `graph TD
+    A[Program Manager] --> B[Technical Lead]
+    A --> C[Operations Lead]
+    B --> D[Developer 1]
+    B --> E[Developer 2]
+    C --> F[Analyst 1]
+    C --> G[Analyst 2]`
+            },
+            {
+                id: 'process-flow',
+                name: 'Process Flow',
+                icon: '🔄',
+                description: 'Workflow and procedures',
+                prompt: 'Create a process flow for',
+                example: `graph LR
+    A[Start] --> B{Review RFP}
+    B -->|Go| C[Capture Planning]
+    B -->|No-Go| D[Archive]
+    C --> E[Write Proposal]
+    E --> F[Review]
+    F --> G[Submit]
+    G --> H[End]`
+            },
+            {
+                id: 'timeline',
+                name: 'Timeline/Gantt',
+                icon: '📅',
+                description: 'Project schedules',
+                prompt: 'Create a timeline for',
+                example: `gantt
+    title Proposal Timeline
+    dateFormat YYYY-MM-DD
+    section Capture
+    Customer Research    :a1, 2026-02-01, 7d
+    Competitor Analysis  :a2, after a1, 5d
+    section Writing
+    Technical Volume     :b1, after a2, 14d
+    Management Volume    :b2, after a2, 10d
+    section Review
+    Pink Team           :c1, after b1, 3d
+    Red Team            :c2, after c1, 3d`
+            },
+            {
+                id: 'architecture',
+                name: 'Architecture',
+                icon: '🏗️',
+                description: 'System diagrams',
+                prompt: 'Create an architecture diagram for',
+                example: `graph TB
+    subgraph Cloud
+        A[Load Balancer] --> B[Web Server 1]
+        A --> C[Web Server 2]
+        B --> D[(Database)]
+        C --> D
+    end
+    subgraph Security
+        E[Firewall] --> A
+        F[WAF] --> E
+    end
+    G[Users] --> F`
+            },
+            {
+                id: 'sequence',
+                name: 'Sequence',
+                icon: '↔️',
+                description: 'Interaction flows',
+                prompt: 'Create a sequence diagram for',
+                example: `sequenceDiagram
+    participant U as User
+    participant S as System
+    participant D as Database
+    U->>S: Submit Request
+    S->>D: Query Data
+    D-->>S: Return Results
+    S-->>U: Display Response`
+            },
+            {
+                id: 'decision-tree',
+                name: 'Decision Tree',
+                icon: '🌳',
+                description: 'Decision logic',
+                prompt: 'Create a decision tree for',
+                example: `graph TD
+    A{Contract Type?} -->|FFP| B[Fixed Price]
+    A -->|T&M| C[Time & Materials]
+    A -->|CPFF| D[Cost Plus]
+    B --> E{Value > $10M?}
+    E -->|Yes| F[Executive Review]
+    E -->|No| G[Manager Approval]`
+            }
+        ];
+
+        // =========================================================================
+        // DEMO GENERATED VISUALS
+        // =========================================================================
+        const DEMO_HISTORY = [
+            {
+                id: 'v1',
+                prompt: 'Create an org chart for DHA healthcare IT project',
+                type: 'org-chart',
+                mermaid: `graph TD
+    PM[Mary Womack<br/>Program Manager] --> TL[Tech Lead<br/>John Smith]
+    PM --> OL[Ops Lead<br/>Sarah Chen]
+    TL --> D1[Sr. Developer<br/>Mike Johnson]
+    TL --> D2[Developer<br/>Lisa Park]
+    OL --> A1[Systems Admin<br/>Tom Wilson]
+    OL --> A2[Help Desk<br/>Ana Garcia]`,
+                created_at: '2026-01-30T10:00:00Z'
+            },
+            {
+                id: 'v2',
+                prompt: 'Show the proposal review process',
+                type: 'process-flow',
+                mermaid: `graph LR
+    A[Draft Complete] --> B{Pink Team}
+    B -->|Pass| C{Red Team}
+    B -->|Fail| D[Revise]
+    D --> B
+    C -->|Pass| E{Gold Team}
+    C -->|Fail| F[Revise]
+    F --> C
+    E -->|Approved| G[Submit]
+    E -->|Changes| H[Final Edit]
+    H --> G`,
+                created_at: '2026-01-30T09:30:00Z'
+            }
+        ];
+
+        // =========================================================================
+        // COMPONENTS
+        // =========================================================================
+
+        // Template Card
+        function TemplateCard({ template, isSelected, onClick }) {
+            return (
+                <div
+                    onClick={onClick}
+                    className={`p-4 rounded-xl cursor-pointer transition-all border ${
+                        isSelected
+                            ? 'bg-cyan-500/20 border-cyan-500/50 ring-2 ring-cyan-500/30'
+                            : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                    }`}
+                >
+                    <div className="text-2xl mb-2">{template.icon}</div>
+                    <h4 className="font-medium text-white">{template.name}</h4>
+                    <p className="text-xs text-slate-500 mt-1">{template.description}</p>
+                </div>
+            );
+        }
+
+        // Mermaid Renderer
+        function MermaidDiagram({ code, id }) {
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                if (containerRef.current && code) {
+                    containerRef.current.innerHTML = '';
+                    try {
+                        mermaid.render(`mermaid-${id}`, code).then(({ svg }) => {
+                            containerRef.current.innerHTML = svg;
+                        });
+                    } catch (e) {
+                        containerRef.current.innerHTML = `<div class="text-red-400 p-4">Error rendering diagram: ${e.message}</div>`;
+                    }
+                }
+            }, [code, id]);
+
+            return <div ref={containerRef} className="mermaid-container bg-white rounded-lg p-4 min-h-[200px]" />;
+        }
+
+        // History Item
+        function HistoryItem({ item, onSelect }) {
+            return (
+                <div
+                    onClick={() => onSelect(item)}
+                    className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-slate-600 cursor-pointer transition-all"
+                >
+                    <div className="flex items-center gap-2 mb-1">
+                        <span>{TEMPLATES.find(t => t.id === item.type)?.icon || '📊'}</span>
+                        <span className="text-sm font-medium text-white truncate">{item.prompt}</span>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                        {new Date(item.created_at).toLocaleDateString()}
+                    </div>
+                </div>
+            );
+        }
+
+        // =========================================================================
+        // MAIN APP
+        // =========================================================================
+        function App() {
+            const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
+            const [prompt, setPrompt] = useState('');
+            const [mermaidCode, setMermaidCode] = useState(TEMPLATES[0].example);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [history, setHistory] = useState(DEMO_HISTORY);
+            const [showCode, setShowCode] = useState(false);
+            const [isOnline, setIsOnline] = useState(true);
+
+            // Initialize Mermaid
+            useEffect(() => {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: 'default',
+                    securityLevel: 'loose',
+                    fontFamily: 'Inter, sans-serif'
+                });
+            }, []);
+
+            // Generate diagram
+            const handleGenerate = async () => {
+                if (!prompt.trim()) return;
+
+                setIsGenerating(true);
+
+                // Simulate AI generation (in production, call API)
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Demo: generate based on template type
+                let generatedCode = selectedTemplate.example;
+                
+                // Simple customization based on prompt
+                if (prompt.toLowerCase().includes('proposal')) {
+                    generatedCode = `graph LR
+    A[RFP Release] --> B[Capture Planning]
+    B --> C[Solution Design]
+    C --> D[Write Volumes]
+    D --> E[Pink Team]
+    E --> F[Red Team]
+    F --> G[Gold Team]
+    G --> H[Submit]`;
+                } else if (prompt.toLowerCase().includes('team') || prompt.toLowerCase().includes('org')) {
+                    generatedCode = `graph TD
+    CEO[CEO] --> PM[Program Manager]
+    PM --> TL[Technical Lead]
+    PM --> BL[Business Lead]
+    TL --> D1[Developer 1]
+    TL --> D2[Developer 2]
+    BL --> A1[Analyst 1]
+    BL --> A2[Analyst 2]`;
+                }
+
+                setMermaidCode(generatedCode);
+
+                // Add to history
+                const newItem = {
+                    id: `v${Date.now()}`,
+                    prompt: prompt,
+                    type: selectedTemplate.id,
+                    mermaid: generatedCode,
+                    created_at: new Date().toISOString()
+                };
+                setHistory(prev => [newItem, ...prev]);
+
+                setIsGenerating(false);
+            };
+
+            // Export as SVG
+            const handleExport = () => {
+                const svg = document.querySelector('.mermaid-container svg');
+                if (svg) {
+                    const svgData = new XMLSerializer().serializeToString(svg);
+                    const blob = new Blob([svgData], { type: 'image/svg+xml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `diagram-${Date.now()}.svg`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            };
+
+            // Copy code
+            const handleCopyCode = () => {
+                navigator.clipboard.writeText(mermaidCode);
+            };
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="glass border-b border-slate-700 px-6 py-4 sticky top-0 z-20">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="missionpulse-dashboard-hub.html" className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                                        <span className="text-xl">🎨</span>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold text-white">AI Visual Generator</h1>
+                                        <p className="text-xs text-slate-500">Create proposal diagrams with AI</p>
+                                    </div>
+                                </a>
+                            </div>
+                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${
+                                isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                            }`}>
+                                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                {isOnline ? 'Online' : 'Demo Mode'}
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-7xl mx-auto px-6 py-8">
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Left Panel - Input */}
+                            <div className="space-y-6">
+                                {/* Template Selection */}
+                                <div>
+                                    <h3 className="font-semibold text-white mb-3">Diagram Type</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {TEMPLATES.map(template => (
+                                            <TemplateCard
+                                                key={template.id}
+                                                template={template}
+                                                isSelected={selectedTemplate.id === template.id}
+                                                onClick={() => {
+                                                    setSelectedTemplate(template);
+                                                    setMermaidCode(template.example);
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Prompt Input */}
+                                <div className="glass rounded-xl p-4">
+                                    <h3 className="font-semibold text-white mb-3">Describe Your Diagram</h3>
+                                    <textarea
+                                        value={prompt}
+                                        onChange={(e) => setPrompt(e.target.value)}
+                                        placeholder={`${selectedTemplate.prompt}...`}
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 resize-none h-24 focus:border-cyan-500 focus:outline-none"
+                                    />
+                                    <button
+                                        onClick={handleGenerate}
+                                        disabled={isGenerating || !prompt.trim()}
+                                        className={`w-full mt-3 px-4 py-3 rounded-lg font-medium transition-all ${
+                                            isGenerating
+                                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90'
+                                        }`}
+                                    >
+                                        {isGenerating ? (
+                                            <span className="generating">🎨 Generating...</span>
+                                        ) : (
+                                            '✨ Generate Diagram'
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* History */}
+                                <div>
+                                    <h3 className="font-semibold text-white mb-3">Recent Diagrams</h3>
+                                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                                        {history.map(item => (
+                                            <HistoryItem
+                                                key={item.id}
+                                                item={item}
+                                                onSelect={(i) => {
+                                                    setMermaidCode(i.mermaid);
+                                                    setPrompt(i.prompt);
+                                                    setSelectedTemplate(TEMPLATES.find(t => t.id === i.type) || TEMPLATES[0]);
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Panel - Preview */}
+                            <div className="lg:col-span-2">
+                                <div className="glass rounded-xl p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-semibold text-white">Preview</h3>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setShowCode(!showCode)}
+                                                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                                                    showCode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-700 text-slate-400 hover:text-white'
+                                                }`}
+                                            >
+                                                {showCode ? '👁️ Preview' : '</> Code'}
+                                            </button>
+                                            <button
+                                                onClick={handleCopyCode}
+                                                className="px-3 py-1.5 bg-slate-700 text-slate-400 hover:text-white rounded-lg text-sm transition-colors"
+                                            >
+                                                📋 Copy
+                                            </button>
+                                            <button
+                                                onClick={handleExport}
+                                                className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-lg text-sm transition-colors"
+                                            >
+                                                ⬇️ Export SVG
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {showCode ? (
+                                        <textarea
+                                            value={mermaidCode}
+                                            onChange={(e) => setMermaidCode(e.target.value)}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-4 text-sm text-emerald-400 font-mono resize-none h-96 focus:border-cyan-500 focus:outline-none"
+                                        />
+                                    ) : (
+                                        <div className="bg-white rounded-lg p-6 min-h-96 flex items-center justify-center">
+                                            <MermaidDiagram code={mermaidCode} id="main" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Tips */}
+                                <div className="glass rounded-xl p-4 mt-4">
+                                    <h4 className="font-semibold text-white mb-2">💡 Tips</h4>
+                                    <ul className="text-sm text-slate-400 space-y-1">
+                                        <li>• Be specific: "org chart for 8-person proposal team" works better than "org chart"</li>
+                                        <li>• Edit the code directly for fine-tuning</li>
+                                        <li>• Export as SVG for high-quality proposal graphics</li>
+                                        <li>• Use in technical volumes, org charts, and process diagrams</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-800 mt-8">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <span className="text-slate-500 text-sm">© 2026 Mission Meets Tech</span>
+                            <span className="text-slate-600 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse v1.1 - Playbook Manager</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --primary-cyan: #00E5FA; --deep-navy: #00050F; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--deep-navy); min-height: 100vh; color: #fff; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+    .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .glass-nav { background: rgba(0, 5, 15, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(0, 229, 250, 0.1); }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0A1628; }
+    ::-webkit-scrollbar-thumb { background: rgba(0, 229, 250, 0.3); border-radius: 4px; }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, createContext, useContext, useCallback } = React;
+
+    // Shared Config
+    const ROLES = {
+      executive: { id: 'executive', name: 'Executive / Admin', icon: 'crown', canAccessAdmin: true },
+      capture_manager: { id: 'capture_manager', name: 'Capture Manager', icon: 'target', canAccessAdmin: false },
+      proposal_manager: { id: 'proposal_manager', name: 'Proposal Manager', icon: 'clipboard', canAccessAdmin: false },
+    };
+
+    const NAV_ITEMS = [
+      { id: 'dashboard', name: 'Dashboard', icon: 'dashboard', href: 'index.html', roles: ['all'] },
+      { id: 'agents', name: 'AI Agents', icon: 'cpu', href: 'agent-hub.html', roles: ['all'] },
+      { id: 'pipeline', name: 'Pipeline', icon: 'kanban', href: '#pipeline', roles: ['internal'] },
+      { id: 'training', name: 'Training Data', icon: 'database', href: 'training-admin.html', roles: ['admin', 'capture_manager', 'proposal_manager'] },
+      { id: 'playbook', name: 'Playbook', icon: 'book', href: 'playbook-manager.html', roles: ['admin', 'capture_manager', 'proposal_manager'] },
+      { id: 'analytics', name: 'Analytics', icon: 'chart', href: 'analytics.html', roles: ['admin', 'capture_manager'] },
+    ];
+
+    const PLAYBOOK_CATEGORIES = [
+      { id: 'shredding', name: 'PWS Shredding', icon: 'search', color: '#00E5FA', description: 'Analyzing solicitations, extracting requirements' },
+      { id: 'compliance', name: 'Compliance & Review', icon: 'shield', color: '#00BDAE', description: 'L/M validation, FAR/DFAR, checklists' },
+      { id: 'win_themes', name: 'Win Themes & Strategy', icon: 'target', color: '#8B5CF6', description: 'Differentiators, ghost competitors, positioning' },
+      { id: 'drafting', name: 'Proposal Drafting', icon: 'edit', color: '#10B981', description: 'Executive summaries, technical volumes' },
+      { id: 'pricing', name: 'Pricing & BOE', icon: 'calculator', color: '#F59E0B', description: 'Cost analysis, basis of estimate' },
+      { id: 'orals', name: 'Orals Prep', icon: 'presentation', color: '#EC4899', description: 'Presentation prep, Q&A simulation' },
+    ];
+
+    const LIFECYCLE_PHASES = [
+      'Opportunity Identification', 'Capture Planning', 'RFP Analysis', 'Blue Team', 
+      'Pink Team', 'Red Team', 'Gold Team', 'Final Production', 'Submission'
+    ];
+
+    // Sample Playbook Data
+    const SAMPLE_PLAYBOOK = [
+      {
+        id: 'sample_001',
+        title: 'DHA MHS GENESIS Executive Summary',
+        category: 'drafting',
+        lifecycle_phase: 'Drafting',
+        customer_agency: 'DHA',
+        quality_score: 92,
+        use_count: 5,
+        status: 'approved',
+        created_at: '2026-01-15',
+        user_prompt: 'Write an executive summary for DHA MHS GENESIS support contract',
+        assistant_response: '**Mission Meets Tech** brings unparalleled expertise to supporting the Defense Health Agency\'s MHS GENESIS deployment...',
+        tags: ['dha', 'executive_summary', 'mhs_genesis'],
+      },
+      {
+        id: 'sample_002',
+        title: 'VA Compliance Matrix Example',
+        category: 'compliance',
+        lifecycle_phase: 'Review',
+        customer_agency: 'VA',
+        quality_score: 88,
+        use_count: 3,
+        status: 'approved',
+        created_at: '2026-01-16',
+        user_prompt: 'Review my proposal draft against Section L/M requirements for VA EHRM',
+        assistant_response: '## Compliance Matrix: VA EHRM Solicitation\n\n### Section L Validation Results...',
+        tags: ['va', 'compliance', 'ehrm', 'section_l'],
+      },
+      {
+        id: 'sample_003',
+        title: 'Competitor Ghost Theme Strategy',
+        category: 'win_themes',
+        lifecycle_phase: 'Capture Planning',
+        customer_agency: 'DHA',
+        quality_score: 95,
+        use_count: 8,
+        status: 'approved',
+        created_at: '2026-01-10',
+        user_prompt: 'Generate ghost theme strategy against TechHealth Partners for DHA contract',
+        assistant_response: '## Competitive Positioning Strategy\n\n### Ghost Theme Analysis...',
+        tags: ['strategy', 'competitor', 'ghost_theme'],
+      },
+      {
+        id: 'sample_004',
+        title: 'Labor Category Pricing Analysis',
+        category: 'pricing',
+        lifecycle_phase: 'RFP Analysis',
+        customer_agency: 'VA',
+        quality_score: 78,
+        use_count: 2,
+        status: 'pending',
+        created_at: '2026-01-20',
+        user_prompt: 'Analyze labor rates for VA contract compared to GSA schedule',
+        assistant_response: '## Labor Rate Analysis\n\nBased on market analysis and your labor rates...',
+        tags: ['pricing', 'labor_rates', 'gsa'],
+      },
+    ];
+
+    const Icons = {
+      dashboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>,
+      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
+      kanban: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" /></svg>,
+      database: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth={2}/><path strokeWidth={2} d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>,
+      book: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
+      chart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      menu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
+      bell: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
+      searchIcon: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      target: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><circle cx="12" cy="12" r="6" strokeWidth={2}/><circle cx="12" cy="12" r="2" strokeWidth={2}/></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      calculator: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+      presentation: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      star: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
+      starOutline: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      archive: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      crown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l3.5 7L12 6l3.5 4L19 3m-14 8v8h14v-8M5 15h14" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-flex items-center justify-center ${className}`}><IconComponent /></span> : null;
+    };
+
+    // Auth Context
+    const AuthContext = createContext(null);
+    const useAuth = () => useContext(AuthContext);
+
+    const AuthProvider = ({ children }) => {
+      const [currentRole, setCurrentRole] = useState('executive');
+      const [user] = useState({ name: 'Mary Womack', email: 'mary@missionpulse.io' });
+      const hasAccess = useCallback((allowedRoles) => {
+        if (allowedRoles.includes('all')) return true;
+        if (allowedRoles.includes('admin') && ROLES[currentRole]?.canAccessAdmin) return true;
+        if (allowedRoles.includes('internal')) return true;
+        return allowedRoles.includes(currentRole);
+      }, [currentRole]);
+      return (
+        <AuthContext.Provider value={{ currentRole, setCurrentRole, user, hasAccess, roleInfo: ROLES[currentRole] }}>
+          {children}
+        </AuthContext.Provider>
+      );
+    };
+
+    // UI Components
+    const Badge = ({ children, variant = 'default', size = 'sm', icon }) => {
+      const variants = {
+        default: 'bg-slate-700/50 text-slate-300 border-slate-600/50',
+        primary: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border-red-500/30',
+        purple: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full font-medium border ${variants[variant]} ${sizes[size]}`}>
+          {icon && <Icon name={icon} className="w-3 h-3" />}
+          {children}
+        </span>
+      );
+    };
+
+    const Button = ({ children, variant = 'primary', size = 'md', icon, disabled, className = '', ...props }) => {
+      const variants = {
+        primary: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400 shadow-lg shadow-cyan-500/25',
+        secondary: 'bg-slate-700/50 text-white hover:bg-slate-600/50 border border-slate-600/50',
+        ghost: 'text-slate-400 hover:text-white hover:bg-slate-700/50',
+        danger: 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30',
+      };
+      const sizes = { xs: 'px-2 py-1 text-xs', sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
+      return (
+        <button className={`inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`} disabled={disabled} {...props}>
+          {icon && <Icon name={icon} className="w-4 h-4" />}
+          {children}
+        </button>
+      );
+    };
+
+    const Card = ({ children, className = '', glow = false, onClick }) => (
+      <div onClick={onClick} className={`bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl transition-all duration-300 ${onClick ? 'cursor-pointer hover:border-cyan-500/50' : ''} ${glow ? 'shadow-lg shadow-cyan-500/20 border-cyan-500/30' : ''} ${className}`}>
+        {children}
+      </div>
+    );
+
+    // Navigation Header
+    const NavigationHeader = ({ currentPage = 'playbook' }) => {
+      const { currentRole, setCurrentRole, user, hasAccess } = useAuth();
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+      const [profileOpen, setProfileOpen] = useState(false);
+      const accessibleNavItems = NAV_ITEMS.filter(item => hasAccess(item.roles));
+
+      return (
+        <>
+          <nav className="glass-nav fixed top-0 left-0 right-0 z-50 px-4 lg:px-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center justify-between h-16">
+                <a href="index.html" className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                      <Icon name="shield" className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900"></div>
+                  </div>
+                  <div className="hidden sm:block">
+                    <div className="text-lg font-bold text-white">MissionPulse</div>
+                    <div className="text-xs text-cyan-400 -mt-0.5">v1.1 Production</div>
+                  </div>
+                </a>
+
+                <div className="hidden lg:flex items-center gap-1">
+                  {accessibleNavItems.map(item => (
+                    <a key={item.id} href={item.href} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${currentPage === item.id ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}>
+                      <Icon name={item.icon} className="w-4 h-4" />
+                      {item.name}
+                    </a>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/50">
+                    <Icon name="searchIcon" className="w-5 h-5" />
+                  </button>
+                  <button className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/50">
+                    <Icon name="bell" className="w-5 h-5" />
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-cyan-500 rounded-full"></span>
+                  </button>
+                  <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-700/50 border border-slate-600/50">
+                    <Icon name="dollar" className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-mono text-slate-300">$0.0234</span>
+                  </div>
+                  <div className="relative">
+                    <button onClick={() => setProfileOpen(!profileOpen)} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-700/50">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold">
+                        {user.name.charAt(0)}
+                      </div>
+                    </button>
+                    {profileOpen && (
+                      <div className="absolute right-0 top-full mt-2 w-72 py-3 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl animate-fade-in z-50">
+                        <div className="px-4 pb-3 border-b border-slate-700">
+                          <div className="font-semibold text-white">{user.name}</div>
+                          <div className="text-sm text-slate-400">{user.email}</div>
+                        </div>
+                        <div className="px-4 py-3">
+                          <select value={currentRole} onChange={(e) => setCurrentRole(e.target.value)} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white">
+                            {Object.entries(ROLES).map(([id, role]) => (
+                              <option key={id} value={id}>{role.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/50">
+                    <Icon name={mobileMenuOpen ? 'x' : 'menu'} className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </nav>
+
+          {mobileMenuOpen && (
+            <div className="lg:hidden fixed inset-0 z-40 pt-16">
+              <div className="absolute inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
+              <div className="relative bg-slate-900 border-t border-slate-800 p-4 space-y-1 animate-fade-in">
+                {accessibleNavItems.map(item => (
+                  <a key={item.id} href={item.href} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${currentPage === item.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400'}`}>
+                    <Icon name={item.icon} className="w-5 h-5" />
+                    {item.name}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {profileOpen && <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />}
+        </>
+      );
+    };
+
+    const LiabilityFooter = () => (
+      <div className="fixed bottom-0 left-0 right-0 py-2 px-4 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 z-30">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs">
+          <span className="text-amber-400 font-medium">AI GENERATED - REQUIRES HUMAN REVIEW</span>
+          <span className="text-cyan-500 hidden sm:block">Mission. Technology. Transformation.</span>
+        </div>
+      </div>
+    );
+
+    // Quality Score Indicator
+    const QualityScore = ({ score }) => {
+      const color = score >= 85 ? 'emerald' : score >= 70 ? 'amber' : 'red';
+      return (
+        <div className="flex items-center gap-2">
+          <div className={`w-10 h-10 rounded-xl bg-${color}-500/20 flex items-center justify-center`}>
+            <span className={`text-lg font-bold text-${color}-400`}>{score}</span>
+          </div>
+          <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className={`h-full bg-${color}-500 rounded-full transition-all`} style={{ width: `${score}%` }} />
+          </div>
+        </div>
+      );
+    };
+
+    // Playbook Entry Card
+    const PlaybookCard = ({ entry, onView, onApprove, onArchive, onDelete }) => {
+      const category = PLAYBOOK_CATEGORIES.find(c => c.id === entry.category);
+      
+      return (
+        <Card className="p-4 hover:border-cyan-500/30 transition-colors">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ backgroundColor: `${category?.color}20` }}>
+                <Icon name={category?.icon} className="w-5 h-5" style={{ color: category?.color }} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white line-clamp-1">{entry.title}</h3>
+                <p className="text-xs text-slate-400">{category?.name} • {entry.lifecycle_phase}</p>
+              </div>
+            </div>
+            <Badge variant={entry.status === 'approved' ? 'success' : 'warning'} size="xs">
+              {entry.status}
+            </Badge>
+          </div>
+          
+          <p className="text-sm text-slate-400 line-clamp-2 mb-3">{entry.user_prompt}</p>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 text-xs text-slate-500">
+              <span className="flex items-center gap-1">
+                <Icon name="star" className="w-3 h-3 text-amber-400" />
+                {entry.quality_score}
+              </span>
+              <span className="flex items-center gap-1">
+                <Icon name="eye" className="w-3 h-3" />
+                {entry.use_count} uses
+              </span>
+              <span>{entry.customer_agency}</span>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="xs" icon="eye" onClick={() => onView(entry)}>View</Button>
+              {entry.status === 'pending' && (
+                <Button variant="success" size="xs" icon="check" onClick={() => onApprove(entry.id)}>Approve</Button>
+              )}
+              <Button variant="ghost" size="xs" icon="archive" onClick={() => onArchive(entry.id)} />
+              <Button variant="ghost" size="xs" icon="trash" className="text-red-400" onClick={() => onDelete(entry.id)} />
+            </div>
+          </div>
+        </Card>
+      );
+    };
+
+    // Playbook Manager Content
+    const PlaybookManagerContent = () => {
+      const [entries, setEntries] = useState(SAMPLE_PLAYBOOK);
+      const [filter, setFilter] = useState('all');
+      const [statusFilter, setStatusFilter] = useState('all');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedEntry, setSelectedEntry] = useState(null);
+
+      const filteredEntries = entries.filter(entry => {
+        if (filter !== 'all' && entry.category !== filter) return false;
+        if (statusFilter !== 'all' && entry.status !== statusFilter) return false;
+        if (searchQuery && !entry.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        return true;
+      });
+
+      const handleApprove = (id) => {
+        setEntries(entries.map(e => e.id === id ? { ...e, status: 'approved' } : e));
+      };
+
+      const handleArchive = (id) => {
+        setEntries(entries.map(e => e.id === id ? { ...e, status: 'archived' } : e));
+      };
+
+      const handleDelete = (id) => {
+        if (confirm('Are you sure you want to delete this playbook entry?')) {
+          setEntries(entries.filter(e => e.id !== id));
+        }
+      };
+
+      const stats = {
+        total: entries.length,
+        approved: entries.filter(e => e.status === 'approved').length,
+        pending: entries.filter(e => e.status === 'pending').length,
+        avgScore: Math.round(entries.reduce((sum, e) => sum + e.quality_score, 0) / entries.length),
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-white mb-1">Playbook Manager</h1>
+              <p className="text-slate-400">Curate golden examples for AI context injection</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="success" size="md">{stats.approved} Approved</Badge>
+              <Badge variant="warning" size="md">{stats.pending} Pending Review</Badge>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: 'Total Examples', value: stats.total, icon: 'book', color: 'cyan' },
+              { label: 'Approved', value: stats.approved, icon: 'check', color: 'emerald' },
+              { label: 'Pending Review', value: stats.pending, icon: 'clock', color: 'amber' },
+              { label: 'Avg Quality', value: stats.avgScore, icon: 'star', color: 'purple' },
+            ].map((stat, i) => (
+              <Card key={i} className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg bg-${stat.color}-500/20`}>
+                    <Icon name={stat.icon} className={`w-5 h-5 text-${stat.color}-400`} />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-white">{stat.value}</div>
+                    <div className="text-xs text-slate-400">{stat.label}</div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Filters */}
+          <Card className="p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex-1 min-w-64">
+                <div className="relative">
+                  <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Search playbook entries..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+              
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white"
+              >
+                <option value="all">All Categories</option>
+                {PLAYBOOK_CATEGORIES.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white"
+              >
+                <option value="all">All Status</option>
+                <option value="approved">Approved</option>
+                <option value="pending">Pending</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </Card>
+
+          {/* Entries Grid */}
+          <div className="grid md:grid-cols-2 gap-4">
+            {filteredEntries.map((entry, index) => (
+              <div key={entry.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                <PlaybookCard
+                  entry={entry}
+                  onView={setSelectedEntry}
+                  onApprove={handleApprove}
+                  onArchive={handleArchive}
+                  onDelete={handleDelete}
+                />
+              </div>
+            ))}
+          </div>
+
+          {filteredEntries.length === 0 && (
+            <Card className="p-12 text-center">
+              <Icon name="book" className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-400">No playbook entries match your filters</p>
+            </Card>
+          )}
+
+          {/* View Modal */}
+          {selectedEntry && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedEntry(null)} />
+              <div className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl animate-fade-in">
+                <div className="sticky top-0 p-4 border-b border-slate-700 bg-slate-900 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-white">{selectedEntry.title}</h2>
+                  <button onClick={() => setSelectedEntry(null)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700/50">
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-6">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="primary">{PLAYBOOK_CATEGORIES.find(c => c.id === selectedEntry.category)?.name}</Badge>
+                    <Badge variant="default">{selectedEntry.lifecycle_phase}</Badge>
+                    <Badge variant="default">{selectedEntry.customer_agency}</Badge>
+                    <Badge variant={selectedEntry.status === 'approved' ? 'success' : 'warning'}>{selectedEntry.status}</Badge>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-semibold text-cyan-400 mb-2">User Prompt</h3>
+                    <div className="p-4 bg-slate-800 rounded-xl text-sm text-slate-300">{selectedEntry.user_prompt}</div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-semibold text-cyan-400 mb-2">AI Response</h3>
+                    <div className="p-4 bg-slate-800 rounded-xl text-sm text-slate-300 whitespace-pre-wrap">{selectedEntry.assistant_response}</div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-700">
+                    <QualityScore score={selectedEntry.quality_score} />
+                    <div className="flex items-center gap-2">
+                      {selectedEntry.status === 'pending' && (
+                        <Button variant="success" icon="check" onClick={() => { handleApprove(selectedEntry.id); setSelectedEntry(null); }}>
+                          Approve
+                        </Button>
+                      )}
+                      <Button variant="secondary" onClick={() => setSelectedEntry(null)}>Close</Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // Main App
+    const App = () => (
+      <AuthProvider>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
+          <NavigationHeader currentPage="playbook" />
+          <main className="pt-20 pb-16 px-4 lg:px-6">
+            <div className="max-w-7xl mx-auto">
+              <PlaybookManagerContent />
+            </div>
+          </main>
+          <LiabilityFooter />
+        </div>
+      </AuthProvider>
+    );
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
