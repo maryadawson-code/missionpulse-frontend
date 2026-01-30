@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse - Leads Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(0, 229, 250, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.2); }
+        .glass-hover:hover { background: rgba(0, 229, 250, 0.1); border-color: rgba(0, 229, 250, 0.4); }
+        .glow { box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: rgba(0, 229, 250, 0.1); }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0, 229, 250, 0.3); border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // =========================================================================
+        // CONFIGURATION
+        // =========================================================================
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        // Demo data for offline mode
+        const DEMO_LEADS = [
+            {
+                id: '1',
+                first_name: 'James',
+                last_name: 'Thompson',
+                email: 'james@sdvosbexample.com',
+                company: 'Veteran Tech Solutions',
+                title: 'Capture Manager',
+                company_size: '11-50',
+                contract_type: 'prime',
+                certifications: ['sdvosb'],
+                proposals_per_year: '6-10',
+                biggest_challenge: 'We struggle with consistent win themes across proposal volumes.',
+                referral_source: 'linkedin',
+                status: 'new',
+                priority: 'high',
+                created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                demo_scheduled: false
+            },
+            {
+                id: '2',
+                first_name: 'Sarah',
+                last_name: 'Chen',
+                email: 'sarah@healthitpartners.com',
+                company: 'Health IT Partners',
+                title: 'CEO',
+                company_size: '51-200',
+                contract_type: 'both',
+                certifications: ['wosb', '8a'],
+                proposals_per_year: '11-25',
+                biggest_challenge: 'Our pricing estimates take too long and are often inaccurate.',
+                referral_source: 'referral',
+                status: 'contacted',
+                priority: 'urgent',
+                created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+                demo_scheduled: true,
+                demo_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+                id: '3',
+                first_name: 'Michael',
+                last_name: 'Rodriguez',
+                email: 'mike@feddefense.io',
+                company: 'Federal Defense Systems',
+                title: 'VP Business Development',
+                company_size: '201-500',
+                contract_type: 'prime',
+                certifications: [],
+                proposals_per_year: '26-50',
+                biggest_challenge: 'We need better competitive intelligence on incumbents.',
+                referral_source: 'conference',
+                status: 'qualified',
+                priority: 'normal',
+                created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+                demo_scheduled: false
+            },
+            {
+                id: '4',
+                first_name: 'Amanda',
+                last_name: 'Foster',
+                email: 'afoster@cybergovtech.com',
+                company: 'CyberGov Technologies',
+                title: 'Director of Capture',
+                company_size: '51-200',
+                contract_type: 'both',
+                certifications: ['8a', 'hubzone'],
+                proposals_per_year: '11-25',
+                biggest_challenge: 'Compliance matrix tracking is a nightmare.',
+                referral_source: 'webinar',
+                status: 'new',
+                priority: 'normal',
+                created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+                demo_scheduled: false
+            }
+        ];
+
+        const STATUS_CONFIG = {
+            new: { label: 'New', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' },
+            contacted: { label: 'Contacted', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
+            qualified: { label: 'Qualified', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' },
+            demo_scheduled: { label: 'Demo Scheduled', color: 'bg-purple-500/20 text-purple-400 border-purple-500/40' },
+            converted: { label: 'Converted', color: 'bg-green-500/20 text-green-400 border-green-500/40' },
+            lost: { label: 'Lost', color: 'bg-red-500/20 text-red-400 border-red-500/40' }
+        };
+
+        const PRIORITY_CONFIG = {
+            urgent: { label: 'Urgent', color: 'bg-red-500/30 text-red-300' },
+            high: { label: 'High', color: 'bg-orange-500/30 text-orange-300' },
+            normal: { label: 'Normal', color: 'bg-slate-500/30 text-slate-300' },
+            low: { label: 'Low', color: 'bg-slate-700/30 text-slate-400' }
+        };
+
+        // =========================================================================
+        // UTILITY FUNCTIONS
+        // =========================================================================
+        function timeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+            
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            return new Date(dateString).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // =========================================================================
+        // COMPONENTS
+        // =========================================================================
+        function StatCard({ label, value, icon, trend }) {
+            return (
+                <div className="glass p-4 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">{icon}</span>
+                        {trend && (
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                                trend > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                            }`}>
+                                {trend > 0 ? '+' : ''}{trend}%
+                            </span>
+                        )}
+                    </div>
+                    <div className="text-2xl font-bold text-white">{value}</div>
+                    <div className="text-sm text-slate-400">{label}</div>
+                </div>
+            );
+        }
+
+        function StatusBadge({ status }) {
+            const config = STATUS_CONFIG[status] || STATUS_CONFIG.new;
+            return (
+                <span className={`px-2 py-1 rounded-full text-xs border ${config.color}`}>
+                    {config.label}
+                </span>
+            );
+        }
+
+        function PriorityBadge({ priority }) {
+            const config = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.normal;
+            return (
+                <span className={`px-2 py-1 rounded-full text-xs ${config.color}`}>
+                    {config.label}
+                </span>
+            );
+        }
+
+        function CertificationBadge({ cert }) {
+            const certLabels = {
+                sdvosb: 'SDVOSB',
+                '8a': '8(a)',
+                hubzone: 'HUBZone',
+                wosb: 'WOSB',
+                edwosb: 'EDWOSB'
+            };
+            return (
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-xs">
+                    {certLabels[cert] || cert}
+                </span>
+            );
+        }
+
+        function LeadDetailModal({ lead, onClose, onUpdate }) {
+            const [editedLead, setEditedLead] = useState({ ...lead });
+            const [notes, setNotes] = useState(lead.notes || '');
+            const [isSaving, setIsSaving] = useState(false);
+
+            const handleSave = async () => {
+                setIsSaving(true);
+                await onUpdate({ ...editedLead, notes });
+                setIsSaving(false);
+                onClose();
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                    <div className="glass rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-thin">
+                        {/* Header */}
+                        <div className="p-6 border-b border-cyan-500/20 flex items-center justify-between sticky top-0 bg-slate-950/90 backdrop-blur">
+                            <div>
+                                <h2 className="text-xl font-bold text-white">
+                                    {lead.first_name} {lead.last_name}
+                                </h2>
+                                <p className="text-slate-400">{lead.company}</p>
+                            </div>
+                            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">
+                                ×
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 space-y-6">
+                            {/* Contact Info */}
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Email</label>
+                                    <a href={`mailto:${lead.email}`} className="text-cyan-400 hover:underline">
+                                        {lead.email}
+                                    </a>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Phone</label>
+                                    <span className="text-white">{lead.phone || '-'}</span>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Title</label>
+                                    <span className="text-white">{lead.title || '-'}</span>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Company Size</label>
+                                    <span className="text-white">{lead.company_size || '-'}</span>
+                                </div>
+                            </div>
+
+                            {/* Qualifications */}
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Contract Type</label>
+                                    <span className="text-white capitalize">{lead.contract_type || '-'}</span>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-1">Proposals/Year</label>
+                                    <span className="text-white">{lead.proposals_per_year || '-'}</span>
+                                </div>
+                            </div>
+
+                            {/* Certifications */}
+                            {lead.certifications && lead.certifications.length > 0 && (
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-2">Certifications</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {lead.certifications.map(cert => (
+                                            <CertificationBadge key={cert} cert={cert} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Challenge */}
+                            {lead.biggest_challenge && (
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-2">Biggest Challenge</label>
+                                    <p className="text-slate-300 bg-slate-900/50 p-3 rounded-lg text-sm">
+                                        "{lead.biggest_challenge}"
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Status & Priority */}
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-2">Status</label>
+                                    <select
+                                        value={editedLead.status}
+                                        onChange={(e) => setEditedLead({ ...editedLead, status: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white"
+                                    >
+                                        {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                                            <option key={key} value={key}>{config.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-500 mb-2">Priority</label>
+                                    <select
+                                        value={editedLead.priority}
+                                        onChange={(e) => setEditedLead({ ...editedLead, priority: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white"
+                                    >
+                                        {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+                                            <option key={key} value={key}>{config.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Demo Scheduling */}
+                            <div className="flex items-center gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={editedLead.demo_scheduled}
+                                        onChange={(e) => setEditedLead({ ...editedLead, demo_scheduled: e.target.checked })}
+                                        className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-cyan-500"
+                                    />
+                                    <span className="text-slate-300">Demo Scheduled</span>
+                                </label>
+                                {editedLead.demo_scheduled && (
+                                    <input
+                                        type="datetime-local"
+                                        value={editedLead.demo_date ? editedLead.demo_date.slice(0, 16) : ''}
+                                        onChange={(e) => setEditedLead({ ...editedLead, demo_date: e.target.value })}
+                                        className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Notes */}
+                            <div>
+                                <label className="block text-xs text-slate-500 mb-2">Internal Notes</label>
+                                <textarea
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white resize-none"
+                                    rows={4}
+                                    placeholder="Add notes about this lead..."
+                                />
+                            </div>
+
+                            {/* Meta */}
+                            <div className="flex items-center justify-between text-xs text-slate-500">
+                                <span>Source: {lead.referral_source || 'Unknown'}</span>
+                                <span>Submitted: {formatDate(lead.created_at)}</span>
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="p-6 border-t border-cyan-500/20 flex items-center justify-between">
+                            <div className="flex gap-2">
+                                <a
+                                    href={`mailto:${lead.email}?subject=Welcome to MissionPulse&body=Hi ${lead.first_name},%0D%0A%0D%0AThank you for your interest in MissionPulse!`}
+                                    className="px-4 py-2 glass rounded-lg text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+                                >
+                                    📧 Send Email
+                                </a>
+                                <button
+                                    onClick={() => setEditedLead({ ...editedLead, status: 'contacted' })}
+                                    className="px-4 py-2 glass rounded-lg text-slate-400 hover:text-white transition-colors"
+                                >
+                                    ✓ Mark Contacted
+                                </button>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={onClose}
+                                    className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    className="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg font-medium transition-colors disabled:opacity-50"
+                                >
+                                    {isSaving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function LeadRow({ lead, onClick }) {
+            return (
+                <tr 
+                    onClick={() => onClick(lead)}
+                    className="border-b border-slate-800/50 hover:bg-slate-900/50 cursor-pointer transition-colors"
+                >
+                    <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-medium">
+                                {lead.first_name[0]}{lead.last_name[0]}
+                            </div>
+                            <div>
+                                <div className="font-medium text-white">
+                                    {lead.first_name} {lead.last_name}
+                                </div>
+                                <div className="text-sm text-slate-500">{lead.email}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td className="px-4 py-4">
+                        <div className="text-white">{lead.company}</div>
+                        <div className="text-sm text-slate-500">{lead.title || '-'}</div>
+                    </td>
+                    <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-1">
+                            {lead.certifications && lead.certifications.slice(0, 2).map(cert => (
+                                <CertificationBadge key={cert} cert={cert} />
+                            ))}
+                            {lead.certifications && lead.certifications.length > 2 && (
+                                <span className="text-xs text-slate-500">+{lead.certifications.length - 2}</span>
+                            )}
+                        </div>
+                    </td>
+                    <td className="px-4 py-4">
+                        <StatusBadge status={lead.status} />
+                    </td>
+                    <td className="px-4 py-4">
+                        <PriorityBadge priority={lead.priority} />
+                    </td>
+                    <td className="px-4 py-4 text-slate-400 text-sm">
+                        {timeAgo(lead.created_at)}
+                    </td>
+                    <td className="px-4 py-4">
+                        {lead.demo_scheduled ? (
+                            <span className="text-emerald-400 text-sm">✓ Scheduled</span>
+                        ) : (
+                            <span className="text-slate-500 text-sm">-</span>
+                        )}
+                    </td>
+                </tr>
+            );
+        }
+
+        // =========================================================================
+        // MAIN APP
+        // =========================================================================
+        function App() {
+            const [leads, setLeads] = useState(DEMO_LEADS);
+            const [connected, setConnected] = useState(false);
+            const [loading, setLoading] = useState(true);
+            const [selectedLead, setSelectedLead] = useState(null);
+            const [filter, setFilter] = useState('all');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [sortBy, setSortBy] = useState('created_at');
+            const [sortOrder, setSortOrder] = useState('desc');
+
+            useEffect(() => {
+                loadLeads();
+            }, []);
+
+            const loadLeads = async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('access_requests')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+                    
+                    if (!error && data && data.length > 0) {
+                        setLeads(data);
+                        setConnected(true);
+                    }
+                } catch (e) {
+                    console.log('Using demo data');
+                }
+                setLoading(false);
+            };
+
+            const updateLead = async (updatedLead) => {
+                // Update local state immediately
+                setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
+                
+                // Try to update in Supabase
+                if (connected) {
+                    try {
+                        await supabase
+                            .from('access_requests')
+                            .update(updatedLead)
+                            .eq('id', updatedLead.id);
+                    } catch (e) {
+                        console.error('Failed to update lead:', e);
+                    }
+                }
+            };
+
+            // Filter and sort leads
+            const filteredLeads = useMemo(() => {
+                let result = [...leads];
+                
+                // Status filter
+                if (filter !== 'all') {
+                    result = result.filter(l => l.status === filter);
+                }
+                
+                // Search filter
+                if (searchTerm) {
+                    const term = searchTerm.toLowerCase();
+                    result = result.filter(l => 
+                        l.first_name.toLowerCase().includes(term) ||
+                        l.last_name.toLowerCase().includes(term) ||
+                        l.email.toLowerCase().includes(term) ||
+                        l.company.toLowerCase().includes(term)
+                    );
+                }
+                
+                // Sort
+                result.sort((a, b) => {
+                    let aVal = a[sortBy];
+                    let bVal = b[sortBy];
+                    
+                    if (sortBy === 'created_at') {
+                        aVal = new Date(aVal);
+                        bVal = new Date(bVal);
+                    }
+                    
+                    if (sortOrder === 'asc') {
+                        return aVal > bVal ? 1 : -1;
+                    }
+                    return aVal < bVal ? 1 : -1;
+                });
+                
+                return result;
+            }, [leads, filter, searchTerm, sortBy, sortOrder]);
+
+            // Calculate stats
+            const stats = useMemo(() => {
+                const now = new Date();
+                const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+                
+                return {
+                    total: leads.length,
+                    new: leads.filter(l => l.status === 'new').length,
+                    thisWeek: leads.filter(l => new Date(l.created_at) > weekAgo).length,
+                    qualified: leads.filter(l => l.status === 'qualified').length,
+                    converted: leads.filter(l => l.status === 'converted').length,
+                    demosScheduled: leads.filter(l => l.demo_scheduled).length
+                };
+            }, [leads]);
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-cyan-400 text-xl">Loading leads...</div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="glass border-b border-cyan-500/20 px-6 py-4 sticky top-0 z-40">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-2xl font-bold">
+                                    <span className="text-cyan-400">Mission</span>
+                                    <span className="text-white">Pulse</span>
+                                </a>
+                                <span className="text-slate-500">|</span>
+                                <span className="text-slate-400">Leads Management</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs ${
+                                    connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                                }`}>
+                                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                    {connected ? 'Connected' : 'Demo Mode'}
+                                </div>
+                                <a href="index.html" className="text-slate-400 hover:text-cyan-400">
+                                    ← Dashboard
+                                </a>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-7xl mx-auto px-6 py-8">
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                            <StatCard label="Total Leads" value={stats.total} icon="📊" />
+                            <StatCard label="New" value={stats.new} icon="🆕" trend={stats.thisWeek > 0 ? Math.round((stats.thisWeek / stats.total) * 100) : 0} />
+                            <StatCard label="This Week" value={stats.thisWeek} icon="📅" />
+                            <StatCard label="Qualified" value={stats.qualified} icon="✅" />
+                            <StatCard label="Demos Booked" value={stats.demosScheduled} icon="📞" />
+                            <StatCard label="Converted" value={stats.converted} icon="🎉" />
+                        </div>
+
+                        {/* Filters */}
+                        <div className="glass p-4 rounded-xl mb-6">
+                            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        onClick={() => setFilter('all')}
+                                        className={`px-4 py-2 rounded-lg transition-colors ${
+                                            filter === 'all' ? 'bg-cyan-500 text-slate-900' : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        All ({leads.length})
+                                    </button>
+                                    {Object.entries(STATUS_CONFIG).map(([key, config]) => {
+                                        const count = leads.filter(l => l.status === key).length;
+                                        if (count === 0) return null;
+                                        return (
+                                            <button
+                                                key={key}
+                                                onClick={() => setFilter(key)}
+                                                className={`px-4 py-2 rounded-lg transition-colors ${
+                                                    filter === key ? 'bg-cyan-500 text-slate-900' : 'text-slate-400 hover:text-white'
+                                                }`}
+                                            >
+                                                {config.label} ({count})
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex gap-4">
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        placeholder="Search leads..."
+                                        className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 w-64"
+                                    />
+                                    <a
+                                        href="missionpulse-request-access.html"
+                                        target="_blank"
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg font-medium transition-colors"
+                                    >
+                                        View Form →
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Leads Table */}
+                        <div className="glass rounded-xl overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-slate-700/50 text-left">
+                                            <th className="px-4 py-3 text-slate-400 font-medium text-sm">Contact</th>
+                                            <th className="px-4 py-3 text-slate-400 font-medium text-sm">Company</th>
+                                            <th className="px-4 py-3 text-slate-400 font-medium text-sm">Certifications</th>
+                                            <th className="px-4 py-3 text-slate-400 font-medium text-sm">Status</th>
+                                            <th className="px-4 py-3 text-slate-400 font-medium text-sm">Priority</th>
+                                            <th className="px-4 py-3 text-slate-400 font-medium text-sm">Submitted</th>
+                                            <th className="px-4 py-3 text-slate-400 font-medium text-sm">Demo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredLeads.map(lead => (
+                                            <LeadRow 
+                                                key={lead.id} 
+                                                lead={lead} 
+                                                onClick={setSelectedLead}
+                                            />
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            {filteredLeads.length === 0 && (
+                                <div className="p-12 text-center text-slate-500">
+                                    No leads found matching your criteria.
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Urgent Leads Alert */}
+                        {stats.new > 0 && (
+                            <div className="mt-6 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-2xl">⚡</span>
+                                    <div>
+                                        <p className="text-amber-300 font-medium">
+                                            {stats.new} new lead{stats.new !== 1 ? 's' : ''} awaiting response
+                                        </p>
+                                        <p className="text-amber-300/70 text-sm">
+                                            Respond within 24 hours for best conversion rates
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setFilter('new')}
+                                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg font-medium transition-colors"
+                                >
+                                    View New Leads
+                                </button>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Lead Detail Modal */}
+                    {selectedLead && (
+                        <LeadDetailModal
+                            lead={selectedLead}
+                            onClose={() => setSelectedLead(null)}
+                            onUpdate={updateLead}
+                        />
+                    )}
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-800 mt-8">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between text-sm text-slate-500">
+                            <span>MissionPulse v3.1 • Mission Meets Tech</span>
+                            <span>AI GENERATED - REQUIRES HUMAN REVIEW</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
