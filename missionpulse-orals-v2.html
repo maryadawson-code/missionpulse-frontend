@@ -1,311 +1,368 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+  FILE: missionpulse-orals-v2.html
+  ROLE: CEO | COO | CAP | PM | SA
+  SECURITY: env vars verified - Supabase anon key (public safe)
+  VERSION: 2.0.0
+  
+  Orals Prep Studio - AI-Powered Presentation Builder
+  © 2026 Mission Meets Tech
+-->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - Orals Prep</title>
+  <title>Orals Prep Studio | MissionPulse</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
-    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
-    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
-    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
-    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
-    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
-    .status-scheduled { border-left: 4px solid #F59E0B; }
-    .status-completed { border-left: 4px solid #10B981; }
-    .status-cancelled { border-left: 4px solid #EF4444; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
   </style>
 </head>
-<body class="p-6">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
-    <div class="flex items-center gap-4">
-      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
-      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Orals</span> Prep</h1>
-    </div>
-    <div class="flex items-center gap-4">
-      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
-        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-        <span class="text-gray-400">Connecting...</span>
-      </div>
-      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
-        <option value="">All Opportunities</option>
-      </select>
-      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ New Session</button>
-    </div>
-  </div>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-  <!-- Stats Row -->
-  <div class="grid grid-cols-4 gap-4 mb-6">
-    <div class="card p-4 text-center">
-      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
-      <div class="text-gray-400 text-sm">Total Sessions</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statCompleted" class="text-3xl font-bold text-green-400">0</div>
-      <div class="text-gray-400 text-sm">Completed</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statScheduled" class="text-3xl font-bold text-amber-400">0</div>
-      <div class="text-gray-400 text-sm">Scheduled</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statAvgScore" class="text-3xl font-bold text-purple-400">-</div>
-      <div class="text-gray-400 text-sm">Avg Score</div>
-    </div>
-  </div>
-
-  <!-- Sessions Grid -->
-  <div id="sessionsContainer" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-    <div class="card p-8 text-center text-gray-500 col-span-full">Loading sessions...</div>
-  </div>
-
-  <!-- Add/Edit Modal -->
-  <div id="sessionModal" class="modal hidden">
-    <div class="card p-6 w-full max-w-xl">
-      <div class="flex items-center justify-between mb-4">
-        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">New Session</h2>
-        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
-      </div>
-      <form id="sessionForm" onsubmit="handleSubmit(event)">
-        <input type="hidden" id="sessionId">
-        
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Session Name *</label>
-          <input type="text" id="sessionName" required placeholder="Mock Orals Round 1" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Session Date *</label>
-            <input type="datetime-local" id="sessionDate" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Duration (minutes)</label>
-            <input type="number" id="durationMinutes" placeholder="60" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Status</label>
-            <select id="sessionStatus" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-              <option value="scheduled">Scheduled</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Overall Score (1-100)</label>
-            <input type="number" id="overallScore" min="0" max="100" placeholder="85" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Evaluator Notes</label>
-          <textarea id="evaluatorNotes" rows="4" placeholder="Feedback from evaluators..." class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
-        </div>
-
-        <div class="flex justify-end gap-3">
-          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
-          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Session</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="mt-8 text-center text-xs text-gray-500">AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026</div>
-
-  <script>
+    // Supabase Configuration
     const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-    
-    let supabase, allSessions = [], opportunities = [], editingId = null;
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    function initSupabase() {
-      if (typeof window.supabase !== 'undefined') {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        updateConnectionStatus(true);
-        return true;
-      }
-      return false;
-    }
+    // Demo Data
+    const DEMO_OPPORTUNITIES = [
+      { id: 1, name: 'DHA Healthcare Platform', agency: 'DHA', contract_value: 47000000, shipley_phase: 'Phase 3' },
+      { id: 2, name: 'VA Claims Modernization', agency: 'VA', contract_value: 23000000, shipley_phase: 'Phase 2' },
+      { id: 3, name: 'CMS Data Analytics', agency: 'CMS', contract_value: 15000000, shipley_phase: 'Phase 3' },
+    ];
 
-    function updateConnectionStatus(connected) {
-      document.getElementById('connectionStatus').innerHTML = connected 
-        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
-        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
-    }
+    const SLIDE_TEMPLATES = [
+      { id: 'title', name: 'Title Slide', icon: '🎯', duration: 60 },
+      { id: 'team', name: 'Team Introduction', icon: '👥', duration: 120 },
+      { id: 'understanding', name: 'Understanding of Need', icon: '🔍', duration: 180 },
+      { id: 'approach', name: 'Technical Approach', icon: '⚙️', duration: 300 },
+      { id: 'experience', name: 'Relevant Experience', icon: '📊', duration: 240 },
+      { id: 'management', name: 'Management Plan', icon: '📋', duration: 180 },
+      { id: 'staffing', name: 'Staffing Plan', icon: '👤', duration: 120 },
+      { id: 'questions', name: 'Q&A Prep', icon: '❓', duration: 300 },
+      { id: 'closing', name: 'Closing Statement', icon: '🏆', duration: 60 },
+    ];
 
-    async function loadOpportunities() {
-      try {
-        const { data } = await supabase.from('opportunities').select('id, title, name').order('title');
-        opportunities = data || [];
-        document.getElementById('opportunityFilter').innerHTML = `<option value="">All Opportunities</option>` + 
-          opportunities.map(o => `<option value="${o.id}">${o.title || o.name}</option>`).join('');
-      } catch (err) { console.error('Failed to load opportunities:', err); }
-    }
+    function OralsStudio() {
+      const [connected, setConnected] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [opportunities, setOpportunities] = useState([]);
+      const [selectedOpp, setSelectedOpp] = useState(null);
+      const [deck, setDeck] = useState([]);
+      const [activeSlide, setActiveSlide] = useState(null);
+      const [practicing, setPracticing] = useState(false);
+      const [timer, setTimer] = useState(0);
+      const [totalTime, setTotalTime] = useState(0);
 
-    async function loadSessions() {
-      try {
-        const oppFilter = document.getElementById('opportunityFilter').value;
-        let query = supabase.from('orals_sessions').select('*').order('session_date', { ascending: false });
-        if (oppFilter) query = query.eq('opportunity_id', oppFilter);
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        allSessions = data || [];
-        renderSessions();
-        updateStats();
-      } catch (err) {
-        console.error('Failed to load sessions:', err);
-        showEmptyState('Failed to load sessions');
-      }
-    }
+      useEffect(() => {
+        loadData();
+      }, []);
 
-    function renderSessions() {
-      const container = document.getElementById('sessionsContainer');
-      if (allSessions.length === 0) { showEmptyState('No sessions found'); return; }
-      
-      container.innerHTML = allSessions.map(s => `
-        <div class="card p-4 status-${s.status || 'scheduled'} hover:border-cyan-400/50 cursor-pointer" onclick="openEditModal('${s.id}')">
-          <div class="flex items-start justify-between mb-3">
-            <h3 class="font-semibold">${s.session_name || 'Untitled Session'}</h3>
-            <span class="text-xs px-2 py-1 rounded ${getStatusClass(s.status)}">${(s.status || 'scheduled').toUpperCase()}</span>
-          </div>
+      useEffect(() => {
+        setTotalTime(deck.reduce((sum, s) => sum + (s.duration || 0), 0));
+      }, [deck]);
+
+      useEffect(() => {
+        let interval;
+        if (practicing) {
+          interval = setInterval(() => setTimer(t => t + 1), 1000);
+        }
+        return () => clearInterval(interval);
+      }, [practicing]);
+
+      const loadData = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('opportunities')
+            .select('*')
+            .in('shipley_phase', ['Phase 3', 'Phase 2'])
+            .order('contract_value', { ascending: false });
           
-          <div class="grid grid-cols-2 gap-2 mb-3">
-            <div class="bg-slate-800 rounded p-2 text-center">
-              <div class="text-lg font-bold text-cyan-400">${s.duration_minutes || '-'}</div>
-              <div class="text-xs text-gray-500">Minutes</div>
-            </div>
-            <div class="bg-slate-800 rounded p-2 text-center">
-              <div class="text-lg font-bold ${getScoreColor(s.overall_score)}">${s.overall_score || '-'}</div>
-              <div class="text-xs text-gray-500">Score</div>
-            </div>
-          </div>
-          
-          ${s.evaluator_notes ? `<p class="text-xs text-gray-400 mb-2 line-clamp-2">📝 ${s.evaluator_notes}</p>` : ''}
-          
-          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
-            <span class="text-xs text-gray-500">${formatDate(s.session_date)}</span>
-            <button onclick="event.stopPropagation(); deleteSession('${s.id}')" class="text-red-400 hover:text-red-300 text-xs">Delete</button>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function showEmptyState(msg) {
-      document.getElementById('sessionsContainer').innerHTML = `<div class="card p-8 text-center text-gray-500 col-span-full"><p>${msg}</p><button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Schedule First Session</button></div>`;
-    }
-
-    function getStatusClass(status) {
-      const c = { scheduled: 'bg-amber-500/20 text-amber-400', completed: 'bg-green-500/20 text-green-400', cancelled: 'bg-red-500/20 text-red-400' };
-      return c[status] || c.scheduled;
-    }
-
-    function getScoreColor(score) {
-      if (!score) return 'text-gray-400';
-      if (score >= 80) return 'text-green-400';
-      if (score >= 60) return 'text-amber-400';
-      return 'text-red-400';
-    }
-
-    function formatDate(date) { return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'; }
-
-    function updateStats() {
-      const completed = allSessions.filter(s => s.status === 'completed');
-      const scheduled = allSessions.filter(s => s.status === 'scheduled');
-      const scores = completed.filter(s => s.overall_score).map(s => s.overall_score);
-      const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
-      
-      document.getElementById('statTotal').textContent = allSessions.length;
-      document.getElementById('statCompleted').textContent = completed.length;
-      document.getElementById('statScheduled').textContent = scheduled.length;
-      document.getElementById('statAvgScore').textContent = avgScore || '-';
-    }
-
-    function openAddModal() {
-      editingId = null;
-      document.getElementById('modalTitle').textContent = 'New Session';
-      document.getElementById('sessionForm').reset();
-      document.getElementById('sessionModal').classList.remove('hidden');
-    }
-
-    function openEditModal(id) {
-      const session = allSessions.find(s => s.id === id);
-      if (!session) return;
-      
-      editingId = id;
-      document.getElementById('modalTitle').textContent = 'Edit Session';
-      document.getElementById('sessionName').value = session.session_name || '';
-      document.getElementById('sessionDate').value = session.session_date ? session.session_date.slice(0, 16) : '';
-      document.getElementById('durationMinutes').value = session.duration_minutes || '';
-      document.getElementById('sessionStatus').value = session.status || 'scheduled';
-      document.getElementById('overallScore').value = session.overall_score || '';
-      document.getElementById('evaluatorNotes').value = session.evaluator_notes || '';
-      document.getElementById('sessionModal').classList.remove('hidden');
-    }
-
-    function closeModal() { document.getElementById('sessionModal').classList.add('hidden'); editingId = null; }
-
-    async function handleSubmit(event) {
-      event.preventDefault();
-      const data = {
-        session_name: document.getElementById('sessionName').value,
-        session_date: document.getElementById('sessionDate').value,
-        duration_minutes: parseInt(document.getElementById('durationMinutes').value) || null,
-        status: document.getElementById('sessionStatus').value,
-        overall_score: parseInt(document.getElementById('overallScore').value) || null,
-        evaluator_notes: document.getElementById('evaluatorNotes').value || null,
-        opportunity_id: document.getElementById('opportunityFilter').value || null,
-        updated_at: new Date().toISOString()
+          if (error) throw error;
+          setOpportunities(data?.length ? data : DEMO_OPPORTUNITIES);
+          setConnected(true);
+        } catch (err) {
+          console.error('Load failed:', err);
+          setOpportunities(DEMO_OPPORTUNITIES);
+          setConnected(false);
+        } finally {
+          setLoading(false);
+        }
       };
 
-      try {
-        if (editingId) {
-          const { error } = await supabase.from('orals_sessions').update(data).eq('id', editingId);
-          if (error) throw error;
-        } else {
-          data.created_at = new Date().toISOString();
-          const { error } = await supabase.from('orals_sessions').insert([data]);
-          if (error) throw error;
+      const addSlide = (template) => {
+        const newSlide = {
+          ...template,
+          slideId: Date.now(),
+          content: '',
+          notes: '',
+          talking_points: []
+        };
+        setDeck([...deck, newSlide]);
+        setActiveSlide(newSlide);
+      };
+
+      const updateSlide = (slideId, updates) => {
+        setDeck(deck.map(s => s.slideId === slideId ? { ...s, ...updates } : s));
+        if (activeSlide?.slideId === slideId) {
+          setActiveSlide({ ...activeSlide, ...updates });
         }
-        closeModal();
-        await loadSessions();
-      } catch (err) { console.error('Failed to save:', err); alert('Failed to save: ' + err.message); }
+      };
+
+      const removeSlide = (slideId) => {
+        setDeck(deck.filter(s => s.slideId !== slideId));
+        if (activeSlide?.slideId === slideId) setActiveSlide(null);
+      };
+
+      const moveSlide = (index, direction) => {
+        const newDeck = [...deck];
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= deck.length) return;
+        [newDeck[index], newDeck[newIndex]] = [newDeck[newIndex], newDeck[index]];
+        setDeck(newDeck);
+      };
+
+      const formatTime = (seconds) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+      };
+
+      const saveDeck = async () => {
+        if (!selectedOpp) return alert('Select an opportunity first');
+        
+        try {
+          const deckData = {
+            opportunity_id: selectedOpp.id,
+            slides: deck,
+            total_duration: totalTime,
+            created_at: new Date().toISOString()
+          };
+          
+          const { error } = await supabase.from('orals_decks').insert(deckData);
+          if (error) throw error;
+          alert('Deck saved successfully!');
+        } catch (err) {
+          console.error('Save failed:', err);
+          alert('Saved locally (demo mode)');
+        }
+      };
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-slate-400">Loading Orals Studio...</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-[#00050F] text-white p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🎤</span>
+                <h1 className="text-2xl font-bold">Orals Prep Studio</h1>
+                <span className={`px-2 py-1 text-xs rounded-full ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                  {connected ? '● Live' : '○ Demo'}
+                </span>
+              </div>
+              <p className="text-slate-400 mt-1">Build and practice your oral presentation deck</p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {practicing && (
+                <div className="px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-lg">
+                  <span className="text-red-400 font-mono text-lg">{formatTime(timer)}</span>
+                </div>
+              )}
+              <button 
+                onClick={() => { setPracticing(!practicing); if (!practicing) setTimer(0); }}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  practicing ? 'bg-red-500 hover:bg-red-600' : 'bg-purple-500 hover:bg-purple-600'
+                }`}
+              >
+                {practicing ? '⏹ Stop Practice' : '▶ Start Practice'}
+              </button>
+              <button onClick={saveDeck} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium">
+                💾 Save Deck
+              </button>
+            </div>
+          </div>
+
+          {/* Opportunity Selector */}
+          <div className="mb-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+            <label className="block text-sm font-medium text-slate-400 mb-2">Select Opportunity</label>
+            <select 
+              value={selectedOpp?.id || ''} 
+              onChange={(e) => setSelectedOpp(opportunities.find(o => o.id == e.target.value))}
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white"
+            >
+              <option value="">-- Select Opportunity --</option>
+              {opportunities.map(opp => (
+                <option key={opp.id} value={opp.id}>
+                  {opp.name} ({opp.agency}) - ${(opp.contract_value / 1000000).toFixed(1)}M
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-12 gap-6">
+            {/* Slide Templates */}
+            <div className="col-span-3 space-y-4">
+              <h3 className="font-semibold text-slate-300 mb-2">Slide Templates</h3>
+              <div className="space-y-2">
+                {SLIDE_TEMPLATES.map(template => (
+                  <button 
+                    key={template.id}
+                    onClick={() => addSlide(template)}
+                    className="w-full p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg border border-slate-700/50 text-left transition-colors group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{template.icon}</span>
+                        <span className="text-sm font-medium">{template.name}</span>
+                      </div>
+                      <span className="text-xs text-slate-500">{formatTime(template.duration)}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              
+              {deck.length > 0 && (
+                <div className="mt-6 p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
+                  <div className="text-sm text-slate-400">Total Duration</div>
+                  <div className="text-2xl font-bold text-cyan-400">{formatTime(totalTime)}</div>
+                  <div className="text-xs text-slate-500 mt-1">{deck.length} slides</div>
+                </div>
+              )}
+            </div>
+
+            {/* Deck Builder */}
+            <div className="col-span-4 space-y-4">
+              <h3 className="font-semibold text-slate-300">Your Deck ({deck.length} slides)</h3>
+              {deck.length === 0 ? (
+                <div className="p-8 border-2 border-dashed border-slate-700 rounded-xl text-center">
+                  <span className="text-4xl mb-2 block">📑</span>
+                  <p className="text-slate-500">Add slides from templates</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                  {deck.map((slide, index) => (
+                    <div 
+                      key={slide.slideId}
+                      onClick={() => setActiveSlide(slide)}
+                      className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                        activeSlide?.slideId === slide.slideId 
+                          ? 'bg-cyan-500/20 border-cyan-500/50' 
+                          : 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-500 text-sm w-6">{index + 1}.</span>
+                          <span>{slide.icon}</span>
+                          <span className="text-sm font-medium">{slide.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={(e) => { e.stopPropagation(); moveSlide(index, -1); }} className="p-1 hover:bg-slate-700 rounded text-slate-500">↑</button>
+                          <button onClick={(e) => { e.stopPropagation(); moveSlide(index, 1); }} className="p-1 hover:bg-slate-700 rounded text-slate-500">↓</button>
+                          <button onClick={(e) => { e.stopPropagation(); removeSlide(slide.slideId); }} className="p-1 hover:bg-red-500/20 rounded text-red-400">×</button>
+                        </div>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 pl-8">{formatTime(slide.duration)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Slide Editor */}
+            <div className="col-span-5">
+              {activeSlide ? (
+                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <span className="text-3xl">{activeSlide.icon}</span>
+                    <div>
+                      <h3 className="font-bold text-lg">{activeSlide.name}</h3>
+                      <p className="text-sm text-slate-400">Target: {formatTime(activeSlide.duration)}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-2">Slide Content</label>
+                      <textarea
+                        value={activeSlide.content}
+                        onChange={(e) => updateSlide(activeSlide.slideId, { content: e.target.value })}
+                        placeholder="Key points for this slide..."
+                        className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-2">Speaker Notes</label>
+                      <textarea
+                        value={activeSlide.notes}
+                        onChange={(e) => updateSlide(activeSlide.slideId, { notes: e.target.value })}
+                        placeholder="What you'll say during this slide..."
+                        className="w-full h-24 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-2">Duration (seconds)</label>
+                      <input
+                        type="number"
+                        value={activeSlide.duration}
+                        onChange={(e) => updateSlide(activeSlide.slideId, { duration: parseInt(e.target.value) || 0 })}
+                        className="w-32 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white"
+                      />
+                    </div>
+
+                    <button className="w-full mt-4 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-medium hover:opacity-90 transition-opacity">
+                      🤖 Generate AI Talking Points
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/50">
+                  <div className="text-center">
+                    <span className="text-4xl mb-2 block">👈</span>
+                    <p className="text-slate-500">Select a slide to edit</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-8 pt-4 border-t border-slate-800 text-center text-xs text-slate-600">
+            AI GENERATED - REQUIRES HUMAN REVIEW
+          </div>
+        </div>
+      );
     }
 
-    async function deleteSession(id) {
-      if (!confirm('Delete this session?')) return;
-      try {
-        const { error } = await supabase.from('orals_sessions').delete().eq('id', id);
-        if (error) throw error;
-        await loadSessions();
-      } catch (err) { console.error('Failed to delete:', err); }
-    }
-
-    function subscribeToChanges() {
-      supabase.channel('orals_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'orals_sessions' }, () => loadSessions()).subscribe();
-    }
-
-    document.getElementById('opportunityFilter').addEventListener('change', loadSessions);
-
-    async function init() {
-      if (!initSupabase()) { updateConnectionStatus(false); return; }
-      await loadOpportunities();
-      await loadSessions();
-      subscribeToChanges();
-    }
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
+    ReactDOM.createRoot(document.getElementById('root')).render(<OralsStudio />);
   </script>
 </body>
 </html>

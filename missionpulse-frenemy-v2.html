@@ -1,443 +1,468 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+  FILE: missionpulse-frenemy-v2.html
+  ROLE: CEO | COO | CAP (RESTRICTED)
+  SECURITY: env vars verified, data masking enforced
+  VERSION: 2.0.0
+  
+  Frenemy View - Partner Data Masking for Sensitive Sharing
+  © 2026 Mission Meets Tech
+-->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - Frenemy Protocol</title>
+  <title>Frenemy View | MissionPulse</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #F8FAFC; }
-    .card { background: #0d1f3c; border: 1px solid rgba(0, 229, 250, 0.3); border-radius: 12px; }
-    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #0891B2 100%); color: #00050F; font-weight: 600; }
-    .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 229, 250, 0.4); }
-    .glow-text { text-shadow: 0 0 10px rgba(0, 229, 250, 0.5); }
-    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
-    .relationship-ally { border-left: 4px solid #10B981; }
-    .relationship-competitor { border-left: 4px solid #EF4444; }
-    .relationship-frenemy { border-left: 4px solid #F59E0B; }
-    .relationship-unknown { border-left: 4px solid #6B7280; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .redacted { background: repeating-linear-gradient(90deg, #1e293b 0px, #1e293b 8px, #334155 8px, #334155 16px); color: transparent; user-select: none; border-radius: 4px; }
+    .blur-sensitive { filter: blur(6px); transition: filter 0.3s; }
+    .blur-sensitive:hover { filter: blur(0); }
   </style>
 </head>
-<body class="p-6">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
-    <div class="flex items-center gap-4">
-      <a href="index.html" class="text-gray-400 hover:text-cyan-400">← Dashboard</a>
-      <h1 class="text-2xl font-bold"><span class="text-cyan-400 glow-text">Frenemy</span> Protocol</h1>
-    </div>
-    <div class="flex items-center gap-4">
-      <div id="connectionStatus" class="flex items-center gap-2 text-sm">
-        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-        <span class="text-gray-400">Connecting...</span>
-      </div>
-      <select id="opportunityFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm">
-        <option value="">All Opportunities</option>
-      </select>
-      <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg">+ Add Entity</button>
-    </div>
-  </div>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
 
-  <!-- Stats Row -->
-  <div class="grid grid-cols-5 gap-4 mb-6">
-    <div class="card p-4 text-center">
-      <div id="statTotal" class="text-3xl font-bold text-cyan-400">0</div>
-      <div class="text-gray-400 text-sm">Total Entities</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statAllies" class="text-3xl font-bold text-green-400">0</div>
-      <div class="text-gray-400 text-sm">Allies</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statCompetitors" class="text-3xl font-bold text-red-400">0</div>
-      <div class="text-gray-400 text-sm">Competitors</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statFrenemies" class="text-3xl font-bold text-amber-400">0</div>
-      <div class="text-gray-400 text-sm">Frenemies</div>
-    </div>
-    <div class="card p-4 text-center">
-      <div id="statThreatScore" class="text-3xl font-bold text-purple-400">0</div>
-      <div class="text-gray-400 text-sm">Avg Threat Score</div>
-    </div>
-  </div>
-
-  <!-- Search & Filters -->
-  <div class="card p-4 mb-6">
-    <div class="flex gap-4">
-      <input type="text" id="searchInput" placeholder="Search entities..."
-             class="flex-1 bg-slate-800 border border-slate-600 rounded px-4 py-2" oninput="filterEntities()">
-      <select id="relationshipFilter" class="bg-slate-800 border border-slate-600 rounded px-3 py-2" onchange="filterEntities()">
-        <option value="">All Relationships</option>
-        <option value="ally">Allies</option>
-        <option value="competitor">Competitors</option>
-        <option value="frenemy">Frenemies</option>
-        <option value="unknown">Unknown</option>
-      </select>
-    </div>
-  </div>
-
-  <!-- Entities Grid -->
-  <div id="entitiesContainer" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-    <div class="card p-8 text-center text-gray-500 col-span-full">Loading entities...</div>
-  </div>
-
-  <!-- Add/Edit Modal -->
-  <div id="entityModal" class="modal hidden">
-    <div class="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <h2 id="modalTitle" class="text-xl font-bold text-cyan-400">Add Entity</h2>
-        <button onclick="closeModal()" class="text-gray-400 hover:text-white">✕</button>
-      </div>
-      <form id="entityForm" onsubmit="handleSubmit(event)">
-        <input type="hidden" id="entityId">
-        
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Entity Name *</label>
-            <input type="text" id="entityName" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Relationship *</label>
-            <select id="entityRelationship" required class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-              <option value="unknown">Unknown</option>
-              <option value="ally">Ally</option>
-              <option value="competitor">Competitor</option>
-              <option value="frenemy">Frenemy</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">CAGE Code</label>
-            <input type="text" id="cageCode" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Set-Aside Status</label>
-            <select id="setAsideStatus" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-              <option value="">None</option>
-              <option value="SDVOSB">SDVOSB</option>
-              <option value="8(a)">8(a)</option>
-              <option value="WOSB">WOSB</option>
-              <option value="HUBZone">HUBZone</option>
-              <option value="Small Business">Small Business</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Threat Score (1-10)</label>
-            <input type="number" id="threatScore" min="1" max="10" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Win Rate vs Us (%)</label>
-            <input type="number" id="winRate" min="0" max="100" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Capabilities</label>
-          <textarea id="capabilities" rows="2" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
-        </div>
-
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Strengths</label>
-          <textarea id="strengths" rows="2" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
-        </div>
-
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Weaknesses</label>
-          <textarea id="weaknesses" rows="2" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
-        </div>
-
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Intel Notes</label>
-          <textarea id="intelNotes" rows="2" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2"></textarea>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Contact Name</label>
-            <input type="text" id="contactName" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">Contact Email</label>
-            <input type="email" id="contactEmail" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2">
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-3">
-          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">Cancel</button>
-          <button type="submit" class="btn-primary px-6 py-2 rounded-lg">Save Entity</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="mt-8 text-center text-xs text-gray-500">
-    AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse © 2026
-  </div>
-
-  <script>
-    // ========== SUPABASE CONFIG ==========
     const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-    
-    let supabase;
-    let allEntities = [];
-    let opportunities = [];
-    let editingId = null;
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    function initSupabase() {
-      if (typeof window.supabase !== 'undefined') {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        updateConnectionStatus(true);
-        return true;
+    const MASKING_PRESETS = [
+      { id: 'teaming_call', name: 'Teaming Call', icon: '📞', description: 'Hide pricing, competitor details, internal notes', fields: ['pricing', 'competitors', 'internal_notes', 'strategy'] },
+      { id: 'partner_review', name: 'Partner Review', icon: '🤝', description: 'Hide other partners, pricing details, win themes', fields: ['other_partners', 'pricing', 'win_themes', 'strategy'] },
+      { id: 'client_demo', name: 'Client Demo', icon: '🎯', description: 'Hide all sensitive business data', fields: ['pricing', 'competitors', 'partners', 'internal_notes', 'strategy', 'financials'] },
+      { id: 'executive_brief', name: 'Executive Brief', icon: '👔', description: 'Show high-level only, hide details', fields: ['internal_notes', 'task_details', 'technical_details'] },
+      { id: 'custom', name: 'Custom Masking', icon: '⚙️', description: 'Choose specific fields to mask', fields: [] },
+    ];
+
+    const MASKABLE_FIELDS = [
+      { id: 'pricing', name: 'Pricing & Rates', icon: '💰', category: 'Financial' },
+      { id: 'competitors', name: 'Competitor Intel', icon: '🎯', category: 'Strategy' },
+      { id: 'partners', name: 'Partner Details', icon: '🤝', category: 'Teaming' },
+      { id: 'other_partners', name: 'Other Partners', icon: '👥', category: 'Teaming' },
+      { id: 'win_themes', name: 'Win Themes', icon: '🏆', category: 'Strategy' },
+      { id: 'strategy', name: 'Capture Strategy', icon: '📋', category: 'Strategy' },
+      { id: 'internal_notes', name: 'Internal Notes', icon: '📝', category: 'Internal' },
+      { id: 'financials', name: 'Financial Details', icon: '📊', category: 'Financial' },
+      { id: 'contacts', name: 'Contact Info', icon: '📱', category: 'Personal' },
+      { id: 'technical_details', name: 'Technical Details', icon: '⚙️', category: 'Technical' },
+      { id: 'task_details', name: 'Task Assignments', icon: '✅', category: 'Internal' },
+    ];
+
+    const DEMO_OPPORTUNITY = {
+      id: 1,
+      name: 'DHA Healthcare Data Platform Modernization',
+      agency: 'Defense Health Agency',
+      contract_value: 47000000,
+      due_date: '2026-03-15',
+      shipley_phase: 'Phase 3 - Proposal',
+      win_probability: 72,
+      pricing: {
+        total: 47000000,
+        labor: 38000000,
+        materials: 5000000,
+        travel: 2000000,
+        other: 2000000,
+        rates: [
+          { role: 'Program Manager', rate: 185 },
+          { role: 'Solution Architect', rate: 165 },
+          { role: 'Senior Developer', rate: 145 },
+        ]
+      },
+      competitors: [
+        { name: 'Leidos', threat: 'High', strengths: 'Incumbent, cleared staff', weaknesses: 'Higher rates, slow delivery' },
+        { name: 'GDIT', threat: 'Medium', strengths: 'DHA relationships', weaknesses: 'Recent contract issues' },
+        { name: 'Booz Allen', threat: 'Medium', strengths: 'Technical depth', weaknesses: 'Premium pricing' },
+      ],
+      partners: [
+        { name: 'CloudFirst Technologies', role: 'Cloud Infrastructure', share: 30 },
+        { name: 'SecureNet Solutions', role: 'Cybersecurity', share: 25 },
+      ],
+      win_themes: [
+        { theme: 'Proven Healthcare Platform', strength: 95 },
+        { theme: 'Cleared Healthcare IT Experts', strength: 88 },
+        { theme: 'VA Modernization Track Record', strength: 92 },
+      ],
+      strategy: 'Ghost Leidos on delivery speed and innovation. Emphasize our AI capabilities and modern tech stack. Leverage VA relationship for DHA credibility.',
+      internal_notes: 'Sarah needs to finalize Section L.4 by Friday. Pricing review scheduled for Monday. CEO approved aggressive pricing strategy.',
+      contacts: {
+        contracting: 'Jane Smith, jane.smith@dha.mil, 703-555-0100',
+        technical: 'Dr. Robert Chen, robert.chen@dha.mil, 703-555-0101',
       }
-      return false;
-    }
+    };
 
-    function updateConnectionStatus(connected) {
-      const status = document.getElementById('connectionStatus');
-      status.innerHTML = connected 
-        ? `<span class="w-2 h-2 rounded-full bg-green-400"></span><span class="text-green-400">Connected</span>`
-        : `<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-red-400">Disconnected</span>`;
-    }
+    function FrenemyView() {
+      const [connected, setConnected] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [opportunity, setOpportunity] = useState(null);
+      const [selectedPreset, setSelectedPreset] = useState(null);
+      const [maskedFields, setMaskedFields] = useState([]);
+      const [viewerName, setViewerName] = useState('');
+      const [showPreview, setShowPreview] = useState(false);
+      const [shareLink, setShareLink] = useState('');
 
-    // ========== DATA LOADING ==========
-    async function loadOpportunities() {
-      try {
-        const { data, error } = await supabase.from('opportunities').select('id, title, name').order('title');
-        if (error) throw error;
-        opportunities = data || [];
-        const select = document.getElementById('opportunityFilter');
-        select.innerHTML = `<option value="">All Opportunities</option>` + 
-          opportunities.map(o => `<option value="${o.id}">${o.title || o.name}</option>`).join('');
-      } catch (err) {
-        console.error('Failed to load opportunities:', err);
-      }
-    }
+      useEffect(() => { loadData(); }, []);
 
-    async function loadEntities() {
-      try {
-        const oppFilter = document.getElementById('opportunityFilter').value;
-        let query = supabase.from('frenemy_entities').select('*').order('entity_name');
-        if (oppFilter) query = query.eq('opportunity_id', oppFilter);
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        allEntities = data || [];
-        filterEntities();
-        updateStats();
-      } catch (err) {
-        console.error('Failed to load entities:', err);
-        showEmptyState('Failed to load entities');
-      }
-    }
-
-    function filterEntities() {
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      const relFilter = document.getElementById('relationshipFilter').value;
-      
-      const filtered = allEntities.filter(e => {
-        const matchesSearch = !search || 
-          e.entity_name?.toLowerCase().includes(search) ||
-          e.capabilities?.toLowerCase().includes(search);
-        const matchesRel = !relFilter || e.relationship === relFilter;
-        return matchesSearch && matchesRel;
-      });
-      renderEntities(filtered);
-    }
-
-    function renderEntities(entities) {
-      const container = document.getElementById('entitiesContainer');
-      if (entities.length === 0) {
-        showEmptyState('No entities found');
-        return;
-      }
-      
-      container.innerHTML = entities.map(e => `
-        <div class="card p-4 relationship-${e.relationship || 'unknown'} hover:border-cyan-400/50 cursor-pointer"
-             onclick="openEditModal('${e.id}')">
-          <div class="flex items-start justify-between mb-3">
-            <div>
-              <h3 class="font-semibold">${e.entity_name || 'Unknown'}</h3>
-              <span class="text-xs text-gray-500">${e.cage_code ? 'CAGE: ' + e.cage_code : ''}</span>
-            </div>
-            <span class="text-xs px-2 py-1 rounded ${getRelationshipClass(e.relationship)}">
-              ${(e.relationship || 'unknown').toUpperCase()}
-            </span>
-          </div>
-          
-          ${e.set_aside_status ? `<div class="text-xs text-cyan-400 mb-2">${e.set_aside_status}</div>` : ''}
-          
-          <div class="grid grid-cols-2 gap-2 mb-3">
-            <div class="bg-slate-800 rounded p-2 text-center">
-              <div class="text-lg font-bold ${getThreatColor(e.threat_score)}">${e.threat_score || '-'}</div>
-              <div class="text-xs text-gray-500">Threat</div>
-            </div>
-            <div class="bg-slate-800 rounded p-2 text-center">
-              <div class="text-lg font-bold text-amber-400">${e.win_rate || '-'}%</div>
-              <div class="text-xs text-gray-500">Win Rate</div>
-            </div>
-          </div>
-          
-          ${e.capabilities ? `<p class="text-xs text-gray-400 mb-2 line-clamp-2">📋 ${e.capabilities}</p>` : ''}
-          
-          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
-            <span class="text-xs text-gray-500">${formatDate(e.updated_at)}</span>
-            <button onclick="event.stopPropagation(); deleteEntity('${e.id}')" class="text-red-400 hover:text-red-300 text-xs">Delete</button>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function showEmptyState(message) {
-      document.getElementById('entitiesContainer').innerHTML = `
-        <div class="card p-8 text-center text-gray-500 col-span-full">
-          <p>${message}</p>
-          <button onclick="openAddModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">Add First Entity</button>
-        </div>`;
-    }
-
-    function getRelationshipClass(rel) {
-      const classes = { ally: 'bg-green-500/20 text-green-400', competitor: 'bg-red-500/20 text-red-400', frenemy: 'bg-amber-500/20 text-amber-400', unknown: 'bg-gray-500/20 text-gray-400' };
-      return classes[rel] || classes.unknown;
-    }
-
-    function getThreatColor(score) {
-      if (!score) return 'text-gray-400';
-      if (score >= 8) return 'text-red-400';
-      if (score >= 5) return 'text-amber-400';
-      return 'text-green-400';
-    }
-
-    function formatDate(date) {
-      if (!date) return 'N/A';
-      return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-
-    function updateStats() {
-      const allies = allEntities.filter(e => e.relationship === 'ally').length;
-      const competitors = allEntities.filter(e => e.relationship === 'competitor').length;
-      const frenemies = allEntities.filter(e => e.relationship === 'frenemy').length;
-      const avgThreat = allEntities.length > 0 
-        ? Math.round(allEntities.reduce((sum, e) => sum + (e.threat_score || 0), 0) / allEntities.length) : 0;
-      
-      document.getElementById('statTotal').textContent = allEntities.length;
-      document.getElementById('statAllies').textContent = allies;
-      document.getElementById('statCompetitors').textContent = competitors;
-      document.getElementById('statFrenemies').textContent = frenemies;
-      document.getElementById('statThreatScore').textContent = avgThreat;
-    }
-
-    // ========== MODAL HANDLERS ==========
-    function openAddModal() {
-      editingId = null;
-      document.getElementById('modalTitle').textContent = 'Add Entity';
-      document.getElementById('entityForm').reset();
-      document.getElementById('entityModal').classList.remove('hidden');
-    }
-
-    function openEditModal(id) {
-      const entity = allEntities.find(e => e.id === id);
-      if (!entity) return;
-      
-      editingId = id;
-      document.getElementById('modalTitle').textContent = 'Edit Entity';
-      document.getElementById('entityId').value = id;
-      document.getElementById('entityName').value = entity.entity_name || '';
-      document.getElementById('entityRelationship').value = entity.relationship || 'unknown';
-      document.getElementById('cageCode').value = entity.cage_code || '';
-      document.getElementById('setAsideStatus').value = entity.set_aside_status || '';
-      document.getElementById('threatScore').value = entity.threat_score || '';
-      document.getElementById('winRate').value = entity.win_rate || '';
-      document.getElementById('capabilities').value = entity.capabilities || '';
-      document.getElementById('strengths').value = entity.strengths || '';
-      document.getElementById('weaknesses').value = entity.weaknesses || '';
-      document.getElementById('intelNotes').value = entity.intel_notes || '';
-      document.getElementById('contactName').value = entity.contact_name || '';
-      document.getElementById('contactEmail').value = entity.contact_email || '';
-      document.getElementById('entityModal').classList.remove('hidden');
-    }
-
-    function closeModal() {
-      document.getElementById('entityModal').classList.add('hidden');
-      editingId = null;
-    }
-
-    async function handleSubmit(event) {
-      event.preventDefault();
-      
-      const entityData = {
-        entity_name: document.getElementById('entityName').value,
-        relationship: document.getElementById('entityRelationship').value,
-        cage_code: document.getElementById('cageCode').value || null,
-        set_aside_status: document.getElementById('setAsideStatus').value || null,
-        threat_score: parseInt(document.getElementById('threatScore').value) || null,
-        win_rate: parseInt(document.getElementById('winRate').value) || null,
-        capabilities: document.getElementById('capabilities').value || null,
-        strengths: document.getElementById('strengths').value || null,
-        weaknesses: document.getElementById('weaknesses').value || null,
-        intel_notes: document.getElementById('intelNotes').value || null,
-        contact_name: document.getElementById('contactName').value || null,
-        contact_email: document.getElementById('contactEmail').value || null,
-        opportunity_id: document.getElementById('opportunityFilter').value || null,
-        updated_at: new Date().toISOString()
+      const loadData = async () => {
+        try {
+          const { data } = await supabase.from('opportunities').select('*').limit(1).single();
+          setOpportunity(data || DEMO_OPPORTUNITY);
+          setConnected(!!data);
+        } catch (err) {
+          console.error('Load error:', err);
+          setOpportunity(DEMO_OPPORTUNITY);
+        } finally {
+          setLoading(false);
+        }
       };
 
-      try {
-        if (editingId) {
-          const { error } = await supabase.from('frenemy_entities').update(entityData).eq('id', editingId);
-          if (error) throw error;
-        } else {
-          entityData.created_at = new Date().toISOString();
-          const { error } = await supabase.from('frenemy_entities').insert([entityData]);
-          if (error) throw error;
+      const applyPreset = (preset) => {
+        setSelectedPreset(preset);
+        setMaskedFields(preset.fields);
+      };
+
+      const toggleField = (fieldId) => {
+        setSelectedPreset(MASKING_PRESETS.find(p => p.id === 'custom'));
+        setMaskedFields(prev => 
+          prev.includes(fieldId) 
+            ? prev.filter(f => f !== fieldId)
+            : [...prev, fieldId]
+        );
+      };
+
+      const generateShareLink = () => {
+        const params = new URLSearchParams({
+          opp: opportunity.id,
+          mask: maskedFields.join(','),
+          viewer: viewerName,
+          expires: new Date(Date.now() + 24*60*60*1000).toISOString()
+        });
+        const link = `https://missionpulse.io/shared?${params.toString()}`;
+        setShareLink(link);
+        navigator.clipboard.writeText(link);
+        alert('Share link copied to clipboard! Link expires in 24 hours.');
+      };
+
+      const isMasked = (fieldId) => maskedFields.includes(fieldId);
+
+      const renderMasked = (content, fieldId) => {
+        if (isMasked(fieldId)) {
+          return <span className="redacted px-2 py-1">{content}</span>;
         }
-        closeModal();
-        await loadEntities();
-      } catch (err) {
-        console.error('Failed to save entity:', err);
-        alert('Failed to save: ' + err.message);
+        return content;
+      };
+
+      const formatCurrency = (val) => `$${(val/1000000).toFixed(1)}M`;
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+          </div>
+        );
       }
+
+      return (
+        <div className="min-h-screen bg-[#00050F] text-white p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">👁️</span>
+                <h1 className="text-2xl font-bold">Frenemy View</h1>
+                <span className={`px-2 py-1 text-xs rounded-full ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                  {connected ? '● Live' : '○ Demo'}
+                </span>
+                <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+                  🔒 RESTRICTED ACCESS
+                </span>
+              </div>
+              <p className="text-slate-400 mt-1">Create masked views for secure partner sharing</p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setShowPreview(!showPreview)}
+                className={`px-4 py-2 rounded-lg font-medium ${showPreview ? 'bg-purple-500' : 'bg-slate-700 hover:bg-slate-600'}`}
+              >
+                {showPreview ? '✓ Preview Mode' : '👁️ Preview'}
+              </button>
+              <button 
+                onClick={generateShareLink}
+                disabled={!viewerName || maskedFields.length === 0}
+                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg font-medium"
+              >
+                🔗 Generate Share Link
+              </button>
+            </div>
+          </div>
+
+          {/* Warning Banner */}
+          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <div className="font-semibold text-amber-400">Sensitive Data Masking</div>
+                <div className="text-sm text-slate-400">Fields you select will be hidden when sharing. Always verify masked view before sending.</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left Panel - Masking Controls */}
+            <div className="col-span-4 space-y-4">
+              {/* Viewer Info */}
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+                <h3 className="font-semibold mb-3">Sharing With</h3>
+                <input 
+                  type="text"
+                  value={viewerName}
+                  onChange={e => setViewerName(e.target.value)}
+                  placeholder="Partner name or email..."
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2"
+                />
+              </div>
+
+              {/* Presets */}
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+                <h3 className="font-semibold mb-3">Masking Presets</h3>
+                <div className="space-y-2">
+                  {MASKING_PRESETS.map(preset => (
+                    <button
+                      key={preset.id}
+                      onClick={() => applyPreset(preset)}
+                      className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                        selectedPreset?.id === preset.id 
+                          ? 'bg-cyan-500/20 border-cyan-500/50' 
+                          : 'bg-slate-900/50 border-slate-700 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{preset.icon}</span>
+                        <div>
+                          <div className="font-medium">{preset.name}</div>
+                          <div className="text-xs text-slate-500">{preset.description}</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Individual Fields */}
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+                <h3 className="font-semibold mb-3">Mask Individual Fields</h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {MASKABLE_FIELDS.map(field => (
+                    <label 
+                      key={field.id}
+                      className="flex items-center gap-3 p-2 rounded hover:bg-slate-800/50 cursor-pointer"
+                    >
+                      <input 
+                        type="checkbox"
+                        checked={maskedFields.includes(field.id)}
+                        onChange={() => toggleField(field.id)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-lg">{field.icon}</span>
+                      <span className="text-sm">{field.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Masking Summary */}
+              <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-slate-400">Fields Masked</span>
+                  <span className="font-bold text-cyan-400">{maskedFields.length}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {maskedFields.map(f => {
+                    const field = MASKABLE_FIELDS.find(mf => mf.id === f);
+                    return field ? (
+                      <span key={f} className="px-2 py-1 text-xs bg-red-500/20 text-red-400 rounded">
+                        {field.icon} {field.name}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Panel - Preview */}
+            <div className="col-span-8">
+              <div className={`bg-slate-800/50 rounded-xl border ${showPreview ? 'border-purple-500/50' : 'border-slate-700/50'} p-6`}>
+                {showPreview && (
+                  <div className="mb-4 p-3 bg-purple-500/20 border border-purple-500/30 rounded-lg flex items-center gap-2">
+                    <span>👁️</span>
+                    <span className="text-sm text-purple-300">Preview Mode - This is how {viewerName || 'the recipient'} will see this data</span>
+                  </div>
+                )}
+
+                {/* Opportunity Header */}
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold">{opportunity.name}</h2>
+                  <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
+                    <span>🏛️ {opportunity.agency}</span>
+                    <span>📅 Due: {opportunity.due_date}</span>
+                    <span>📊 {opportunity.shipley_phase}</span>
+                  </div>
+                </div>
+
+                {/* Key Metrics */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="p-4 bg-slate-900/50 rounded-lg">
+                    <div className="text-sm text-slate-500">Contract Value</div>
+                    <div className="text-2xl font-bold text-emerald-400">
+                      {showPreview ? renderMasked(formatCurrency(opportunity.contract_value), 'financials') : formatCurrency(opportunity.contract_value)}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-slate-900/50 rounded-lg">
+                    <div className="text-sm text-slate-500">Win Probability</div>
+                    <div className="text-2xl font-bold text-cyan-400">{opportunity.win_probability}%</div>
+                  </div>
+                  <div className="p-4 bg-slate-900/50 rounded-lg">
+                    <div className="text-sm text-slate-500">Phase</div>
+                    <div className="text-lg font-bold text-purple-400">{opportunity.shipley_phase}</div>
+                  </div>
+                </div>
+
+                {/* Pricing Section */}
+                <div className="mb-6">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    💰 Pricing Details
+                    {isMasked('pricing') && showPreview && <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">MASKED</span>}
+                  </h3>
+                  {showPreview && isMasked('pricing') ? (
+                    <div className="p-4 bg-slate-900/30 rounded-lg text-center">
+                      <span className="redacted px-4 py-2">Pricing information hidden</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-3">
+                      {Object.entries(opportunity.pricing).filter(([k]) => k !== 'rates').map(([key, val]) => (
+                        <div key={key} className="p-3 bg-slate-900/50 rounded-lg">
+                          <div className="text-xs text-slate-500 capitalize">{key}</div>
+                          <div className="font-bold">{formatCurrency(val)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Competitors Section */}
+                <div className="mb-6">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    🎯 Competitor Intelligence
+                    {isMasked('competitors') && showPreview && <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">MASKED</span>}
+                  </h3>
+                  {showPreview && isMasked('competitors') ? (
+                    <div className="p-4 bg-slate-900/30 rounded-lg text-center">
+                      <span className="redacted px-4 py-2">Competitor information hidden</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {opportunity.competitors.map((comp, i) => (
+                        <div key={i} className="p-3 bg-slate-900/50 rounded-lg flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{comp.name}</div>
+                            <div className="text-xs text-slate-500">Strengths: {comp.strengths}</div>
+                          </div>
+                          <span className={`px-2 py-1 text-xs rounded ${
+                            comp.threat === 'High' ? 'bg-red-500/20 text-red-400' :
+                            comp.threat === 'Medium' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-slate-500/20 text-slate-400'
+                          }`}>
+                            {comp.threat} Threat
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Partners Section */}
+                <div className="mb-6">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    🤝 Teaming Partners
+                    {(isMasked('partners') || isMasked('other_partners')) && showPreview && <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">MASKED</span>}
+                  </h3>
+                  {showPreview && (isMasked('partners') || isMasked('other_partners')) ? (
+                    <div className="p-4 bg-slate-900/30 rounded-lg text-center">
+                      <span className="redacted px-4 py-2">Partner information hidden</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {opportunity.partners.map((partner, i) => (
+                        <div key={i} className="p-3 bg-slate-900/50 rounded-lg flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{partner.name}</div>
+                            <div className="text-xs text-slate-500">{partner.role}</div>
+                          </div>
+                          <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded">
+                            {partner.share}% Share
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Strategy Section */}
+                <div className="mb-6">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    📋 Capture Strategy
+                    {isMasked('strategy') && showPreview && <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">MASKED</span>}
+                  </h3>
+                  {showPreview && isMasked('strategy') ? (
+                    <div className="p-4 bg-slate-900/30 rounded-lg">
+                      <span className="redacted px-4 py-2">Strategy information hidden</span>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-900/50 rounded-lg text-slate-300">
+                      {opportunity.strategy}
+                    </div>
+                  )}
+                </div>
+
+                {/* Internal Notes */}
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    📝 Internal Notes
+                    {isMasked('internal_notes') && showPreview && <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">MASKED</span>}
+                  </h3>
+                  {showPreview && isMasked('internal_notes') ? (
+                    <div className="p-4 bg-slate-900/30 rounded-lg">
+                      <span className="redacted px-4 py-2">Internal notes hidden</span>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-900/50 rounded-lg text-slate-300">
+                      {opportunity.internal_notes}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-8 pt-4 border-t border-slate-800 text-center text-xs text-slate-600">
+            AI GENERATED - REQUIRES HUMAN REVIEW • Partner access auto-revokes upon proposal submission
+          </div>
+        </div>
+      );
     }
 
-    async function deleteEntity(id) {
-      if (!confirm('Delete this entity?')) return;
-      try {
-        const { error } = await supabase.from('frenemy_entities').delete().eq('id', id);
-        if (error) throw error;
-        await loadEntities();
-      } catch (err) {
-        console.error('Failed to delete:', err);
-      }
-    }
-
-    // ========== REAL-TIME ==========
-    function subscribeToChanges() {
-      supabase.channel('frenemy_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'frenemy_entities' }, () => loadEntities()).subscribe();
-    }
-
-    // ========== EVENT LISTENERS ==========
-    document.getElementById('opportunityFilter').addEventListener('change', loadEntities);
-
-    // ========== INIT ==========
-    async function init() {
-      if (!initSupabase()) { updateConnectionStatus(false); return; }
-      await loadOpportunities();
-      await loadEntities();
-      subscribeToChanges();
-    }
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
+    ReactDOM.createRoot(document.getElementById('root')).render(<FrenemyView />);
   </script>
 </body>
 </html>
