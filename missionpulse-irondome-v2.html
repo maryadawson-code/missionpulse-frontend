@@ -3,731 +3,521 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - Iron Dome Writer</title>
+  <title>MissionPulse | Iron Dome</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
-    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
-    .animate-shimmer { background: linear-gradient(90deg, transparent, rgba(0,229,250,0.1), transparent); background-size: 200% 100%; animation: shimmer 2s infinite; }
-    .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.1); }
-    .glass-hover:hover { background: rgba(0, 229, 250, 0.08); border-color: rgba(0, 229, 250, 0.3); }
-    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; }
-    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-    .editor-content { min-height: 300px; white-space: pre-wrap; }
-    .cui-banner { font-family: monospace; letter-spacing: 0.1em; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.15); }
+    .progress-bar { transition: width 0.3s ease; }
   </style>
 </head>
-<body>
+<body class="bg-[#00050F] text-white min-h-screen">
   <div id="root"></div>
+  
   <script type="text/babel">
-    const { useState, useEffect, useRef, useCallback } = React;
-
-    // ═══════════════════════════════════════════════════════════════════
-    // SUPABASE CONFIGURATION - CORRECT URL
-    // ═══════════════════════════════════════════════════════════════════
     const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-    
-    let supabase = null;
-    try {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    } catch (e) {
-      console.warn('Supabase init failed, using demo mode');
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // ICONS
-    // ═══════════════════════════════════════════════════════════════════
-    const Icons = {
-      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
-      fileText: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
-      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
-      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
-      cpu: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>,
-      zap: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
-      save: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
-      chevronDown: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>,
-      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
-      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
-      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
-      home: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
-      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
-      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
-    };
-
-    const Icon = ({ name, className = "w-4 h-4" }) => {
-      const IconComponent = Icons[name];
-      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
-    };
-
-    // ═══════════════════════════════════════════════════════════════════
-    // CUI MARKINGS
-    // ═══════════════════════════════════════════════════════════════════
-    const CUI_MARKINGS = [
-      { value: 'UNCLASSIFIED', label: 'UNCLASSIFIED', color: '#22C55E' },
-      { value: 'CUI//PROPIN', label: 'CUI//PROPIN', color: '#F59E0B' },
-      { value: 'CUI//FEDCON', label: 'CUI//FEDCON', color: '#EF4444' },
-      { value: 'CUI//SP-CTI', label: 'CUI//SP-CTI', color: '#EC4899' },
-      { value: 'CUI//SP-EXPT', label: 'CUI//SP-EXPT', color: '#A855F7' },
-    ];
-
-    const STATUS_CONFIG = {
-      not_started: { label: 'Not Started', color: '#6B7280', bg: 'rgba(107, 114, 128, 0.2)' },
-      drafting: { label: 'Drafting', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.2)' },
-      review: { label: 'In Review', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.2)' },
-      approved: { label: 'Approved', color: '#22C55E', bg: 'rgba(34, 197, 94, 0.2)' },
-      locked: { label: 'Locked', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.2)' },
-    };
-
-    const VOLUME_CONFIG = {
-      technical: { label: 'Technical', color: '#00E5FA', icon: 'cpu' },
-      management: { label: 'Management', color: '#8B5CF6', icon: 'shield' },
-      past_performance: { label: 'Past Performance', color: '#F59E0B', icon: 'check' },
-      pricing: { label: 'Pricing', color: '#22C55E', icon: 'fileText' },
-      executive_summary: { label: 'Executive Summary', color: '#EC4899', icon: 'edit' },
-    };
-
-    // ═══════════════════════════════════════════════════════════════════
-    // DEMO DATA FALLBACK
-    // ═══════════════════════════════════════════════════════════════════
-    const DEMO_OPPORTUNITIES = [
-      { id: '550e8400-e29b-41d4-a716-446655440001', nickname: 'MEDCHART', title: 'DHA EHR Modernization', agency: 'DHA' },
-      { id: '550e8400-e29b-41d4-a716-446655440002', nickname: 'VETCARE', title: 'VA Telehealth Platform', agency: 'VA' },
-    ];
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    const DEFAULT_COMPANY_ID = '11111111-1111-1111-1111-111111111111';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
     const DEMO_SECTIONS = [
-      { id: 'demo-1', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', volume: 'technical', section_number: '1.0', title: 'Executive Summary', content: 'Our team brings unparalleled expertise in healthcare IT modernization...', word_count: 2847, page_limit: 35, current_pages: 11.5, status: 'review', assigned_to: 'Sarah Chen', ai_generated_percent: 68, citations_count: 12, compliance_score: 94, cui_marking: 'CUI//PROPIN' },
-      { id: 'demo-2', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', volume: 'technical', section_number: '2.0', title: 'Technical Solution', content: 'The proposed architecture employs a microservices-based design pattern...', word_count: 4231, page_limit: 50, current_pages: 17.2, status: 'drafting', assigned_to: 'Michael Torres', ai_generated_percent: 72, citations_count: 8, compliance_score: 87, cui_marking: 'CUI//FEDCON' },
-      { id: 'demo-3', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', volume: 'technical', section_number: '3.0', title: 'Quality Assurance', content: 'Our ISO 9001:2015 certified quality management system...', word_count: 1856, page_limit: 15, current_pages: 7.5, status: 'approved', assigned_to: 'Lisa Wang', ai_generated_percent: 61, citations_count: 5, compliance_score: 98, cui_marking: 'UNCLASSIFIED' },
-      { id: 'demo-4', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', volume: 'management', section_number: '1.0', title: 'Program Management', content: 'Our Program Manager brings 18 years of federal healthcare IT experience...', word_count: 2156, page_limit: 20, current_pages: 8.7, status: 'review', assigned_to: 'Jennifer Adams', ai_generated_percent: 45, citations_count: 6, compliance_score: 96, cui_marking: 'CUI//PROPIN' },
-      { id: 'demo-5', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', volume: 'management', section_number: '2.0', title: 'Staffing Plan', content: 'The proposed team structure includes 24 FTEs...', word_count: 1890, page_limit: 15, current_pages: 7.6, status: 'approved', assigned_to: 'David Kim', ai_generated_percent: 38, citations_count: 4, compliance_score: 100, cui_marking: 'UNCLASSIFIED' },
-      { id: 'demo-6', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', volume: 'past_performance', section_number: '1.0', title: 'Relevant Contracts', content: 'Contract #1: DHA DHITS Program - $125M CPFF...', word_count: 3200, page_limit: 30, current_pages: 13.0, status: 'approved', assigned_to: 'Emily Rodriguez', ai_generated_percent: 22, citations_count: 15, compliance_score: 100, cui_marking: 'CUI//FEDCON' },
-      { id: 'demo-7', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', volume: 'pricing', section_number: '1.0', title: 'Pricing Narrative', content: 'Our pricing approach balances competitive rates...', word_count: 1200, page_limit: 10, current_pages: 4.9, status: 'drafting', assigned_to: 'Finance Team', ai_generated_percent: 15, citations_count: 2, compliance_score: 88, cui_marking: 'CUI//PROPIN' },
-      { id: 'demo-8', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', volume: 'executive_summary', section_number: '1.0', title: 'Cover Letter', content: 'Mission Meets Tech is pleased to submit this proposal...', word_count: 450, page_limit: 2, current_pages: 1.8, status: 'approved', assigned_to: 'Mary Womack', ai_generated_percent: 25, citations_count: 0, compliance_score: 100, cui_marking: 'UNCLASSIFIED' },
+      { id: '1', opportunity_id: '1', volume: 'Technical', section_number: '1.0', title: 'Executive Summary', page_limit: 5, current_pages: 4, status: 'Complete', compliance_score: 95 },
+      { id: '2', opportunity_id: '1', volume: 'Technical', section_number: '2.0', title: 'Technical Approach', page_limit: 30, current_pages: 28, status: 'In Review', compliance_score: 88 },
+      { id: '3', opportunity_id: '1', volume: 'Technical', section_number: '3.0', title: 'Management Approach', page_limit: 20, current_pages: 22, status: 'Over Limit', compliance_score: 72 },
+      { id: '4', opportunity_id: '1', volume: 'Technical', section_number: '4.0', title: 'Staffing Plan', page_limit: 15, current_pages: 10, status: 'Draft', compliance_score: 65 },
+      { id: '5', opportunity_id: '1', volume: 'Technical', section_number: '5.0', title: 'Quality Control', page_limit: 10, current_pages: 0, status: 'Not Started', compliance_score: 0 },
+      { id: '6', opportunity_id: '1', volume: 'Management', section_number: '1.0', title: 'Org Chart & Key Personnel', page_limit: 10, current_pages: 8, status: 'In Review', compliance_score: 82 },
+      { id: '7', opportunity_id: '1', volume: 'Management', section_number: '2.0', title: 'Risk Management', page_limit: 8, current_pages: 7, status: 'Draft', compliance_score: 70 },
+      { id: '8', opportunity_id: '1', volume: 'Past Performance', section_number: '1.0', title: 'Contract References', page_limit: 15, current_pages: 12, status: 'Complete', compliance_score: 100 },
+      { id: '9', opportunity_id: '1', volume: 'Past Performance', section_number: '2.0', title: 'Relevance Matrix', page_limit: 5, current_pages: 5, status: 'Complete', compliance_score: 92 },
     ];
 
-    // ═══════════════════════════════════════════════════════════════════
-    // MAIN COMPONENT
-    // ═══════════════════════════════════════════════════════════════════
-    function IronDomeApp() {
-      const [connected, setConnected] = useState(false);
-      const [loading, setLoading] = useState(true);
-      const [opportunities, setOpportunities] = useState([]);
-      const [sections, setSections] = useState([]);
-      const [selectedOpp, setSelectedOpp] = useState(null);
-      const [selectedSection, setSelectedSection] = useState(null);
-      const [activeVolume, setActiveVolume] = useState('technical');
-      const [editMode, setEditMode] = useState(false);
-      const [editContent, setEditContent] = useState('');
-      const [saving, setSaving] = useState(false);
-      const [showAddModal, setShowAddModal] = useState(false);
-      const [aiGenerating, setAiGenerating] = useState(false);
+    const DEMO_OPPORTUNITIES = [
+      { id: '1', title: 'DHA MHS GENESIS Support', agency: 'DHA' },
+      { id: '2', title: 'VA EHR Modernization', agency: 'VA' },
+    ];
 
-      // Load data
-      useEffect(() => {
+    function App() {
+      const [connected, setConnected] = React.useState(false);
+      const [loading, setLoading] = React.useState(true);
+      const [sections, setSections] = React.useState(DEMO_SECTIONS);
+      const [opportunities, setOpportunities] = React.useState(DEMO_OPPORTUNITIES);
+      const [selectedOpp, setSelectedOpp] = React.useState('1');
+      const [selectedVolume, setSelectedVolume] = React.useState('all');
+      const [showModal, setShowModal] = React.useState(false);
+      const [editingSection, setEditingSection] = React.useState(null);
+      const [form, setForm] = React.useState({ 
+        volume: 'Technical', 
+        section_number: '', 
+        title: '', 
+        page_limit: 10, 
+        current_pages: 0, 
+        status: 'Not Started',
+        compliance_score: 0,
+        opportunity_id: '1'
+      });
+
+      React.useEffect(() => {
         loadData();
       }, []);
 
-      async function loadData() {
-        setLoading(true);
+      const loadData = async () => {
         try {
-          if (supabase) {
-            // Try to load from Supabase
-            const { data: opps, error: oppError } = await supabase
-              .from('opportunities')
-              .select('id, nickname, title, agency')
-              .order('created_at', { ascending: false });
-
-            if (!oppError && opps?.length > 0) {
-              setOpportunities(opps);
-              setSelectedOpp(opps[0]);
-              setConnected(true);
-              
-              // Load sections for first opportunity
-              const { data: secs } = await supabase
-                .from('proposal_sections')
-                .select('*')
-                .eq('opportunity_id', opps[0].id)
-                .order('section_number');
-              
-              if (secs) setSections(secs);
-            } else {
-              throw new Error('No data');
-            }
-          } else {
-            throw new Error('No Supabase');
+          const [sectionsRes, oppsRes] = await Promise.all([
+            supabase.from('proposal_sections').select('*').order('section_number'),
+            supabase.from('opportunities').select('id, title, agency')
+          ]);
+          
+          if (!sectionsRes.error && sectionsRes.data?.length > 0) {
+            setSections(sectionsRes.data);
+            setConnected(true);
+          }
+          if (!oppsRes.error && oppsRes.data?.length > 0) {
+            setOpportunities(oppsRes.data);
+            setSelectedOpp(oppsRes.data[0].id);
           }
         } catch (e) {
-          console.log('Using demo data:', e.message);
-          setOpportunities(DEMO_OPPORTUNITIES);
-          setSelectedOpp(DEMO_OPPORTUNITIES[0]);
-          setSections(DEMO_SECTIONS);
-          setConnected(false);
+          console.log('Using demo data');
         }
         setLoading(false);
-      }
+      };
 
-      async function loadSections(oppId) {
-        if (!oppId) return;
-        try {
-          if (supabase && connected) {
-            const { data } = await supabase
-              .from('proposal_sections')
-              .select('*')
-              .eq('opportunity_id', oppId)
-              .order('section_number');
-            if (data) setSections(data);
-          } else {
-            setSections(DEMO_SECTIONS.filter(s => s.opportunity_id === oppId));
-          }
-        } catch (e) {
-          setSections(DEMO_SECTIONS.filter(s => s.opportunity_id === oppId));
-        }
-      }
-
-      function handleOppChange(opp) {
-        setSelectedOpp(opp);
-        setSelectedSection(null);
-        loadSections(opp.id);
-      }
-
-      async function saveSection() {
-        if (!selectedSection) return;
-        setSaving(true);
-        
-        const wordCount = editContent.split(/\s+/).filter(w => w).length;
-        const currentPages = (wordCount / 250).toFixed(1);
-        
-        const updates = {
-          content: editContent,
-          word_count: wordCount,
-          current_pages: parseFloat(currentPages),
+      const saveSection = async () => {
+        const sectionData = {
+          ...form,
+          company_id: DEFAULT_COMPANY_ID,
           updated_at: new Date().toISOString()
         };
 
-        try {
-          if (supabase && connected) {
-            await supabase
-              .from('proposal_sections')
-              .update(updates)
-              .eq('id', selectedSection.id);
+        if (connected) {
+          try {
+            if (editingSection) {
+              const { error } = await supabase.from('proposal_sections').update(sectionData).eq('id', editingSection.id);
+              if (!error) {
+                setSections(sections.map(s => s.id === editingSection.id ? { ...s, ...sectionData } : s));
+              }
+            } else {
+              const { data, error } = await supabase.from('proposal_sections').insert([sectionData]).select();
+              if (!error && data) {
+                setSections([...sections, data[0]]);
+              }
+            }
+          } catch (e) {
+            console.error('Save error:', e);
           }
-          
-          setSections(prev => prev.map(s => 
-            s.id === selectedSection.id ? { ...s, ...updates } : s
-          ));
-          setSelectedSection(prev => ({ ...prev, ...updates }));
-          setEditMode(false);
-        } catch (e) {
-          console.error('Save failed:', e);
+        } else {
+          if (editingSection) {
+            setSections(sections.map(s => s.id === editingSection.id ? { ...s, ...sectionData } : s));
+          } else {
+            setSections([...sections, { ...sectionData, id: Date.now().toString() }]);
+          }
         }
-        setSaving(false);
-      }
+        
+        setShowModal(false);
+        setEditingSection(null);
+        resetForm();
+      };
 
-      async function updateSectionStatus(sectionId, newStatus) {
-        try {
-          if (supabase && connected) {
-            await supabase
-              .from('proposal_sections')
-              .update({ status: newStatus, updated_at: new Date().toISOString() })
-              .eq('id', sectionId);
-          }
-          
-          setSections(prev => prev.map(s => 
-            s.id === sectionId ? { ...s, status: newStatus } : s
-          ));
-          if (selectedSection?.id === sectionId) {
-            setSelectedSection(prev => ({ ...prev, status: newStatus }));
-          }
-        } catch (e) {
-          console.error('Status update failed:', e);
+      const resetForm = () => {
+        setForm({ 
+          volume: 'Technical', 
+          section_number: '', 
+          title: '', 
+          page_limit: 10, 
+          current_pages: 0, 
+          status: 'Not Started',
+          compliance_score: 0,
+          opportunity_id: selectedOpp
+        });
+      };
+
+      const deleteSection = async (id) => {
+        if (!confirm('Delete this section?')) return;
+        if (connected) {
+          await supabase.from('proposal_sections').delete().eq('id', id);
         }
-      }
+        setSections(sections.filter(s => s.id !== id));
+      };
 
-      async function simulateAIGeneration() {
-        if (!selectedSection) return;
-        setAiGenerating(true);
+      const updatePages = async (section, newPages) => {
+        const newStatus = newPages === 0 ? 'Not Started' : 
+                         newPages > section.page_limit ? 'Over Limit' :
+                         newPages === section.page_limit ? 'Complete' : 
+                         section.status === 'Not Started' ? 'Draft' : section.status;
         
-        // Simulate AI generation delay
-        await new Promise(r => setTimeout(r, 2000));
+        const updated = { ...section, current_pages: newPages, status: newStatus };
         
-        const aiContent = `${editContent || selectedSection.content || ''}\n\n[AI GENERATED CONTENT]\nBased on the RFP requirements and our proven methodologies, the following approach ensures compliance with Section L evaluation criteria while demonstrating our competitive advantages:\n\n• Leveraging 15+ years of federal healthcare IT experience\n• FedRAMP High authorized infrastructure\n• CMMI Level 3 certified processes\n• 98.7% on-time delivery rate across similar engagements\n\n[End AI Generated - Requires Human Review]`;
-        
-        setEditContent(aiContent);
-        setAiGenerating(false);
-      }
+        if (connected) {
+          await supabase.from('proposal_sections').update({ 
+            current_pages: newPages, 
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          }).eq('id', section.id);
+        }
+        setSections(sections.map(s => s.id === section.id ? updated : s));
+      };
 
-      const filteredSections = sections.filter(s => s.volume === activeVolume);
-      const volumeStats = Object.keys(VOLUME_CONFIG).map(vol => ({
-        volume: vol,
-        count: sections.filter(s => s.volume === vol).length,
-        approved: sections.filter(s => s.volume === vol && s.status === 'approved').length,
-        totalWords: sections.filter(s => s.volume === vol).reduce((sum, s) => sum + (s.word_count || 0), 0)
-      }));
+      const openEditModal = (section) => {
+        setEditingSection(section);
+        setForm({
+          volume: section.volume,
+          section_number: section.section_number || '',
+          title: section.title,
+          page_limit: section.page_limit || 10,
+          current_pages: section.current_pages || 0,
+          status: section.status || 'Not Started',
+          compliance_score: section.compliance_score || 0,
+          opportunity_id: section.opportunity_id
+        });
+        setShowModal(true);
+      };
 
-      const overallProgress = sections.length > 0 
-        ? Math.round((sections.filter(s => s.status === 'approved').length / sections.length) * 100)
-        : 0;
+      // Filter sections
+      const filteredSections = sections.filter(s => {
+        const oppMatch = s.opportunity_id === selectedOpp;
+        const volMatch = selectedVolume === 'all' || s.volume === selectedVolume;
+        return oppMatch && volMatch;
+      });
+
+      // Get unique volumes
+      const volumes = [...new Set(sections.filter(s => s.opportunity_id === selectedOpp).map(s => s.volume))];
+
+      // Calculate stats
+      const stats = {
+        totalPages: filteredSections.reduce((sum, s) => sum + (s.page_limit || 0), 0),
+        usedPages: filteredSections.reduce((sum, s) => sum + (s.current_pages || 0), 0),
+        overLimit: filteredSections.filter(s => s.current_pages > s.page_limit).length,
+        complete: filteredSections.filter(s => s.status === 'Complete').length,
+        avgCompliance: filteredSections.length > 0 
+          ? Math.round(filteredSections.reduce((sum, s) => sum + (s.compliance_score || 0), 0) / filteredSections.length)
+          : 0
+      };
+
+      const getStatusColor = (status) => {
+        switch (status) {
+          case 'Complete': return 'bg-emerald-500/20 text-emerald-400';
+          case 'In Review': return 'bg-blue-500/20 text-blue-400';
+          case 'Draft': return 'bg-amber-500/20 text-amber-400';
+          case 'Over Limit': return 'bg-red-500/20 text-red-400';
+          case 'Not Started': return 'bg-slate-500/20 text-slate-400';
+          default: return 'bg-slate-500/20 text-slate-400';
+        }
+      };
+
+      const getPageBarColor = (current, limit) => {
+        const ratio = current / limit;
+        if (ratio > 1) return 'bg-red-500';
+        if (ratio > 0.9) return 'bg-amber-500';
+        if (ratio > 0.7) return 'bg-cyan-500';
+        return 'bg-emerald-500';
+      };
 
       if (loading) {
         return (
-          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-cyan-400">Loading Iron Dome...</p>
-            </div>
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
         );
       }
 
       return (
-        <div className="min-h-screen bg-[#00050F] text-white">
+        <div className="min-h-screen p-6">
           {/* Header */}
-          <header className="glass border-b border-cyan-500/20 sticky top-0 z-50">
-            <div className="max-w-7xl mx-auto px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <a href="index.html" className="p-2 rounded-lg hover:bg-cyan-500/10 transition-colors">
-                    <Icon name="home" className="w-5 h-5 text-cyan-400" />
-                  </a>
-                  <div className="flex items-center gap-2">
-                    <Icon name="shield" className="w-6 h-6 text-cyan-400" />
-                    <h1 className="text-xl font-bold">Iron Dome Writer</h1>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <a href="index.html" className="text-slate-400 hover:text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </a>
+              <div>
+                <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <span className="text-cyan-400">🛡️</span> Iron Dome
+                </h1>
+                <p className="text-slate-400 text-sm">Proposal section tracking & page management</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className={`px-3 py-1 rounded-full text-xs ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                {connected ? '● Live' : '○ Demo'}
+              </div>
+              <button
+                onClick={() => { setEditingSection(null); resetForm(); setShowModal(true); }}
+                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-medium transition-colors"
+              >
+                + Add Section
+              </button>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex items-center gap-4 mb-6">
+            <select
+              value={selectedOpp}
+              onChange={(e) => setSelectedOpp(e.target.value)}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+            >
+              {opportunities.map(opp => (
+                <option key={opp.id} value={opp.id}>{opp.title}</option>
+              ))}
+            </select>
+            <select
+              value={selectedVolume}
+              onChange={(e) => setSelectedVolume(e.target.value)}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="all">All Volumes</option>
+              {volumes.map(v => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="glass rounded-xl p-4">
+              <p className="text-slate-400 text-xs mb-1">Page Budget</p>
+              <p className="text-2xl font-bold text-white">{stats.usedPages} / {stats.totalPages}</p>
+              <div className="h-1.5 bg-slate-700 rounded-full mt-2 overflow-hidden">
+                <div 
+                  className={`h-full progress-bar ${getPageBarColor(stats.usedPages, stats.totalPages)}`}
+                  style={{ width: `${Math.min((stats.usedPages / stats.totalPages) * 100, 100)}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="glass rounded-xl p-4">
+              <p className="text-slate-400 text-xs mb-1">Over Limit</p>
+              <p className={`text-2xl font-bold ${stats.overLimit > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                {stats.overLimit}
+              </p>
+            </div>
+            <div className="glass rounded-xl p-4">
+              <p className="text-slate-400 text-xs mb-1">Complete</p>
+              <p className="text-2xl font-bold text-emerald-400">{stats.complete} / {filteredSections.length}</p>
+            </div>
+            <div className="glass rounded-xl p-4">
+              <p className="text-slate-400 text-xs mb-1">Avg Compliance</p>
+              <p className={`text-2xl font-bold ${stats.avgCompliance >= 80 ? 'text-emerald-400' : stats.avgCompliance >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                {stats.avgCompliance}%
+              </p>
+            </div>
+            <div className="glass rounded-xl p-4">
+              <p className="text-slate-400 text-xs mb-1">Pages Remaining</p>
+              <p className="text-2xl font-bold text-cyan-400">{Math.max(0, stats.totalPages - stats.usedPages)}</p>
+            </div>
+          </div>
+
+          {/* Sections Table */}
+          <div className="glass rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-cyan-500/20">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase">Section</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase">Volume</th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase">Pages</th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase">Status</th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase">Compliance</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSections.map(section => (
+                  <tr key={section.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-3 px-4">
+                      <p className="text-white font-medium">{section.section_number} {section.title}</p>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-slate-400">{section.volume}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => updatePages(section, Math.max(0, section.current_pages - 1))}
+                          className="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white"
+                        >
+                          -
+                        </button>
+                        <div className="w-24">
+                          <p className={`text-center font-medium ${section.current_pages > section.page_limit ? 'text-red-400' : 'text-white'}`}>
+                            {section.current_pages} / {section.page_limit}
+                          </p>
+                          <div className="h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
+                            <div 
+                              className={`h-full progress-bar ${getPageBarColor(section.current_pages, section.page_limit)}`}
+                              style={{ width: `${Math.min((section.current_pages / section.page_limit) * 100, 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => updatePages(section, section.current_pages + 1)}
+                          className="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(section.status)}`}>
+                        {section.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`font-medium ${section.compliance_score >= 80 ? 'text-emerald-400' : section.compliance_score >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                        {section.compliance_score}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => openEditModal(section)} className="text-slate-400 hover:text-cyan-400 transition-colors">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button onClick={() => deleteSection(section.id)} className="text-slate-400 hover:text-red-400 transition-colors">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredSections.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-slate-500">No sections found. Add sections to track your proposal.</p>
+            </div>
+          )}
+
+          {/* Modal */}
+          {showModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="glass rounded-xl p-6 w-full max-w-lg">
+                <h2 className="text-xl font-bold text-white mb-4">
+                  {editingSection ? 'Edit Section' : 'Add Section'}
+                </h2>
+                
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Volume *</label>
+                      <select
+                        value={form.volume}
+                        onChange={(e) => setForm({ ...form, volume: e.target.value })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+                      >
+                        <option value="Technical">Technical</option>
+                        <option value="Management">Management</option>
+                        <option value="Past Performance">Past Performance</option>
+                        <option value="Pricing">Pricing</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Section #</label>
+                      <input
+                        type="text"
+                        value={form.section_number}
+                        onChange={(e) => setForm({ ...form, section_number: e.target.value })}
+                        placeholder="e.g., 1.0"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Title *</label>
+                    <input
+                      type="text"
+                      value={form.title}
+                      onChange={(e) => setForm({ ...form, title: e.target.value })}
+                      placeholder="e.g., Technical Approach"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Page Limit</label>
+                      <input
+                        type="number"
+                        value={form.page_limit}
+                        onChange={(e) => setForm({ ...form, page_limit: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Current Pages</label>
+                      <input
+                        type="number"
+                        value={form.current_pages}
+                        onChange={(e) => setForm({ ...form, current_pages: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Compliance %</label>
+                      <input
+                        type="number"
+                        value={form.compliance_score}
+                        onChange={(e) => setForm({ ...form, compliance_score: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Status</label>
+                    <select
+                      value={form.status}
+                      onChange={(e) => setForm({ ...form, status: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+                    >
+                      <option value="Not Started">Not Started</option>
+                      <option value="Draft">Draft</option>
+                      <option value="In Review">In Review</option>
+                      <option value="Complete">Complete</option>
+                      <option value="Over Limit">Over Limit</option>
+                    </select>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4">
-                  {/* Opportunity Selector */}
-                  <select
-                    value={selectedOpp?.id || ''}
-                    onChange={(e) => {
-                      const opp = opportunities.find(o => o.id === e.target.value);
-                      if (opp) handleOppChange(opp);
-                    }}
-                    className="bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-sm focus:border-cyan-400 outline-none"
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => { setShowModal(false); setEditingSection(null); }}
+                    className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
                   >
-                    {opportunities.map(opp => (
-                      <option key={opp.id} value={opp.id}>
-                        {opp.nickname} - {opp.title}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  {/* Connection Status */}
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${connected ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
-                    {connected ? 'Connected' : 'Demo Mode'}
-                  </div>
-                  
-                  <button onClick={loadData} className="p-2 rounded-lg hover:bg-cyan-500/10">
-                    <Icon name="refresh" className="w-5 h-5 text-cyan-400" />
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveSection}
+                    disabled={!form.title || !form.volume}
+                    className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                  >
+                    {editingSection ? 'Update' : 'Create'}
                   </button>
                 </div>
               </div>
             </div>
-          </header>
-
-          <main className="max-w-7xl mx-auto px-4 py-6">
-            {/* Progress Overview */}
-            <div className="glass rounded-xl p-4 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Proposal Progress</h2>
-                <span className="text-2xl font-bold text-cyan-400">{overallProgress}%</span>
-              </div>
-              <div className="h-3 bg-slate-800 rounded-full overflow-hidden mb-4">
-                <div 
-                  className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-500"
-                  style={{ width: `${overallProgress}%` }}
-                ></div>
-              </div>
-              <div className="grid grid-cols-5 gap-4">
-                {volumeStats.map(vs => (
-                  <div 
-                    key={vs.volume}
-                    onClick={() => setActiveVolume(vs.volume)}
-                    className={`p-3 rounded-lg cursor-pointer transition-all ${activeVolume === vs.volume ? 'bg-cyan-500/20 border border-cyan-500/50' : 'bg-slate-800/50 hover:bg-slate-800'}`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon name={VOLUME_CONFIG[vs.volume].icon} className="w-4 h-4" style={{ color: VOLUME_CONFIG[vs.volume].color }} />
-                      <span className="text-xs font-medium">{VOLUME_CONFIG[vs.volume].label}</span>
-                    </div>
-                    <div className="text-lg font-bold">{vs.approved}/{vs.count}</div>
-                    <div className="text-xs text-slate-400">{vs.totalWords.toLocaleString()} words</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-6">
-              {/* Section List */}
-              <div className="col-span-1">
-                <div className="glass rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold">{VOLUME_CONFIG[activeVolume].label} Sections</h3>
-                    <button 
-                      onClick={() => setShowAddModal(true)}
-                      className="p-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400"
-                    >
-                      <Icon name="plus" className="w-4 h-4" />
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin">
-                    {filteredSections.length === 0 ? (
-                      <div className="text-center py-8 text-slate-500">
-                        <Icon name="fileText" className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No sections yet</p>
-                      </div>
-                    ) : (
-                      filteredSections.map(section => (
-                        <div
-                          key={section.id}
-                          onClick={() => {
-                            setSelectedSection(section);
-                            setEditContent(section.content || '');
-                            setEditMode(false);
-                          }}
-                          className={`p-3 rounded-lg cursor-pointer transition-all ${
-                            selectedSection?.id === section.id 
-                              ? 'bg-cyan-500/20 border border-cyan-500/50' 
-                              : 'bg-slate-800/50 hover:bg-slate-800 border border-transparent'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-mono text-cyan-400">{section.section_number}</span>
-                                <span 
-                                  className="px-1.5 py-0.5 rounded text-xs"
-                                  style={{ 
-                                    backgroundColor: STATUS_CONFIG[section.status]?.bg,
-                                    color: STATUS_CONFIG[section.status]?.color 
-                                  }}
-                                >
-                                  {STATUS_CONFIG[section.status]?.label}
-                                </span>
-                              </div>
-                              <h4 className="font-medium text-sm truncate">{section.title}</h4>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                                <span>{section.word_count?.toLocaleString()} words</span>
-                                <span>{section.current_pages}/{section.page_limit} pg</span>
-                              </div>
-                            </div>
-                            {section.status === 'locked' && (
-                              <Icon name="lock" className="w-4 h-4 text-red-400" />
-                            )}
-                          </div>
-                          
-                          {/* Page limit warning */}
-                          {section.current_pages > section.page_limit && (
-                            <div className="mt-2 flex items-center gap-1 text-xs text-red-400">
-                              <Icon name="alert" className="w-3 h-3" />
-                              Over page limit!
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Editor Panel */}
-              <div className="col-span-2">
-                {selectedSection ? (
-                  <div className="glass rounded-xl overflow-hidden">
-                    {/* CUI Banner */}
-                    <div 
-                      className="cui-banner px-4 py-2 text-center text-sm font-bold"
-                      style={{ 
-                        backgroundColor: CUI_MARKINGS.find(c => c.value === selectedSection.cui_marking)?.color + '20',
-                        color: CUI_MARKINGS.find(c => c.value === selectedSection.cui_marking)?.color,
-                        borderBottom: `2px solid ${CUI_MARKINGS.find(c => c.value === selectedSection.cui_marking)?.color}`
-                      }}
-                    >
-                      {selectedSection.cui_marking}
-                    </div>
-                    
-                    {/* Section Header */}
-                    <div className="p-4 border-b border-slate-700/50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h2 className="text-xl font-bold">
-                            {selectedSection.section_number} {selectedSection.title}
-                          </h2>
-                          <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
-                            <span>Assigned: {selectedSection.assigned_to || 'Unassigned'}</span>
-                            <span>AI: {selectedSection.ai_generated_percent}%</span>
-                            <span>Citations: {selectedSection.citations_count}</span>
-                            <span>Compliance: {selectedSection.compliance_score}%</span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          {/* Status Dropdown */}
-                          <select
-                            value={selectedSection.status}
-                            onChange={(e) => updateSectionStatus(selectedSection.id, e.target.value)}
-                            className="bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-sm"
-                            disabled={selectedSection.status === 'locked'}
-                          >
-                            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-                              <option key={key} value={key}>{cfg.label}</option>
-                            ))}
-                          </select>
-                          
-                          {!editMode ? (
-                            <button
-                              onClick={() => setEditMode(true)}
-                              disabled={selectedSection.status === 'locked'}
-                              className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 rounded-lg text-cyan-400 disabled:opacity-50"
-                            >
-                              <Icon name="edit" className="w-4 h-4" />
-                              Edit
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  setEditMode(false);
-                                  setEditContent(selectedSection.content || '');
-                                }}
-                                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={saveSection}
-                                disabled={saving}
-                                className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 rounded-lg text-black font-medium disabled:opacity-50"
-                              >
-                                <Icon name="save" className="w-4 h-4" />
-                                {saving ? 'Saving...' : 'Save'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Word/Page Stats */}
-                      <div className="mt-4 grid grid-cols-4 gap-4">
-                        <div className="bg-slate-800/50 rounded-lg p-3">
-                          <div className="text-xs text-slate-400">Words</div>
-                          <div className="text-lg font-bold">{(editMode ? editContent.split(/\s+/).filter(w => w).length : selectedSection.word_count)?.toLocaleString()}</div>
-                        </div>
-                        <div className={`rounded-lg p-3 ${selectedSection.current_pages > selectedSection.page_limit ? 'bg-red-500/20' : 'bg-slate-800/50'}`}>
-                          <div className="text-xs text-slate-400">Pages</div>
-                          <div className="text-lg font-bold">{editMode ? (editContent.split(/\s+/).filter(w => w).length / 250).toFixed(1) : selectedSection.current_pages} / {selectedSection.page_limit}</div>
-                        </div>
-                        <div className="bg-slate-800/50 rounded-lg p-3">
-                          <div className="text-xs text-slate-400">AI Content</div>
-                          <div className="text-lg font-bold">{selectedSection.ai_generated_percent}%</div>
-                        </div>
-                        <div className={`rounded-lg p-3 ${selectedSection.compliance_score >= 90 ? 'bg-green-500/20' : selectedSection.compliance_score >= 70 ? 'bg-yellow-500/20' : 'bg-red-500/20'}`}>
-                          <div className="text-xs text-slate-400">Compliance</div>
-                          <div className="text-lg font-bold">{selectedSection.compliance_score}%</div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Content Area */}
-                    <div className="p-4">
-                      {editMode ? (
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <button
-                              onClick={simulateAIGeneration}
-                              disabled={aiGenerating}
-                              className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-400 text-sm disabled:opacity-50"
-                            >
-                              <Icon name="zap" className="w-4 h-4" />
-                              {aiGenerating ? 'Generating...' : 'AI Assist'}
-                            </button>
-                            <span className="text-xs text-slate-500">Generate content based on RFP requirements</span>
-                          </div>
-                          <textarea
-                            value={editContent}
-                            onChange={(e) => setEditContent(e.target.value)}
-                            className="w-full h-96 bg-slate-900/50 border border-cyan-500/30 rounded-lg p-4 text-sm font-mono resize-none focus:border-cyan-400 outline-none"
-                            placeholder="Enter section content..."
-                          />
-                        </div>
-                      ) : (
-                        <div className="editor-content bg-slate-900/50 rounded-lg p-4 text-sm min-h-[400px] max-h-[600px] overflow-y-auto scrollbar-thin">
-                          {selectedSection.content || <span className="text-slate-500 italic">No content yet. Click Edit to start writing.</span>}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Footer with CUI reminder */}
-                    <div 
-                      className="cui-banner px-4 py-2 text-center text-xs"
-                      style={{ 
-                        backgroundColor: CUI_MARKINGS.find(c => c.value === selectedSection.cui_marking)?.color + '10',
-                        color: CUI_MARKINGS.find(c => c.value === selectedSection.cui_marking)?.color
-                      }}
-                    >
-                      Controlled by: Mission Meets Tech | Dissemination controls apply
-                    </div>
-                  </div>
-                ) : (
-                  <div className="glass rounded-xl p-12 text-center">
-                    <Icon name="fileText" className="w-16 h-16 mx-auto mb-4 text-slate-600" />
-                    <h3 className="text-xl font-semibold mb-2">Select a Section</h3>
-                    <p className="text-slate-400">Choose a section from the left panel to view and edit content</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </main>
+          )}
 
           {/* Footer */}
-          <footer className="border-t border-cyan-500/10 mt-8 py-4 text-center text-xs text-slate-500">
-            <p>MissionPulse v3.1 • Mission Meets Tech • AI GENERATED CONTENT REQUIRES HUMAN REVIEW</p>
-          </footer>
-
-          {/* Add Section Modal */}
-          {showAddModal && (
-            <AddSectionModal
-              volume={activeVolume}
-              opportunityId={selectedOpp?.id}
-              onClose={() => setShowAddModal(false)}
-              onSave={async (newSection) => {
-                if (supabase && connected) {
-                  const { data } = await supabase
-                    .from('proposal_sections')
-                    .insert([newSection])
-                    .select()
-                    .single();
-                  if (data) setSections(prev => [...prev, data]);
-                } else {
-                  setSections(prev => [...prev, { ...newSection, id: `demo-${Date.now()}` }]);
-                }
-                setShowAddModal(false);
-              }}
-            />
-          )}
-        </div>
-      );
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // ADD SECTION MODAL
-    // ═══════════════════════════════════════════════════════════════════
-    function AddSectionModal({ volume, opportunityId, onClose, onSave }) {
-      const [formData, setFormData] = useState({
-        section_number: '',
-        title: '',
-        page_limit: 10,
-        assigned_to: '',
-        cui_marking: 'UNCLASSIFIED'
-      });
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        onSave({
-          ...formData,
-          opportunity_id: opportunityId,
-          volume,
-          content: '',
-          word_count: 0,
-          current_pages: 0,
-          status: 'not_started',
-          ai_generated_percent: 0,
-          citations_count: 0,
-          compliance_score: 0
-        });
-      };
-
-      return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="glass rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Add New Section</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Section Number</label>
-                <input
-                  type="text"
-                  value={formData.section_number}
-                  onChange={(e) => setFormData(prev => ({ ...prev, section_number: e.target.value }))}
-                  className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
-                  placeholder="e.g., 4.0"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Title</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
-                  placeholder="Section title"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Page Limit</label>
-                  <input
-                    type="number"
-                    value={formData.page_limit}
-                    onChange={(e) => setFormData(prev => ({ ...prev, page_limit: parseInt(e.target.value) }))}
-                    className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
-                    min="1"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">CUI Marking</label>
-                  <select
-                    value={formData.cui_marking}
-                    onChange={(e) => setFormData(prev => ({ ...prev, cui_marking: e.target.value }))}
-                    className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
-                  >
-                    {CUI_MARKINGS.map(cui => (
-                      <option key={cui.value} value={cui.value}>{cui.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Assigned To</label>
-                <input
-                  type="text"
-                  value={formData.assigned_to}
-                  onChange={(e) => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
-                  className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
-                  placeholder="Team member name"
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
-                  Cancel
-                </button>
-                <button type="submit" className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 rounded-lg text-black font-medium">
-                  Add Section
-                </button>
-              </div>
-            </form>
+          <div className="mt-8 text-center text-slate-500 text-sm">
+            MissionPulse v3.1 • Mission Meets Tech • AI GENERATED CONTENT REQUIRES HUMAN REVIEW
           </div>
         </div>
       );
     }
 
-    ReactDOM.render(<IronDomeApp />, document.getElementById('root'));
+    ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 </body>
 </html>
