@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Audit Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>.glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); }</style>
+</head>
+<body class="bg-[#00050F] text-white min-h-screen">
+  <div id="root"></div>
+  <script type="text/babel">
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    const DEMO_LOGS = [
+      { id: 1, timestamp: '2026-01-30T14:32:15Z', user: 'Mary Womack', role: 'CEO', action: 'approved', module: 'HITL', target: 'Executive Summary Draft', details: 'AI content approved', ip: '192.168.1.105' },
+      { id: 2, timestamp: '2026-01-30T14:28:00Z', user: 'Sarah Chen', role: 'CAP', action: 'updated', module: 'Pipeline', target: 'DHA MHS GENESIS', details: 'Phase: Blue → Pink Team', ip: '192.168.1.112' },
+      { id: 3, timestamp: '2026-01-30T14:15:30Z', user: 'Mike Torres', role: 'PM', action: 'created', module: 'War Room', target: 'Task: Section L response', details: 'Assigned to Lisa Park', ip: '192.168.1.108' },
+      { id: 4, timestamp: '2026-01-30T13:45:00Z', user: 'System', role: 'System', action: 'scanned', module: 'Iron Dome', target: 'VA EHR Modernization', details: '87% compliance score', ip: 'system' },
+      { id: 5, timestamp: '2026-01-30T13:30:22Z', user: 'Lisa Park', role: 'SA', action: 'uploaded', module: 'RFP Shredder', target: 'VA_EHR_RFP.pdf', details: '47 requirements extracted', ip: '192.168.1.115' },
+      { id: 6, timestamp: '2026-01-30T12:58:00Z', user: 'David Kim', role: 'Tech', action: 'viewed', module: 'Black Hat', target: 'Competitor Analysis', details: 'Accessed Leidos intel', ip: '192.168.1.120' },
+      { id: 7, timestamp: '2026-01-30T12:45:15Z', user: 'Mary Womack', role: 'CEO', action: 'exported', module: 'Pricing', target: 'BOE_v3.xlsx', details: 'CUI data exported', ip: '192.168.1.105' },
+      { id: 8, timestamp: '2026-01-30T11:30:00Z', user: 'James Wilson', role: 'CON', action: 'updated', module: 'Frenemy', target: 'TechForward Solutions', details: 'TA status: Active', ip: '192.168.1.118' },
+      { id: 9, timestamp: '2026-01-30T10:15:45Z', user: 'Sarah Chen', role: 'CAP', action: 'created', module: 'Lessons', target: 'Key Personnel Prep', details: 'From IHS win', ip: '192.168.1.112' },
+      { id: 10, timestamp: '2026-01-30T09:00:00Z', user: 'System', role: 'System', action: 'backup', module: 'System', target: 'Database Backup', details: 'Daily backup complete', ip: 'system' },
+      { id: 11, timestamp: '2026-01-29T17:45:30Z', user: 'Mike Torres', role: 'PM', action: 'rejected', module: 'HITL', target: 'Technical Draft', details: 'Need CI/CD details', ip: '192.168.1.108' },
+      { id: 12, timestamp: '2026-01-29T16:20:00Z', user: 'Mary Womack', role: 'CEO', action: 'login', module: 'Auth', target: 'Session Started', details: 'Desktop login', ip: '192.168.1.105' }
+    ];
+
+    const ACTION_CONFIG = {
+      created: { icon: '➕', color: 'emerald' }, updated: { icon: '✏️', color: 'blue' },
+      approved: { icon: '✅', color: 'emerald' }, rejected: { icon: '❌', color: 'red' },
+      viewed: { icon: '👁️', color: 'slate' }, exported: { icon: '📤', color: 'amber' },
+      uploaded: { icon: '📥', color: 'cyan' }, scanned: { icon: '🔍', color: 'purple' },
+      login: { icon: '🔐', color: 'blue' }, backup: { icon: '💾', color: 'emerald' }
+    };
+
+    const MODULES = ['All', 'Pipeline', 'War Room', 'HITL', 'Pricing', 'Black Hat', 'Iron Dome', 'RFP Shredder', 'Frenemy', 'Lessons', 'Auth', 'System'];
+
+    const formatTime = (ts) => new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const formatAgo = (ts) => { const m = Math.floor((Date.now() - new Date(ts)) / 60000); return m < 60 ? `${m}m` : m < 1440 ? `${Math.floor(m/60)}h` : `${Math.floor(m/1440)}d`; };
+
+    const StatsSummary = ({ logs }) => {
+      const today = logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString());
+      return (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[{ label: 'Total Events', value: logs.length, color: 'cyan', icon: '📊' },
+            { label: 'Today', value: today.length, color: 'blue', icon: '📅' },
+            { label: 'Active Users', value: [...new Set(logs.map(l => l.user))].length, color: 'emerald', icon: '👥' },
+            { label: 'Reviews', value: logs.filter(l => ['approved','rejected'].includes(l.action)).length, color: 'purple', icon: '✅' }
+          ].map(({ label, value, color, icon }) => (
+            <div key={label} className="glass rounded-lg p-4 border border-slate-700/50">
+              <div className="flex items-center gap-2 mb-1"><span>{icon}</span><p className="text-xs text-slate-400">{label}</p></div>
+              <p className={`text-2xl font-bold text-${color}-400`}>{value}</p>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    const LogEntry = ({ log }) => {
+      const action = ACTION_CONFIG[log.action] || { icon: '•', color: 'slate' };
+      const [expanded, setExpanded] = React.useState(false);
+      return (
+        <div className="glass rounded-lg border border-slate-700/50 overflow-hidden">
+          <div className="p-4 cursor-pointer hover:bg-slate-800/30" onClick={() => setExpanded(!expanded)}>
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-lg bg-${action.color}-500/20 flex items-center justify-center text-xl`}>{action.icon}</div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium text-white">{log.user}</span>
+                  <span className="text-slate-500">•</span>
+                  <span className={`px-2 py-0.5 rounded text-xs bg-${action.color}-500/20 text-${action.color}-400`}>{log.action}</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-400 text-sm">{log.module}</span>
+                </div>
+                <p className="text-sm text-slate-300 truncate">{log.target}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-slate-400">{formatAgo(log.timestamp)} ago</p>
+                <p className="text-xs text-slate-500">{formatTime(log.timestamp)}</p>
+              </div>
+            </div>
+          </div>
+          {expanded && (
+            <div className="border-t border-slate-700 p-4 bg-slate-900/30 grid md:grid-cols-2 gap-4 text-sm">
+              <div><p className="text-slate-500 mb-1">Details</p><p className="text-slate-300">{log.details}</p></div>
+              <div className="space-y-2">
+                <div className="flex justify-between"><span className="text-slate-500">Role</span><span className="text-slate-300">{log.role}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">IP</span><span className="text-slate-300 font-mono">{log.ip}</span></div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    function App() {
+      const [logs, setLogs] = React.useState(DEMO_LOGS);
+      const [filters, setFilters] = React.useState({ module: 'All', search: '' });
+      const [connected, setConnected] = React.useState(false);
+      const [loading, setLoading] = React.useState(true);
+
+      React.useEffect(() => {
+        (async () => {
+          try {
+            const { data } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(50);
+            if (data?.length > 0) { setLogs(data); setConnected(true); }
+          } catch (e) {}
+          setLoading(false);
+        })();
+      }, []);
+
+      const filtered = logs.filter(l => {
+        if (filters.module !== 'All' && l.module !== filters.module) return false;
+        if (filters.search) { const s = filters.search.toLowerCase(); return l.user.toLowerCase().includes(s) || l.target.toLowerCase().includes(s); }
+        return true;
+      });
+
+      const handleExport = () => {
+        const csv = ['Timestamp,User,Role,Action,Module,Target,Details,IP', ...filtered.map(l => `${l.timestamp},${l.user},${l.role},${l.action},${l.module},"${l.target}","${l.details}",${l.ip}`)].join('\n');
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.download = `audit-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+      };
+
+      if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div></div>;
+
+      return (
+        <div className="min-h-screen">
+          <header className="glass border-b border-slate-700/50 sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <a href="missionpulse-dashboard-v3.html" className="p-2 hover:bg-slate-700/50 rounded-lg">← Back</a>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-500 to-slate-600 flex items-center justify-center">📋</div>
+                  <div><h1 className="text-xl font-bold">Audit Log</h1><p className="text-xs text-slate-400">System Activity</p></div>
+                </div>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-xs ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>{connected ? '● Live' : '○ Demo'}</div>
+            </div>
+          </header>
+          <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+            <StatsSummary logs={logs} />
+            <div className="flex flex-col md:flex-row gap-4">
+              <select value={filters.module} onChange={(e) => setFilters({ ...filters, module: e.target.value })} className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                {MODULES.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <input type="text" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder="Search..." className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white placeholder-slate-500" />
+              <button onClick={handleExport} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium">📥 Export CSV</button>
+            </div>
+            <p className="text-sm text-slate-500">Showing {filtered.length} of {logs.length} events</p>
+            <div className="space-y-2">{filtered.map(log => <LogEntry key={log.id} log={log} />)}{filtered.length === 0 && <div className="text-center py-12 text-slate-500">No events match filters</div>}</div>
+          </main>
+          <footer className="border-t border-slate-800 py-6"><div className="max-w-7xl mx-auto px-6 flex justify-between"><p className="text-xs text-slate-500">© 2026 Mission Meets Tech</p><p className="text-xs text-slate-600">AI GENERATED - REQUIRES HUMAN REVIEW</p></div></footer>
+        </div>
+      );
+    }
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
