@@ -3,253 +3,679 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Compliance Matrix | MissionPulse</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>MissionPulse - Compliance Matrix</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Inter',system-ui,sans-serif;background:#00050F;color:#e2e8f0;min-height:100vh}
-    .glass{background:rgba(15,23,42,0.85);backdrop-filter:blur(16px);border:1px solid rgba(0,229,250,0.1);border-radius:12px}
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+    .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .glass-hover:hover { background: rgba(0, 229, 250, 0.08); border-color: rgba(0, 229, 250, 0.3); }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
   </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const{useState,useEffect}=React;
-const SUPABASE_URL='https://qdrtpnpnhkxvfmvfziop.supabase.co';
-const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-const supabase=window.supabase?.createClient(SUPABASE_URL,SUPABASE_ANON);
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
 
-const DEMO_ITEMS=[
-  {id:1,req_id:'L.1.1',description:'Technical Approach Overview',section:'Volume I',type:'L',status:'complete',owner:'Sarah C.',notes:'Submitted for Pink Team'},
-  {id:2,req_id:'L.1.2',description:'Staffing Plan with LCAT breakdown',section:'Volume I',type:'L',status:'in_progress',owner:'Amanda F.',notes:''},
-  {id:3,req_id:'L.2.1',description:'Quality Control Plan',section:'Volume I',type:'L',status:'pending',owner:'James T.',notes:''},
-  {id:4,req_id:'L.2.2',description:'Risk Mitigation Strategy',section:'Volume I',type:'L',status:'in_progress',owner:'Michael T.',notes:''},
-  {id:5,req_id:'M.1.1',description:'Past Performance Citations (3 required)',section:'Volume II',type:'M',status:'complete',owner:'Lisa M.',notes:'All 3 submitted'},
-  {id:6,req_id:'M.1.2',description:'Key Personnel Resumes',section:'Volume II',type:'M',status:'in_progress',owner:'David C.',notes:'2 of 5 complete'},
-  {id:7,req_id:'M.2.1',description:'Organizational Chart',section:'Volume II',type:'M',status:'pending',owner:'Amanda F.',notes:''},
-  {id:8,req_id:'M.2.2',description:'Teaming Agreements',section:'Volume II',type:'M',status:'blocked',owner:'Robert W.',notes:'Awaiting partner signature'}
-];
+    // ═══════════════════════════════════════════════════════════════════
+    // SUPABASE CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    let supabase = null;
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) {
+      console.warn('Supabase init failed, using demo mode');
+    }
 
-function ComplianceMatrix(){
-  const[connected,setConnected]=useState(false);
-  const[items,setItems]=useState(DEMO_ITEMS);
-  const[filter,setFilter]=useState('all');
-  const[typeFilter,setTypeFilter]=useState('all');
-  const[showAdd,setShowAdd]=useState(false);
-  const[newItem,setNewItem]=useState({req_id:'',description:'',section:'Volume I',type:'L',status:'pending',owner:'',notes:''});
-
-  useEffect(()=>{
-    const load=async()=>{
-      try{
-        const{data,error}=await supabase.from('compliance_items').select('*').order('req_id');
-        if(!error&&data?.length)setItems(data);
-        setConnected(!error);
-      }catch{setConnected(false)}
+    // ═══════════════════════════════════════════════════════════════════
+    // ICONS
+    // ═══════════════════════════════════════════════════════════════════
+    const Icons = {
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      filter: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      trash: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      home: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      link: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
     };
-    load();
-  },[]);
 
-  const addItem=()=>{
-    if(!newItem.req_id||!newItem.description)return;
-    setItems([...items,{...newItem,id:Date.now()}]);
-    setNewItem({req_id:'',description:'',section:'Volume I',type:'L',status:'pending',owner:'',notes:''});
-    setShowAdd(false);
-  };
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
 
-  const updateStatus=(id,status)=>setItems(items.map(i=>i.id===id?{...i,status}:i));
+    // ═══════════════════════════════════════════════════════════════════
+    // STATUS & CATEGORY CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════
+    const STATUS_CONFIG = {
+      compliant: { label: 'Compliant', color: '#22C55E', bg: 'rgba(34, 197, 94, 0.2)', icon: 'check' },
+      partial: { label: 'Partial', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.2)', icon: 'alert' },
+      not_compliant: { label: 'Not Compliant', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.2)', icon: 'x' },
+      pending: { label: 'Pending', color: '#6B7280', bg: 'rgba(107, 114, 128, 0.2)', icon: 'clock' },
+    };
 
-  const filteredItems=items.filter(i=>{
-    if(filter!=='all'&&i.status!==filter)return false;
-    if(typeFilter!=='all'&&i.type!==typeFilter)return false;
-    return true;
-  });
+    const CATEGORY_CONFIG = {
+      security: { label: 'Security', color: '#EF4444' },
+      technical: { label: 'Technical', color: '#3B82F6' },
+      performance: { label: 'Performance', color: '#8B5CF6' },
+      compliance: { label: 'Compliance', color: '#F59E0B' },
+      personnel: { label: 'Personnel', color: '#EC4899' },
+      support: { label: 'Support', color: '#22C55E' },
+      general: { label: 'General', color: '#6B7280' },
+    };
 
-  const stats={
-    total:items.length,
-    complete:items.filter(i=>i.status==='complete').length,
-    inProgress:items.filter(i=>i.status==='in_progress').length,
-    pending:items.filter(i=>i.status==='pending').length,
-    blocked:items.filter(i=>i.status==='blocked').length,
-    lItems:items.filter(i=>i.type==='L').length,
-    mItems:items.filter(i=>i.type==='M').length
-  };
-  
-  const completion=Math.round((stats.complete/stats.total)*100);
+    // ═══════════════════════════════════════════════════════════════════
+    // DEMO DATA
+    // ═══════════════════════════════════════════════════════════════════
+    const DEMO_OPPORTUNITIES = [
+      { id: '550e8400-e29b-41d4-a716-446655440001', nickname: 'MEDCHART', title: 'DHA EHR Modernization', agency: 'DHA' },
+      { id: '550e8400-e29b-41d4-a716-446655440002', nickname: 'VETCARE', title: 'VA Telehealth Platform', agency: 'VA' },
+    ];
 
-  const statusColors={
-    complete:'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    in_progress:'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    pending:'bg-slate-500/20 text-slate-400 border-slate-500/30',
-    blocked:'bg-red-500/20 text-red-400 border-red-500/30'
-  };
+    const DEMO_COMPLIANCE = [
+      { id: 'c1', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'Offeror shall demonstrate FedRAMP High authorization or equivalent', requirement_ref: 'L.5.1.a', category: 'security', status: 'compliant', notes: 'FedRAMP High ATO obtained 2024', response_location: 'Vol I, Sec 2.3' },
+      { id: 'c2', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'Key personnel shall hold active Secret clearance minimum', requirement_ref: 'L.5.2.b', category: 'personnel', status: 'compliant', notes: 'All KP cleared - verification attached', response_location: 'Vol II, Sec 1.2' },
+      { id: 'c3', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'System shall achieve 99.9% uptime SLA', requirement_ref: 'C.3.2.1', category: 'performance', status: 'compliant', notes: 'Architecture supports 99.95% - exceeds requirement', response_location: 'Vol I, Sec 3.1' },
+      { id: 'c4', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'Contractor shall comply with HIPAA Security Rule', requirement_ref: 'H.8.1', category: 'compliance', status: 'compliant', notes: 'BAA executed - HIPAA compliant', response_location: 'Vol I, Sec 4.0' },
+      { id: 'c5', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'Data shall be encrypted at rest using AES-256', requirement_ref: 'L.5.1.c', category: 'security', status: 'compliant', notes: 'FIPS 140-2 validated encryption', response_location: 'Vol I, Sec 2.3.1' },
+      { id: 'c6', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'Response time shall not exceed 2 seconds for 95% of transactions', requirement_ref: 'C.3.2.4', category: 'performance', status: 'partial', notes: 'Current: 2.1s - optimization in progress', response_location: 'Vol I, Sec 3.2' },
+      { id: 'c7', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'Offeror shall provide 24/7 helpdesk support', requirement_ref: 'C.4.1.1', category: 'support', status: 'compliant', notes: 'NOC staffed 24/7/365', response_location: 'Vol II, Sec 3.0' },
+      { id: 'c8', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'System shall integrate with existing MHS GENESIS', requirement_ref: 'C.2.3.1', category: 'technical', status: 'compliant', notes: 'HL7 FHIR integration tested', response_location: 'Vol I, Sec 2.4' },
+      { id: 'c9', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'Contractor shall maintain CMMC Level 2 certification', requirement_ref: 'H.9.1', category: 'compliance', status: 'pending', notes: 'Assessment scheduled Q2 2026', response_location: 'Vol I, Sec 4.1' },
+      { id: 'c10', opportunity_id: '550e8400-e29b-41d4-a716-446655440001', requirement_text: 'All code shall undergo independent security review', requirement_ref: 'L.5.3.a', category: 'security', status: 'not_compliant', notes: 'Third-party review pending budget approval', response_location: 'Vol I, Sec 2.5' },
+    ];
 
-  return(
-    <div className="min-h-screen p-6">
-      {/* Header */}
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            ✓ Compliance Matrix
-            <span className={`text-xs px-2 py-1 rounded ${connected?'bg-emerald-500/20 text-emerald-400':'bg-red-500/20 text-red-400'}`}>
-              {connected?'● Live':'○ Demo'}
-            </span>
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">L/M requirement tracking and compliance</p>
-        </div>
-        <button onClick={()=>setShowAdd(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-medium">
-          + Add Requirement
-        </button>
-      </div>
+    // ═══════════════════════════════════════════════════════════════════
+    // MAIN COMPONENT
+    // ═══════════════════════════════════════════════════════════════════
+    function ComplianceMatrixApp() {
+      const [connected, setConnected] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [opportunities, setOpportunities] = useState([]);
+      const [complianceItems, setComplianceItems] = useState([]);
+      const [selectedOpp, setSelectedOpp] = useState(null);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [filterStatus, setFilterStatus] = useState('all');
+      const [filterCategory, setFilterCategory] = useState('all');
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [editingItem, setEditingItem] = useState(null);
 
-      {/* Progress & Stats */}
-      <div className="grid grid-cols-6 gap-4 mb-6">
-        <div className="col-span-2 glass p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-sm">Overall Progress</span>
-            <span className="text-2xl font-bold text-cyan-400">{completion}%</span>
+      useEffect(() => {
+        loadData();
+      }, []);
+
+      async function loadData() {
+        setLoading(true);
+        try {
+          if (supabase) {
+            const { data: opps, error: oppError } = await supabase
+              .from('opportunities')
+              .select('id, nickname, title, agency')
+              .order('created_at', { ascending: false });
+
+            if (!oppError && opps?.length > 0) {
+              setOpportunities(opps);
+              setSelectedOpp(opps[0]);
+              setConnected(true);
+              
+              const { data: items } = await supabase
+                .from('compliance_items')
+                .select('*')
+                .eq('opportunity_id', opps[0].id);
+              
+              if (items) setComplianceItems(items);
+            } else {
+              throw new Error('No data');
+            }
+          } else {
+            throw new Error('No Supabase');
+          }
+        } catch (e) {
+          console.log('Using demo data:', e.message);
+          setOpportunities(DEMO_OPPORTUNITIES);
+          setSelectedOpp(DEMO_OPPORTUNITIES[0]);
+          setComplianceItems(DEMO_COMPLIANCE);
+          setConnected(false);
+        }
+        setLoading(false);
+      }
+
+      async function loadComplianceItems(oppId) {
+        if (!oppId) return;
+        try {
+          if (supabase && connected) {
+            const { data } = await supabase
+              .from('compliance_items')
+              .select('*')
+              .eq('opportunity_id', oppId);
+            if (data) setComplianceItems(data);
+          } else {
+            setComplianceItems(DEMO_COMPLIANCE.filter(c => c.opportunity_id === oppId));
+          }
+        } catch (e) {
+          setComplianceItems(DEMO_COMPLIANCE.filter(c => c.opportunity_id === oppId));
+        }
+      }
+
+      function handleOppChange(opp) {
+        setSelectedOpp(opp);
+        loadComplianceItems(opp.id);
+      }
+
+      async function updateItemStatus(itemId, newStatus) {
+        try {
+          if (supabase && connected) {
+            await supabase
+              .from('compliance_items')
+              .update({ status: newStatus })
+              .eq('id', itemId);
+          }
+          setComplianceItems(prev => prev.map(item =>
+            item.id === itemId ? { ...item, status: newStatus } : item
+          ));
+        } catch (e) {
+          console.error('Update failed:', e);
+        }
+      }
+
+      async function saveItem(itemData) {
+        try {
+          if (editingItem) {
+            // Update
+            if (supabase && connected) {
+              await supabase
+                .from('compliance_items')
+                .update(itemData)
+                .eq('id', editingItem.id);
+            }
+            setComplianceItems(prev => prev.map(item =>
+              item.id === editingItem.id ? { ...item, ...itemData } : item
+            ));
+          } else {
+            // Create
+            const newItem = { ...itemData, opportunity_id: selectedOpp?.id };
+            if (supabase && connected) {
+              const { data } = await supabase
+                .from('compliance_items')
+                .insert([newItem])
+                .select()
+                .single();
+              if (data) setComplianceItems(prev => [...prev, data]);
+            } else {
+              setComplianceItems(prev => [...prev, { ...newItem, id: `demo-${Date.now()}` }]);
+            }
+          }
+          setShowAddModal(false);
+          setEditingItem(null);
+        } catch (e) {
+          console.error('Save failed:', e);
+        }
+      }
+
+      async function deleteItem(itemId) {
+        if (!confirm('Delete this compliance item?')) return;
+        try {
+          if (supabase && connected) {
+            await supabase.from('compliance_items').delete().eq('id', itemId);
+          }
+          setComplianceItems(prev => prev.filter(item => item.id !== itemId));
+        } catch (e) {
+          console.error('Delete failed:', e);
+        }
+      }
+
+      // Filter and search
+      const filteredItems = useMemo(() => {
+        return complianceItems.filter(item => {
+          const matchesSearch = searchQuery === '' || 
+            item.requirement_text?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.requirement_ref?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.notes?.toLowerCase().includes(searchQuery.toLowerCase());
+          const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
+          const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
+          return matchesSearch && matchesStatus && matchesCategory;
+        });
+      }, [complianceItems, searchQuery, filterStatus, filterCategory]);
+
+      // Statistics
+      const stats = useMemo(() => {
+        const total = complianceItems.length;
+        const compliant = complianceItems.filter(i => i.status === 'compliant').length;
+        const partial = complianceItems.filter(i => i.status === 'partial').length;
+        const notCompliant = complianceItems.filter(i => i.status === 'not_compliant').length;
+        const pending = complianceItems.filter(i => i.status === 'pending').length;
+        const score = total > 0 ? Math.round(((compliant + partial * 0.5) / total) * 100) : 0;
+        return { total, compliant, partial, notCompliant, pending, score };
+      }, [complianceItems]);
+
+      // Export to CSV
+      function exportCSV() {
+        const headers = ['Reference', 'Category', 'Requirement', 'Status', 'Response Location', 'Notes'];
+        const rows = complianceItems.map(item => [
+          item.requirement_ref,
+          item.category,
+          `"${item.requirement_text?.replace(/"/g, '""')}"`,
+          item.status,
+          item.response_location || '',
+          `"${(item.notes || '').replace(/"/g, '""')}"`
+        ]);
+        
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `compliance-matrix-${selectedOpp?.nickname || 'export'}-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+      }
+
+      if (loading) {
+        return (
+          <div className="min-h-screen bg-[#00050F] flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-cyan-400">Loading Compliance Matrix...</p>
+            </div>
           </div>
-          <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all" style={{width:`${completion}%`}}/>
-          </div>
-          <div className="flex justify-between mt-2 text-xs text-slate-500">
-            <span>{stats.complete} complete</span>
-            <span>{stats.total - stats.complete} remaining</span>
-          </div>
-        </div>
-        {[
-          {label:'Total',value:stats.total,color:'text-white'},
-          {label:'Complete',value:stats.complete,color:'text-emerald-400'},
-          {label:'In Progress',value:stats.inProgress,color:'text-amber-400'},
-          {label:'Blocked',value:stats.blocked,color:'text-red-400'}
-        ].map((s,i)=>(
-          <div key={i} className="glass p-4 text-center">
-            <div className="text-slate-400 text-xs">{s.label}</div>
-            <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-          </div>
-        ))}
-      </div>
+        );
+      }
 
-      {/* Filters */}
-      <div className="flex gap-3 mb-4">
-        <select value={filter} onChange={e=>setFilter(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-          <option value="all">All Status</option>
-          <option value="complete">Complete</option>
-          <option value="in_progress">In Progress</option>
-          <option value="pending">Pending</option>
-          <option value="blocked">Blocked</option>
-        </select>
-        <select value={typeFilter} onChange={e=>setTypeFilter(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-          <option value="all">All Types</option>
-          <option value="L">L - Instructions ({stats.lItems})</option>
-          <option value="M">M - Evaluation ({stats.mItems})</option>
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="glass overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-800/50">
-            <tr>
-              {['Req ID','Type','Description','Section','Owner','Status','Actions'].map(h=>(
-                <th key={h} className="text-left p-3 text-xs font-semibold text-slate-400 uppercase">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-700/30">
-            {filteredItems.map(item=>(
-              <tr key={item.id} className="hover:bg-slate-800/30">
-                <td className="p-3 font-mono text-cyan-400 text-sm">{item.req_id}</td>
-                <td className="p-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.type==='L'?'bg-blue-500/20 text-blue-400':'bg-purple-500/20 text-purple-400'}`}>
-                    {item.type}
-                  </span>
-                </td>
-                <td className="p-3 text-sm text-white max-w-md">
-                  <div>{item.description}</div>
-                  {item.notes&&<div className="text-xs text-slate-500 mt-1">📝 {item.notes}</div>}
-                </td>
-                <td className="p-3 text-sm text-slate-400">{item.section}</td>
-                <td className="p-3 text-sm text-slate-300">{item.owner}</td>
-                <td className="p-3">
-                  <span className={`px-2 py-1 rounded text-xs border ${statusColors[item.status]}`}>
-                    {item.status.replace('_',' ')}
-                  </span>
-                </td>
-                <td className="p-3">
-                  <select value={item.status} onChange={e=>updateStatus(item.id,e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white">
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="complete">Complete</option>
-                    <option value="blocked">Blocked</option>
+      return (
+        <div className="min-h-screen bg-[#00050F] text-white">
+          {/* Header */}
+          <header className="glass border-b border-cyan-500/20 sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <a href="index.html" className="p-2 rounded-lg hover:bg-cyan-500/10 transition-colors">
+                    <Icon name="home" className="w-5 h-5 text-cyan-400" />
+                  </a>
+                  <div className="flex items-center gap-2">
+                    <Icon name="shield" className="w-6 h-6 text-cyan-400" />
+                    <h1 className="text-xl font-bold">Compliance Matrix</h1>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <select
+                    value={selectedOpp?.id || ''}
+                    onChange={(e) => {
+                      const opp = opportunities.find(o => o.id === e.target.value);
+                      if (opp) handleOppChange(opp);
+                    }}
+                    className="bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-sm focus:border-cyan-400 outline-none"
+                  >
+                    {opportunities.map(opp => (
+                      <option key={opp.id} value={opp.id}>
+                        {opp.nickname} - {opp.title}
+                      </option>
+                    ))}
                   </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* L vs M Summary */}
-      <div className="grid grid-cols-2 gap-4 mt-6">
-        <div className="glass p-4">
-          <h3 className="font-semibold text-white mb-3">📘 Section L - Instructions</h3>
-          <div className="flex items-center gap-4">
-            <div className="text-3xl font-bold text-blue-400">{items.filter(i=>i.type==='L'&&i.status==='complete').length}/{stats.lItems}</div>
-            <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500" style={{width:`${(items.filter(i=>i.type==='L'&&i.status==='complete').length/stats.lItems)*100}%`}}/>
+                  
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${connected ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
+                    {connected ? 'Connected' : 'Demo Mode'}
+                  </div>
+                  
+                  <button onClick={loadData} className="p-2 rounded-lg hover:bg-cyan-500/10">
+                    <Icon name="refresh" className="w-5 h-5 text-cyan-400" />
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="glass p-4">
-          <h3 className="font-semibold text-white mb-3">📙 Section M - Evaluation</h3>
-          <div className="flex items-center gap-4">
-            <div className="text-3xl font-bold text-purple-400">{items.filter(i=>i.type==='M'&&i.status==='complete').length}/{stats.mItems}</div>
-            <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-purple-500" style={{width:`${(items.filter(i=>i.type==='M'&&i.status==='complete').length/stats.mItems)*100}%`}}/>
-            </div>
-          </div>
-        </div>
-      </div>
+          </header>
 
-      {/* Add Modal */}
-      {showAdd&&(
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="glass p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold text-white mb-4">Add Requirement</h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <input value={newItem.req_id} onChange={e=>setNewItem({...newItem,req_id:e.target.value})} placeholder="Req ID (e.g. L.1.1)" className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"/>
-                <select value={newItem.type} onChange={e=>setNewItem({...newItem,type:e.target.value})} className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
-                  <option value="L">L - Instructions</option>
-                  <option value="M">M - Evaluation</option>
+          <main className="max-w-7xl mx-auto px-4 py-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-6 gap-4 mb-6">
+              <div className="glass rounded-xl p-4 col-span-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-400">Compliance Score</p>
+                    <p className="text-3xl font-bold mt-1" style={{ color: stats.score >= 80 ? '#22C55E' : stats.score >= 60 ? '#F59E0B' : '#EF4444' }}>
+                      {stats.score}%
+                    </p>
+                  </div>
+                  <div className="w-16 h-16">
+                    <svg viewBox="0 0 36 36" className="w-full h-full">
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#1e293b"
+                        strokeWidth="3"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke={stats.score >= 80 ? '#22C55E' : stats.score >= 60 ? '#F59E0B' : '#EF4444'}
+                        strokeWidth="3"
+                        strokeDasharray={`${stats.score}, 100`}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              {Object.entries(STATUS_CONFIG).map(([status, config]) => (
+                <div key={status} className="glass rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: config.bg }}>
+                      <Icon name={config.icon} className="w-3 h-3" style={{ color: config.color }} />
+                    </div>
+                    <span className="text-xs text-slate-400">{config.label}</span>
+                  </div>
+                  <p className="text-2xl font-bold" style={{ color: config.color }}>
+                    {stats[status === 'not_compliant' ? 'notCompliant' : status]}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Toolbar */}
+            <div className="glass rounded-xl p-4 mb-6">
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* Search */}
+                <div className="flex-1 min-w-[200px] relative">
+                  <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search requirements..."
+                    className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-cyan-400 outline-none"
+                  />
+                </div>
+                
+                {/* Status Filter */}
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="all">All Status</option>
+                  {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                    <option key={key} value={key}>{cfg.label}</option>
+                  ))}
                 </select>
-              </div>
-              <input value={newItem.description} onChange={e=>setNewItem({...newItem,description:e.target.value})} placeholder="Description" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"/>
-              <div className="grid grid-cols-2 gap-3">
-                <input value={newItem.section} onChange={e=>setNewItem({...newItem,section:e.target.value})} placeholder="Section" className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"/>
-                <input value={newItem.owner} onChange={e=>setNewItem({...newItem,owner:e.target.value})} placeholder="Owner" className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"/>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={()=>setShowAdd(false)} className="flex-1 px-4 py-2 bg-slate-700 rounded-lg">Cancel</button>
-                <button onClick={addItem} className="flex-1 px-4 py-2 bg-cyan-500 rounded-lg text-white">Add</button>
+                
+                {/* Category Filter */}
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="all">All Categories</option>
+                  {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+                    <option key={key} value={key}>{cfg.label}</option>
+                  ))}
+                </select>
+                
+                {/* Actions */}
+                <button
+                  onClick={() => { setEditingItem(null); setShowAddModal(true); }}
+                  className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 rounded-lg text-cyan-400"
+                >
+                  <Icon name="plus" className="w-4 h-4" />
+                  Add Requirement
+                </button>
+                
+                <button
+                  onClick={exportCSV}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg"
+                >
+                  <Icon name="download" className="w-4 h-4" />
+                  Export CSV
+                </button>
               </div>
             </div>
+
+            {/* Compliance Table */}
+            <div className="glass rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-700/50">
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Ref</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Category</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Requirement</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Location</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12 text-slate-500">
+                        <Icon name="shield" className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No compliance items found</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredItems.map(item => (
+                      <tr key={item.id} className="border-b border-slate-700/30 hover:bg-slate-800/30">
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-cyan-400 text-sm">{item.requirement_ref}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span 
+                            className="px-2 py-1 rounded text-xs font-medium"
+                            style={{ 
+                              backgroundColor: CATEGORY_CONFIG[item.category]?.color + '20',
+                              color: CATEGORY_CONFIG[item.category]?.color 
+                            }}
+                          >
+                            {CATEGORY_CONFIG[item.category]?.label || item.category}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 max-w-md">
+                          <p className="text-sm truncate">{item.requirement_text}</p>
+                          {item.notes && (
+                            <p className="text-xs text-slate-500 mt-1 truncate">{item.notes}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={item.status}
+                            onChange={(e) => updateItemStatus(item.id, e.target.value)}
+                            className="bg-transparent border-0 text-sm font-medium cursor-pointer"
+                            style={{ color: STATUS_CONFIG[item.status]?.color }}
+                          >
+                            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                              <option key={key} value={key} style={{ color: 'black' }}>{cfg.label}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          {item.response_location && (
+                            <span className="flex items-center gap-1 text-sm text-slate-400">
+                              <Icon name="link" className="w-3 h-3" />
+                              {item.response_location}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => { setEditingItem(item); setShowAddModal(true); }}
+                              className="p-1.5 rounded hover:bg-cyan-500/20 text-cyan-400"
+                            >
+                              <Icon name="edit" className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteItem(item.id)}
+                              className="p-1.5 rounded hover:bg-red-500/20 text-red-400"
+                            >
+                              <Icon name="trash" className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Results count */}
+            <div className="mt-4 text-sm text-slate-500 text-center">
+              Showing {filteredItems.length} of {complianceItems.length} requirements
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-cyan-500/10 mt-8 py-4 text-center text-xs text-slate-500">
+            <p>MissionPulse v3.1 • Mission Meets Tech • AI GENERATED CONTENT REQUIRES HUMAN REVIEW</p>
+          </footer>
+
+          {/* Add/Edit Modal */}
+          {showAddModal && (
+            <ComplianceModal
+              item={editingItem}
+              onClose={() => { setShowAddModal(false); setEditingItem(null); }}
+              onSave={saveItem}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // COMPLIANCE MODAL
+    // ═══════════════════════════════════════════════════════════════════
+    function ComplianceModal({ item, onClose, onSave }) {
+      const [formData, setFormData] = useState({
+        requirement_ref: item?.requirement_ref || '',
+        requirement_text: item?.requirement_text || '',
+        category: item?.category || 'general',
+        status: item?.status || 'pending',
+        response_location: item?.response_location || '',
+        notes: item?.notes || '',
+      });
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(formData);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="glass rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">
+              {item ? 'Edit Requirement' : 'Add Requirement'}
+            </h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Reference (e.g., L.5.1.a)</label>
+                  <input
+                    type="text"
+                    value={formData.requirement_ref}
+                    onChange={(e) => setFormData(prev => ({ ...prev, requirement_ref: e.target.value }))}
+                    className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
+                    placeholder="L.5.1.a"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
+                  >
+                    {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+                      <option key={key} value={key}>{cfg.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Requirement Text</label>
+                <textarea
+                  value={formData.requirement_text}
+                  onChange={(e) => setFormData(prev => ({ ...prev, requirement_text: e.target.value }))}
+                  className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2 h-24 resize-none"
+                  placeholder="Full requirement text from RFP..."
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
+                  >
+                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                      <option key={key} value={key}>{cfg.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Response Location</label>
+                  <input
+                    type="text"
+                    value={formData.response_location}
+                    onChange={(e) => setFormData(prev => ({ ...prev, response_location: e.target.value }))}
+                    className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2"
+                    placeholder="Vol I, Sec 2.3"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Notes</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-lg px-3 py-2 h-20 resize-none"
+                  placeholder="Compliance notes, evidence, or action items..."
+                />
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
+                  Cancel
+                </button>
+                <button type="submit" className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 rounded-lg text-black font-medium">
+                  {item ? 'Save Changes' : 'Add Requirement'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      )}
+      );
+    }
 
-      <div className="text-center text-xs text-slate-500 mt-8">
-        AI GENERATED - REQUIRES HUMAN REVIEW | © 2026 Mission Meets Tech
-      </div>
-    </div>
-  );
-}
-
-ReactDOM.render(<ComplianceMatrix/>,document.getElementById('root'));
-</script>
+    ReactDOM.render(<ComplianceMatrixApp />, document.getElementById('root'));
+  </script>
 </body>
 </html>
