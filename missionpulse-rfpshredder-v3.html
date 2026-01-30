@@ -3,523 +3,181 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - RFP Shredder</title>
+  <title>MissionPulse | RFP Shredder</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); }
-    @keyframes shred { 0% { transform: translateY(0) rotate(0); } 100% { transform: translateY(20px) rotate(5deg); } }
-    .shredding { animation: shred 0.3s ease-in-out infinite alternate; }
-    .drop-zone { border: 2px dashed rgba(100, 116, 139, 0.5); }
-    .drop-zone.active { border-color: rgba(0, 229, 250, 0.8); background: rgba(0, 229, 250, 0.05); }
+    :root { --mmt-cyan: #00E5FA; --mmt-navy: #00050F; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--mmt-navy); color: #e2e8f0; }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.1); }
   </style>
 </head>
-<body class="bg-[#00050F] text-white min-h-screen">
+<body>
   <div id="root"></div>
-  
   <script type="text/babel">
-    // PDF.js worker
-    if (window.pdfjsLib) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
+const { useState, useEffect } = React;
 
-    // ============================================
-    // CONFIGURATION
-    // ============================================
-    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-    const API_URL = 'https://missionpulse-api.onrender.com';
-    
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const CONFIG = {
+  SUPABASE_URL: 'https://qdrtpnpnhkxvfmvfziop.supabase.co',
+  SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8',
+  LOGIN_PAGE: 'login.html'
+};
 
-    // ============================================
-    // DEMO DATA
-    // ============================================
-    const DEMO_REQUIREMENTS = [
-      { id: 1, section: 'L.1', text: 'The contractor shall provide a Program Manager with PMP certification and 10+ years federal healthcare IT experience.', type: 'Personnel', priority: 'mandatory', compliance: 'compliant', owner: 'HR', notes: 'John Smith meets all requirements' },
-      { id: 2, section: 'L.2', text: 'Technical approach shall demonstrate experience with HL7 FHIR interoperability standards.', type: 'Technical', priority: 'mandatory', compliance: 'partial', owner: 'Technical', notes: 'Need to strengthen FHIR examples' },
-      { id: 3, section: 'L.3', text: 'Offeror shall provide three (3) past performance references of similar scope within the last 5 years.', type: 'Past Performance', priority: 'mandatory', compliance: 'compliant', owner: 'Contracts', notes: 'VA, DHA, CMS references ready' },
-      { id: 4, section: 'L.4', text: 'Quality Assurance plan shall comply with ISO 9001:2015 standards.', type: 'Quality', priority: 'mandatory', compliance: 'pending', owner: 'QA', notes: 'Awaiting QA plan from subcontractor' },
-      { id: 5, section: 'M.1', text: 'Understanding of requirements - demonstrate clear understanding of VA EHR modernization objectives.', type: 'Evaluation', priority: 'discriminator', compliance: 'compliant', owner: 'Technical', notes: 'Strong section drafted' },
-      { id: 6, section: 'M.2', text: 'Small business participation plan with minimum 30% small business subcontracting.', type: 'Socioeconomic', priority: 'mandatory', compliance: 'partial', owner: 'Contracts', notes: 'Currently at 27%, need to add partner' },
-      { id: 7, section: 'L.5', text: 'Cybersecurity approach shall align with NIST 800-53 and VA Handbook 6500.', type: 'Security', priority: 'mandatory', compliance: 'compliant', owner: 'Security', notes: 'CMMC L2 certified' },
-      { id: 8, section: 'L.6', text: 'Transition plan shall ensure zero disruption to ongoing operations.', type: 'Management', priority: 'discriminator', compliance: 'pending', owner: 'PM', notes: 'Draft in progress' }
-    ];
+const DEMO_REQUIREMENTS = [
+  { id: 1, section: 'L.1.1', text: 'The contractor shall provide experienced Program Manager with PMP certification', type: 'mandatory', status: 'compliant', volume: 'L' },
+  { id: 2, section: 'L.1.2', text: 'Offeror must demonstrate 3+ years experience with VA healthcare IT systems', type: 'mandatory', status: 'partial', volume: 'L' },
+  { id: 3, section: 'L.2.1', text: 'Technical approach shall address interoperability with existing EHR systems', type: 'evaluation', status: 'pending', volume: 'L' },
+  { id: 4, section: 'M.1.1', text: 'Provide 3 past performance references of similar scope and complexity', type: 'mandatory', status: 'compliant', volume: 'M' },
+  { id: 5, section: 'K.1.1', text: 'Pricing shall be submitted using SF 1449 format', type: 'mandatory', status: 'compliant', volume: 'K' },
+  { id: 6, section: 'L.3.1', text: 'Describe approach to CMMC Level 2 compliance', type: 'evaluation', status: 'pending', volume: 'L' }
+];
 
-    const REQUIREMENT_TYPES = ['Personnel', 'Technical', 'Past Performance', 'Quality', 'Evaluation', 'Socioeconomic', 'Security', 'Management', 'Pricing', 'Other'];
-    const COMPLIANCE_STATUS = ['compliant', 'partial', 'non-compliant', 'pending'];
-    const PRIORITY_LEVELS = ['mandatory', 'discriminator', 'desirable'];
+function checkAuth() {
+  const session = localStorage.getItem('MP_SESSION');
+  if (!session) { window.location.href = CONFIG.LOGIN_PAGE; return null; }
+  try { return JSON.parse(localStorage.getItem('MP_USER')); }
+  catch { return { email: 'demo@mmt.com', role: 'PM', name: 'Demo User' }; }
+}
 
-    // ============================================
-    // UTILITY FUNCTIONS
-    // ============================================
-    const getComplianceColor = (status) => ({
-      compliant: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/50' },
-      partial: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/50' },
-      'non-compliant': { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/50' },
-      pending: { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/50' }
-    }[status] || { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/50' });
+function RequirementRow({ req, onStatusChange }) {
+  const statusColors = { compliant: 'bg-green-500/20 text-green-400', partial: 'bg-amber-500/20 text-amber-400', pending: 'bg-slate-500/20 text-slate-400', noncompliant: 'bg-red-500/20 text-red-400' };
+  const typeColors = { mandatory: 'bg-red-500/20 text-red-400', evaluation: 'bg-blue-500/20 text-blue-400' };
+  
+  return (
+    <tr className="border-b border-slate-700/50 hover:bg-slate-800/30">
+      <td className="py-3 px-4"><span className="font-mono text-cyan-400">{req.section}</span></td>
+      <td className="py-3 px-4 text-sm text-slate-300">{req.text}</td>
+      <td className="py-3 px-4"><span className={`px-2 py-1 rounded text-xs ${typeColors[req.type]}`}>{req.type}</span></td>
+      <td className="py-3 px-4"><span className="text-xs px-2 py-1 bg-slate-700 rounded">Vol {req.volume}</span></td>
+      <td className="py-3 px-4">
+        <select value={req.status} onChange={(e) => onStatusChange(req.id, e.target.value)} className={`px-2 py-1 rounded text-xs ${statusColors[req.status]} bg-transparent border border-current cursor-pointer`}>
+          <option value="pending">Pending</option>
+          <option value="compliant">Compliant</option>
+          <option value="partial">Partial</option>
+          <option value="noncompliant">Non-Compliant</option>
+        </select>
+      </td>
+    </tr>
+  );
+}
 
-    const getPriorityColor = (priority) => ({
-      mandatory: 'text-red-400',
-      discriminator: 'text-amber-400',
-      desirable: 'text-blue-400'
-    }[priority] || 'text-slate-400');
+function App() {
+  const [user, setUser] = useState(null);
+  const [requirements, setRequirements] = useState(DEMO_REQUIREMENTS);
+  const [filterVolume, setFilterVolume] = useState('all');
 
-    // ============================================
-    // PDF TEXT EXTRACTION
-    // ============================================
-    const extractTextFromPDF = async (file) => {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let fullText = '';
-      
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
-        fullText += pageText + '\n\n';
-      }
-      
-      return fullText;
-    };
+  useEffect(() => {
+    const authUser = checkAuth();
+    if (authUser) setUser(authUser);
+  }, []);
 
-    // ============================================
-    // COMPONENTS
-    // ============================================
+  const handleStatusChange = (id, status) => {
+    setRequirements(requirements.map(r => r.id === id ? { ...r, status } : r));
+  };
 
-    // File Upload Zone
-    const FileUploadZone = ({ onFileSelect, isProcessing }) => {
-      const [isDragActive, setIsDragActive] = React.useState(false);
-      const fileInputRef = React.useRef(null);
+  const filtered = filterVolume === 'all' ? requirements : requirements.filter(r => r.volume === filterVolume);
+  const stats = {
+    total: requirements.length,
+    compliant: requirements.filter(r => r.status === 'compliant').length,
+    partial: requirements.filter(r => r.status === 'partial').length,
+    pending: requirements.filter(r => r.status === 'pending').length
+  };
 
-      const handleDrag = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === 'dragenter' || e.type === 'dragover') {
-          setIsDragActive(true);
-        } else if (e.type === 'dragleave') {
-          setIsDragActive(false);
-        }
-      };
+  if (!user) return <div className="min-h-screen flex items-center justify-center text-cyan-400">Loading...</div>;
 
-      const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragActive(false);
-        
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-          onFileSelect(e.dataTransfer.files[0]);
-        }
-      };
-
-      const handleChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-          onFileSelect(e.target.files[0]);
-        }
-      };
-
-      return (
-        <div
-          className={`drop-zone rounded-xl p-8 text-center transition-all ${isDragActive ? 'active' : ''} ${isProcessing ? 'opacity-50' : ''}`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => !isProcessing && fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.doc,.docx,.txt"
-            onChange={handleChange}
-            disabled={isProcessing}
-          />
-          
-          {isProcessing ? (
-            <div className="space-y-4">
-              <div className="text-6xl shredding">📄</div>
-              <p className="text-cyan-400 font-medium">Shredding RFP...</p>
-              <p className="text-slate-500 text-sm">Extracting requirements with AI</p>
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <header className="glass border-b border-slate-700/50 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <a href="missionpulse-dashboard-v3.html" className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            </a>
+            <div>
+              <h1 className="text-xl font-bold text-white">📄 RFP Shredder</h1>
+              <p className="text-sm text-slate-400">Requirements Extraction & Compliance Matrix</p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-6xl">📄</div>
-              <p className="text-white font-medium">Drop RFP document here</p>
-              <p className="text-slate-500 text-sm">or click to browse • PDF, DOC, DOCX supported</p>
-            </div>
-          )}
+          </div>
+          <span className="text-sm text-slate-400">{user.name} ({user.role})</span>
         </div>
-      );
-    };
+      </header>
 
-    // Stats Summary
-    const StatsSummary = ({ requirements }) => {
-      const total = requirements.length;
-      const compliant = requirements.filter(r => r.compliance === 'compliant').length;
-      const partial = requirements.filter(r => r.compliance === 'partial').length;
-      const nonCompliant = requirements.filter(r => r.compliance === 'non-compliant').length;
-      const pending = requirements.filter(r => r.compliance === 'pending').length;
-      const complianceRate = total > 0 ? Math.round((compliant / total) * 100) : 0;
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-4">
+          <div className="glass rounded-xl p-4 text-center">
+            <p className="text-3xl font-bold text-white">{stats.total}</p>
+            <p className="text-sm text-slate-400">Total Requirements</p>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <p className="text-3xl font-bold text-green-400">{stats.compliant}</p>
+            <p className="text-sm text-slate-400">Compliant</p>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <p className="text-3xl font-bold text-amber-400">{stats.partial}</p>
+            <p className="text-sm text-slate-400">Partial</p>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <p className="text-3xl font-bold text-slate-400">{stats.pending}</p>
+            <p className="text-sm text-slate-400">Pending Review</p>
+          </div>
+        </div>
 
-      return (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          {[
-            { label: 'Total Requirements', value: total, color: 'cyan', icon: '📋' },
-            { label: 'Compliant', value: compliant, color: 'emerald', icon: '✅' },
-            { label: 'Partial', value: partial, color: 'amber', icon: '⚠️' },
-            { label: 'Non-Compliant', value: nonCompliant, color: 'red', icon: '❌' },
-            { label: 'Pending', value: pending, color: 'slate', icon: '⏳' },
-            { label: 'Compliance Rate', value: `${complianceRate}%`, color: complianceRate >= 80 ? 'emerald' : complianceRate >= 60 ? 'amber' : 'red', icon: '📊' }
-          ].map(({ label, value, color, icon }) => (
-            <div key={label} className="glass rounded-lg p-4 border border-slate-700/50">
-              <div className="flex items-center gap-2 mb-1">
-                <span>{icon}</span>
-                <p className="text-xs text-slate-400">{label}</p>
-              </div>
-              <p className={`text-2xl font-bold text-${color}-400`}>{value}</p>
-            </div>
+        {/* Filter */}
+        <div className="flex gap-2">
+          {['all', 'L', 'M', 'K'].map(v => (
+            <button key={v} onClick={() => setFilterVolume(v)} className={`px-3 py-1.5 rounded-lg text-sm ${filterVolume === v ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+              {v === 'all' ? 'All Volumes' : `Volume ${v}`}
+            </button>
           ))}
         </div>
-      );
-    };
 
-    // Requirement Row
-    const RequirementRow = ({ req, onUpdate }) => {
-      const [editing, setEditing] = React.useState(false);
-      const [editData, setEditData] = React.useState(req);
-      const compliance = getComplianceColor(req.compliance);
-
-      const handleSave = () => {
-        onUpdate(editData);
-        setEditing(false);
-      };
-
-      if (editing) {
-        return (
-          <tr className="border-b border-slate-800 bg-slate-800/50">
-            <td className="py-3 px-4">
-              <input
-                value={editData.section}
-                onChange={(e) => setEditData({ ...editData, section: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm"
-              />
-            </td>
-            <td className="py-3 px-4">
-              <textarea
-                value={editData.text}
-                onChange={(e) => setEditData({ ...editData, text: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm"
-                rows={2}
-              />
-            </td>
-            <td className="py-3 px-4">
-              <select
-                value={editData.type}
-                onChange={(e) => setEditData({ ...editData, type: e.target.value })}
-                className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm"
-              >
-                {REQUIREMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </td>
-            <td className="py-3 px-4">
-              <select
-                value={editData.compliance}
-                onChange={(e) => setEditData({ ...editData, compliance: e.target.value })}
-                className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm"
-              >
-                {COMPLIANCE_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </td>
-            <td className="py-3 px-4">
-              <input
-                value={editData.owner}
-                onChange={(e) => setEditData({ ...editData, owner: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm"
-              />
-            </td>
-            <td className="py-3 px-4">
-              <div className="flex gap-2">
-                <button onClick={handleSave} className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs">Save</button>
-                <button onClick={() => setEditing(false)} className="px-2 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs">Cancel</button>
-              </div>
-            </td>
-          </tr>
-        );
-      }
-
-      return (
-        <tr className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors group">
-          <td className="py-3 px-4 font-mono text-cyan-400 text-sm">{req.section}</td>
-          <td className="py-3 px-4 text-sm text-slate-300 max-w-md">
-            <p className="line-clamp-2">{req.text}</p>
-            {req.notes && <p className="text-xs text-slate-500 mt-1">💡 {req.notes}</p>}
-          </td>
-          <td className="py-3 px-4">
-            <span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{req.type}</span>
-          </td>
-          <td className="py-3 px-4">
-            <span className={`px-2 py-0.5 rounded text-xs ${compliance.bg} ${compliance.text}`}>
-              {req.compliance}
-            </span>
-          </td>
-          <td className="py-3 px-4 text-sm text-slate-400">{req.owner}</td>
-          <td className="py-3 px-4">
-            <button
-              onClick={() => setEditing(true)}
-              className="opacity-0 group-hover:opacity-100 px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs transition-opacity"
-            >
-              Edit
-            </button>
-          </td>
-        </tr>
-      );
-    };
-
-    // Filter Bar
-    const FilterBar = ({ filters, onChange }) => (
-      <div className="flex gap-4 flex-wrap">
-        <select
-          value={filters.type}
-          onChange={(e) => onChange({ ...filters, type: e.target.value })}
-          className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white text-sm"
-        >
-          <option value="">All Types</option>
-          {REQUIREMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select
-          value={filters.compliance}
-          onChange={(e) => onChange({ ...filters, compliance: e.target.value })}
-          className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white text-sm"
-        >
-          <option value="">All Status</option>
-          {COMPLIANCE_STATUS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-        </select>
-        <select
-          value={filters.priority}
-          onChange={(e) => onChange({ ...filters, priority: e.target.value })}
-          className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white text-sm"
-        >
-          <option value="">All Priorities</option>
-          {PRIORITY_LEVELS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-        </select>
-        <input
-          type="text"
-          value={filters.search}
-          onChange={(e) => onChange({ ...filters, search: e.target.value })}
-          placeholder="Search requirements..."
-          className="flex-1 min-w-48 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white text-sm placeholder-slate-500"
-        />
-      </div>
-    );
-
-    // ============================================
-    // MAIN APP
-    // ============================================
-    function App() {
-      const [requirements, setRequirements] = React.useState([]);
-      const [isProcessing, setIsProcessing] = React.useState(false);
-      const [hasDocument, setHasDocument] = React.useState(false);
-      const [documentName, setDocumentName] = React.useState('');
-      const [filters, setFilters] = React.useState({ type: '', compliance: '', priority: '', search: '' });
-      const [connected, setConnected] = React.useState(false);
-
-      React.useEffect(() => {
-        // Load any existing requirements from Supabase
-        loadData();
-      }, []);
-
-      const loadData = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('rfp_requirements')
-            .select('*')
-            .order('section', { ascending: true });
-
-          if (!error && data && data.length > 0) {
-            setRequirements(data);
-            setHasDocument(true);
-            setConnected(true);
-          }
-        } catch (e) {
-          console.log('No existing requirements');
-        }
-      };
-
-      const handleFileSelect = async (file) => {
-        setIsProcessing(true);
-        setDocumentName(file.name);
-
-        try {
-          let text = '';
-          
-          if (file.type === 'application/pdf') {
-            text = await extractTextFromPDF(file);
-          } else {
-            text = await file.text();
-          }
-
-          // For demo, use demo data
-          // In production, this would call AI to extract requirements
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate processing
-          
-          setRequirements(DEMO_REQUIREMENTS);
-          setHasDocument(true);
-          
-        } catch (error) {
-          console.error('Error processing file:', error);
-          alert('Error processing file. Using demo data.');
-          setRequirements(DEMO_REQUIREMENTS);
-          setHasDocument(true);
-        } finally {
-          setIsProcessing(false);
-        }
-      };
-
-      const handleUpdateRequirement = (updated) => {
-        setRequirements(prev => prev.map(r => r.id === updated.id ? updated : r));
-      };
-
-      const handleExport = () => {
-        const csv = [
-          ['Section', 'Requirement', 'Type', 'Priority', 'Compliance', 'Owner', 'Notes'].join(','),
-          ...requirements.map(r => [
-            r.section,
-            `"${r.text.replace(/"/g, '""')}"`,
-            r.type,
-            r.priority,
-            r.compliance,
-            r.owner,
-            r.notes || ''
-          ].join(','))
-        ].join('\n');
-
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `compliance-matrix-${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-      };
-
-      const filteredRequirements = requirements.filter(r => {
-        if (filters.type && r.type !== filters.type) return false;
-        if (filters.compliance && r.compliance !== filters.compliance) return false;
-        if (filters.priority && r.priority !== filters.priority) return false;
-        if (filters.search && !r.text.toLowerCase().includes(filters.search.toLowerCase())) return false;
-        return true;
-      });
-
-      return (
-        <div className="min-h-screen">
-          {/* Header */}
-          <header className="glass border-b border-slate-700/50 sticky top-0 z-40">
-            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <a href="missionpulse-dashboard-v3.html" className="p-2 hover:bg-slate-700/50 rounded-lg">← Back</a>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">📄</div>
-                  <div>
-                    <h1 className="text-xl font-bold text-white">RFP Shredder</h1>
-                    <p className="text-xs text-slate-400">AI-Powered Requirement Extraction</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                {hasDocument && (
-                  <button
-                    onClick={handleExport}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium"
-                  >
-                    📥 Export CSV
-                  </button>
-                )}
-                <div className={`px-3 py-1 rounded-full text-xs ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                  {connected ? '● Connected' : '○ Demo'}
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-            {!hasDocument ? (
-              /* Upload Zone */
-              <FileUploadZone onFileSelect={handleFileSelect} isProcessing={isProcessing} />
-            ) : (
-              <>
-                {/* Document Info */}
-                <div className="glass rounded-lg p-4 border border-slate-700/50 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">📄</span>
-                    <div>
-                      <p className="font-medium text-white">{documentName || 'RFP Document'}</p>
-                      <p className="text-xs text-slate-400">{requirements.length} requirements extracted</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => { setHasDocument(false); setRequirements([]); }}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
-                  >
-                    Upload New
-                  </button>
-                </div>
-
-                {/* Stats */}
-                <StatsSummary requirements={requirements} />
-
-                {/* Filters */}
-                <FilterBar filters={filters} onChange={setFilters} />
-
-                {/* Requirements Table */}
-                <div className="glass rounded-xl border border-slate-700/50 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-slate-800/50">
-                        <tr className="text-left text-xs text-slate-400 uppercase tracking-wider">
-                          <th className="py-3 px-4 w-24">Section</th>
-                          <th className="py-3 px-4">Requirement</th>
-                          <th className="py-3 px-4 w-32">Type</th>
-                          <th className="py-3 px-4 w-32">Compliance</th>
-                          <th className="py-3 px-4 w-28">Owner</th>
-                          <th className="py-3 px-4 w-20"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredRequirements.map(req => (
-                          <RequirementRow key={req.id} req={req} onUpdate={handleUpdateRequirement} />
-                        ))}
-                        {filteredRequirements.length === 0 && (
-                          <tr>
-                            <td colSpan="6" className="py-12 text-center text-slate-500">
-                              No requirements match your filters
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </>
-            )}
-          </main>
-
-          {/* Footer */}
-          <footer className="border-t border-slate-800 py-6">
-            <div className="max-w-7xl mx-auto px-6 flex justify-between">
-              <p className="text-xs text-slate-500">© 2026 Mission Meets Tech</p>
-              <p className="text-xs text-slate-600">AI GENERATED - REQUIRES HUMAN REVIEW</p>
-            </div>
-          </footer>
+        {/* Requirements Table */}
+        <div className="glass rounded-xl overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-slate-800/50">
+              <tr>
+                <th className="py-3 px-4 text-left text-sm font-medium text-slate-400">Section</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-slate-400">Requirement</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-slate-400">Type</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-slate-400">Volume</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-slate-400">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(req => <RequirementRow key={req.id} req={req} onStatusChange={handleStatusChange} />)}
+            </tbody>
+          </table>
         </div>
-      );
-    }
 
-    ReactDOM.render(<App />, document.getElementById('root'));
+        {/* Compliance Score */}
+        <div className="glass rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Overall Compliance Score</h3>
+            <span className="text-3xl font-bold text-cyan-400">{Math.round((stats.compliant / stats.total) * 100)}%</span>
+          </div>
+          <div className="w-full h-4 bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-cyan-500 to-green-500 rounded-full transition-all" style={{ width: `${(stats.compliant / stats.total) * 100}%` }} />
+          </div>
+        </div>
+      </main>
+
+      <footer className="border-t border-slate-800 mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-4 text-center text-xs text-slate-500">
+          Mission Meets Tech © 2026 | MissionPulse v3.0 | RFP Shredder Module
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 </body>
 </html>

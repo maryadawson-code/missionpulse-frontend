@@ -3,435 +3,200 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - Launch Control</title>
+  <title>MissionPulse | Launch & ROI</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); }
-    @keyframes launch-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-    .launch-ready { animation: launch-pulse 1s infinite; }
-    @keyframes countdown { from { opacity: 1; } to { opacity: 0.5; } }
-    .countdown-flash { animation: countdown 1s infinite alternate; }
+    :root { --mmt-cyan: #00E5FA; --mmt-navy: #00050F; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--mmt-navy); color: #e2e8f0; }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .animate-pulse { animation: pulse 2s infinite; }
   </style>
 </head>
-<body class="bg-[#00050F] text-white min-h-screen">
+<body>
   <div id="root"></div>
-  
   <script type="text/babel">
-    // ============================================
-    // CONFIGURATION
-    // ============================================
-    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-    
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const { useState, useEffect } = React;
 
-    // ============================================
-    // DEMO DATA
-    // ============================================
-    const DEMO_OPPORTUNITY = {
-      id: 1,
-      title: 'VA EHR Modernization Support Services',
-      solicitation: 'VA-RFP-2026-0042',
-      agency: 'Department of Veterans Affairs',
-      due_date: '2026-02-15T17:00:00Z',
-      submission_method: 'SAM.gov',
-      ceiling_value: 125000000,
-      phase: 'White Glove'
-    };
+const CONFIG = {
+  SUPABASE_URL: 'https://qdrtpnpnhkxvfmvfziop.supabase.co',
+  SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8',
+  LOGIN_PAGE: 'login.html'
+};
 
-    const DEMO_CHECKLIST = {
-      administrative: [
-        { id: 'a1', item: 'SF-33 signed by authorized representative', checked: true, critical: true },
-        { id: 'a2', item: 'All required certifications included', checked: true, critical: true },
-        { id: 'a3', item: 'SAM.gov registration active and current', checked: true, critical: true },
-        { id: 'a4', item: 'Correct solicitation number on all documents', checked: true, critical: true },
-        { id: 'a5', item: 'Table of Contents accurate and complete', checked: false, critical: false },
-        { id: 'a6', item: 'Page numbers correct throughout', checked: false, critical: false }
-      ],
-      technical: [
-        { id: 't1', item: 'Technical Volume within page limits', checked: true, critical: true },
-        { id: 't2', item: 'All Section L requirements addressed', checked: true, critical: true },
-        { id: 't3', item: 'Cross-references verified', checked: true, critical: false },
-        { id: 't4', item: 'Graphics legible and captioned', checked: true, critical: false },
-        { id: 't5', item: 'Acronyms defined on first use', checked: false, critical: false },
-        { id: 't6', item: 'Spell check and grammar review complete', checked: false, critical: false }
-      ],
-      management: [
-        { id: 'm1', item: 'Management Volume within page limits', checked: true, critical: true },
-        { id: 'm2', item: 'Org chart matches narrative', checked: true, critical: false },
-        { id: 'm3', item: 'Key Personnel resumes included', checked: true, critical: true },
-        { id: 'm4', item: 'Letters of commitment obtained', checked: true, critical: false },
-        { id: 'm5', item: 'Transition plan complete', checked: false, critical: false }
-      ],
-      pastPerformance: [
-        { id: 'p1', item: 'Past Performance Volume complete', checked: true, critical: true },
-        { id: 'p2', item: 'CPARS ratings documented', checked: true, critical: true },
-        { id: 'p3', item: 'Reference contact info verified', checked: true, critical: true },
-        { id: 'p4', item: 'Relevance statements included', checked: true, critical: false }
-      ],
-      pricing: [
-        { id: 'c1', item: 'Pricing Volume complete and accurate', checked: true, critical: true },
-        { id: 'c2', item: 'BOE documentation attached', checked: true, critical: true },
-        { id: 'c3', item: 'Labor rates validated against GSA', checked: true, critical: false },
-        { id: 'c4', item: 'Subcontractor pricing included', checked: false, critical: true },
-        { id: 'c5', item: 'Small Business plan if required', checked: false, critical: true }
-      ],
-      compliance: [
-        { id: 'x1', item: 'Compliance matrix 100% complete', checked: false, critical: true },
-        { id: 'x2', item: 'No outstanding compliance gaps', checked: false, critical: true },
-        { id: 'x3', item: 'FAR/DFARS clauses acknowledged', checked: true, critical: true },
-        { id: 'x4', item: 'CUI markings applied where required', checked: true, critical: false }
-      ],
-      submission: [
-        { id: 's1', item: 'PDF file sizes within limits', checked: true, critical: true },
-        { id: 's2', item: 'File naming convention correct', checked: true, critical: true },
-        { id: 's3', item: 'All volumes uploaded to SAM.gov', checked: false, critical: true },
-        { id: 's4', item: 'Submission confirmation received', checked: false, critical: true },
-        { id: 's5', item: 'Backup submission method ready', checked: true, critical: false }
-      ]
-    };
+const SUBMISSION_CHECKLIST = [
+  { id: 1, item: 'All volumes compiled and formatted', status: 'complete' },
+  { id: 2, item: 'Page count within limits', status: 'complete' },
+  { id: 3, item: 'Compliance matrix 100%', status: 'complete' },
+  { id: 4, item: 'CEO/COO final approval', status: 'pending' },
+  { id: 5, item: 'Partner access revoked', status: 'pending' },
+  { id: 6, item: 'Upload to submission portal', status: 'not_started' },
+  { id: 7, item: 'Confirmation receipt saved', status: 'not_started' }
+];
 
-    const DEMO_GATES = [
-      { id: 1, name: 'Gold Team Complete', status: 'passed', date: '2026-01-28' },
-      { id: 2, name: 'Executive Review', status: 'passed', date: '2026-01-29' },
-      { id: 3, name: 'Pricing Final Lock', status: 'passed', date: '2026-01-30' },
-      { id: 4, name: 'Compliance Verification', status: 'pending', date: null },
-      { id: 5, name: 'CEO Go/No-Go', status: 'pending', date: null },
-      { id: 6, name: 'Submission', status: 'pending', date: null }
-    ];
+const ROI_METRICS = {
+  proposalHours: 340,
+  traditionalHours: 520,
+  hoursSaved: 180,
+  costPerHour: 150,
+  costSavings: 27000,
+  winRateImpact: 18
+};
 
-    // ============================================
-    // COMPONENTS
-    // ============================================
+function checkAuth() {
+  const session = localStorage.getItem('MP_SESSION');
+  if (!session) { window.location.href = CONFIG.LOGIN_PAGE; return null; }
+  try { return JSON.parse(localStorage.getItem('MP_USER')); }
+  catch { return { email: 'demo@mmt.com', role: 'CEO', name: 'Demo User' }; }
+}
 
-    // Countdown Timer
-    const CountdownTimer = ({ dueDate }) => {
-      const [time, setTime] = React.useState({ days: 0, hours: 0, mins: 0, secs: 0 });
-      const [urgent, setUrgent] = React.useState(false);
+function ChecklistItem({ item }) {
+  const statusIcons = { complete: '✅', pending: '🔄', not_started: '⬜' };
+  const statusColors = { complete: 'text-green-400', pending: 'text-amber-400', not_started: 'text-slate-500' };
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <span className="text-lg">{statusIcons[item.status]}</span>
+      <span className={`${statusColors[item.status]} ${item.status === 'complete' ? '' : ''}`}>{item.item}</span>
+    </div>
+  );
+}
 
-      React.useEffect(() => {
-        const calc = () => {
-          const diff = new Date(dueDate) - new Date();
-          if (diff <= 0) {
-            setTime({ days: 0, hours: 0, mins: 0, secs: 0 });
-            return;
-          }
-          setTime({
-            days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-            hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-            mins: Math.floor((diff / (1000 * 60)) % 60),
-            secs: Math.floor((diff / 1000) % 60)
-          });
-          setUrgent(diff < 24 * 60 * 60 * 1000);
-        };
-        calc();
-        const interval = setInterval(calc, 1000);
-        return () => clearInterval(interval);
-      }, [dueDate]);
+function App() {
+  const [user, setUser] = useState(null);
+  const [checklist, setChecklist] = useState(SUBMISSION_CHECKLIST);
+  const [countdown, setCountdown] = useState({ days: 2, hours: 14, minutes: 32 });
+  const [submitted, setSubmitted] = useState(false);
 
-      const TimeBox = ({ value, label }) => (
-        <div className="text-center">
-          <div className={`text-4xl md:text-5xl font-mono font-bold ${urgent ? 'text-red-400 countdown-flash' : 'text-cyan-400'}`}>
-            {String(value).padStart(2, '0')}
-          </div>
-          <div className="text-xs text-slate-500 uppercase mt-1">{label}</div>
-        </div>
-      );
+  useEffect(() => {
+    const authUser = checkAuth();
+    if (authUser) setUser(authUser);
+  }, []);
 
-      return (
-        <div className={`glass rounded-xl border p-6 ${urgent ? 'border-red-500/50' : 'border-slate-700/50'}`}>
-          <h3 className="text-sm text-slate-400 text-center mb-4">TIME TO SUBMISSION</h3>
-          <div className="flex items-center justify-center gap-4 md:gap-8">
-            <TimeBox value={time.days} label="Days" />
-            <span className={`text-3xl ${urgent ? 'text-red-400' : 'text-slate-600'}`}>:</span>
-            <TimeBox value={time.hours} label="Hours" />
-            <span className={`text-3xl ${urgent ? 'text-red-400' : 'text-slate-600'}`}>:</span>
-            <TimeBox value={time.mins} label="Mins" />
-            <span className={`text-3xl ${urgent ? 'text-red-400' : 'text-slate-600'}`}>:</span>
-            <TimeBox value={time.secs} label="Secs" />
-          </div>
-          <p className="text-center text-sm text-slate-500 mt-4">
-            Due: {new Date(dueDate).toLocaleString('en-US', { 
-              weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-              hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
-            })}
-          </p>
-        </div>
-      );
-    };
+  const completedCount = checklist.filter(c => c.status === 'complete').length;
+  const readyToSubmit = completedCount === checklist.length;
 
-    // Gate Progress
-    const GateProgress = ({ gates }) => (
-      <div className="glass rounded-xl border border-slate-700/50 p-6">
-        <h3 className="font-semibold text-white mb-4">🚀 Launch Gates</h3>
-        <div className="relative">
-          {/* Progress Line */}
-          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-700"></div>
-          
-          {gates.map((gate, i) => (
-            <div key={gate.id} className="relative flex items-start gap-4 pb-6 last:pb-0">
-              <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${
-                gate.status === 'passed' ? 'bg-emerald-500' :
-                gate.status === 'pending' ? 'bg-slate-700' :
-                'bg-red-500'
-              }`}>
-                {gate.status === 'passed' ? '✓' : gate.status === 'failed' ? '✕' : (i + 1)}
-              </div>
-              <div className="flex-1">
-                <p className={`font-medium ${gate.status === 'passed' ? 'text-emerald-400' : 'text-white'}`}>
-                  {gate.name}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {gate.date ? new Date(gate.date).toLocaleDateString() : 'Pending'}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const handleSubmit = () => {
+    if (confirm('🚀 Confirm proposal submission? This action cannot be undone.')) {
+      setSubmitted(true);
+    }
+  };
 
-    // Checklist Section
-    const ChecklistSection = ({ title, items, onToggle }) => {
-      const completed = items.filter(i => i.checked).length;
-      const critical = items.filter(i => i.critical && !i.checked);
-      
-      return (
-        <div className="glass rounded-xl border border-slate-700/50 overflow-hidden">
-          <div className="bg-slate-800/50 px-4 py-3 flex items-center justify-between">
-            <h4 className="font-medium text-white">{title}</h4>
-            <div className="flex items-center gap-3">
-              {critical.length > 0 && (
-                <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded">
-                  {critical.length} critical
-                </span>
-              )}
-              <span className="text-sm text-slate-400">{completed}/{items.length}</span>
+  if (!user) return <div className="min-h-screen flex items-center justify-center text-cyan-400">Loading...</div>;
+
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <header className="glass border-b border-slate-700/50 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <a href="missionpulse-dashboard-v3.html" className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            </a>
+            <div>
+              <h1 className="text-xl font-bold text-white">🚀 Launch & ROI</h1>
+              <p className="text-sm text-slate-400">Final Submission & Value Metrics</p>
             </div>
           </div>
-          <div className="p-4 space-y-2">
-            {items.map(item => (
-              <div 
-                key={item.id}
-                className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${
-                  item.checked ? 'bg-emerald-500/10' : 'hover:bg-slate-800/50'
-                }`}
-                onClick={() => onToggle(item.id)}
-              >
-                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                  item.checked 
-                    ? 'bg-emerald-500 border-emerald-500 text-white' 
-                    : item.critical 
-                      ? 'border-red-500' 
-                      : 'border-slate-600'
-                }`}>
-                  {item.checked && <span className="text-xs">✓</span>}
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {submitted ? (
+          /* Success State */
+          <div className="glass rounded-xl p-12 text-center border border-green-500/30">
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-3xl font-bold text-green-400 mb-2">Proposal Submitted!</h2>
+            <p className="text-slate-400 mb-6">VA EHR Modernization - Submitted Jan 30, 2026 at 2:45 PM EST</p>
+            <p className="text-sm text-slate-500">Confirmation #: VA-EHRM-2026-001-MMT</p>
+            <div className="flex justify-center gap-4 mt-8">
+              <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg">Download Receipt</button>
+              <button onClick={() => window.location.href = 'missionpulse-postaward-v3.html'} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg">Start Post-Award</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Countdown */}
+            <div className="glass rounded-xl p-6 text-center">
+              <h2 className="text-lg text-slate-400 mb-2">Time to Submission Deadline</h2>
+              <div className="flex justify-center gap-8">
+                <div><span className="text-5xl font-bold text-red-400">{countdown.days}</span><p className="text-sm text-slate-500">Days</p></div>
+                <div><span className="text-5xl font-bold text-amber-400">{countdown.hours}</span><p className="text-sm text-slate-500">Hours</p></div>
+                <div><span className="text-5xl font-bold text-cyan-400">{countdown.minutes}</span><p className="text-sm text-slate-500">Minutes</p></div>
+              </div>
+              <p className="text-sm text-slate-500 mt-4">Due: February 2, 2026 at 5:00 PM EST</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              {/* Checklist */}
+              <div className="glass rounded-xl p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-white">Submission Checklist</h2>
+                  <span className="text-sm text-cyan-400">{completedCount}/{checklist.length}</span>
                 </div>
-                <span className={`flex-1 text-sm ${item.checked ? 'text-slate-400 line-through' : 'text-white'}`}>
-                  {item.item}
-                </span>
-                {item.critical && !item.checked && (
-                  <span className="text-red-400 text-xs">CRITICAL</span>
-                )}
+                <div className="space-y-1">
+                  {checklist.map(item => <ChecklistItem key={item.id} item={item} />)}
+                </div>
+                <div className="mt-6 pt-4 border-t border-slate-700/50">
+                  <div className="w-full h-3 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-cyan-500 to-green-500 rounded-full transition-all" style={{ width: `${(completedCount / checklist.length) * 100}%` }} />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">{Math.round((completedCount / checklist.length) * 100)}% ready</p>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      );
-    };
 
-    // Launch Button
-    const LaunchButton = ({ ready, onLaunch }) => (
-      <button
-        onClick={onLaunch}
-        disabled={!ready}
-        className={`w-full py-6 rounded-xl font-bold text-xl transition-all ${
-          ready 
-            ? 'bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white launch-ready' 
-            : 'bg-slate-700 text-slate-400 cursor-not-allowed'
-        }`}
-      >
-        {ready ? '🚀 SUBMIT PROPOSAL' : '⏸️ Complete Checklist to Enable'}
-      </button>
-    );
-
-    // ============================================
-    // MAIN APP
-    // ============================================
-    function App() {
-      const [opportunity] = React.useState(DEMO_OPPORTUNITY);
-      const [checklist, setChecklist] = React.useState(DEMO_CHECKLIST);
-      const [gates, setGates] = React.useState(DEMO_GATES);
-      const [connected, setConnected] = React.useState(false);
-      const [loading, setLoading] = React.useState(true);
-      const [submitted, setSubmitted] = React.useState(false);
-
-      React.useEffect(() => {
-        setTimeout(() => setLoading(false), 500);
-      }, []);
-
-      const handleToggle = (itemId) => {
-        setChecklist(prev => {
-          const updated = { ...prev };
-          for (const section of Object.keys(updated)) {
-            updated[section] = updated[section].map(item =>
-              item.id === itemId ? { ...item, checked: !item.checked } : item
-            );
-          }
-          return updated;
-        });
-      };
-
-      const allItems = Object.values(checklist).flat();
-      const criticalIncomplete = allItems.filter(i => i.critical && !i.checked);
-      const totalComplete = allItems.filter(i => i.checked).length;
-      const isReady = criticalIncomplete.length === 0 && totalComplete >= allItems.length * 0.9;
-
-      const handleLaunch = () => {
-        if (!isReady) return;
-        if (window.confirm('Are you ready to submit? This action will mark the proposal as submitted.')) {
-          setSubmitted(true);
-          setGates(prev => prev.map(g => 
-            g.name === 'Submission' ? { ...g, status: 'passed', date: new Date().toISOString().split('T')[0] } : g
-          ));
-        }
-      };
-
-      if (loading) {
-        return (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-400">Initializing Launch Control...</p>
-            </div>
-          </div>
-        );
-      }
-
-      if (submitted) {
-        return (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center glass rounded-xl border border-emerald-500/50 p-12 max-w-lg">
-              <div className="text-6xl mb-4">🎉</div>
-              <h1 className="text-3xl font-bold text-emerald-400 mb-2">PROPOSAL SUBMITTED!</h1>
-              <p className="text-slate-400 mb-6">
-                {opportunity.title} has been submitted to {opportunity.agency} via {opportunity.submission_method}.
-              </p>
-              <p className="text-sm text-slate-500 mb-6">
-                Submission Time: {new Date().toLocaleString()}
-              </p>
-              <a 
-                href="missionpulse-dashboard-v3.html"
-                className="inline-block px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium"
-              >
-                Return to Dashboard
-              </a>
-            </div>
-          </div>
-        );
-      }
-
-      return (
-        <div className="min-h-screen">
-          {/* Header */}
-          <header className="glass border-b border-slate-700/50 sticky top-0 z-40">
-            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <a href="missionpulse-dashboard-v3.html" className="p-2 hover:bg-slate-700/50 rounded-lg">← Back</a>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center">🚀</div>
-                  <div>
-                    <h1 className="text-xl font-bold text-white">Launch Control</h1>
-                    <p className="text-xs text-slate-400">Final Submission Checklist</p>
+              {/* ROI Metrics */}
+              <div className="glass rounded-xl p-6">
+                <h2 className="text-lg font-semibold text-white mb-4">MissionPulse ROI</h2>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
+                    <span className="text-slate-400">Hours with MissionPulse</span>
+                    <span className="text-2xl font-bold text-cyan-400">{ROI_METRICS.proposalHours}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
+                    <span className="text-slate-400">Traditional Hours</span>
+                    <span className="text-2xl font-bold text-slate-500 line-through">{ROI_METRICS.traditionalHours}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                    <span className="text-green-400">Hours Saved</span>
+                    <span className="text-2xl font-bold text-green-400">{ROI_METRICS.hoursSaved} hrs</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                    <span className="text-green-400">Cost Savings</span>
+                    <span className="text-2xl font-bold text-green-400">${ROI_METRICS.costSavings.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                    <span className="text-purple-400">Win Rate Impact</span>
+                    <span className="text-2xl font-bold text-purple-400">+{ROI_METRICS.winRateImpact}%</span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  isReady ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                }`}>
-                  {isReady ? '✓ LAUNCH READY' : `${criticalIncomplete.length} Critical Items`}
-                </span>
-              </div>
-            </div>
-          </header>
-
-          <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-            {/* Opportunity Header */}
-            <div className="glass rounded-xl border border-slate-700/50 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-1">{opportunity.title}</h2>
-                  <p className="text-slate-400">{opportunity.agency}</p>
-                  <p className="text-sm text-slate-500 font-mono mt-2">{opportunity.solicitation}</p>
-                </div>
-                <div className="text-right">
-                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm">
-                    {opportunity.phase}
-                  </span>
-                  <p className="text-sm text-slate-500 mt-2">Via: {opportunity.submission_method}</p>
-                </div>
-              </div>
             </div>
 
-            {/* Countdown & Gates */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              <CountdownTimer dueDate={opportunity.due_date} />
-              <GateProgress gates={gates} />
+            {/* Submit Button */}
+            <div className="glass rounded-xl p-6 text-center">
+              <button onClick={handleSubmit} disabled={!readyToSubmit} className={`px-8 py-4 rounded-xl font-bold text-lg transition-all ${readyToSubmit ? 'bg-gradient-to-r from-green-600 to-cyan-600 hover:from-green-500 hover:to-cyan-500 animate-pulse' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}>
+                🚀 {readyToSubmit ? 'LAUNCH PROPOSAL' : 'Complete Checklist First'}
+              </button>
+              {!readyToSubmit && <p className="text-sm text-slate-500 mt-2">Complete all checklist items to enable submission</p>}
             </div>
+          </>
+        )}
+      </main>
 
-            {/* Progress Overview */}
-            <div className="glass rounded-xl border border-slate-700/50 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-white">Pre-Flight Progress</h3>
-                <span className="text-cyan-400 font-mono">{totalComplete}/{allItems.length}</span>
-              </div>
-              <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all ${isReady ? 'bg-emerald-500' : 'bg-cyan-500'}`}
-                  style={{ width: `${(totalComplete / allItems.length) * 100}%` }}
-                />
-              </div>
-              {criticalIncomplete.length > 0 && (
-                <p className="text-sm text-red-400 mt-2">
-                  ⚠️ {criticalIncomplete.length} critical items remaining
-                </p>
-              )}
-            </div>
+      <footer className="border-t border-slate-800 mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-4 text-center text-xs text-slate-500">Mission Meets Tech © 2026 | MissionPulse v3.0 | Launch Module</div>
+      </footer>
+    </div>
+  );
+}
 
-            {/* Checklists */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <ChecklistSection title="📋 Administrative" items={checklist.administrative} onToggle={handleToggle} />
-              <ChecklistSection title="🔧 Technical" items={checklist.technical} onToggle={handleToggle} />
-              <ChecklistSection title="👥 Management" items={checklist.management} onToggle={handleToggle} />
-              <ChecklistSection title="🏆 Past Performance" items={checklist.pastPerformance} onToggle={handleToggle} />
-              <ChecklistSection title="💰 Pricing" items={checklist.pricing} onToggle={handleToggle} />
-              <ChecklistSection title="✓ Compliance" items={checklist.compliance} onToggle={handleToggle} />
-            </div>
-
-            {/* Submission Checklist */}
-            <ChecklistSection title="🚀 Submission" items={checklist.submission} onToggle={handleToggle} />
-
-            {/* Launch Button */}
-            <LaunchButton ready={isReady} onLaunch={handleLaunch} />
-          </main>
-
-          {/* Footer */}
-          <footer className="border-t border-slate-800 py-6">
-            <div className="max-w-7xl mx-auto px-6 flex justify-between">
-              <p className="text-xs text-slate-500">© 2026 Mission Meets Tech</p>
-              <p className="text-xs text-slate-600">AI GENERATED - REQUIRES HUMAN REVIEW</p>
-            </div>
-          </footer>
-        </div>
-      );
-    }
-
-    ReactDOM.render(<App />, document.getElementById('root'));
+ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 </body>
 </html>

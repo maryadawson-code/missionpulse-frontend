@@ -3,695 +3,320 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse - Pricing Engine | CUI//SP-PROPIN</title>
+  <title>MissionPulse | Pricing Engine [CUI]</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); } 50% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.5); } }
-    .cui-glow { animation: pulse-glow 3s infinite; }
-    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); }
+    :root { --mmt-cyan: #00E5FA; --mmt-navy: #00050F; --mmt-surface: #0f172a; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--mmt-navy); color: #e2e8f0; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .cui-banner { background: linear-gradient(90deg, #dc2626 0%, #b91c1c 100%); }
   </style>
 </head>
-<body class="bg-[#00050F] text-white min-h-screen">
-  <div id="root"></div>
+<body>
+  <!-- CUI BANNER - REQUIRED FOR CONTROLLED UNCLASSIFIED INFORMATION -->
+  <div class="cui-banner text-white text-center py-1 text-xs font-bold tracking-wider">
+    ⚠️ CUI // SP-PROCURE // CONTROLLED UNCLASSIFIED INFORMATION - AUTHORIZED USE ONLY
+  </div>
   
+  <div id="root"></div>
   <script type="text/babel">
-    // ============================================
-    // CONFIGURATION
-    // ============================================
-    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
-    const API_URL = 'https://missionpulse-api.onrender.com';
-    const MODULE_ID = 'pricing';
-    const CUI_MARKING = 'CUI//SP-PROPIN';
+// ============================================================
+// MISSIONPULSE PRICING ENGINE V3
+// Mission Meets Tech © 2026
+// CLASSIFICATION: CUI // SP-PROCURE
+// ============================================================
+
+const { useState, useEffect, useMemo } = React;
+
+// CONFIG
+const CONFIG = {
+  SUPABASE_URL: 'https://qdrtpnpnhkxvfmvfziop.supabase.co',
+  SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8',
+  API_URL: 'https://missionpulse-api.onrender.com',
+  LOGIN_PAGE: 'login.html',
+  ALLOWED_ROLES: ['CEO', 'COO', 'FIN', 'Admin'] // RBAC for pricing module
+};
+
+const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+
+// GSA LABOR CATEGORIES
+const GSA_LCATS = [
+  { id: 1, title: 'Program Manager III', gsa_rate: 185.50, loaded_rate: 245.00, sin: '541611' },
+  { id: 2, title: 'Senior Systems Engineer', gsa_rate: 172.00, loaded_rate: 228.00, sin: '541512' },
+  { id: 3, title: 'Software Developer III', gsa_rate: 158.00, loaded_rate: 210.00, sin: '541512' },
+  { id: 4, title: 'Data Scientist II', gsa_rate: 165.00, loaded_rate: 218.00, sin: '541512' },
+  { id: 5, title: 'Cybersecurity Analyst II', gsa_rate: 145.00, loaded_rate: 192.00, sin: '541519' },
+  { id: 6, title: 'Technical Writer II', gsa_rate: 95.00, loaded_rate: 126.00, sin: '541611' },
+  { id: 7, title: 'Quality Assurance Lead', gsa_rate: 138.00, loaded_rate: 183.00, sin: '541512' },
+  { id: 8, title: 'Business Analyst III', gsa_rate: 142.00, loaded_rate: 188.00, sin: '541611' }
+];
+
+// INDIRECT RATES
+const INDIRECT_RATES = {
+  fringe: 0.32,
+  overhead: 0.45,
+  ga: 0.12,
+  fee: 0.08
+};
+
+// Auth & RBAC Check
+function checkAuth() {
+  const session = localStorage.getItem('MP_SESSION');
+  if (!session) { window.location.href = CONFIG.LOGIN_PAGE; return null; }
+  try { 
+    const user = JSON.parse(localStorage.getItem('MP_USER'));
+    if (!CONFIG.ALLOWED_ROLES.includes(user.role)) {
+      alert('Access Denied: Pricing module requires CEO, COO, FIN, or Admin role');
+      window.location.href = 'missionpulse-dashboard-v3.html';
+      return null;
+    }
+    return user;
+  }
+  catch { return { email: 'demo@mmt.com', role: 'FIN', name: 'Demo User' }; }
+}
+
+// Icons
+const Icons = {
+  back: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
+  dollar: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  calculator: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+  download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+  lock: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+};
+
+// BOE Line Item Component
+function BOELineItem({ lcat, hours, onHoursChange }) {
+  const directCost = hours * lcat.loaded_rate;
+  const fullyLoaded = directCost * (1 + INDIRECT_RATES.fringe + INDIRECT_RATES.overhead + INDIRECT_RATES.ga + INDIRECT_RATES.fee);
+  
+  return (
+    <tr className="border-b border-slate-700/50 hover:bg-slate-800/30">
+      <td className="py-3 px-4">
+        <div className="font-medium text-white">{lcat.title}</div>
+        <div className="text-xs text-slate-500">SIN {lcat.sin}</div>
+      </td>
+      <td className="py-3 px-4 text-right text-slate-400">${lcat.gsa_rate.toFixed(2)}</td>
+      <td className="py-3 px-4 text-right text-slate-400">${lcat.loaded_rate.toFixed(2)}</td>
+      <td className="py-3 px-4">
+        <input 
+          type="number"
+          value={hours}
+          onChange={(e) => onHoursChange(lcat.id, parseInt(e.target.value) || 0)}
+          className="w-20 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-right text-white focus:border-cyan-500 focus:outline-none"
+        />
+      </td>
+      <td className="py-3 px-4 text-right text-cyan-400 font-medium">${directCost.toLocaleString()}</td>
+      <td className="py-3 px-4 text-right text-green-400 font-medium">${fullyLoaded.toLocaleString()}</td>
+    </tr>
+  );
+}
+
+// Rate Card Component
+function RateCard({ title, rate, description }) {
+  return (
+    <div className="glass rounded-lg p-4">
+      <div className="text-sm text-slate-400 mb-1">{title}</div>
+      <div className="text-2xl font-bold text-cyan-400">{(rate * 100).toFixed(1)}%</div>
+      <div className="text-xs text-slate-500 mt-1">{description}</div>
+    </div>
+  );
+}
+
+// Main App
+function App() {
+  const [user, setUser] = useState(null);
+  const [hours, setHours] = useState({});
+  const [opportunityName, setOpportunityName] = useState('VA EHR Modernization');
+  const [periodOfPerformance, setPeriodOfPerformance] = useState(36);
+
+  useEffect(() => {
+    const authUser = checkAuth();
+    if (authUser) {
+      setUser(authUser);
+      // Initialize hours
+      const initialHours = {};
+      GSA_LCATS.forEach(lcat => { initialHours[lcat.id] = 0; });
+      setHours(initialHours);
+    }
+  }, []);
+
+  const handleHoursChange = (lcatId, newHours) => {
+    setHours(prev => ({ ...prev, [lcatId]: newHours }));
+  };
+
+  // Calculate totals
+  const calculations = useMemo(() => {
+    let totalDirect = 0;
+    let totalLoaded = 0;
+    let totalHours = 0;
     
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-
-    // ============================================
-    // DEMO DATA
-    // ============================================
-    const DEMO_LCATS = [
-      { id: 1, title: 'Program Manager', laborCategory: 'PM-III', baseRate: 185.00, fringe: 0.32, overhead: 0.45, ga: 0.08, profit: 0.10, hours: 2080, quantity: 1 },
-      { id: 2, title: 'Senior Systems Engineer', laborCategory: 'SE-IV', baseRate: 165.00, fringe: 0.32, overhead: 0.45, ga: 0.08, profit: 0.10, hours: 2080, quantity: 2 },
-      { id: 3, title: 'Cloud Architect', laborCategory: 'CA-III', baseRate: 175.00, fringe: 0.32, overhead: 0.45, ga: 0.08, profit: 0.10, hours: 2080, quantity: 1 },
-      { id: 4, title: 'Cybersecurity Analyst', laborCategory: 'CS-II', baseRate: 145.00, fringe: 0.32, overhead: 0.45, ga: 0.08, profit: 0.10, hours: 2080, quantity: 2 },
-      { id: 5, title: 'Business Analyst', laborCategory: 'BA-II', baseRate: 125.00, fringe: 0.32, overhead: 0.45, ga: 0.08, profit: 0.10, hours: 1040, quantity: 1 },
-      { id: 6, title: 'Technical Writer', laborCategory: 'TW-II', baseRate: 95.00, fringe: 0.32, overhead: 0.45, ga: 0.08, profit: 0.10, hours: 520, quantity: 1 }
-    ];
-
-    const DEMO_OPPORTUNITIES = [
-      { id: 1, title: 'VA EHR Modernization', agency: 'VA', ceiling_value: 125000000 },
-      { id: 2, title: 'DHA MHS GENESIS Support', agency: 'DHA', ceiling_value: 89000000 },
-      { id: 3, title: 'CMS Data Analytics', agency: 'CMS', ceiling_value: 45000000 }
-    ];
-
-    const WRAP_RATE_PRESETS = {
-      'GSA': { fringe: 0.34, overhead: 0.42, ga: 0.06, profit: 0.10 },
-      'OASIS': { fringe: 0.32, overhead: 0.45, ga: 0.08, profit: 0.10 },
-      'SEWP': { fringe: 0.30, overhead: 0.40, ga: 0.07, profit: 0.12 },
-      'Custom': { fringe: 0.32, overhead: 0.45, ga: 0.08, profit: 0.10 }
-    };
-
-    // ============================================
-    // AI ROUTER (CUI-Aware)
-    // ============================================
-    const sendToAI = async (message, context = {}) => {
-      // All pricing queries go through secure channel
-      console.log('[PricingAI] Routing through secure channel (CUI content)');
-      
-      try {
-        const response = await fetch(`${API_URL}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message,
-            agent: 'pricing',
-            context: {
-              module: MODULE_ID,
-              cuiMarking: CUI_MARKING,
-              sensitivity: 'high',
-              ...context
-            }
-          })
-        });
-        
-        if (!response.ok) throw new Error('API error');
-        const data = await response.json();
-        return { 
-          content: data.response, 
-          provider: 'secure', // Will be 'asksage' when configured
-          cui: CUI_MARKING 
-        };
-      } catch (e) {
-        return { 
-          content: 'Secure AI channel temporarily unavailable. Please try again.', 
-          error: true,
-          cui: CUI_MARKING
-        };
-      }
-    };
-
-    // ============================================
-    // UTILITY FUNCTIONS
-    // ============================================
-    const formatCurrency = (value) => {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(value);
-    };
-
-    const formatRate = (value) => {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(value);
-    };
-
-    const formatPercent = (value) => {
-      return `${(value * 100).toFixed(1)}%`;
-    };
-
-    const calculateLoadedRate = (baseRate, fringe, overhead, ga, profit) => {
-      const fringeAmount = baseRate * fringe;
-      const laborWithFringe = baseRate + fringeAmount;
-      const overheadAmount = laborWithFringe * overhead;
-      const subtotal = laborWithFringe + overheadAmount;
-      const gaAmount = subtotal * ga;
-      const costBase = subtotal + gaAmount;
-      const profitAmount = costBase * profit;
-      return costBase + profitAmount;
-    };
-
-    // ============================================
-    // COMPONENTS
-    // ============================================
+    GSA_LCATS.forEach(lcat => {
+      const h = hours[lcat.id] || 0;
+      const direct = h * lcat.loaded_rate;
+      const loaded = direct * (1 + INDIRECT_RATES.fringe + INDIRECT_RATES.overhead + INDIRECT_RATES.ga + INDIRECT_RATES.fee);
+      totalDirect += direct;
+      totalLoaded += loaded;
+      totalHours += h;
+    });
     
-    // CUI Banner
-    const CUIBanner = () => (
-      <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg px-4 py-2 flex items-center gap-3 cui-glow">
-        <span className="text-amber-400 text-lg">🔒</span>
-        <div>
-          <span className="font-mono text-amber-400 font-bold">{CUI_MARKING}</span>
-          <span className="text-amber-300/70 text-sm ml-3">Controlled Unclassified Information - Proprietary</span>
-        </div>
-      </div>
-    );
+    const fte = totalHours / (periodOfPerformance * 173); // 173 hours/month average
+    const monthlyBurn = totalLoaded / periodOfPerformance;
+    
+    return { totalDirect, totalLoaded, totalHours, fte, monthlyBurn };
+  }, [hours, periodOfPerformance]);
 
-    // Header
-    const Header = ({ connected, onBack }) => (
-      <header className="glass border-b border-slate-700/50 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={onBack}
-                className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
-              >
-                ← Back
-              </button>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                  <span className="text-xl">💵</span>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-white">Pricing Engine</h1>
-                  <p className="text-xs text-slate-400">BOE Calculator & Rate Analysis</p>
-                </div>
-              </div>
+  if (!user) return <div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-cyan-400">Verifying access...</div></div>;
+
+  return (
+    <div className="min-h-screen bg-slate-950">
+      {/* Header */}
+      <header className="glass border-b border-slate-700/50 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <a href="missionpulse-dashboard-v3.html" className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white">
+              <Icons.back />
+            </a>
+            <div>
+              <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                💵 Pricing Engine
+                <span className="px-2 py-0.5 bg-red-600 text-white text-xs rounded flex items-center gap-1">
+                  <Icons.lock /> CUI
+                </span>
+              </h1>
+              <p className="text-sm text-slate-400">BOE Builder & Cost Analysis</p>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <CUIBanner />
-              <div className={`px-3 py-1 rounded-full text-xs flex items-center gap-2 ${
-                connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
-                {connected ? 'Secure' : 'Demo'}
-              </div>
-            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <button className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm flex items-center gap-2">
+              <Icons.download /> Export BOE
+            </button>
+            <span className="text-sm text-slate-400">{user.name} ({user.role})</span>
           </div>
         </div>
       </header>
-    );
 
-    // Wrap Rate Card
-    const WrapRateCard = ({ rates, preset, onPresetChange, onRateChange }) => (
-      <div className="glass rounded-xl border border-slate-700/50 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-white">Wrap Rate Configuration</h3>
-          <select
-            value={preset}
-            onChange={(e) => onPresetChange(e.target.value)}
-            className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cyan-500"
-          >
-            {Object.keys(WRAP_RATE_PRESETS).map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { key: 'fringe', label: 'Fringe', color: 'cyan' },
-            { key: 'overhead', label: 'Overhead', color: 'purple' },
-            { key: 'ga', label: 'G&A', color: 'amber' },
-            { key: 'profit', label: 'Profit', color: 'emerald' }
-          ].map(({ key, label, color }) => (
-            <div key={key} className="bg-slate-800/50 rounded-lg p-4">
-              <label className="block text-xs text-slate-400 mb-2">{label}</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={(rates[key] * 100).toFixed(1)}
-                  onChange={(e) => onRateChange(key, parseFloat(e.target.value) / 100)}
-                  step="0.1"
-                  className={`w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-${color}-400 font-mono focus:outline-none focus:border-${color}-500`}
-                />
-                <span className="text-slate-400">%</span>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="mt-4 p-3 bg-slate-900/50 rounded-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-400">Total Burden Rate:</span>
-            <span className="font-mono text-lg text-cyan-400">
-              {formatPercent(rates.fringe + rates.overhead + rates.ga + rates.profit)}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-
-    // LCAT Row
-    const LCATRow = ({ lcat, rates, onUpdate, onDelete }) => {
-      const loadedRate = calculateLoadedRate(
-        lcat.baseRate, 
-        rates.fringe, 
-        rates.overhead, 
-        rates.ga, 
-        rates.profit
-      );
-      const annualCost = loadedRate * lcat.hours * lcat.quantity;
-
-      return (
-        <tr className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
-          <td className="py-4 px-4">
-            <input
-              type="text"
-              value={lcat.title}
-              onChange={(e) => onUpdate({ ...lcat, title: e.target.value })}
-              className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-cyan-500 outline-none text-white w-full"
-            />
-          </td>
-          <td className="py-4 px-4">
-            <input
-              type="text"
-              value={lcat.laborCategory}
-              onChange={(e) => onUpdate({ ...lcat, laborCategory: e.target.value })}
-              className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-cyan-500 outline-none text-slate-400 font-mono text-sm w-24"
-            />
-          </td>
-          <td className="py-4 px-4">
-            <input
-              type="number"
-              value={lcat.baseRate}
-              onChange={(e) => onUpdate({ ...lcat, baseRate: parseFloat(e.target.value) || 0 })}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-amber-400 font-mono text-right w-24 focus:outline-none focus:border-amber-500"
-            />
-          </td>
-          <td className="py-4 px-4 text-right font-mono text-cyan-400">
-            {formatRate(loadedRate)}
-          </td>
-          <td className="py-4 px-4">
-            <input
-              type="number"
-              value={lcat.hours}
-              onChange={(e) => onUpdate({ ...lcat, hours: parseInt(e.target.value) || 0 })}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono text-right w-20 focus:outline-none focus:border-cyan-500"
-            />
-          </td>
-          <td className="py-4 px-4">
-            <input
-              type="number"
-              value={lcat.quantity}
-              onChange={(e) => onUpdate({ ...lcat, quantity: parseInt(e.target.value) || 1 })}
-              min="1"
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono text-center w-16 focus:outline-none focus:border-cyan-500"
-            />
-          </td>
-          <td className="py-4 px-4 text-right font-mono text-emerald-400 font-semibold">
-            {formatCurrency(annualCost)}
-          </td>
-          <td className="py-4 px-4">
-            <button
-              onClick={() => onDelete(lcat.id)}
-              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1 rounded"
-            >
-              ✕
-            </button>
-          </td>
-        </tr>
-      );
-    };
-
-    // Summary Card
-    const SummaryCard = ({ lcats, rates }) => {
-      const totalAnnual = lcats.reduce((sum, lcat) => {
-        const loaded = calculateLoadedRate(lcat.baseRate, rates.fringe, rates.overhead, rates.ga, rates.profit);
-        return sum + (loaded * lcat.hours * lcat.quantity);
-      }, 0);
-      
-      const totalFTE = lcats.reduce((sum, lcat) => sum + (lcat.hours * lcat.quantity / 2080), 0);
-      const avgLoadedRate = totalAnnual / lcats.reduce((sum, lcat) => sum + (lcat.hours * lcat.quantity), 0) || 0;
-
-      return (
-        <div className="glass rounded-xl border border-amber-500/30 p-6 cui-glow">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-amber-400">🔒</span>
-            <h3 className="font-semibold text-white">Pricing Summary</h3>
-            <span className="text-xs font-mono text-amber-400">{CUI_MARKING}</span>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-              <p className="text-xs text-slate-400 mb-1">Total Annual</p>
-              <p className="text-2xl font-bold text-emerald-400">{formatCurrency(totalAnnual)}</p>
-            </div>
-            <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-              <p className="text-xs text-slate-400 mb-1">Total FTEs</p>
-              <p className="text-2xl font-bold text-cyan-400">{totalFTE.toFixed(1)}</p>
-            </div>
-            <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-              <p className="text-xs text-slate-400 mb-1">Avg Loaded Rate</p>
-              <p className="text-2xl font-bold text-purple-400">{formatRate(avgLoadedRate)}</p>
-            </div>
-            <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-              <p className="text-xs text-slate-400 mb-1">Labor Categories</p>
-              <p className="text-2xl font-bold text-amber-400">{lcats.length}</p>
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    // AI Chat Widget
-    const AIChatWidget = ({ context }) => {
-      const [isOpen, setIsOpen] = React.useState(false);
-      const [messages, setMessages] = React.useState([]);
-      const [input, setInput] = React.useState('');
-      const [loading, setLoading] = React.useState(false);
-      const messagesEndRef = React.useRef(null);
-
-      React.useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, [messages]);
-
-      const handleSend = async () => {
-        if (!input.trim() || loading) return;
-        
-        const userMsg = input.trim();
-        setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-        setInput('');
-        setLoading(true);
-
-        const result = await sendToAI(userMsg, context);
-        setMessages(prev => [...prev, { role: 'assistant', ...result }]);
-        setLoading(false);
-      };
-
-      const suggestedPrompts = [
-        'Analyze our wrap rates vs GSA schedule',
-        'Suggest labor mix optimization',
-        'Calculate price-to-win range',
-        'Review compliance with FAR 15.404'
-      ];
-
-      if (!isOpen) {
-        return (
-          <button
-            onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-amber-500 to-orange-600 rounded-full shadow-lg hover:shadow-amber-500/25 transition-all flex items-center justify-center z-50"
-          >
-            <span className="text-2xl">💬</span>
-          </button>
-        );
-      }
-
-      return (
-        <div className="fixed bottom-6 right-6 w-96 h-[500px] glass border border-amber-500/30 rounded-xl shadow-2xl flex flex-col z-50">
-          <div className="flex items-center justify-between p-4 border-b border-slate-700">
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Opportunity Header */}
+        <div className="glass rounded-xl p-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
-              <h3 className="font-semibold text-white">Pricing Analyst</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-amber-400">🔒 Secure Channel</span>
-                <span className="text-xs font-mono text-amber-400/70">{CUI_MARKING}</span>
-              </div>
-            </div>
-            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">✕</button>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-slate-500 mb-3">Suggested queries:</p>
-                {suggestedPrompts.map((prompt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setInput(prompt)}
-                    className="block w-full text-left px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-            )}
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                  msg.role === 'user' ? 'bg-amber-600 text-white' : 
-                  msg.error ? 'bg-red-900/50 text-red-300' : 'bg-slate-800 text-slate-200'
-                }`}>
-                  {msg.content}
-                  {msg.cui && (
-                    <span className="block text-xs text-amber-400 mt-1 font-mono">{msg.cui}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-slate-800 px-4 py-2 rounded-lg text-slate-400">
-                  <span className="animate-pulse">Analyzing...</span>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-          
-          <div className="p-4 border-t border-slate-700">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask about pricing..."
-                className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+              <label className="text-sm text-slate-400 block mb-1">Opportunity</label>
+              <input 
+                type="text" 
+                value={opportunityName}
+                onChange={(e) => setOpportunityName(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
               />
-              <button
-                onClick={handleSend}
-                disabled={loading || !input.trim()}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 rounded-lg transition-colors"
-              >
-                →
-              </button>
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Period of Performance (months)</label>
+              <input 
+                type="number" 
+                value={periodOfPerformance}
+                onChange={(e) => setPeriodOfPerformance(parseInt(e.target.value) || 12)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Contract Type</label>
+              <select className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none">
+                <option>T&M</option>
+                <option>FFP</option>
+                <option>Cost-Plus</option>
+                <option>IDIQ Task Order</option>
+              </select>
             </div>
           </div>
         </div>
-      );
-    };
 
-    // ============================================
-    // MAIN APP
-    // ============================================
-    function App() {
-      const [lcats, setLcats] = React.useState(DEMO_LCATS);
-      const [opportunities, setOpportunities] = React.useState(DEMO_OPPORTUNITIES);
-      const [selectedOpp, setSelectedOpp] = React.useState(null);
-      const [connected, setConnected] = React.useState(false);
-      const [loading, setLoading] = React.useState(true);
-      const [preset, setPreset] = React.useState('OASIS');
-      const [rates, setRates] = React.useState(WRAP_RATE_PRESETS['OASIS']);
-
-      React.useEffect(() => {
-        loadData();
-      }, []);
-
-      const loadData = async () => {
-        try {
-          // Load pricing items
-          const { data: items, error: itemsError } = await supabase
-            .from('pricing_items')
-            .select('*')
-            .order('created_at', { ascending: true });
-
-          if (!itemsError && items && items.length > 0) {
-            const formattedItems = items.map(item => ({
-              id: item.id,
-              title: item.labor_category || item.title,
-              laborCategory: item.lcat_code || 'LCAT',
-              baseRate: item.base_rate || 100,
-              fringe: item.fringe_rate || 0.32,
-              overhead: item.overhead_rate || 0.45,
-              ga: item.ga_rate || 0.08,
-              profit: item.profit_rate || 0.10,
-              hours: item.hours || 2080,
-              quantity: item.quantity || 1
-            }));
-            setLcats(formattedItems);
-            setConnected(true);
-          }
-
-          // Load opportunities
-          const { data: opps, error: oppsError } = await supabase
-            .from('opportunities')
-            .select('id, title, agency, ceiling_value')
-            .order('title', { ascending: true });
-
-          if (!oppsError && opps && opps.length > 0) {
-            setOpportunities(opps);
-          }
-        } catch (e) {
-          console.log('Using demo data:', e);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const handlePresetChange = (newPreset) => {
-        setPreset(newPreset);
-        setRates(WRAP_RATE_PRESETS[newPreset]);
-      };
-
-      const handleRateChange = (key, value) => {
-        setRates(prev => ({ ...prev, [key]: value }));
-        setPreset('Custom');
-      };
-
-      const handleUpdateLcat = (updated) => {
-        setLcats(prev => prev.map(l => l.id === updated.id ? updated : l));
-      };
-
-      const handleDeleteLcat = (id) => {
-        setLcats(prev => prev.filter(l => l.id !== id));
-      };
-
-      const handleAddLcat = () => {
-        const newId = Math.max(...lcats.map(l => l.id), 0) + 1;
-        setLcats(prev => [...prev, {
-          id: newId,
-          title: 'New Position',
-          laborCategory: 'LCAT-XX',
-          baseRate: 100.00,
-          hours: 2080,
-          quantity: 1
-        }]);
-      };
-
-      const handleExport = () => {
-        const exportData = {
-          cuiMarking: CUI_MARKING,
-          exportDate: new Date().toISOString(),
-          wrapRates: rates,
-          lcats: lcats.map(lcat => ({
-            ...lcat,
-            loadedRate: calculateLoadedRate(lcat.baseRate, rates.fringe, rates.overhead, rates.ga, rates.profit),
-            annualCost: calculateLoadedRate(lcat.baseRate, rates.fringe, rates.overhead, rates.ga, rates.profit) * lcat.hours * lcat.quantity
-          })),
-          totals: {
-            annual: lcats.reduce((sum, lcat) => {
-              const loaded = calculateLoadedRate(lcat.baseRate, rates.fringe, rates.overhead, rates.ga, rates.profit);
-              return sum + (loaded * lcat.hours * lcat.quantity);
-            }, 0),
-            fte: lcats.reduce((sum, lcat) => sum + (lcat.hours * lcat.quantity / 2080), 0)
-          }
-        };
-        
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `pricing-boe-${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-      };
-
-      if (loading) {
-        return (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-400">Loading Pricing Engine...</p>
-              <p className="text-xs text-amber-400 mt-2 font-mono">{CUI_MARKING}</p>
-            </div>
-          </div>
-        );
-      }
-
-      return (
-        <div className="min-h-screen">
-          <Header connected={connected} onBack={() => window.location.href = 'missionpulse-dashboard-v3.html'} />
-
-          <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-            {/* Opportunity Selector */}
-            <div className="glass rounded-xl border border-slate-700/50 p-4">
-              <div className="flex items-center gap-4">
-                <label className="text-sm text-slate-400">Opportunity:</label>
-                <select
-                  value={selectedOpp || ''}
-                  onChange={(e) => setSelectedOpp(e.target.value)}
-                  className="flex-1 max-w-md bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="">Select Opportunity...</option>
-                  {opportunities.map(opp => (
-                    <option key={opp.id} value={opp.id}>
-                      {opp.title} ({opp.agency}) - {formatCurrency(opp.ceiling_value)}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleExport}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                >
-                  📥 Export BOE
-                </button>
-              </div>
-            </div>
-
-            {/* Wrap Rates */}
-            <WrapRateCard 
-              rates={rates}
-              preset={preset}
-              onPresetChange={handlePresetChange}
-              onRateChange={handleRateChange}
-            />
-
-            {/* LCAT Table */}
-            <div className="glass rounded-xl border border-slate-700/50 overflow-hidden">
-              <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-                <h3 className="font-semibold text-white">Labor Categories (LCATs)</h3>
-                <button
-                  onClick={handleAddLcat}
-                  className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm transition-colors"
-                >
-                  + Add LCAT
-                </button>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-800/50">
-                    <tr className="text-left text-xs text-slate-400 uppercase tracking-wider">
-                      <th className="py-3 px-4">Position Title</th>
-                      <th className="py-3 px-4">LCAT Code</th>
-                      <th className="py-3 px-4">Base Rate</th>
-                      <th className="py-3 px-4 text-right">Loaded Rate</th>
-                      <th className="py-3 px-4">Hours</th>
-                      <th className="py-3 px-4">Qty</th>
-                      <th className="py-3 px-4 text-right">Annual Cost</th>
-                      <th className="py-3 px-4"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lcats.map(lcat => (
-                      <LCATRow
-                        key={lcat.id}
-                        lcat={lcat}
-                        rates={rates}
-                        onUpdate={handleUpdateLcat}
-                        onDelete={handleDeleteLcat}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Summary */}
-            <SummaryCard lcats={lcats} rates={rates} />
-          </main>
-
-          {/* Footer */}
-          <footer className="border-t border-slate-800 py-6">
-            <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <p className="text-xs text-slate-500">
-                  © 2026 Mission Meets Tech
-                </p>
-                <span className="text-xs font-mono text-amber-400">{CUI_MARKING}</span>
-              </div>
-              <p className="text-xs text-slate-600">
-                AI GENERATED - REQUIRES HUMAN REVIEW
-              </p>
-            </div>
-          </footer>
-
-          {/* AI Chat */}
-          <AIChatWidget context={{ lcats, rates, selectedOpp }} />
+        {/* Indirect Rates */}
+        <div className="grid grid-cols-4 gap-4">
+          <RateCard title="Fringe Benefits" rate={INDIRECT_RATES.fringe} description="Health, retirement, PTO" />
+          <RateCard title="Overhead" rate={INDIRECT_RATES.overhead} description="Facilities, IT, admin" />
+          <RateCard title="G&A" rate={INDIRECT_RATES.ga} description="General & Administrative" />
+          <RateCard title="Fee/Profit" rate={INDIRECT_RATES.fee} description="Contract fee margin" />
         </div>
-      );
-    }
 
-    ReactDOM.render(<App />, document.getElementById('root'));
+        {/* BOE Table */}
+        <div className="glass rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Icons.calculator /> Labor Categories (LCAT)
+            </h2>
+            <span className="text-sm text-slate-400">{GSA_LCATS.length} categories • GSA Schedule pricing</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="py-3 px-4 text-left text-sm font-medium text-slate-400">Labor Category</th>
+                  <th className="py-3 px-4 text-right text-sm font-medium text-slate-400">GSA Rate</th>
+                  <th className="py-3 px-4 text-right text-sm font-medium text-slate-400">Loaded Rate</th>
+                  <th className="py-3 px-4 text-center text-sm font-medium text-slate-400">Hours</th>
+                  <th className="py-3 px-4 text-right text-sm font-medium text-slate-400">Direct Cost</th>
+                  <th className="py-3 px-4 text-right text-sm font-medium text-slate-400">Fully Loaded</th>
+                </tr>
+              </thead>
+              <tbody>
+                {GSA_LCATS.map(lcat => (
+                  <BOELineItem key={lcat.id} lcat={lcat} hours={hours[lcat.id] || 0} onHoursChange={handleHoursChange} />
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-800/80">
+                <tr className="border-t-2 border-cyan-500/30">
+                  <td className="py-4 px-4 font-bold text-white">TOTAL</td>
+                  <td className="py-4 px-4"></td>
+                  <td className="py-4 px-4"></td>
+                  <td className="py-4 px-4 text-center text-white font-bold">{calculations.totalHours.toLocaleString()}</td>
+                  <td className="py-4 px-4 text-right text-cyan-400 font-bold">${calculations.totalDirect.toLocaleString()}</td>
+                  <td className="py-4 px-4 text-right text-green-400 font-bold text-lg">${calculations.totalLoaded.toLocaleString()}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-4 gap-4">
+          <div className="glass rounded-xl p-4 text-center">
+            <p className="text-3xl font-bold text-cyan-400">${(calculations.totalLoaded / 1000000).toFixed(2)}M</p>
+            <p className="text-sm text-slate-400">Total Contract Value</p>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <p className="text-3xl font-bold text-green-400">{calculations.fte.toFixed(1)}</p>
+            <p className="text-sm text-slate-400">FTE Equivalent</p>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <p className="text-3xl font-bold text-amber-400">${(calculations.monthlyBurn / 1000).toFixed(0)}K</p>
+            <p className="text-sm text-slate-400">Monthly Burn Rate</p>
+          </div>
+          <div className="glass rounded-xl p-4 text-center">
+            <p className="text-3xl font-bold text-purple-400">{((INDIRECT_RATES.fringe + INDIRECT_RATES.overhead + INDIRECT_RATES.ga + INDIRECT_RATES.fee) * 100).toFixed(0)}%</p>
+            <p className="text-sm text-slate-400">Total Wrap Rate</p>
+          </div>
+        </div>
+      </main>
+
+      {/* CUI Footer */}
+      <footer className="cui-banner text-white text-center py-2 text-xs">
+        CUI // SP-PROCURE // Authorized Distribution Only | Mission Meets Tech © 2026
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 </body>
 </html>
