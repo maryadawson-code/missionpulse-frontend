@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Automation | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.15); backdrop-filter: blur(10px); }
+        .workflow-node { transition: all 0.3s ease; cursor: move; }
+        .workflow-node:hover { transform: scale(1.02); box-shadow: 0 0 20px rgba(0, 229, 250, 0.3); }
+        .workflow-node.selected { border-color: #00E5FA; box-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+        .connector-line { stroke: rgba(0, 229, 250, 0.5); stroke-width: 2; }
+        .trigger-node { border-left: 4px solid #10B981; }
+        .action-node { border-left: 4px solid #3B82F6; }
+        .condition-node { border-left: 4px solid #F59E0B; }
+        .end-node { border-left: 4px solid #EF4444; }
+        .node-palette-item { transition: all 0.2s ease; }
+        .node-palette-item:hover { background: rgba(0, 229, 250, 0.1); transform: translateX(4px); }
+        .canvas-grid { background-image: radial-gradient(circle, rgba(0, 229, 250, 0.1) 1px, transparent 1px); background-size: 20px 20px; }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Navigation -->
+    <nav class="bg-[#00050F]/90 border-b border-cyan-500/20 sticky top-0 z-50">
+        <div class="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="missionpulse-mission-control.html" class="text-cyan-400 hover:text-cyan-300">
+                    <i class="fas fa-arrow-left mr-2"></i>Mission Control
+                </a>
+                <span class="text-gray-600">|</span>
+                <h1 class="text-xl font-bold text-white">
+                    <i class="fas fa-project-diagram text-cyan-400 mr-2"></i>Workflow Automation
+                </h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <select id="workflowSelect" class="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" onchange="loadWorkflow()">
+                    <option value="new">+ New Workflow</option>
+                    <option value="proposal-review">Proposal Review Process</option>
+                    <option value="go-nogo">Go/No-Go Decision</option>
+                    <option value="partner-onboard">Partner Onboarding</option>
+                </select>
+                <button onclick="saveWorkflow()" class="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 transition-all">
+                    <i class="fas fa-save mr-2"></i>Save
+                </button>
+                <button onclick="runWorkflow()" class="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 rounded-lg text-green-400 transition-all">
+                    <i class="fas fa-play mr-2"></i>Run
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex h-[calc(100vh-60px)]">
+        <!-- Left Sidebar - Node Palette -->
+        <aside class="w-64 bg-[#00050F]/80 border-r border-cyan-500/20 p-4 overflow-y-auto">
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Node Palette</h3>
+            
+            <div class="mb-6">
+                <div class="text-xs text-gray-500 mb-2">TRIGGERS</div>
+                <div class="space-y-2">
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'trigger', 'opportunity-created')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-green-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-plus text-green-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Opportunity Created</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'trigger', 'status-changed')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-green-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-exchange-alt text-green-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Status Changed</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'trigger', 'deadline-approaching')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-green-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-clock text-green-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Deadline Approaching</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <div class="text-xs text-gray-500 mb-2">CONDITIONS</div>
+                <div class="space-y-2">
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'condition', 'if-value')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-yellow-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-code-branch text-yellow-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">If/Else Condition</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'condition', 'pwin-check')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-yellow-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-percentage text-yellow-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">pWin Threshold</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <div class="text-xs text-gray-500 mb-2">ACTIONS</div>
+                <div class="space-y-2">
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'action', 'send-notification')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-blue-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-bell text-blue-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Send Notification</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'action', 'assign-task')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-blue-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-tasks text-blue-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Assign Task</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'action', 'update-status')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-blue-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-edit text-blue-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Update Status</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'action', 'send-email')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-blue-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-envelope text-blue-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Send Email</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'action', 'create-document')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-blue-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-file-alt text-blue-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Create Document</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'action', 'ai-analysis')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-purple-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-brain text-purple-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">AI Analysis</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <div class="text-xs text-gray-500 mb-2">CONTROL</div>
+                <div class="space-y-2">
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'control', 'delay')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-gray-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-hourglass-half text-gray-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">Delay</span>
+                        </div>
+                    </div>
+                    <div class="node-palette-item p-3 bg-gray-800/30 rounded-lg cursor-pointer" draggable="true" ondragstart="dragNode(event, 'end', 'end')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-red-500/20 rounded flex items-center justify-center">
+                                <i class="fas fa-stop text-red-400 text-sm"></i>
+                            </div>
+                            <span class="text-white text-sm">End Workflow</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Canvas -->
+        <main class="flex-1 relative overflow-auto">
+            <div id="canvas" class="canvas-grid w-full h-full min-h-[800px] relative p-8" 
+                ondragover="allowDrop(event)" ondrop="dropNode(event)">
+                
+                <!-- SVG for connections -->
+                <svg id="connections" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 1;"></svg>
+                
+                <!-- Workflow nodes will be added here -->
+                <div id="workflowNodes" class="relative" style="z-index: 2;"></div>
+                
+                <!-- Empty state -->
+                <div id="emptyState" class="absolute inset-0 flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="w-20 h-20 mx-auto bg-gray-800/50 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-project-diagram text-gray-600 text-3xl"></i>
+                        </div>
+                        <p class="text-gray-500 mb-2">Drag nodes from the palette to build your workflow</p>
+                        <p class="text-gray-600 text-sm">or select a template from the dropdown above</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar - Node Properties -->
+        <aside id="propertiesPanel" class="w-80 bg-[#00050F]/80 border-l border-cyan-500/20 p-4 overflow-y-auto hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Node Properties</h3>
+                <button onclick="closeProperties()" class="text-gray-500 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div id="propertyForm" class="space-y-4">
+                <!-- Populated dynamically -->
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <button onclick="deleteSelectedNode()" class="w-full py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-400 transition-all">
+                    <i class="fas fa-trash mr-2"></i>Delete Node
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-900 border border-cyan-500/30 rounded-lg p-4 shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="flex items-center space-x-3">
+            <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMessage" class="text-white">Action completed</span>
+        </div>
+    </div>
+
+    <script>
+        let nodes = [];
+        let connections = [];
+        let selectedNode = null;
+        let nodeIdCounter = 0;
+
+        const nodeTemplates = {
+            'trigger': { color: 'green', icon: 'fa-bolt' },
+            'condition': { color: 'yellow', icon: 'fa-code-branch' },
+            'action': { color: 'blue', icon: 'fa-cog' },
+            'control': { color: 'gray', icon: 'fa-hourglass-half' },
+            'end': { color: 'red', icon: 'fa-stop' }
+        };
+
+        const nodeConfigs = {
+            'opportunity-created': { name: 'Opportunity Created', type: 'trigger', fields: ['opportunity_type'] },
+            'status-changed': { name: 'Status Changed', type: 'trigger', fields: ['from_status', 'to_status'] },
+            'deadline-approaching': { name: 'Deadline Approaching', type: 'trigger', fields: ['days_before'] },
+            'if-value': { name: 'If/Else Condition', type: 'condition', fields: ['field', 'operator', 'value'] },
+            'pwin-check': { name: 'pWin Threshold', type: 'condition', fields: ['threshold'] },
+            'send-notification': { name: 'Send Notification', type: 'action', fields: ['recipient_role', 'message'] },
+            'assign-task': { name: 'Assign Task', type: 'action', fields: ['assignee_role', 'task_name', 'due_days'] },
+            'update-status': { name: 'Update Status', type: 'action', fields: ['new_status'] },
+            'send-email': { name: 'Send Email', type: 'action', fields: ['to', 'subject', 'template'] },
+            'create-document': { name: 'Create Document', type: 'action', fields: ['template', 'output_name'] },
+            'ai-analysis': { name: 'AI Analysis', type: 'action', fields: ['agent_type', 'prompt'] },
+            'delay': { name: 'Delay', type: 'control', fields: ['duration', 'unit'] },
+            'end': { name: 'End Workflow', type: 'end', fields: [] }
+        };
+
+        // Demo workflow templates
+        const workflowTemplates = {
+            'proposal-review': [
+                { id: 1, type: 'trigger', subtype: 'status-changed', x: 100, y: 100, config: { from_status: 'Draft', to_status: 'Review' } },
+                { id: 2, type: 'action', subtype: 'send-notification', x: 100, y: 220, config: { recipient_role: 'QA', message: 'New proposal ready for review' } },
+                { id: 3, type: 'action', subtype: 'assign-task', x: 100, y: 340, config: { assignee_role: 'QA', task_name: 'Review Proposal', due_days: 2 } },
+                { id: 4, type: 'end', subtype: 'end', x: 100, y: 460, config: {} }
+            ],
+            'go-nogo': [
+                { id: 1, type: 'trigger', subtype: 'opportunity-created', x: 100, y: 100, config: {} },
+                { id: 2, type: 'condition', subtype: 'pwin-check', x: 100, y: 220, config: { threshold: 50 } },
+                { id: 3, type: 'action', subtype: 'send-notification', x: 300, y: 340, config: { recipient_role: 'CEO', message: 'High pWin opportunity - recommend GO' } },
+                { id: 4, type: 'action', subtype: 'update-status', x: 100, y: 340, config: { new_status: 'No-Go' } },
+                { id: 5, type: 'end', subtype: 'end', x: 200, y: 460, config: {} }
+            ]
+        };
+
+        function dragNode(e, type, subtype) {
+            e.dataTransfer.setData('nodeType', type);
+            e.dataTransfer.setData('nodeSubtype', subtype);
+        }
+
+        function allowDrop(e) {
+            e.preventDefault();
+        }
+
+        function dropNode(e) {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('nodeType');
+            const subtype = e.dataTransfer.getData('nodeSubtype');
+            
+            if (!type || !subtype) return;
+            
+            const rect = document.getElementById('canvas').getBoundingClientRect();
+            const x = e.clientX - rect.left - 100;
+            const y = e.clientY - rect.top - 40;
+            
+            addNode(type, subtype, x, y);
+        }
+
+        function addNode(type, subtype, x, y, config = {}) {
+            nodeIdCounter++;
+            const nodeConfig = nodeConfigs[subtype];
+            const template = nodeTemplates[type];
+            
+            const node = {
+                id: nodeIdCounter,
+                type,
+                subtype,
+                x,
+                y,
+                config
+            };
+            nodes.push(node);
+            
+            renderNodes();
+            hideEmptyState();
+            showToast(`Added ${nodeConfig.name} node`, 'success');
+        }
+
+        function renderNodes() {
+            const container = document.getElementById('workflowNodes');
+            
+            container.innerHTML = nodes.map(node => {
+                const config = nodeConfigs[node.subtype];
+                const template = nodeTemplates[node.type];
+                const colorMap = {
+                    'green': 'border-green-500 bg-green-500/10',
+                    'yellow': 'border-yellow-500 bg-yellow-500/10',
+                    'blue': 'border-blue-500 bg-blue-500/10',
+                    'gray': 'border-gray-500 bg-gray-500/10',
+                    'red': 'border-red-500 bg-red-500/10'
+                };
+                const iconColorMap = {
+                    'green': 'text-green-400',
+                    'yellow': 'text-yellow-400',
+                    'blue': 'text-blue-400',
+                    'gray': 'text-gray-400',
+                    'red': 'text-red-400'
+                };
+                
+                return `
+                    <div class="workflow-node absolute glass-card rounded-lg p-4 w-52 border-l-4 ${colorMap[template.color]} ${selectedNode === node.id ? 'selected' : ''}"
+                        style="left: ${node.x}px; top: ${node.y}px;"
+                        onclick="selectNode(${node.id})"
+                        data-id="${node.id}">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-gray-800/50 rounded-lg flex items-center justify-center">
+                                <i class="fas ${template.icon} ${iconColorMap[template.color]}"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium text-sm">${config.name}</div>
+                                <div class="text-gray-500 text-xs">${node.type}</div>
+                            </div>
+                        </div>
+                        <div class="mt-2 flex justify-between">
+                            <div class="node-connector input w-3 h-3 bg-gray-600 rounded-full cursor-pointer hover:bg-cyan-400" 
+                                onclick="event.stopPropagation(); startConnection(${node.id}, 'input')"></div>
+                            <div class="node-connector output w-3 h-3 bg-gray-600 rounded-full cursor-pointer hover:bg-cyan-400"
+                                onclick="event.stopPropagation(); startConnection(${node.id}, 'output')"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            renderConnections();
+        }
+
+        function renderConnections() {
+            const svg = document.getElementById('connections');
+            svg.innerHTML = connections.map(conn => {
+                const fromNode = nodes.find(n => n.id === conn.from);
+                const toNode = nodes.find(n => n.id === conn.to);
+                if (!fromNode || !toNode) return '';
+                
+                const x1 = fromNode.x + 200;
+                const y1 = fromNode.y + 50;
+                const x2 = toNode.x;
+                const y2 = toNode.y + 50;
+                
+                return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="connector-line" marker-end="url(#arrowhead)"/>`;
+            }).join('') + `
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="rgba(0, 229, 250, 0.5)"/>
+                    </marker>
+                </defs>
+            `;
+        }
+
+        function selectNode(id) {
+            selectedNode = id;
+            renderNodes();
+            showProperties(id);
+        }
+
+        function showProperties(id) {
+            const node = nodes.find(n => n.id === id);
+            if (!node) return;
+            
+            const config = nodeConfigs[node.subtype];
+            const panel = document.getElementById('propertiesPanel');
+            const form = document.getElementById('propertyForm');
+            
+            const fieldTemplates = {
+                'opportunity_type': `<select class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">
+                    <option>All Types</option><option>IDIQ</option><option>FFP</option><option>T&M</option>
+                </select>`,
+                'from_status': `<select class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">
+                    <option>Any</option><option>Pipeline</option><option>Pursuing</option><option>Draft</option>
+                </select>`,
+                'to_status': `<select class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">
+                    <option>Pursuing</option><option>Review</option><option>Submitted</option><option>Won</option>
+                </select>`,
+                'days_before': `<input type="number" value="7" class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">`,
+                'threshold': `<input type="number" value="50" min="0" max="100" class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">`,
+                'recipient_role': `<select class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">
+                    <option>CEO</option><option>COO</option><option>CAP</option><option>PM</option><option>QA</option>
+                </select>`,
+                'assignee_role': `<select class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">
+                    <option>CAP</option><option>PM</option><option>SA</option><option>QA</option>
+                </select>`,
+                'message': `<textarea class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white h-20"></textarea>`,
+                'task_name': `<input type="text" placeholder="Task name" class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">`,
+                'due_days': `<input type="number" value="3" class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">`,
+                'new_status': `<select class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">
+                    <option>Pursuing</option><option>Review</option><option>Submitted</option><option>Won</option><option>Lost</option>
+                </select>`,
+                'agent_type': `<select class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">
+                    <option>capture</option><option>strategy</option><option>blackhat</option><option>pricing</option><option>compliance</option>
+                </select>`,
+                'duration': `<input type="number" value="1" class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">`,
+                'unit': `<select class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">
+                    <option>hours</option><option>days</option><option>weeks</option>
+                </select>`
+            };
+            
+            form.innerHTML = `
+                <div>
+                    <label class="text-gray-400 text-sm mb-1 block">Node Name</label>
+                    <div class="text-white font-medium">${config.name}</div>
+                </div>
+                ${config.fields.map(field => `
+                    <div>
+                        <label class="text-gray-400 text-sm mb-1 block">${field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
+                        ${fieldTemplates[field] || `<input type="text" class="w-full bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white">`}
+                    </div>
+                `).join('')}
+            `;
+            
+            panel.classList.remove('hidden');
+        }
+
+        function closeProperties() {
+            document.getElementById('propertiesPanel').classList.add('hidden');
+            selectedNode = null;
+            renderNodes();
+        }
+
+        function deleteSelectedNode() {
+            if (!selectedNode) return;
+            nodes = nodes.filter(n => n.id !== selectedNode);
+            connections = connections.filter(c => c.from !== selectedNode && c.to !== selectedNode);
+            closeProperties();
+            renderNodes();
+            
+            if (nodes.length === 0) showEmptyState();
+            showToast('Node deleted', 'success');
+        }
+
+        function hideEmptyState() {
+            document.getElementById('emptyState').classList.add('hidden');
+        }
+
+        function showEmptyState() {
+            document.getElementById('emptyState').classList.remove('hidden');
+        }
+
+        function loadWorkflow() {
+            const selected = document.getElementById('workflowSelect').value;
+            if (selected === 'new') {
+                nodes = [];
+                connections = [];
+                nodeIdCounter = 0;
+                renderNodes();
+                showEmptyState();
+                return;
+            }
+            
+            const template = workflowTemplates[selected];
+            if (template) {
+                nodes = JSON.parse(JSON.stringify(template));
+                nodeIdCounter = Math.max(...nodes.map(n => n.id));
+                
+                // Auto-connect nodes in sequence
+                connections = [];
+                for (let i = 0; i < nodes.length - 1; i++) {
+                    connections.push({ from: nodes[i].id, to: nodes[i + 1].id });
+                }
+                
+                renderNodes();
+                hideEmptyState();
+                showToast(`Loaded ${selected} workflow`, 'success');
+            }
+        }
+
+        function saveWorkflow() {
+            const workflow = { nodes, connections };
+            localStorage.setItem('missionpulse_workflow', JSON.stringify(workflow));
+            showToast('Workflow saved', 'success');
+        }
+
+        function runWorkflow() {
+            if (nodes.length === 0) {
+                showToast('Add nodes to your workflow first', 'warning');
+                return;
+            }
+            showToast('Workflow activated - will run when triggered', 'success');
+        }
+
+        let pendingConnection = null;
+        function startConnection(nodeId, type) {
+            if (!pendingConnection) {
+                pendingConnection = { nodeId, type };
+                showToast('Click another node to connect', 'info');
+            } else {
+                if (pendingConnection.nodeId !== nodeId) {
+                    connections.push({
+                        from: pendingConnection.type === 'output' ? pendingConnection.nodeId : nodeId,
+                        to: pendingConnection.type === 'output' ? nodeId : pendingConnection.nodeId
+                    });
+                    renderConnections();
+                    showToast('Nodes connected', 'success');
+                }
+                pendingConnection = null;
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+            
+            const iconMap = {
+                'success': 'fa-check-circle text-green-400',
+                'warning': 'fa-exclamation-triangle text-yellow-400',
+                'error': 'fa-times-circle text-red-400',
+                'info': 'fa-info-circle text-blue-400'
+            };
+            
+            icon.className = `fas ${iconMap[type] || iconMap.success}`;
+            msg.textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitor Intelligence | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.15); backdrop-filter: blur(10px); }
+        .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+        .competitor-card { transition: all 0.3s ease; }
+        .competitor-card:hover { transform: translateY(-2px); border-color: rgba(0, 229, 250, 0.4); }
+        .threat-high { border-left: 4px solid #EF4444; }
+        .threat-medium { border-left: 4px solid #F59E0B; }
+        .threat-low { border-left: 4px solid #10B981; }
+        .strength-bar { transition: width 0.5s ease; }
+        .intel-tag { transition: all 0.2s ease; }
+        .intel-tag:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Navigation -->
+    <nav class="bg-[#00050F]/90 border-b border-cyan-500/20 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="missionpulse-mission-control.html" class="text-cyan-400 hover:text-cyan-300">
+                    <i class="fas fa-arrow-left mr-2"></i>Mission Control
+                </a>
+                <span class="text-gray-600">|</span>
+                <h1 class="text-xl font-bold text-white">
+                    <i class="fas fa-user-secret text-cyan-400 mr-2"></i>Competitor Intelligence
+                </h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="text-gray-400 text-sm">RBAC: <span id="userRole" class="text-cyan-400">Loading...</span></span>
+                <button onclick="openAddCompetitor()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white transition-all">
+                    <i class="fas fa-plus mr-2"></i>Add Competitor
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Threat Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="glass-card rounded-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-400 text-sm">Total Tracked</span>
+                    <div class="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-building text-cyan-400"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-cyan-400" id="totalCompetitors">8</div>
+            </div>
+            <div class="glass-card rounded-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-400 text-sm">High Threat</span>
+                    <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-red-400"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-red-400" id="highThreat">3</div>
+            </div>
+            <div class="glass-card rounded-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-400 text-sm">Active Bids Against</span>
+                    <div class="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-crosshairs text-yellow-400"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-yellow-400" id="activeBids">5</div>
+            </div>
+            <div class="glass-card rounded-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-400 text-sm">Win Rate vs Them</span>
+                    <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-trophy text-green-400"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-green-400" id="winRate">42%</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="glass-card rounded-xl p-4 mb-6">
+            <div class="flex flex-wrap items-center gap-4">
+                <div>
+                    <label class="text-gray-400 text-sm mr-2">Threat Level:</label>
+                    <select id="threatFilter" class="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" onchange="filterCompetitors()">
+                        <option value="all">All</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-gray-400 text-sm mr-2">Agency Focus:</label>
+                    <select id="agencyFilter" class="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" onchange="filterCompetitors()">
+                        <option value="all">All Agencies</option>
+                        <option value="dha">DHA</option>
+                        <option value="va">VA</option>
+                        <option value="cms">CMS</option>
+                        <option value="dod">DoD</option>
+                    </select>
+                </div>
+                <div class="flex-1"></div>
+                <input type="text" id="searchCompetitor" placeholder="Search competitors..." 
+                    class="bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm w-64" onkeyup="filterCompetitors()">
+            </div>
+        </div>
+
+        <!-- Competitor Cards -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8" id="competitorGrid">
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Competitive Analysis Matrix -->
+        <div class="glass-card rounded-xl p-6 mb-8">
+            <h3 class="text-lg font-bold text-white mb-4">
+                <i class="fas fa-th text-cyan-400 mr-2"></i>Competitive Positioning Matrix
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-gray-400 text-sm border-b border-gray-700">
+                            <th class="pb-3 font-medium">Competitor</th>
+                            <th class="pb-3 font-medium text-center">Price</th>
+                            <th class="pb-3 font-medium text-center">Technical</th>
+                            <th class="pb-3 font-medium text-center">Past Perf.</th>
+                            <th class="pb-3 font-medium text-center">Incumbency</th>
+                            <th class="pb-3 font-medium text-center">Relationships</th>
+                            <th class="pb-3 font-medium text-center">Overall</th>
+                        </tr>
+                    </thead>
+                    <tbody id="matrixBody">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recent Intel -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">
+                    <i class="fas fa-newspaper text-cyan-400 mr-2"></i>Recent Intelligence
+                </h3>
+                <div class="space-y-3" id="recentIntel">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">
+                    <i class="fas fa-chart-bar text-cyan-400 mr-2"></i>Head-to-Head Record
+                </h3>
+                <div class="space-y-4" id="headToHead">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Competitor Modal -->
+    <div id="addCompetitorModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+        <div class="glass-card rounded-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-white">
+                    <i class="fas fa-plus-circle text-cyan-400 mr-2"></i>Add Competitor
+                </h3>
+                <button onclick="closeAddCompetitor()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-gray-400 text-sm mb-2 block">Company Name*</label>
+                    <input type="text" id="compName" placeholder="Company name..." 
+                        class="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-3 text-white">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-gray-400 text-sm mb-2 block">Threat Level</label>
+                        <select id="compThreat" class="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-3 text-white">
+                            <option value="high">High</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-gray-400 text-sm mb-2 block">Company Size</label>
+                        <select id="compSize" class="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-3 text-white">
+                            <option value="large">Large Business</option>
+                            <option value="mid">Mid-size</option>
+                            <option value="small">Small Business</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-gray-400 text-sm mb-2 block">Primary Agencies</label>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg cursor-pointer">
+                            <input type="checkbox" value="dha" class="comp-agency">
+                            <span class="text-white text-sm">DHA</span>
+                        </label>
+                        <label class="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg cursor-pointer">
+                            <input type="checkbox" value="va" class="comp-agency">
+                            <span class="text-white text-sm">VA</span>
+                        </label>
+                        <label class="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg cursor-pointer">
+                            <input type="checkbox" value="cms" class="comp-agency">
+                            <span class="text-white text-sm">CMS</span>
+                        </label>
+                        <label class="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg cursor-pointer">
+                            <input type="checkbox" value="dod" class="comp-agency">
+                            <span class="text-white text-sm">DoD</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-gray-400 text-sm mb-2 block">Key Capabilities</label>
+                    <input type="text" id="compCapabilities" placeholder="EHR, Analytics, Cloud, etc. (comma-separated)" 
+                        class="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-3 text-white">
+                </div>
+                <div>
+                    <label class="text-gray-400 text-sm mb-2 block">Notes</label>
+                    <textarea id="compNotes" rows="3" placeholder="Key intelligence, relationships, strategies..." 
+                        class="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-3 text-white"></textarea>
+                </div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+                <button onclick="closeAddCompetitor()" class="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-white">Cancel</button>
+                <button onclick="saveCompetitor()" class="flex-1 px-4 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white">
+                    <i class="fas fa-check mr-2"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-900 border border-cyan-500/30 rounded-lg p-4 shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="flex items-center space-x-3">
+            <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMessage" class="text-white">Action completed</span>
+        </div>
+    </div>
+
+    <script>
+        // Sample competitor data
+        let competitors = [
+            {
+                id: 1,
+                name: 'Leidos Health',
+                threat: 'high',
+                size: 'large',
+                agencies: ['dha', 'va'],
+                capabilities: ['EHR', 'Analytics', 'Cybersecurity'],
+                scores: { price: 70, technical: 90, pastPerf: 95, incumbency: 85, relationships: 90 },
+                wins: 8, losses: 3,
+                notes: 'Major incumbent at DHA. Strong CLIN relationships.'
+            },
+            {
+                id: 2,
+                name: 'Booz Allen Hamilton',
+                threat: 'high',
+                size: 'large',
+                agencies: ['dha', 'va', 'dod'],
+                capabilities: ['Strategy', 'Analytics', 'Digital Transformation'],
+                scores: { price: 60, technical: 95, pastPerf: 90, incumbency: 80, relationships: 95 },
+                wins: 6, losses: 4,
+                notes: 'Strong consulting relationships. Premium pricing.'
+            },
+            {
+                id: 3,
+                name: 'General Dynamics IT',
+                threat: 'high',
+                size: 'large',
+                agencies: ['dha', 'dod'],
+                capabilities: ['Infrastructure', 'Cloud', 'Help Desk'],
+                scores: { price: 75, technical: 85, pastPerf: 88, incumbency: 90, relationships: 80 },
+                wins: 5, losses: 5,
+                notes: 'Incumbent on several DHA infrastructure contracts.'
+            },
+            {
+                id: 4,
+                name: 'Accenture Federal',
+                threat: 'medium',
+                size: 'large',
+                agencies: ['va', 'cms'],
+                capabilities: ['EHR', 'Cloud', 'Modernization'],
+                scores: { price: 55, technical: 92, pastPerf: 85, incumbency: 70, relationships: 88 },
+                wins: 3, losses: 4,
+                notes: 'Strong VA Cerner implementation experience.'
+            },
+            {
+                id: 5,
+                name: 'ICF International',
+                threat: 'medium',
+                size: 'mid',
+                agencies: ['cms', 'va'],
+                capabilities: ['Analytics', 'Research', 'Program Support'],
+                scores: { price: 80, technical: 78, pastPerf: 82, incumbency: 65, relationships: 75 },
+                wins: 4, losses: 3,
+                notes: 'Strong at CMS. Good subcontractor relationships.'
+            },
+            {
+                id: 6,
+                name: 'Cognosante',
+                threat: 'medium',
+                size: 'mid',
+                agencies: ['va', 'cms'],
+                capabilities: ['Health IT', 'Data Services', 'Appeals'],
+                scores: { price: 85, technical: 75, pastPerf: 80, incumbency: 60, relationships: 70 },
+                wins: 2, losses: 2,
+                notes: 'Growing presence in VA space. Competitive pricing.'
+            },
+            {
+                id: 7,
+                name: 'Nuna Health',
+                threat: 'low',
+                size: 'small',
+                agencies: ['cms'],
+                capabilities: ['Analytics', 'Cloud', 'Data Platform'],
+                scores: { price: 90, technical: 88, pastPerf: 65, incumbency: 40, relationships: 55 },
+                wins: 1, losses: 1,
+                notes: 'Startup with innovative tech. Limited past performance.'
+            },
+            {
+                id: 8,
+                name: 'HealthTech Solutions',
+                threat: 'low',
+                size: 'small',
+                agencies: ['dha'],
+                capabilities: ['Telehealth', 'Mobile Apps'],
+                scores: { price: 92, technical: 72, pastPerf: 60, incumbency: 30, relationships: 50 },
+                wins: 1, losses: 3,
+                notes: 'SDVOSB. Potential teaming partner.'
+            }
+        ];
+
+        const recentIntel = [
+            { date: '2026-01-30', competitor: 'Leidos Health', intel: 'Won DHA T4NG Task Order for $15M EHR support' },
+            { date: '2026-01-28', competitor: 'Booz Allen Hamilton', intel: 'Key capture manager departed to Deloitte' },
+            { date: '2026-01-25', competitor: 'General Dynamics IT', intel: 'Announced partnership with Cerner for VA' },
+            { date: '2026-01-22', competitor: 'Accenture Federal', intel: 'Lost protest on VA modernization contract' },
+            { date: '2026-01-20', competitor: 'ICF International', intel: 'Submitted proposal for CMS data analytics' }
+        ];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // RBAC check
+            document.getElementById('userRole').textContent = 'CEO';
+            renderCompetitors();
+            renderMatrix();
+            renderIntel();
+            renderHeadToHead();
+        });
+
+        function renderCompetitors() {
+            const grid = document.getElementById('competitorGrid');
+            const threatFilter = document.getElementById('threatFilter').value;
+            const agencyFilter = document.getElementById('agencyFilter').value;
+            const search = document.getElementById('searchCompetitor').value.toLowerCase();
+            
+            let filtered = competitors.filter(c => {
+                if (threatFilter !== 'all' && c.threat !== threatFilter) return false;
+                if (agencyFilter !== 'all' && !c.agencies.includes(agencyFilter)) return false;
+                if (search && !c.name.toLowerCase().includes(search)) return false;
+                return true;
+            });
+            
+            grid.innerHTML = filtered.map(c => {
+                const overallScore = Math.round(Object.values(c.scores).reduce((a, b) => a + b, 0) / 5);
+                const threatClass = c.threat === 'high' ? 'threat-high' : c.threat === 'medium' ? 'threat-medium' : 'threat-low';
+                const threatColor = c.threat === 'high' ? 'text-red-400' : c.threat === 'medium' ? 'text-yellow-400' : 'text-green-400';
+                
+                return `
+                    <div class="competitor-card glass-card rounded-xl p-6 ${threatClass}">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 class="text-white font-bold text-lg">${c.name}</h3>
+                                <div class="flex items-center space-x-2 mt-1">
+                                    <span class="text-xs px-2 py-1 bg-gray-700 rounded">${c.size === 'large' ? 'Large' : c.size === 'mid' ? 'Mid-size' : 'Small'}</span>
+                                    <span class="text-xs px-2 py-1 ${threatColor} bg-opacity-20 rounded capitalize">${c.threat} Threat</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold ${overallScore >= 80 ? 'text-red-400' : overallScore >= 70 ? 'text-yellow-400' : 'text-green-400'}">${overallScore}</div>
+                                <div class="text-gray-400 text-xs">Threat Score</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            ${c.capabilities.map(cap => `
+                                <span class="intel-tag text-xs px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded">${cap}</span>
+                            `).join('')}
+                        </div>
+                        
+                        <div class="flex items-center space-x-2 mb-4">
+                            ${c.agencies.map(a => `
+                                <span class="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded uppercase">${a}</span>
+                            `).join('')}
+                        </div>
+                        
+                        <div class="text-gray-400 text-sm mb-4">${c.notes}</div>
+                        
+                        <div class="flex items-center justify-between pt-4 border-t border-gray-700">
+                            <div class="text-sm">
+                                <span class="text-green-400">${c.wins}W</span>
+                                <span class="text-gray-500 mx-1">-</span>
+                                <span class="text-red-400">${c.losses}L</span>
+                                <span class="text-gray-500 ml-2">(vs us)</span>
+                            </div>
+                            <button onclick="editCompetitor(${c.id})" class="text-cyan-400 hover:text-cyan-300 text-sm">
+                                <i class="fas fa-edit mr-1"></i>Edit
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderMatrix() {
+            const tbody = document.getElementById('matrixBody');
+            
+            tbody.innerHTML = competitors.map(c => {
+                const overall = Math.round(Object.values(c.scores).reduce((a, b) => a + b, 0) / 5);
+                
+                const scoreCell = (score) => {
+                    const color = score >= 85 ? 'text-red-400' : score >= 70 ? 'text-yellow-400' : 'text-green-400';
+                    return `<td class="py-3 text-center"><span class="${color} font-medium">${score}</span></td>`;
+                };
+                
+                return `
+                    <tr class="border-b border-gray-800 hover:bg-gray-800/30">
+                        <td class="py-3 text-white font-medium">${c.name}</td>
+                        ${scoreCell(c.scores.price)}
+                        ${scoreCell(c.scores.technical)}
+                        ${scoreCell(c.scores.pastPerf)}
+                        ${scoreCell(c.scores.incumbency)}
+                        ${scoreCell(c.scores.relationships)}
+                        <td class="py-3 text-center">
+                            <span class="font-bold ${overall >= 80 ? 'text-red-400' : overall >= 70 ? 'text-yellow-400' : 'text-green-400'}">${overall}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderIntel() {
+            const container = document.getElementById('recentIntel');
+            
+            container.innerHTML = recentIntel.map(item => `
+                <div class="p-3 bg-gray-800/30 rounded-lg">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-cyan-400 font-medium text-sm">${item.competitor}</span>
+                        <span class="text-gray-500 text-xs">${item.date}</span>
+                    </div>
+                    <p class="text-gray-300 text-sm">${item.intel}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderHeadToHead() {
+            const container = document.getElementById('headToHead');
+            
+            const sorted = [...competitors].sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses)).slice(0, 5);
+            
+            container.innerHTML = sorted.map(c => {
+                const total = c.wins + c.losses;
+                const winPct = total > 0 ? Math.round((c.wins / total) * 100) : 0;
+                
+                return `
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-white text-sm">${c.name}</span>
+                            <span class="text-gray-400 text-sm">${c.wins}W - ${c.losses}L</span>
+                        </div>
+                        <div class="flex h-4 rounded overflow-hidden">
+                            <div class="bg-green-500" style="width: ${winPct}%"></div>
+                            <div class="bg-red-500" style="width: ${100 - winPct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterCompetitors() {
+            renderCompetitors();
+        }
+
+        function openAddCompetitor() {
+            document.getElementById('addCompetitorModal').classList.remove('hidden');
+        }
+
+        function closeAddCompetitor() {
+            document.getElementById('addCompetitorModal').classList.add('hidden');
+        }
+
+        function saveCompetitor() {
+            const name = document.getElementById('compName').value.trim();
+            if (!name) {
+                showToast('Please enter company name', 'warning');
+                return;
+            }
+            
+            const agencies = [];
+            document.querySelectorAll('.comp-agency:checked').forEach(cb => agencies.push(cb.value));
+            
+            const newCompetitor = {
+                id: Date.now(),
+                name,
+                threat: document.getElementById('compThreat').value,
+                size: document.getElementById('compSize').value,
+                agencies,
+                capabilities: document.getElementById('compCapabilities').value.split(',').map(s => s.trim()).filter(s => s),
+                scores: { price: 75, technical: 75, pastPerf: 70, incumbency: 50, relationships: 60 },
+                wins: 0,
+                losses: 0,
+                notes: document.getElementById('compNotes').value
+            };
+            
+            competitors.push(newCompetitor);
+            closeAddCompetitor();
+            
+            // Reset form
+            document.getElementById('compName').value = '';
+            document.getElementById('compCapabilities').value = '';
+            document.getElementById('compNotes').value = '';
+            document.querySelectorAll('.comp-agency').forEach(cb => cb.checked = false);
+            
+            renderCompetitors();
+            renderMatrix();
+            document.getElementById('totalCompetitors').textContent = competitors.length;
+            document.getElementById('highThreat').textContent = competitors.filter(c => c.threat === 'high').length;
+            
+            showToast('Competitor added successfully', 'success');
+        }
+
+        function editCompetitor(id) {
+            showToast('Edit functionality coming soon', 'info');
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+            
+            const iconMap = {
+                'success': 'fa-check-circle text-green-400',
+                'warning': 'fa-exclamation-triangle text-yellow-400',
+                'error': 'fa-times-circle text-red-400',
+                'info': 'fa-info-circle text-blue-400'
+            };
+            
+            icon.className = `fas ${iconMap[type] || iconMap.success}`;
+            msg.textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
