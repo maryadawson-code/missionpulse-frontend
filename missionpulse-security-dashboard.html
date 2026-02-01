@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Dashboard | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.15); backdrop-filter: blur(10px); }
+        .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+        .threat-card { transition: all 0.3s ease; }
+        .threat-card:hover { transform: translateY(-2px); }
+        .shield-pulse { animation: shield-pulse 2s ease-in-out infinite; }
+        @keyframes shield-pulse { 0%, 100% { filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.5)); } 50% { filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.8)); } }
+        .threat-low { border-left: 4px solid #10B981; }
+        .threat-medium { border-left: 4px solid #F59E0B; }
+        .threat-high { border-left: 4px solid #EF4444; }
+        .threat-critical { border-left: 4px solid #DC2626; animation: critical-pulse 1s ease-in-out infinite; }
+        @keyframes critical-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Navigation -->
+    <nav class="bg-[#00050F]/90 border-b border-cyan-500/20 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="missionpulse-mission-control.html" class="text-cyan-400 hover:text-cyan-300">
+                    <i class="fas fa-arrow-left mr-2"></i>Mission Control
+                </a>
+                <span class="text-gray-600">|</span>
+                <h1 class="text-xl font-bold text-white">
+                    <i class="fas fa-shield-alt text-cyan-400 mr-2"></i>Security Dashboard
+                </h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-gray-400 text-sm">RBAC: <span id="userRole" class="text-cyan-400">Loading...</span></span>
+                <button onclick="runSecurityScan()" class="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 transition-all">
+                    <i class="fas fa-radar mr-2"></i>Run Scan
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Security Score Overview -->
+        <div class="glass-card rounded-xl p-6 mb-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center space-x-6">
+                    <div class="shield-pulse">
+                        <div class="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-shield-alt text-green-400 text-4xl"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Security Posture</h2>
+                        <p class="text-gray-400">CMMC Level 2 Compliance Status</p>
+                        <div class="flex items-center space-x-2 mt-2">
+                            <span class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
+                                <i class="fas fa-check mr-1"></i>Protected
+                            </span>
+                            <span class="text-gray-500 text-sm">Last scan: <span id="lastScan">2 hours ago</span></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-green-400" id="controlsPassed">98</div>
+                        <div class="text-gray-400 text-sm">Controls Passed</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-yellow-400" id="controlsWarning">4</div>
+                        <div class="text-gray-400 text-sm">Warnings</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-red-400" id="controlsFailed">0</div>
+                        <div class="text-gray-400 text-sm">Failed</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-cyan-400" id="complianceScore">96%</div>
+                        <div class="text-gray-400 text-sm">Compliance</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Threat Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="glass-card rounded-xl p-5 threat-card">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-400 text-sm">Critical Threats</span>
+                    <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-skull-crossbones text-red-400"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-red-400" id="criticalThreats">0</div>
+            </div>
+            <div class="glass-card rounded-xl p-5 threat-card">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-400 text-sm">High Severity</span>
+                    <div class="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-orange-400"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-orange-400" id="highThreats">2</div>
+            </div>
+            <div class="glass-card rounded-xl p-5 threat-card">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-400 text-sm">Medium Severity</span>
+                    <div class="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exclamation-circle text-yellow-400"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-yellow-400" id="mediumThreats">5</div>
+            </div>
+            <div class="glass-card rounded-xl p-5 threat-card">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-400 text-sm">Low Severity</span>
+                    <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-info-circle text-green-400"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-green-400" id="lowThreats">12</div>
+            </div>
+        </div>
+
+        <!-- CMMC Control Families -->
+        <div class="glass-card rounded-xl p-6 mb-8">
+            <h3 class="text-lg font-bold text-white mb-4">
+                <i class="fas fa-tasks text-cyan-400 mr-2"></i>NIST 800-171 Control Families
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="controlFamilies">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Recent Security Events -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Active Alerts -->
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-white">
+                        <i class="fas fa-bell text-cyan-400 mr-2"></i>Active Alerts
+                    </h3>
+                    <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-sm" id="alertCount">7 Active</span>
+                </div>
+                <div class="space-y-3 max-h-80 overflow-y-auto" id="alertsList">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Recent Login Activity -->
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-white">
+                        <i class="fas fa-sign-in-alt text-cyan-400 mr-2"></i>Recent Login Activity
+                    </h3>
+                    <a href="missionpulse-audit-trail.html" class="text-cyan-400 text-sm hover:text-cyan-300">View All →</a>
+                </div>
+                <div class="space-y-3" id="loginActivity">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Controls -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Access Control -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">
+                    <i class="fas fa-user-lock text-cyan-400 mr-2"></i>Access Control (3.1)
+                </h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                            <span class="text-white">Role-Based Access Control</span>
+                        </div>
+                        <span class="text-green-400 text-sm">Enforced</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                            <span class="text-white">Least Privilege Principle</span>
+                        </div>
+                        <span class="text-green-400 text-sm">Active</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                            <span class="text-white">Session Timeout (30 min)</span>
+                        </div>
+                        <span class="text-green-400 text-sm">Configured</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                            <span class="text-white">MFA Enforcement</span>
+                        </div>
+                        <span class="text-yellow-400 text-sm">Partial (6/8 users)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit & Accountability -->
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">
+                    <i class="fas fa-clipboard-list text-cyan-400 mr-2"></i>Audit & Accountability (3.3)
+                </h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                            <span class="text-white">Event Logging</span>
+                        </div>
+                        <span class="text-green-400 text-sm">2,847 events</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                            <span class="text-white">Log Retention (90 days)</span>
+                        </div>
+                        <span class="text-green-400 text-sm">Compliant</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                            <span class="text-white">Immutable Audit Trail</span>
+                        </div>
+                        <span class="text-green-400 text-sm">Enabled</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                            <span class="text-white">User Activity Tracking</span>
+                        </div>
+                        <span class="text-green-400 text-sm">Active</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CUI Protection Status -->
+        <div class="glass-card rounded-xl p-6">
+            <h3 class="text-lg font-bold text-white mb-4">
+                <i class="fas fa-lock text-cyan-400 mr-2"></i>CUI Protection Status
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-400">Data at Rest</span>
+                        <i class="fas fa-check-circle text-green-400"></i>
+                    </div>
+                    <div class="text-white font-medium">AES-256 Encryption</div>
+                    <div class="text-gray-500 text-sm mt-1">Supabase managed encryption</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-400">Data in Transit</span>
+                        <i class="fas fa-check-circle text-green-400"></i>
+                    </div>
+                    <div class="text-white font-medium">TLS 1.3</div>
+                    <div class="text-gray-500 text-sm mt-1">All connections encrypted</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-400">CUI Marking</span>
+                        <i class="fas fa-check-circle text-green-400"></i>
+                    </div>
+                    <div class="text-white font-medium">Auto-Classification</div>
+                    <div class="text-gray-500 text-sm mt-1">Pricing data marked automatically</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-900 border border-cyan-500/30 rounded-lg p-4 shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="flex items-center space-x-3">
+            <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMessage" class="text-white">Action completed</span>
+        </div>
+    </div>
+
+    <script>
+        // NIST 800-171 Control Families
+        const controlFamilies = [
+            { id: '3.1', name: 'Access Control', total: 22, passed: 21, icon: 'fa-user-lock' },
+            { id: '3.2', name: 'Awareness & Training', total: 3, passed: 3, icon: 'fa-chalkboard-teacher' },
+            { id: '3.3', name: 'Audit & Accountability', total: 9, passed: 9, icon: 'fa-clipboard-list' },
+            { id: '3.4', name: 'Config Management', total: 9, passed: 8, icon: 'fa-cogs' },
+            { id: '3.5', name: 'Identification & Auth', total: 11, passed: 10, icon: 'fa-id-card' },
+            { id: '3.6', name: 'Incident Response', total: 3, passed: 3, icon: 'fa-ambulance' },
+            { id: '3.7', name: 'Maintenance', total: 6, passed: 6, icon: 'fa-wrench' },
+            { id: '3.8', name: 'Media Protection', total: 9, passed: 9, icon: 'fa-hdd' },
+            { id: '3.9', name: 'Personnel Security', total: 2, passed: 2, icon: 'fa-user-shield' },
+            { id: '3.10', name: 'Physical Protection', total: 6, passed: 6, icon: 'fa-building' },
+            { id: '3.11', name: 'Risk Assessment', total: 3, passed: 3, icon: 'fa-chart-pie' },
+            { id: '3.12', name: 'Security Assessment', total: 4, passed: 4, icon: 'fa-search' },
+            { id: '3.13', name: 'System & Comm Protection', total: 16, passed: 15, icon: 'fa-network-wired' },
+            { id: '3.14', name: 'System & Info Integrity', total: 7, passed: 7, icon: 'fa-shield-virus' }
+        ];
+
+        // Security alerts
+        const alerts = [
+            { severity: 'high', title: 'Failed login attempts detected', description: '3 failed attempts for user@company.com', time: '15 min ago' },
+            { severity: 'medium', title: 'New device login', description: 'User logged in from new IP address', time: '1 hour ago' },
+            { severity: 'medium', title: 'MFA not enabled', description: '2 users without MFA protection', time: '2 hours ago' },
+            { severity: 'low', title: 'Password expiring soon', description: '1 user password expires in 7 days', time: '3 hours ago' },
+            { severity: 'low', title: 'Session extended', description: 'Active session auto-renewed', time: '4 hours ago' },
+            { severity: 'medium', title: 'API rate limit warning', description: 'Approaching 80% of rate limit', time: '5 hours ago' },
+            { severity: 'low', title: 'Backup completed', description: 'Daily backup completed successfully', time: '6 hours ago' }
+        ];
+
+        // Login activity
+        const loginActivity = [
+            { user: 'mary.womack@mmt.com', status: 'success', ip: '192.168.1.xxx', time: '10 min ago', location: 'Fort Mill, SC' },
+            { user: 'john.smith@mmt.com', status: 'success', ip: '10.0.0.xxx', time: '2 hours ago', location: 'Charlotte, NC' },
+            { user: 'unknown@test.com', status: 'failed', ip: '45.33.xxx.xxx', time: '3 hours ago', location: 'Unknown' },
+            { user: 'sarah.jones@mmt.com', status: 'success', ip: '192.168.1.xxx', time: '5 hours ago', location: 'Fort Mill, SC' },
+            { user: 'unknown@test.com', status: 'failed', ip: '45.33.xxx.xxx', time: '5 hours ago', location: 'Unknown' }
+        ];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('userRole').textContent = 'CEO';
+            renderControlFamilies();
+            renderAlerts();
+            renderLoginActivity();
+        });
+
+        function renderControlFamilies() {
+            const container = document.getElementById('controlFamilies');
+            
+            container.innerHTML = controlFamilies.map(family => {
+                const percentage = Math.round((family.passed / family.total) * 100);
+                const isComplete = family.passed === family.total;
+                
+                return `
+                    <div class="bg-gray-800/30 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas ${family.icon} ${isComplete ? 'text-green-400' : 'text-yellow-400'}"></i>
+                                <span class="text-white font-medium text-sm">${family.id}</span>
+                            </div>
+                            <span class="${isComplete ? 'text-green-400' : 'text-yellow-400'} text-sm">${family.passed}/${family.total}</span>
+                        </div>
+                        <div class="text-gray-400 text-xs mb-2">${family.name}</div>
+                        <div class="bg-gray-700 rounded-full h-2">
+                            <div class="${isComplete ? 'bg-green-500' : 'bg-yellow-500'} h-full rounded-full" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderAlerts() {
+            const container = document.getElementById('alertsList');
+            
+            const severityConfig = {
+                'critical': { icon: 'fa-skull-crossbones', color: 'text-red-500', class: 'threat-critical' },
+                'high': { icon: 'fa-exclamation-triangle', color: 'text-orange-400', class: 'threat-high' },
+                'medium': { icon: 'fa-exclamation-circle', color: 'text-yellow-400', class: 'threat-medium' },
+                'low': { icon: 'fa-info-circle', color: 'text-green-400', class: 'threat-low' }
+            };
+            
+            container.innerHTML = alerts.map(alert => {
+                const config = severityConfig[alert.severity];
+                return `
+                    <div class="p-3 bg-gray-800/30 rounded-lg ${config.class}">
+                        <div class="flex items-start space-x-3">
+                            <i class="fas ${config.icon} ${config.color} mt-1"></i>
+                            <div class="flex-1">
+                                <div class="text-white text-sm font-medium">${alert.title}</div>
+                                <div class="text-gray-400 text-xs mt-1">${alert.description}</div>
+                                <div class="text-gray-500 text-xs mt-1">${alert.time}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderLoginActivity() {
+            const container = document.getElementById('loginActivity');
+            
+            container.innerHTML = loginActivity.map(login => `
+                <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas ${login.status === 'success' ? 'fa-check-circle text-green-400' : 'fa-times-circle text-red-400'}"></i>
+                        <div>
+                            <div class="text-white text-sm">${login.user}</div>
+                            <div class="text-gray-500 text-xs">${login.location} • ${login.ip}</div>
+                        </div>
+                    </div>
+                    <span class="text-gray-400 text-xs">${login.time}</span>
+                </div>
+            `).join('');
+        }
+
+        function runSecurityScan() {
+            showToast('Running security scan...', 'info');
+            
+            setTimeout(() => {
+                document.getElementById('lastScan').textContent = 'Just now';
+                showToast('Security scan complete - No critical issues found', 'success');
+            }, 2000);
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+            
+            const iconMap = {
+                'success': 'fa-check-circle text-green-400',
+                'warning': 'fa-exclamation-triangle text-yellow-400',
+                'error': 'fa-times-circle text-red-400',
+                'info': 'fa-info-circle text-blue-400'
+            };
+            
+            icon.className = `fas ${iconMap[type] || iconMap.success}`;
+            msg.textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

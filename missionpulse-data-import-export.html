@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Import/Export | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.15); backdrop-filter: blur(10px); }
+        .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+        .upload-zone { border: 2px dashed rgba(0, 229, 250, 0.3); transition: all 0.3s ease; }
+        .upload-zone:hover, .upload-zone.drag-over { border-color: #00E5FA; background: rgba(0, 229, 250, 0.05); }
+        .step-active { background: rgba(0, 229, 250, 0.2); border-color: #00E5FA; }
+        .step-complete { background: rgba(16, 185, 129, 0.2); border-color: #10B981; }
+        .format-card { transition: all 0.3s ease; cursor: pointer; }
+        .format-card:hover { transform: translateY(-2px); border-color: rgba(0, 229, 250, 0.4); }
+        .format-card.selected { border-color: #00E5FA; background: rgba(0, 229, 250, 0.1); }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Navigation -->
+    <nav class="bg-[#00050F]/90 border-b border-cyan-500/20 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="missionpulse-mission-control.html" class="text-cyan-400 hover:text-cyan-300">
+                    <i class="fas fa-arrow-left mr-2"></i>Mission Control
+                </a>
+                <span class="text-gray-600">|</span>
+                <h1 class="text-xl font-bold text-white">
+                    <i class="fas fa-exchange-alt text-cyan-400 mr-2"></i>Data Import/Export
+                </h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-gray-400 text-sm">RBAC: <span id="userRole" class="text-cyan-400">Loading...</span></span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-4 py-8">
+        <!-- Mode Selector -->
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <button onclick="setMode('import')" id="btn-import" class="glass-card rounded-xl p-6 text-center hover:border-cyan-500/50 transition-all border-cyan-500/50 bg-cyan-500/10">
+                <div class="w-16 h-16 mx-auto bg-cyan-500/20 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-file-import text-cyan-400 text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Import Data</h3>
+                <p class="text-gray-400 text-sm">Upload CSV, Excel, or JSON files</p>
+            </button>
+            <button onclick="setMode('export')" id="btn-export" class="glass-card rounded-xl p-6 text-center hover:border-cyan-500/50 transition-all">
+                <div class="w-16 h-16 mx-auto bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-file-export text-green-400 text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Export Data</h3>
+                <p class="text-gray-400 text-sm">Download your data in various formats</p>
+            </button>
+        </div>
+
+        <!-- Import Section -->
+        <div id="importSection">
+            <!-- Step Indicator -->
+            <div class="flex items-center justify-center mb-8">
+                <div class="flex items-center">
+                    <div id="step1" class="w-10 h-10 rounded-full border-2 border-cyan-500 bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold">1</div>
+                    <div class="w-16 h-1 bg-gray-700"></div>
+                    <div id="step2" class="w-10 h-10 rounded-full border-2 border-gray-600 flex items-center justify-center text-gray-400 font-bold">2</div>
+                    <div class="w-16 h-1 bg-gray-700"></div>
+                    <div id="step3" class="w-10 h-10 rounded-full border-2 border-gray-600 flex items-center justify-center text-gray-400 font-bold">3</div>
+                    <div class="w-16 h-1 bg-gray-700"></div>
+                    <div id="step4" class="w-10 h-10 rounded-full border-2 border-gray-600 flex items-center justify-center text-gray-400 font-bold">4</div>
+                </div>
+            </div>
+
+            <!-- Step 1: Upload File -->
+            <div id="importStep1" class="glass-card rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-bold text-white mb-4">Step 1: Upload File</h3>
+                
+                <div id="uploadZone" class="upload-zone rounded-xl p-12 text-center cursor-pointer"
+                    onclick="document.getElementById('fileInput').click()"
+                    ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                    <input type="file" id="fileInput" class="hidden" accept=".csv,.xlsx,.xls,.json" onchange="handleFileSelect(event)">
+                    <div class="w-20 h-20 mx-auto bg-gray-800/50 rounded-full flex items-center justify-center mb-4">
+                        <i class="fas fa-cloud-upload-alt text-cyan-400 text-3xl"></i>
+                    </div>
+                    <p class="text-white font-medium mb-2">Drag & drop your file here</p>
+                    <p class="text-gray-400 text-sm mb-4">or click to browse</p>
+                    <p class="text-gray-500 text-xs">Supported formats: CSV, Excel (.xlsx, .xls), JSON</p>
+                </div>
+
+                <div id="fileInfo" class="hidden mt-4 p-4 bg-gray-800/30 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <i id="fileIcon" class="fas fa-file-csv text-green-400 text-2xl"></i>
+                            <div>
+                                <div id="fileName" class="text-white font-medium">filename.csv</div>
+                                <div id="fileSize" class="text-gray-400 text-sm">0 KB</div>
+                            </div>
+                        </div>
+                        <button onclick="clearFile()" class="text-red-400 hover:text-red-300">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Select Target -->
+            <div id="importStep2" class="glass-card rounded-xl p-6 mb-6 hidden">
+                <h3 class="text-lg font-bold text-white mb-4">Step 2: Select Import Target</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="format-card glass-card rounded-lg p-4" onclick="selectTarget('opportunities')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-bullseye text-blue-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium">Opportunities</div>
+                                <div class="text-gray-400 text-xs">Pipeline & capture data</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="format-card glass-card rounded-lg p-4" onclick="selectTarget('proposals')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-file-alt text-purple-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium">Proposals</div>
+                                <div class="text-gray-400 text-xs">Proposal documents</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="format-card glass-card rounded-lg p-4" onclick="selectTarget('partners')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-handshake text-green-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium">Partners</div>
+                                <div class="text-gray-400 text-xs">Teaming partners</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="format-card glass-card rounded-lg p-4" onclick="selectTarget('contacts')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-address-book text-yellow-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium">Contacts</div>
+                                <div class="text-gray-400 text-xs">Customer contacts</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="format-card glass-card rounded-lg p-4" onclick="selectTarget('knowledge')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-book text-cyan-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium">Knowledge Base</div>
+                                <div class="text-gray-400 text-xs">Company knowledge</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Map Fields -->
+            <div id="importStep3" class="glass-card rounded-xl p-6 mb-6 hidden">
+                <h3 class="text-lg font-bold text-white mb-4">Step 3: Map Fields</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full" id="fieldMappingTable">
+                        <thead>
+                            <tr class="text-left text-gray-400 text-sm border-b border-gray-700">
+                                <th class="pb-3">Source Column</th>
+                                <th class="pb-3">Sample Data</th>
+                                <th class="pb-3">Map To</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fieldMappingBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Step 4: Review & Import -->
+            <div id="importStep4" class="glass-card rounded-xl p-6 mb-6 hidden">
+                <h3 class="text-lg font-bold text-white mb-4">Step 4: Review & Import</h3>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-800/30 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-cyan-400" id="totalRows">0</div>
+                        <div class="text-gray-400 text-sm">Total Rows</div>
+                    </div>
+                    <div class="bg-gray-800/30 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-green-400" id="validRows">0</div>
+                        <div class="text-gray-400 text-sm">Valid Rows</div>
+                    </div>
+                    <div class="bg-gray-800/30 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-red-400" id="errorRows">0</div>
+                        <div class="text-gray-400 text-sm">Errors</div>
+                    </div>
+                </div>
+                <div class="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg mb-4">
+                    <div class="flex items-start space-x-2">
+                        <i class="fas fa-exclamation-triangle text-yellow-400 mt-1"></i>
+                        <div class="text-sm text-gray-300">
+                            <span class="text-yellow-400 font-semibold">Warning:</span> This will add new records to your database. Existing records with matching IDs will be updated.
+                        </div>
+                    </div>
+                </div>
+                <button onclick="executeImport()" class="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg text-white font-semibold transition-all">
+                    <i class="fas fa-check mr-2"></i>Import Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        <div id="exportSection" class="hidden">
+            <div class="glass-card rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-bold text-white mb-4">Select Data to Export</h3>
+                <div class="space-y-3" id="exportOptions">
+                    <label class="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg cursor-pointer hover:bg-gray-700/30">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" class="w-5 h-5 rounded bg-gray-700 border-gray-600" checked data-table="opportunities">
+                            <i class="fas fa-bullseye text-blue-400"></i>
+                            <span class="text-white">Opportunities</span>
+                        </div>
+                        <span class="text-gray-400 text-sm">12 records</span>
+                    </label>
+                    <label class="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg cursor-pointer hover:bg-gray-700/30">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" class="w-5 h-5 rounded bg-gray-700 border-gray-600" data-table="proposals">
+                            <i class="fas fa-file-alt text-purple-400"></i>
+                            <span class="text-white">Proposals</span>
+                        </div>
+                        <span class="text-gray-400 text-sm">47 records</span>
+                    </label>
+                    <label class="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg cursor-pointer hover:bg-gray-700/30">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" class="w-5 h-5 rounded bg-gray-700 border-gray-600" data-table="partners">
+                            <i class="fas fa-handshake text-green-400"></i>
+                            <span class="text-white">Partners</span>
+                        </div>
+                        <span class="text-gray-400 text-sm">23 records</span>
+                    </label>
+                    <label class="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg cursor-pointer hover:bg-gray-700/30">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" class="w-5 h-5 rounded bg-gray-700 border-gray-600" data-table="audit_logs">
+                            <i class="fas fa-clipboard-list text-yellow-400"></i>
+                            <span class="text-white">Audit Logs</span>
+                        </div>
+                        <span class="text-gray-400 text-sm">2,847 records</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-bold text-white mb-4">Export Format</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="format-card glass-card rounded-lg p-4 selected" onclick="selectFormat('csv')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-file-csv text-green-400 text-xl"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium">CSV</div>
+                                <div class="text-gray-400 text-xs">Comma-separated values</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="format-card glass-card rounded-lg p-4" onclick="selectFormat('excel')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-file-excel text-blue-400 text-xl"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium">Excel</div>
+                                <div class="text-gray-400 text-xs">Microsoft Excel (.xlsx)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="format-card glass-card rounded-lg p-4" onclick="selectFormat('json')">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-file-code text-yellow-400 text-xl"></i>
+                            </div>
+                            <div>
+                                <div class="text-white font-medium">JSON</div>
+                                <div class="text-gray-400 text-xs">JavaScript Object Notation</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="executeExport()" class="w-full py-4 bg-green-600 hover:bg-green-500 rounded-xl text-white font-semibold transition-all text-lg">
+                <i class="fas fa-download mr-2"></i>Export Selected Data
+            </button>
+        </div>
+
+        <!-- Import Progress Modal -->
+        <div id="progressModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+            <div class="glass-card rounded-xl p-8 max-w-md w-full mx-4 text-center">
+                <div class="w-20 h-20 mx-auto mb-4">
+                    <div class="w-full h-full border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
+                </div>
+                <h3 id="progressTitle" class="text-xl font-bold text-white mb-2">Processing...</h3>
+                <p id="progressMessage" class="text-gray-400 mb-4">Please wait while we process your data</p>
+                <div class="bg-gray-800/50 rounded-full h-3 overflow-hidden">
+                    <div id="progressBar" class="bg-cyan-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="progressPercent" class="text-cyan-400 text-sm mt-2">0%</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-900 border border-cyan-500/30 rounded-lg p-4 shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="flex items-center space-x-3">
+            <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMessage" class="text-white">Action completed</span>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'import';
+        let currentStep = 1;
+        let selectedFile = null;
+        let selectedTarget = null;
+        let selectedFormat = 'csv';
+        let parsedData = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('userRole').textContent = 'CEO';
+        });
+
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Update buttons
+            document.getElementById('btn-import').classList.toggle('border-cyan-500/50', mode === 'import');
+            document.getElementById('btn-import').classList.toggle('bg-cyan-500/10', mode === 'import');
+            document.getElementById('btn-export').classList.toggle('border-cyan-500/50', mode === 'export');
+            document.getElementById('btn-export').classList.toggle('bg-cyan-500/10', mode === 'export');
+            
+            // Show/hide sections
+            document.getElementById('importSection').classList.toggle('hidden', mode !== 'import');
+            document.getElementById('exportSection').classList.toggle('hidden', mode !== 'export');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('uploadZone').classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('uploadZone').classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('uploadZone').classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+
+        function processFile(file) {
+            const validTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/json'];
+            const ext = file.name.split('.').pop().toLowerCase();
+            
+            if (!['csv', 'xlsx', 'xls', 'json'].includes(ext)) {
+                showToast('Invalid file type. Please upload CSV, Excel, or JSON.', 'error');
+                return;
+            }
+            
+            selectedFile = file;
+            
+            // Update UI
+            document.getElementById('fileInfo').classList.remove('hidden');
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            
+            // Set icon based on type
+            const iconMap = {
+                'csv': 'fa-file-csv text-green-400',
+                'xlsx': 'fa-file-excel text-blue-400',
+                'xls': 'fa-file-excel text-blue-400',
+                'json': 'fa-file-code text-yellow-400'
+            };
+            document.getElementById('fileIcon').className = `fas ${iconMap[ext]} text-2xl`;
+            
+            // Parse file (simulated)
+            simulateFileParsing(file);
+            
+            showToast('File uploaded successfully', 'success');
+            goToStep(2);
+        }
+
+        function simulateFileParsing(file) {
+            // Simulate parsed data
+            parsedData = [
+                { 'Opportunity Name': 'VA EHR Modernization', 'Agency': 'VA', 'Value': '$45M', 'Status': 'Pursuing' },
+                { 'Opportunity Name': 'DHA Analytics Platform', 'Agency': 'DHA', 'Value': '$28M', 'Status': 'Pipeline' },
+                { 'Opportunity Name': 'CMS Data Integration', 'Agency': 'CMS', 'Value': '$15M', 'Status': 'Submitted' }
+            ];
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            parsedData = [];
+            document.getElementById('fileInfo').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+            goToStep(1);
+        }
+
+        function selectTarget(target) {
+            selectedTarget = target;
+            
+            // Update UI
+            document.querySelectorAll('#importStep2 .format-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+            
+            // Show field mapping
+            renderFieldMapping();
+            goToStep(3);
+        }
+
+        function renderFieldMapping() {
+            const targetFields = {
+                'opportunities': ['title', 'agency', 'value', 'status', 'due_date', 'pwin', 'solicitation_number'],
+                'proposals': ['title', 'opportunity_id', 'status', 'version', 'due_date'],
+                'partners': ['company_name', 'contact_name', 'email', 'phone', 'capability'],
+                'contacts': ['name', 'email', 'phone', 'agency', 'title'],
+                'knowledge': ['title', 'content', 'category', 'tags']
+            };
+            
+            const sourceColumns = Object.keys(parsedData[0] || {});
+            const fields = targetFields[selectedTarget] || [];
+            
+            const tbody = document.getElementById('fieldMappingBody');
+            tbody.innerHTML = sourceColumns.map((col, i) => `
+                <tr class="border-b border-gray-800">
+                    <td class="py-3 text-white">${col}</td>
+                    <td class="py-3 text-gray-400 text-sm">${parsedData[0]?.[col] || 'N/A'}</td>
+                    <td class="py-3">
+                        <select class="bg-gray-800/50 border border-gray-700 rounded px-3 py-2 text-white text-sm w-full">
+                            <option value="">-- Skip --</option>
+                            ${fields.map(f => `<option value="${f}" ${col.toLowerCase().includes(f) ? 'selected' : ''}>${f}</option>`).join('')}
+                        </select>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function goToStep(step) {
+            currentStep = step;
+            
+            // Update step indicators
+            for (let i = 1; i <= 4; i++) {
+                const stepEl = document.getElementById(`step${i}`);
+                stepEl.classList.remove('border-cyan-500', 'bg-cyan-500/20', 'text-cyan-400', 'border-green-500', 'bg-green-500/20', 'text-green-400');
+                stepEl.classList.add('border-gray-600', 'text-gray-400');
+                
+                if (i < step) {
+                    stepEl.classList.remove('border-gray-600', 'text-gray-400');
+                    stepEl.classList.add('border-green-500', 'bg-green-500/20', 'text-green-400');
+                    stepEl.innerHTML = '<i class="fas fa-check"></i>';
+                } else if (i === step) {
+                    stepEl.classList.remove('border-gray-600', 'text-gray-400');
+                    stepEl.classList.add('border-cyan-500', 'bg-cyan-500/20', 'text-cyan-400');
+                    stepEl.textContent = i;
+                } else {
+                    stepEl.textContent = i;
+                }
+            }
+            
+            // Show/hide steps
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById(`importStep${i}`).classList.toggle('hidden', i !== step);
+            }
+            
+            // Update review stats
+            if (step === 4) {
+                document.getElementById('totalRows').textContent = parsedData.length;
+                document.getElementById('validRows').textContent = parsedData.length;
+                document.getElementById('errorRows').textContent = '0';
+            }
+        }
+
+        function executeImport() {
+            const modal = document.getElementById('progressModal');
+            modal.classList.remove('hidden');
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    
+                    setTimeout(() => {
+                        modal.classList.add('hidden');
+                        showToast(`Successfully imported ${parsedData.length} records`, 'success');
+                        
+                        // Reset
+                        clearFile();
+                        selectedTarget = null;
+                        currentStep = 1;
+                    }, 500);
+                }
+                
+                document.getElementById('progressBar').style.width = progress + '%';
+                document.getElementById('progressPercent').textContent = Math.round(progress) + '%';
+            }, 200);
+        }
+
+        function selectFormat(format) {
+            selectedFormat = format;
+            document.querySelectorAll('#exportSection .format-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+        }
+
+        function executeExport() {
+            const selectedTables = [];
+            document.querySelectorAll('#exportOptions input:checked').forEach(cb => {
+                selectedTables.push(cb.dataset.table);
+            });
+            
+            if (selectedTables.length === 0) {
+                showToast('Please select at least one data type to export', 'warning');
+                return;
+            }
+            
+            const modal = document.getElementById('progressModal');
+            document.getElementById('progressTitle').textContent = 'Exporting...';
+            document.getElementById('progressMessage').textContent = 'Preparing your download';
+            modal.classList.remove('hidden');
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 20;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    
+                    setTimeout(() => {
+                        modal.classList.add('hidden');
+                        
+                        // Create download
+                        const exportData = {
+                            exportDate: new Date().toISOString(),
+                            format: selectedFormat,
+                            tables: selectedTables,
+                            data: {
+                                opportunities: [{ id: 1, title: 'Sample Opportunity' }],
+                                // More mock data...
+                            }
+                        };
+                        
+                        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `missionpulse-export-${new Date().toISOString().split('T')[0]}.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        
+                        showToast(`Exported ${selectedTables.length} table(s) successfully`, 'success');
+                    }, 500);
+                }
+                
+                document.getElementById('progressBar').style.width = progress + '%';
+                document.getElementById('progressPercent').textContent = Math.round(progress) + '%';
+            }, 150);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+            
+            const iconMap = {
+                'success': 'fa-check-circle text-green-400',
+                'warning': 'fa-exclamation-triangle text-yellow-400',
+                'error': 'fa-times-circle text-red-400',
+                'info': 'fa-info-circle text-blue-400'
+            };
+            
+            icon.className = `fas ${iconMap[type] || iconMap.success}`;
+            msg.textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
