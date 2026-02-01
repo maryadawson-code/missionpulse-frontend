@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lead Management | MissionPulse Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .glass-card { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .status-pending { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+    .status-contacted { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+    .status-demo_scheduled { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+    .status-converted { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .status-declined { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .status-unresponsive { background: rgba(107, 114, 128, 0.2); color: #6b7280; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #0f172a; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body class="text-white">
+  <div class="min-h-screen p-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-2xl font-bold text-cyan-400">Lead Management</h1>
+        <p class="text-gray-400 text-sm">Manage access requests and convert leads</p>
+      </div>
+      <a href="index.html" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">
+        ← Back to Dashboard
+      </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8" id="statsContainer">
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-yellow-400" id="statPending">-</div>
+        <div class="text-xs text-gray-400 mt-1">Pending</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-blue-400" id="statContacted">-</div>
+        <div class="text-xs text-gray-400 mt-1">Contacted</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-purple-400" id="statDemo">-</div>
+        <div class="text-xs text-gray-400 mt-1">Demo Scheduled</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-green-400" id="statConverted">-</div>
+        <div class="text-xs text-gray-400 mt-1">Converted</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-red-400" id="statDeclined">-</div>
+        <div class="text-xs text-gray-400 mt-1">Declined</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-cyan-400" id="statTotal">-</div>
+        <div class="text-xs text-gray-400 mt-1">Total Leads</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-4 mb-6">
+      <select id="filterStatus" class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-cyan-500 focus:outline-none">
+        <option value="">All Statuses</option>
+        <option value="pending">Pending</option>
+        <option value="contacted">Contacted</option>
+        <option value="demo_scheduled">Demo Scheduled</option>
+        <option value="converted">Converted</option>
+        <option value="declined">Declined</option>
+        <option value="unresponsive">Unresponsive</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="Search by name, email, company..."
+        class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-cyan-500 focus:outline-none flex-1 min-w-[200px]">
+      <button onclick="exportCSV()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium transition-colors">
+        Export CSV
+      </button>
+    </div>
+
+    <!-- Leads Table -->
+    <div class="glass-card rounded-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-800/50">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Name</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Company</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Email</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Interest</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Status</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Submitted</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="leadsTable" class="divide-y divide-gray-800">
+            <tr>
+              <td colspan="7" class="text-center py-8 text-gray-500">Loading leads...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Lead Detail Modal -->
+    <div id="leadModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+      <div class="glass-card rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-gray-800 flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Lead Details</h3>
+          <button onclick="closeModal()" class="text-gray-400 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="p-6" id="modalContent">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase Configuration
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let allLeads = [];
+
+    // Check auth on load
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = 'login.html';
+        return false;
+      }
+      
+      // Check role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      if (!profile || !['CEO', 'COO', 'Admin'].includes(profile.role)) {
+        alert('Access denied. Admin role required.');
+        window.location.href = 'index.html';
+        return false;
+      }
+      
+      return true;
+    }
+
+    // Load leads
+    async function loadLeads() {
+      const { data, error } = await supabase
+        .from('access_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading leads:', error);
+        return;
+      }
+      
+      allLeads = data || [];
+      updateStats();
+      renderLeads();
+    }
+
+    // Update stats
+    function updateStats() {
+      const stats = {
+        pending: 0,
+        contacted: 0,
+        demo_scheduled: 0,
+        converted: 0,
+        declined: 0,
+        unresponsive: 0
+      };
+      
+      allLeads.forEach(lead => {
+        if (stats[lead.status] !== undefined) {
+          stats[lead.status]++;
+        }
+      });
+      
+      document.getElementById('statPending').textContent = stats.pending;
+      document.getElementById('statContacted').textContent = stats.contacted;
+      document.getElementById('statDemo').textContent = stats.demo_scheduled;
+      document.getElementById('statConverted').textContent = stats.converted;
+      document.getElementById('statDeclined').textContent = stats.declined;
+      document.getElementById('statTotal').textContent = allLeads.length;
+    }
+
+    // Render leads table
+    function renderLeads() {
+      const statusFilter = document.getElementById('filterStatus').value;
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      
+      let filtered = allLeads.filter(lead => {
+        const matchesStatus = !statusFilter || lead.status === statusFilter;
+        const matchesSearch = !searchTerm || 
+          lead.full_name?.toLowerCase().includes(searchTerm) ||
+          lead.email?.toLowerCase().includes(searchTerm) ||
+          lead.company?.toLowerCase().includes(searchTerm);
+        return matchesStatus && matchesSearch;
+      });
+      
+      const tbody = document.getElementById('leadsTable');
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No leads found</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = filtered.map(lead => `
+        <tr class="hover:bg-gray-800/30 transition-colors">
+          <td class="px-4 py-3">
+            <div class="font-medium">${escapeHtml(lead.full_name)}</div>
+            <div class="text-xs text-gray-500">${escapeHtml(lead.job_title || '')}</div>
+          </td>
+          <td class="px-4 py-3">
+            <div>${escapeHtml(lead.company)}</div>
+            <div class="text-xs text-gray-500">${escapeHtml(lead.company_size || '')}</div>
+          </td>
+          <td class="px-4 py-3">
+            <a href="mailto:${escapeHtml(lead.email)}" class="text-cyan-400 hover:underline">${escapeHtml(lead.email)}</a>
+          </td>
+          <td class="px-4 py-3 text-gray-400">${formatInterest(lead.primary_interest)}</td>
+          <td class="px-4 py-3">
+            <select onchange="updateStatus('${lead.id}', this.value)" 
+              class="status-${lead.status} px-2 py-1 rounded text-xs font-medium border-0 cursor-pointer">
+              <option value="pending" ${lead.status === 'pending' ? 'selected' : ''}>Pending</option>
+              <option value="contacted" ${lead.status === 'contacted' ? 'selected' : ''}>Contacted</option>
+              <option value="demo_scheduled" ${lead.status === 'demo_scheduled' ? 'selected' : ''}>Demo Scheduled</option>
+              <option value="converted" ${lead.status === 'converted' ? 'selected' : ''}>Converted</option>
+              <option value="declined" ${lead.status === 'declined' ? 'selected' : ''}>Declined</option>
+              <option value="unresponsive" ${lead.status === 'unresponsive' ? 'selected' : ''}>Unresponsive</option>
+            </select>
+          </td>
+          <td class="px-4 py-3 text-gray-400 text-xs">${formatDate(lead.created_at)}</td>
+          <td class="px-4 py-3">
+            <button onclick="openModal('${lead.id}')" class="text-cyan-400 hover:text-cyan-300 text-sm">
+              View
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Update lead status
+    async function updateStatus(id, newStatus) {
+      const updates = { status: newStatus };
+      
+      if (newStatus === 'contacted') {
+        updates.contacted_at = new Date().toISOString();
+      } else if (newStatus === 'converted') {
+        updates.converted_at = new Date().toISOString();
+      }
+      
+      const { error } = await supabase
+        .from('access_requests')
+        .update(updates)
+        .eq('id', id);
+      
+      if (error) {
+        alert('Error updating status: ' + error.message);
+        return;
+      }
+      
+      // Reload
+      loadLeads();
+    }
+
+    // Open modal
+    function openModal(id) {
+      const lead = allLeads.find(l => l.id === id);
+      if (!lead) return;
+      
+      document.getElementById('modalContent').innerHTML = `
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-gray-500">Full Name</label>
+              <div class="font-medium">${escapeHtml(lead.full_name)}</div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Job Title</label>
+              <div>${escapeHtml(lead.job_title || 'N/A')}</div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Company</label>
+              <div>${escapeHtml(lead.company)}</div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Company Size</label>
+              <div>${escapeHtml(lead.company_size || 'N/A')}</div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Email</label>
+              <div><a href="mailto:${escapeHtml(lead.email)}" class="text-cyan-400 hover:underline">${escapeHtml(lead.email)}</a></div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Primary Interest</label>
+              <div>${formatInterest(lead.primary_interest)}</div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Referral Source</label>
+              <div>${escapeHtml(lead.referral_source || 'N/A')}</div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Submitted</label>
+              <div>${formatDate(lead.created_at)}</div>
+            </div>
+          </div>
+          
+          ${lead.message ? `
+            <div>
+              <label class="text-xs text-gray-500">Message</label>
+              <div class="mt-1 p-3 bg-gray-800/50 rounded-lg text-sm">${escapeHtml(lead.message)}</div>
+            </div>
+          ` : ''}
+          
+          <div>
+            <label class="text-xs text-gray-500">Internal Notes</label>
+            <textarea id="leadNotes" class="w-full mt-1 p-3 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:border-cyan-500 focus:outline-none" rows="3"
+              placeholder="Add internal notes...">${escapeHtml(lead.notes || '')}</textarea>
+          </div>
+          
+          <div class="flex gap-3 pt-4">
+            <button onclick="saveNotes('${lead.id}')" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium">
+              Save Notes
+            </button>
+            <a href="mailto:${escapeHtml(lead.email)}?subject=MissionPulse Access Request" 
+              class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium">
+              Send Email
+            </a>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('leadModal').classList.remove('hidden');
+    }
+
+    // Close modal
+    function closeModal() {
+      document.getElementById('leadModal').classList.add('hidden');
+    }
+
+    // Save notes
+    async function saveNotes(id) {
+      const notes = document.getElementById('leadNotes').value;
+      
+      const { error } = await supabase
+        .from('access_requests')
+        .update({ notes })
+        .eq('id', id);
+      
+      if (error) {
+        alert('Error saving notes: ' + error.message);
+        return;
+      }
+      
+      // Update local data
+      const lead = allLeads.find(l => l.id === id);
+      if (lead) lead.notes = notes;
+      
+      alert('Notes saved!');
+    }
+
+    // Export CSV
+    function exportCSV() {
+      const headers = ['Name', 'Email', 'Company', 'Job Title', 'Company Size', 'Interest', 'Source', 'Status', 'Submitted', 'Message'];
+      const rows = allLeads.map(lead => [
+        lead.full_name,
+        lead.email,
+        lead.company,
+        lead.job_title,
+        lead.company_size || '',
+        lead.primary_interest || '',
+        lead.referral_source || '',
+        lead.status,
+        lead.created_at,
+        (lead.message || '').replace(/"/g, '""')
+      ]);
+      
+      let csv = headers.join(',') + '\n';
+      rows.forEach(row => {
+        csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+      });
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `missionpulse-leads-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+    }
+
+    // Helpers
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      return new Date(dateStr).toLocaleDateString('en-US', { 
+        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function formatInterest(interest) {
+      if (!interest) return 'N/A';
+      return interest.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    // Event listeners
+    document.getElementById('filterStatus').addEventListener('change', renderLeads);
+    document.getElementById('searchInput').addEventListener('input', renderLeads);
+    document.getElementById('leadModal').addEventListener('click', (e) => {
+      if (e.target.id === 'leadModal') closeModal();
+    });
+
+    // Initialize
+    checkAuth().then(authed => {
+      if (authed) loadLeads();
+    });
+  </script>
+</body>
+</html>
