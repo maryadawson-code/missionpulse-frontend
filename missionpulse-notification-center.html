@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Center | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001529 50%, #00050F 100%); min-height: 100vh; }
+        .glass-card {
+            background: rgba(0, 229, 250, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 229, 250, 0.15);
+            border-radius: 16px;
+        }
+        .glass-card-dark {
+            background: rgba(0, 5, 15, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 229, 250, 0.1);
+            border-radius: 12px;
+        }
+        .text-cyber { color: #00E5FA; }
+        .btn-cyber {
+            background: linear-gradient(135deg, #00E5FA 0%, #00b8d4 100%);
+            color: #00050F;
+            font-weight: 600;
+        }
+        .notification-item {
+            transition: all 0.3s ease;
+        }
+        .notification-item:hover {
+            background: rgba(0, 229, 250, 0.05);
+        }
+        .notification-unread {
+            border-left: 3px solid #00E5FA;
+        }
+        .badge-critical { background: #ef4444; }
+        .badge-warning { background: #fbbf24; }
+        .badge-info { background: #3b82f6; }
+        .badge-success { background: #22c55e; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .notification-new {
+            animation: slideIn 0.3s ease;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            background: #374151;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        .toggle-switch.active {
+            background: #00E5FA;
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+        .toggle-switch.active::after {
+            transform: translateX(24px);
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Navigation -->
+    <nav class="glass-card-dark border-b border-cyan-500/20 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <a href="index.html" class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center">
+                            <span class="text-xl">🔔</span>
+                        </div>
+                        <div>
+                            <span class="text-xl font-bold text-cyber">MissionPulse</span>
+                            <span class="text-xs text-gray-400 block">Notification Center</span>
+                        </div>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="markAllRead()" class="text-cyan-400 text-sm hover:underline">Mark all as read</button>
+                    <span id="userRole" class="px-3 py-1 rounded-full text-xs font-medium bg-cyan-500/20 text-cyber"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-6xl mx-auto px-6 py-8">
+        <!-- Header Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="glass-card p-4 text-center">
+                <p id="unreadCount" class="text-3xl font-bold text-cyber">0</p>
+                <p class="text-gray-400 text-sm">Unread</p>
+            </div>
+            <div class="glass-card p-4 text-center">
+                <p id="criticalCount" class="text-3xl font-bold text-red-400">0</p>
+                <p class="text-gray-400 text-sm">Critical</p>
+            </div>
+            <div class="glass-card p-4 text-center">
+                <p id="deadlineCount" class="text-3xl font-bold text-yellow-400">0</p>
+                <p class="text-gray-400 text-sm">Deadlines</p>
+            </div>
+            <div class="glass-card p-4 text-center">
+                <p id="todayCount" class="text-3xl font-bold text-green-400">0</p>
+                <p class="text-gray-400 text-sm">Today</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Sidebar - Filters & Settings -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- Filter -->
+                <div class="glass-card p-4">
+                    <h3 class="font-semibold text-white mb-4">Filter</h3>
+                    <div class="space-y-2">
+                        <button onclick="filterNotifications('all')" class="w-full text-left px-3 py-2 rounded-lg bg-cyan-500/20 text-cyber text-sm" id="filter-all">
+                            📥 All Notifications
+                        </button>
+                        <button onclick="filterNotifications('unread')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-700/50 text-gray-300 text-sm" id="filter-unread">
+                            ⭕ Unread Only
+                        </button>
+                        <button onclick="filterNotifications('deadline')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-700/50 text-gray-300 text-sm" id="filter-deadline">
+                            ⏰ Deadlines
+                        </button>
+                        <button onclick="filterNotifications('mention')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-700/50 text-gray-300 text-sm" id="filter-mention">
+                            @️ Mentions
+                        </button>
+                        <button onclick="filterNotifications('system')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-700/50 text-gray-300 text-sm" id="filter-system">
+                            ⚙️ System
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Notification Settings -->
+                <div class="glass-card p-4">
+                    <h3 class="font-semibold text-white mb-4">Settings</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300 text-sm">Email Alerts</span>
+                            <div class="toggle-switch active" onclick="toggleSetting(this)" data-setting="email"></div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300 text-sm">Push Notifications</span>
+                            <div class="toggle-switch active" onclick="toggleSetting(this)" data-setting="push"></div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300 text-sm">Deadline Reminders</span>
+                            <div class="toggle-switch active" onclick="toggleSetting(this)" data-setting="deadlines"></div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300 text-sm">Team Updates</span>
+                            <div class="toggle-switch" onclick="toggleSetting(this)" data-setting="team"></div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300 text-sm">AI Insights</span>
+                            <div class="toggle-switch active" onclick="toggleSetting(this)" data-setting="ai"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="glass-card p-4">
+                    <h3 class="font-semibold text-white mb-4">Quick Actions</h3>
+                    <div class="space-y-2">
+                        <button onclick="clearOldNotifications()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-700/50 text-gray-300 text-sm">
+                            🗑️ Clear older than 7 days
+                        </button>
+                        <button onclick="exportNotifications()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-700/50 text-gray-300 text-sm">
+                            📥 Export to JSON
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Notifications List -->
+            <div class="lg:col-span-3">
+                <div class="glass-card overflow-hidden">
+                    <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+                        <h2 class="font-semibold text-white">Notifications</h2>
+                        <span id="notificationCount" class="text-gray-400 text-sm">0 notifications</span>
+                    </div>
+                    <div id="notificationsList" class="divide-y divide-gray-700/50">
+                        <!-- Dynamic notifications -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 p-4 glass-card-dark text-center">
+            <p class="text-xs text-gray-500">
+                🤖 AI GENERATED CONTENT - REQUIRES HUMAN REVIEW | MissionPulse v2.0 | 
+                <span class="text-cyber">Mission Meets Tech</span>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Configuration
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MDY0NTIsImV4cCI6MjA1Mjk4MjQ1Mn0.kPykOLcNowFpHLMOCkLfPC17qb2g9jvVbyUjdUSvfyg';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Demo Notifications
+        const DEMO_NOTIFICATIONS = [
+            {
+                id: 1,
+                type: 'critical',
+                category: 'deadline',
+                title: '🚨 DHA EHR Modernization - 3 Days Left',
+                message: 'Final proposal submission deadline is February 4, 2026. All sections must be complete.',
+                link: 'missionpulse-m2-warroom-enhanced.html',
+                timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+                read: false
+            },
+            {
+                id: 2,
+                type: 'warning',
+                category: 'deadline',
+                title: '⏰ VA Claims Processing - Review Due Tomorrow',
+                message: 'Technical volume review scheduled for tomorrow 2:00 PM EST.',
+                link: 'missionpulse-m9-hitl-enhanced.html',
+                timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                read: false
+            },
+            {
+                id: 3,
+                type: 'info',
+                category: 'mention',
+                title: '@Mary mentioned you in Black Hat Analysis',
+                message: 'Can you review the competitor pricing section before EOD?',
+                link: 'missionpulse-m7-blackhat-enhanced.html',
+                timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+                read: false
+            },
+            {
+                id: 4,
+                type: 'success',
+                category: 'system',
+                title: '✅ CMS Data Analytics - Submitted Successfully',
+                message: 'Proposal was submitted to SAM.gov at 11:47 AM EST.',
+                link: null,
+                timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+                read: true
+            },
+            {
+                id: 5,
+                type: 'info',
+                category: 'system',
+                title: '🤖 AI Insight: Win Probability Updated',
+                message: 'IHS Telehealth pWin increased from 52% to 58% based on new competitive intelligence.',
+                link: 'missionpulse-m13-launch-roi.html',
+                timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+                read: true
+            },
+            {
+                id: 6,
+                type: 'warning',
+                category: 'deadline',
+                title: '📋 Weekly Status Report Due',
+                message: 'Pipeline status report for CEO briefing is due Friday 5:00 PM.',
+                link: 'missionpulse-analytics-dashboard.html',
+                timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+                read: false
+            },
+            {
+                id: 7,
+                type: 'info',
+                category: 'mention',
+                title: '@Sarah assigned you to Pricing Review',
+                message: 'You have been added as a reviewer for DoD Cybersecurity pricing volume.',
+                link: 'missionpulse-m8-pricing.html',
+                timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+                read: true
+            },
+            {
+                id: 8,
+                type: 'success',
+                category: 'system',
+                title: '🏆 Contract Award: FEMA Disaster Response',
+                message: 'Congratulations! We won the FEMA Disaster Response contract ($32M).',
+                link: 'missionpulse-m14-post-award.html',
+                timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+                read: true
+            },
+            {
+                id: 9,
+                type: 'info',
+                category: 'system',
+                title: '📊 New Opportunity Added',
+                message: 'NASA Mission Control Systems ($95M CPFF) has been added to the pipeline.',
+                link: 'missionpulse-m2-warroom-enhanced.html',
+                timestamp: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
+                read: true
+            },
+            {
+                id: 10,
+                type: 'warning',
+                category: 'system',
+                title: '⚠️ Partner Access Expiring',
+                message: 'TechPartner Solutions access expires in 5 days. Review and extend if needed.',
+                link: 'missionpulse-partner-management.html',
+                timestamp: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
+                read: true
+            }
+        ];
+
+        let notifications = [...DEMO_NOTIFICATIONS];
+        let currentFilter = 'all';
+        let settings = {
+            email: true,
+            push: true,
+            deadlines: true,
+            team: false,
+            ai: true
+        };
+
+        // Initialize
+        async function init() {
+            await checkAuth();
+            loadSettings();
+            renderNotifications();
+            updateStats();
+        }
+
+        async function checkAuth() {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', session.user.id)
+                        .single();
+                    document.getElementById('userRole').textContent = profile?.role || 'Viewer';
+                } else {
+                    document.getElementById('userRole').textContent = 'Demo Mode';
+                }
+            } catch (e) {
+                document.getElementById('userRole').textContent = 'Demo Mode';
+            }
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('missionpulse_notification_settings');
+            if (saved) {
+                settings = JSON.parse(saved);
+                // Update toggle states
+                document.querySelectorAll('.toggle-switch').forEach(toggle => {
+                    const setting = toggle.dataset.setting;
+                    if (settings[setting]) {
+                        toggle.classList.add('active');
+                    } else {
+                        toggle.classList.remove('active');
+                    }
+                });
+            }
+        }
+
+        function saveSettings() {
+            localStorage.setItem('missionpulse_notification_settings', JSON.stringify(settings));
+        }
+
+        function toggleSetting(element) {
+            element.classList.toggle('active');
+            const setting = element.dataset.setting;
+            settings[setting] = element.classList.contains('active');
+            saveSettings();
+        }
+
+        function renderNotifications() {
+            const container = document.getElementById('notificationsList');
+            let filtered = [...notifications];
+
+            // Apply filter
+            if (currentFilter !== 'all') {
+                if (currentFilter === 'unread') {
+                    filtered = filtered.filter(n => !n.read);
+                } else {
+                    filtered = filtered.filter(n => n.category === currentFilter);
+                }
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="p-8 text-center">
+                        <span class="text-4xl">📭</span>
+                        <p class="text-gray-400 mt-2">No notifications</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('notificationCount').textContent = `${filtered.length} notifications`;
+
+            container.innerHTML = filtered.map(n => {
+                const badgeClass = {
+                    critical: 'badge-critical',
+                    warning: 'badge-warning',
+                    info: 'badge-info',
+                    success: 'badge-success'
+                }[n.type];
+
+                const timeAgo = getTimeAgo(new Date(n.timestamp));
+
+                return `
+                    <div class="notification-item p-4 ${!n.read ? 'notification-unread bg-cyan-500/5' : ''}" data-id="${n.id}">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-3 flex-1">
+                                <span class="inline-block w-2 h-2 rounded-full mt-2 ${badgeClass}"></span>
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2">
+                                        <p class="text-white font-medium">${n.title}</p>
+                                        ${!n.read ? '<span class="w-2 h-2 rounded-full bg-cyan-400"></span>' : ''}
+                                    </div>
+                                    <p class="text-gray-400 text-sm mt-1">${n.message}</p>
+                                    <div class="flex items-center space-x-4 mt-2">
+                                        <span class="text-gray-500 text-xs">${timeAgo}</span>
+                                        ${n.link ? `<a href="${n.link}" class="text-cyber text-xs hover:underline">View →</a>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2 ml-4">
+                                ${!n.read ? `<button onclick="markAsRead(${n.id})" class="text-gray-400 hover:text-white text-xs">Mark read</button>` : ''}
+                                <button onclick="deleteNotification(${n.id})" class="text-gray-400 hover:text-red-400 text-xs">×</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateStats() {
+            const unread = notifications.filter(n => !n.read).length;
+            const critical = notifications.filter(n => n.type === 'critical' && !n.read).length;
+            const deadlines = notifications.filter(n => n.category === 'deadline' && !n.read).length;
+            const today = notifications.filter(n => {
+                const date = new Date(n.timestamp);
+                const now = new Date();
+                return date.toDateString() === now.toDateString();
+            }).length;
+
+            document.getElementById('unreadCount').textContent = unread;
+            document.getElementById('criticalCount').textContent = critical;
+            document.getElementById('deadlineCount').textContent = deadlines;
+            document.getElementById('todayCount').textContent = today;
+        }
+
+        function filterNotifications(filter) {
+            currentFilter = filter;
+            
+            // Update filter button styles
+            document.querySelectorAll('[id^="filter-"]').forEach(btn => {
+                btn.classList.remove('bg-cyan-500/20', 'text-cyber');
+                btn.classList.add('hover:bg-gray-700/50', 'text-gray-300');
+            });
+            const activeBtn = document.getElementById(`filter-${filter}`);
+            activeBtn.classList.add('bg-cyan-500/20', 'text-cyber');
+            activeBtn.classList.remove('hover:bg-gray-700/50', 'text-gray-300');
+
+            renderNotifications();
+        }
+
+        function markAsRead(id) {
+            const notification = notifications.find(n => n.id === id);
+            if (notification) {
+                notification.read = true;
+                renderNotifications();
+                updateStats();
+            }
+        }
+
+        function markAllRead() {
+            notifications.forEach(n => n.read = true);
+            renderNotifications();
+            updateStats();
+        }
+
+        function deleteNotification(id) {
+            notifications = notifications.filter(n => n.id !== id);
+            renderNotifications();
+            updateStats();
+        }
+
+        function clearOldNotifications() {
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            notifications = notifications.filter(n => new Date(n.timestamp) > sevenDaysAgo);
+            renderNotifications();
+            updateStats();
+        }
+
+        function exportNotifications() {
+            const data = {
+                exportDate: new Date().toISOString(),
+                notifications: notifications
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `missionpulse-notifications-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + ' years ago';
+            
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + ' months ago';
+            
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + ' days ago';
+            
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + ' hours ago';
+            
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + ' minutes ago';
+            
+            return 'Just now';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
