@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse | Solo Proposal Manager</title>
+    
+    <!-- Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mmt-cyan': '#00E5FA',
+                        'mmt-navy': '#00050F',
+                        'mmt-slate': '#0F172A',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #00050F 0%, #0F172A 50%, #1E293B 100%);
+            min-height: 100vh;
+        }
+        
+        .glass {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 229, 250, 0.1);
+        }
+        
+        .phase-card {
+            transition: all 0.3s ease;
+        }
+        
+        .phase-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 229, 250, 0.1);
+        }
+        
+        .phase-active {
+            border-color: #00E5FA;
+            box-shadow: 0 0 20px rgba(0, 229, 250, 0.2);
+        }
+        
+        .phase-complete {
+            border-color: #10B981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+        
+        .task-card {
+            transition: all 0.2s ease;
+        }
+        
+        .task-card:hover {
+            background: rgba(0, 229, 250, 0.05);
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, #00E5FA 0%, #10B981 100%);
+        }
+        
+        .cui-banner {
+            background: linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        
+        .ai-thinking {
+            animation: thinking 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes thinking {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="text-slate-100">
+    <div id="app">
+        <!-- Loading State -->
+        <div id="loading" class="fixed inset-0 flex items-center justify-center bg-mmt-navy z-50">
+            <div class="text-center">
+                <div class="w-16 h-16 border-4 border-mmt-cyan border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-mmt-cyan">Loading Solo Mode...</p>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div id="main-content" class="hidden">
+            <!-- Header -->
+            <header class="glass border-b border-slate-700/50 px-6 py-4 sticky top-0 z-40">
+                <div class="max-w-7xl mx-auto flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <a href="index.html" class="flex items-center gap-2 text-mmt-cyan hover:text-white transition">
+                            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                            <span>Back to Dashboard</span>
+                        </a>
+                        <div class="w-px h-6 bg-slate-600"></div>
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="user-circle" class="w-6 h-6 text-mmt-cyan"></i>
+                            <h1 class="text-xl font-bold">Solo Proposal Manager</h1>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-4">
+                        <div id="connection-status" class="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-sm">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span>Connected</span>
+                        </div>
+                        
+                        <button id="help-btn" class="p-2 rounded-lg hover:bg-slate-700/50 transition" title="Help">
+                            <i data-lucide="help-circle" class="w-5 h-5 text-slate-400"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Opportunity Selector -->
+            <div id="opportunity-selector" class="glass m-6 p-6 rounded-xl">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-2">Select Opportunity</h2>
+                        <p class="text-slate-400">Choose an opportunity to work through the proposal process</p>
+                    </div>
+                    <button id="new-opp-btn" class="flex items-center gap-2 px-4 py-2 bg-mmt-cyan text-mmt-navy font-semibold rounded-lg hover:bg-cyan-400 transition">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        <span>New Opportunity</span>
+                    </button>
+                </div>
+                
+                <div id="opportunities-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- Solo Mode Wizard (shown after selecting opportunity) -->
+            <div id="solo-wizard" class="hidden">
+                <!-- Opportunity Header -->
+                <div class="glass m-6 p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <button id="change-opp-btn" class="flex items-center gap-2 text-slate-400 hover:text-white transition mb-2">
+                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                                <span class="text-sm">Change Opportunity</span>
+                            </button>
+                            <h2 id="opp-name" class="text-2xl font-bold text-white">DHA EHR Modernization</h2>
+                            <p id="opp-details" class="text-slate-400">RFP-2026-0042 | $45.2M | Due: March 15, 2026</p>
+                        </div>
+                        
+                        <div class="text-right">
+                            <div class="text-sm text-slate-400 mb-1">Overall Progress</div>
+                            <div class="flex items-center gap-3">
+                                <div class="w-48 h-3 bg-slate-700 rounded-full overflow-hidden">
+                                    <div id="overall-progress-bar" class="progress-bar h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <span id="overall-progress-text" class="text-mmt-cyan font-bold">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Phase Progress Timeline -->
+                <div class="mx-6 mb-6">
+                    <div class="flex justify-between items-center">
+                        <template id="phase-timeline-template">
+                            <div class="phase-timeline-item flex flex-col items-center flex-1">
+                                <div class="phase-icon w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-2xl mb-2 transition-all">
+                                    <!-- Icon -->
+                                </div>
+                                <div class="text-xs text-center text-slate-400 phase-label">Phase Name</div>
+                                <div class="h-1 w-full bg-slate-700 mt-2 phase-line"></div>
+                            </div>
+                        </template>
+                        <div id="phase-timeline" class="flex w-full">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Current Phase Content -->
+                <div class="mx-6 mb-6">
+                    <div id="current-phase-card" class="glass rounded-xl p-6 phase-active">
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center gap-4">
+                                <div id="phase-icon" class="w-16 h-16 rounded-xl bg-mmt-cyan/10 flex items-center justify-center text-3xl">
+                                    🔍
+                                </div>
+                                <div>
+                                    <div class="text-sm text-mmt-cyan font-medium" id="phase-shipley">Phase 0</div>
+                                    <h3 id="phase-title" class="text-2xl font-bold text-white">Discovery</h3>
+                                    <p id="phase-description" class="text-slate-400">Identify and qualify the opportunity</p>
+                                </div>
+                            </div>
+                            
+                            <div class="text-right">
+                                <div class="text-sm text-slate-400 mb-1">Estimated Duration</div>
+                                <div id="phase-duration" class="text-lg font-semibold text-white">1-2 days</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tasks List -->
+                        <div class="space-y-3 mb-6">
+                            <h4 class="text-sm font-semibold text-slate-400 uppercase tracking-wide">Tasks</h4>
+                            <div id="tasks-container">
+                                <!-- Tasks populated dynamically -->
+                            </div>
+                        </div>
+                        
+                        <!-- Gate Approval Section -->
+                        <div id="gate-section" class="border-t border-slate-700/50 pt-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                                        <i data-lucide="shield-check" class="w-5 h-5 text-amber-400"></i>
+                                    </div>
+                                    <div>
+                                        <h4 id="gate-title" class="font-semibold text-white">Go/No-Go Decision</h4>
+                                        <p class="text-sm text-slate-400">Required approval to proceed to next phase</p>
+                                    </div>
+                                </div>
+                                
+                                <div id="ai-recommendation-badge" class="hidden px-3 py-1 rounded-full text-sm font-medium">
+                                    <!-- AI recommendation shown here -->
+                                </div>
+                            </div>
+                            
+                            <!-- AI Recommendation Panel -->
+                            <div id="ai-recommendation-panel" class="glass p-4 rounded-lg mb-4 hidden">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <i data-lucide="sparkles" class="w-5 h-5 text-mmt-cyan"></i>
+                                    <span class="font-semibold text-white">AI Recommendation</span>
+                                    <span class="text-xs text-slate-400">(powered by MissionPulse agents)</span>
+                                </div>
+                                <div id="ai-recommendation-content" class="text-slate-300">
+                                    <!-- AI recommendation content -->
+                                </div>
+                                <div class="mt-3 pt-3 border-t border-slate-700/50 text-xs text-amber-400">
+                                    ⚠️ AI GENERATED - REQUIRES HUMAN REVIEW
+                                </div>
+                            </div>
+                            
+                            <!-- Decision Notes -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-400 mb-2">Decision Notes (optional)</label>
+                                <textarea id="gate-notes" class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:border-mmt-cyan focus:outline-none resize-none" rows="3" placeholder="Document your reasoning for this decision..."></textarea>
+                            </div>
+                            
+                            <!-- Gate Actions -->
+                            <div class="flex items-center justify-between">
+                                <button id="get-ai-recommendation" class="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition">
+                                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                    <span>Get AI Recommendation</span>
+                                </button>
+                                
+                                <div class="flex items-center gap-3">
+                                    <button id="gate-reject" class="flex items-center gap-2 px-6 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition">
+                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                        <span>No-Go</span>
+                                    </button>
+                                    <button id="gate-approve" class="flex items-center gap-2 px-6 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-400 transition font-semibold">
+                                        <i data-lucide="check" class="w-4 h-4"></i>
+                                        <span>Approve & Continue</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Previous Phases (Collapsed) -->
+                <div id="completed-phases" class="mx-6 mb-6 space-y-3">
+                    <!-- Completed phases shown here -->
+                </div>
+            </div>
+            
+            <!-- AI Chat Sidebar -->
+            <div id="ai-sidebar" class="fixed right-0 top-0 h-full w-96 glass border-l border-slate-700/50 transform translate-x-full transition-transform z-50">
+                <div class="flex flex-col h-full">
+                    <div class="flex items-center justify-between p-4 border-b border-slate-700/50">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="bot" class="w-5 h-5 text-mmt-cyan"></i>
+                            <span class="font-semibold">AI Assistant</span>
+                        </div>
+                        <button id="close-sidebar" class="p-2 hover:bg-slate-700/50 rounded-lg transition">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- CUI Banner -->
+                    <div id="cui-banner" class="hidden cui-banner m-4 p-3 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
+                            <span id="cui-banner-text" class="text-amber-200 text-sm font-medium">CUI//SP-PROPIN</span>
+                        </div>
+                        <p class="text-amber-400/80 text-xs mt-1">Routed to FedRAMP High environment</p>
+                    </div>
+                    
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                        <!-- Chat messages -->
+                    </div>
+                    
+                    <div class="p-4 border-t border-slate-700/50">
+                        <div class="flex items-center gap-2">
+                            <input id="chat-input" type="text" class="flex-1 px-4 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:border-mmt-cyan focus:outline-none" placeholder="Ask the AI assistant...">
+                            <button id="send-chat" class="p-2 bg-mmt-cyan text-mmt-navy rounded-lg hover:bg-cyan-400 transition">
+                                <i data-lucide="send" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Toggle AI Sidebar Button -->
+            <button id="toggle-ai-sidebar" class="fixed right-6 bottom-6 w-14 h-14 bg-mmt-cyan text-mmt-navy rounded-full shadow-lg hover:bg-cyan-400 transition flex items-center justify-center z-40">
+                <i data-lucide="message-circle" class="w-6 h-6"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Help Modal -->
+    <div id="help-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="glass rounded-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="p-6 border-b border-slate-700/50 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-white">Solo Proposal Manager Guide</h3>
+                <button id="close-help" class="p-2 hover:bg-slate-700/50 rounded-lg transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div>
+                    <h4 class="font-semibold text-mmt-cyan mb-2">What is Solo Mode?</h4>
+                    <p class="text-slate-300">Solo Mode is designed for small businesses where one person handles the entire proposal process. The AI acts as your virtual team, providing analysis and drafts for each Shipley phase.</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-mmt-cyan mb-2">How it Works</h4>
+                    <ol class="list-decimal list-inside text-slate-300 space-y-2">
+                        <li>Select or create an opportunity</li>
+                        <li>Work through each phase's tasks with AI assistance</li>
+                        <li>At each gate, review AI recommendations and make your decision</li>
+                        <li>Progress through all 6 phases to submission</li>
+                    </ol>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-mmt-cyan mb-2">CUI Protection</h4>
+                    <p class="text-slate-300">The system automatically detects Controlled Unclassified Information (CUI) in your queries and routes them to FedRAMP High authorized systems. You'll see a yellow banner when this occurs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =================================================================
+        // CONFIGURATION
+        // =================================================================
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYzNTMzMjQsImV4cCI6MjA1MTkyOTMyNH0.gZBp_qKDxIBLUzPJ20lmYLTc1R6I2vXYWZOYKuGiDWE';
+        const API_BASE = 'https://missionpulse-api.onrender.com';
+        
+        // =================================================================
+        // DEMO DATA (Fallback)
+        // =================================================================
+        const DEMO_OPPORTUNITIES = [
+            {
+                id: 'demo-001',
+                name: 'DHA EHR Modernization',
+                solicitation_number: 'RFP-2026-0042',
+                value: 45200000,
+                due_date: '2026-03-15',
+                status: 'capture',
+                pwin: 68
+            },
+            {
+                id: 'demo-002',
+                name: 'VA Telehealth Platform',
+                solicitation_number: 'VA-HEALTH-2026-001',
+                value: 28500000,
+                due_date: '2026-04-01',
+                status: 'qualification',
+                pwin: 55
+            },
+            {
+                id: 'demo-003',
+                name: 'CMS Data Analytics',
+                solicitation_number: 'CMS-DATA-2026-Q2',
+                value: 12800000,
+                due_date: '2026-05-15',
+                status: 'discovery',
+                pwin: 42
+            }
+        ];
+        
+        const PHASES = [
+            {
+                id: 0,
+                name: 'Discovery',
+                shipley: 'Phase 0',
+                icon: '🔍',
+                duration: '1-2 days',
+                description: 'Identify and qualify the opportunity',
+                tasks: [
+                    { id: 'opp-import', title: 'Import from SAM.gov or Manual Entry', ai: true, agent: 'capture' },
+                    { id: 'initial-review', title: 'AI Analysis of RFP/Sources Sought', ai: true, agent: 'capture' },
+                    { id: 'qualification', title: 'Initial Qualification Scoring', ai: true, agent: 'capture' }
+                ],
+                gate: { id: 'go_nogo_0', name: 'Initial Go/No-Go Decision', aiAgent: 'capture' }
+            },
+            {
+                id: 1,
+                name: 'Capture Planning',
+                shipley: 'Phase 1',
+                icon: '🎯',
+                duration: '3-5 days',
+                description: 'Develop win strategy and understand customer',
+                tasks: [
+                    { id: 'customer-intel', title: 'Customer Intelligence Gathering', ai: true, agent: 'capture' },
+                    { id: 'competitor-analysis', title: 'Black Hat Competitor Analysis', ai: true, agent: 'blackhat' },
+                    { id: 'win-themes', title: 'Generate Win Themes & Discriminators', ai: true, agent: 'strategy' },
+                    { id: 'teaming-analysis', title: 'Teaming Partner Recommendations', ai: true, agent: 'strategy' },
+                    { id: 'capture-plan', title: 'AI Draft Capture Plan', ai: true, agent: 'capture' }
+                ],
+                gate: { id: 'capture_readiness', name: 'Capture Readiness Review', aiAgent: 'strategy' }
+            },
+            {
+                id: 2,
+                name: 'RFP Analysis',
+                shipley: 'Phase 2',
+                icon: '📋',
+                duration: '2-3 days',
+                description: 'Shred the RFP and build compliance matrix',
+                tasks: [
+                    { id: 'rfp-shred', title: 'RFP Requirements Extraction', ai: true, agent: 'compliance' },
+                    { id: 'compliance-matrix', title: 'Auto-Generate Compliance Matrix', ai: true, agent: 'compliance' },
+                    { id: 'gap-analysis', title: 'Identify Compliance Gaps', ai: true, agent: 'compliance' },
+                    { id: 'pricing-estimate', title: 'Initial Pricing Estimate', ai: true, agent: 'pricing' }
+                ],
+                gate: { id: 'bid_nobid', name: 'Bid/No-Bid Decision', aiAgent: 'capture' }
+            },
+            {
+                id: 3,
+                name: 'Proposal Planning',
+                shipley: 'Phase 3',
+                icon: '📝',
+                duration: '2-3 days',
+                description: 'Kickoff and outline development',
+                tasks: [
+                    { id: 'outline-gen', title: 'Generate Proposal Outline', ai: true, agent: 'writer' },
+                    { id: 'section-assign', title: 'Section Assignments (AI Drafts)', ai: true, agent: 'writer' },
+                    { id: 'schedule-build', title: 'Production Schedule', ai: false, agent: null },
+                    { id: 'kickoff-prep', title: 'Virtual Kickoff Meeting Prep', ai: true, agent: 'strategy' }
+                ],
+                gate: { id: 'proposal_kickoff', name: 'Proposal Kickoff', aiAgent: 'strategy' }
+            },
+            {
+                id: 4,
+                name: 'Production',
+                shipley: 'Phase 4',
+                icon: '✍️',
+                duration: '5-10 days',
+                description: 'Write, review, and refine volumes',
+                tasks: [
+                    { id: 'tech-draft', title: 'Technical Volume Draft', ai: true, agent: 'writer' },
+                    { id: 'mgmt-draft', title: 'Management Volume Draft', ai: true, agent: 'writer' },
+                    { id: 'past-perf', title: 'Past Performance Volume', ai: true, agent: 'capture' },
+                    { id: 'pricing-final', title: 'Final Pricing Build', ai: true, agent: 'pricing' },
+                    { id: 'pink-review', title: 'Pink Team Review (Outline)', ai: true, agent: 'compliance' },
+                    { id: 'red-review', title: 'Red Team Review (Compliance)', ai: true, agent: 'compliance' }
+                ],
+                gate: { id: 'red_team', name: 'Red Team Review Complete', aiAgent: 'compliance' }
+            },
+            {
+                id: 5,
+                name: 'Final Review & Submit',
+                shipley: 'Phase 5',
+                icon: '🚀',
+                duration: '2-3 days',
+                description: 'Gold team, final edits, and submission',
+                tasks: [
+                    { id: 'gold-review', title: 'Gold Team Final Review', ai: true, agent: 'compliance' },
+                    { id: 'exec-summary', title: 'Executive Summary Polish', ai: true, agent: 'writer' },
+                    { id: 'format-check', title: 'Formatting & Compliance Check', ai: true, agent: 'compliance' },
+                    { id: 'submit-prep', title: 'Submission Package Prep', ai: false, agent: null }
+                ],
+                gate: { id: 'gold_team', name: 'Gold Team Approval', aiAgent: 'writer' }
+            }
+        ];
+        
+        // =================================================================
+        // STATE
+        // =================================================================
+        let supabase = null;
+        let currentUser = null;
+        let selectedOpportunity = null;
+        let currentPhase = 0;
+        let completedTasks = {};
+        let gateApprovals = {};
+        let chatMessages = [];
+        let aiSidebarOpen = false;
+        
+        // =================================================================
+        // INITIALIZATION
+        // =================================================================
+        async function init() {
+            try {
+                // Initialize Supabase
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // Check auth
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    currentUser = session.user;
+                }
+                
+                // Initialize icons
+                lucide.createIcons();
+                
+                // Load opportunities
+                await loadOpportunities();
+                
+                // Setup event listeners
+                setupEventListeners();
+                
+                // Hide loading, show content
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+                
+                console.log('✅ Solo Mode initialized');
+            } catch (err) {
+                console.error('Init error:', err);
+                // Still show content with demo data
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+                renderOpportunities(DEMO_OPPORTUNITIES);
+            }
+        }
+        
+        // =================================================================
+        // DATA LOADING
+        // =================================================================
+        async function loadOpportunities() {
+            try {
+                const { data, error } = await supabase
+                    .from('opportunities')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    renderOpportunities(data);
+                } else {
+                    renderOpportunities(DEMO_OPPORTUNITIES);
+                }
+            } catch (err) {
+                console.warn('Using demo opportunities:', err);
+                renderOpportunities(DEMO_OPPORTUNITIES);
+            }
+        }
+        
+        async function loadGateApprovals(opportunityId) {
+            try {
+                const { data, error } = await supabase
+                    .from('solo_mode_gates')
+                    .select('*')
+                    .eq('opportunity_id', opportunityId);
+                
+                if (!error && data) {
+                    data.forEach(gate => {
+                        gateApprovals[gate.gate_id] = gate;
+                    });
+                    
+                    // Determine current phase based on approvals
+                    for (let i = 0; i < PHASES.length; i++) {
+                        const phase = PHASES[i];
+                        const gateApproval = gateApprovals[phase.gate.id];
+                        if (!gateApproval || gateApproval.status !== 'approved') {
+                            currentPhase = i;
+                            break;
+                        }
+                        if (i === PHASES.length - 1) {
+                            currentPhase = i; // All complete
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not load gate approvals:', err);
+            }
+        }
+        
+        // =================================================================
+        // RENDERING
+        // =================================================================
+        function renderOpportunities(opportunities) {
+            const grid = document.getElementById('opportunities-grid');
+            
+            if (opportunities.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i data-lucide="inbox" class="w-16 h-16 text-slate-600 mx-auto mb-4"></i>
+                        <p class="text-slate-400">No opportunities yet. Create your first one!</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            
+            grid.innerHTML = opportunities.map(opp => `
+                <div class="opp-card glass p-4 rounded-xl cursor-pointer hover:border-mmt-cyan transition" data-id="${opp.id}">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-10 h-10 rounded-lg bg-mmt-cyan/10 flex items-center justify-center">
+                            <i data-lucide="target" class="w-5 h-5 text-mmt-cyan"></i>
+                        </div>
+                        <span class="px-2 py-1 text-xs rounded-full ${getStatusColor(opp.status)}">${opp.status || 'Active'}</span>
+                    </div>
+                    <h3 class="font-semibold text-white mb-1 line-clamp-1">${opp.name}</h3>
+                    <p class="text-sm text-slate-400 mb-3">${opp.solicitation_number || 'No solicitation #'}</p>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-mmt-cyan font-medium">${formatCurrency(opp.value || opp.estimated_value || 0)}</span>
+                        <span class="text-slate-400">${opp.due_date ? formatDate(opp.due_date) : 'No due date'}</span>
+                    </div>
+                    ${opp.pwin ? `
+                        <div class="mt-3 pt-3 border-t border-slate-700/50">
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-slate-400">Win Probability</span>
+                                <span class="font-semibold ${getPwinColor(opp.pwin)}">${opp.pwin}%</span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+            
+            lucide.createIcons();
+            
+            // Add click handlers
+            grid.querySelectorAll('.opp-card').forEach(card => {
+                card.addEventListener('click', () => selectOpportunity(card.dataset.id, opportunities));
+            });
+        }
+        
+        function renderPhaseTimeline() {
+            const timeline = document.getElementById('phase-timeline');
+            
+            timeline.innerHTML = PHASES.map((phase, idx) => {
+                const isComplete = idx < currentPhase;
+                const isActive = idx === currentPhase;
+                const isPending = idx > currentPhase;
+                
+                let bgClass = 'bg-slate-700';
+                let textClass = 'text-slate-500';
+                let lineClass = 'bg-slate-700';
+                
+                if (isComplete) {
+                    bgClass = 'bg-emerald-500';
+                    textClass = 'text-emerald-400';
+                    lineClass = 'bg-emerald-500';
+                } else if (isActive) {
+                    bgClass = 'bg-mmt-cyan';
+                    textClass = 'text-mmt-cyan';
+                }
+                
+                return `
+                    <div class="flex flex-col items-center flex-1 relative">
+                        <div class="w-12 h-12 rounded-full ${bgClass} flex items-center justify-center text-2xl mb-2 transition-all ${isActive ? 'ring-4 ring-mmt-cyan/30' : ''}">
+                            ${isComplete ? '✓' : phase.icon}
+                        </div>
+                        <div class="text-xs text-center ${textClass} font-medium">${phase.name}</div>
+                        ${idx < PHASES.length - 1 ? `<div class="absolute top-6 left-1/2 w-full h-1 ${lineClass} -z-10"></div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function renderCurrentPhase() {
+            const phase = PHASES[currentPhase];
+            
+            document.getElementById('phase-icon').textContent = phase.icon;
+            document.getElementById('phase-shipley').textContent = phase.shipley;
+            document.getElementById('phase-title').textContent = phase.name;
+            document.getElementById('phase-description').textContent = phase.description;
+            document.getElementById('phase-duration').textContent = phase.duration;
+            document.getElementById('gate-title').textContent = phase.gate.name;
+            
+            // Render tasks
+            const tasksContainer = document.getElementById('tasks-container');
+            tasksContainer.innerHTML = phase.tasks.map(task => {
+                const isComplete = completedTasks[task.id];
+                
+                return `
+                    <div class="task-card flex items-center gap-4 p-4 rounded-lg border border-slate-700/50 ${isComplete ? 'bg-emerald-500/10 border-emerald-500/30' : ''}" data-task-id="${task.id}">
+                        <button class="task-toggle w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${isComplete ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500 hover:border-mmt-cyan'}">
+                            ${isComplete ? '<i data-lucide="check" class="w-4 h-4 text-white"></i>' : ''}
+                        </button>
+                        <div class="flex-1">
+                            <div class="font-medium text-white">${task.title}</div>
+                            ${task.ai ? `<div class="text-xs text-mmt-cyan">AI-assisted • ${task.agent} agent</div>` : '<div class="text-xs text-slate-400">Manual task</div>'}
+                        </div>
+                        ${task.ai ? `
+                            <button class="task-ai-btn px-3 py-1 text-sm bg-mmt-cyan/10 text-mmt-cyan rounded-lg hover:bg-mmt-cyan/20 transition" data-agent="${task.agent}" data-task="${task.title}">
+                                <i data-lucide="sparkles" class="w-4 h-4 inline mr-1"></i>
+                                Run AI
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+            
+            // Add task event listeners
+            tasksContainer.querySelectorAll('.task-toggle').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const taskId = e.target.closest('.task-card').dataset.taskId;
+                    toggleTask(taskId);
+                });
+            });
+            
+            tasksContainer.querySelectorAll('.task-ai-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const agent = e.target.dataset.agent || e.target.closest('.task-ai-btn').dataset.agent;
+                    const task = e.target.dataset.task || e.target.closest('.task-ai-btn').dataset.task;
+                    openAISidebar(agent, task);
+                });
+            });
+            
+            // Update progress
+            updateProgress();
+        }
+        
+        function renderCompletedPhases() {
+            const container = document.getElementById('completed-phases');
+            
+            const completedPhasesHtml = [];
+            for (let i = 0; i < currentPhase; i++) {
+                const phase = PHASES[i];
+                const gateApproval = gateApprovals[phase.gate.id];
+                
+                completedPhasesHtml.push(`
+                    <div class="glass p-4 rounded-xl phase-complete">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-xl">
+                                    ✓
+                                </div>
+                                <div>
+                                    <div class="text-sm text-emerald-400">${phase.shipley}</div>
+                                    <h4 class="font-semibold text-white">${phase.name}</h4>
+                                </div>
+                            </div>
+                            <div class="text-right text-sm">
+                                <div class="text-slate-400">Completed</div>
+                                <div class="text-emerald-400">${gateApproval ? formatDate(gateApproval.approved_at) : 'N/A'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            }
+            
+            container.innerHTML = completedPhasesHtml.join('');
+        }
+        
+        // =================================================================
+        // ACTIONS
+        // =================================================================
+        async function selectOpportunity(oppId, opportunities) {
+            selectedOpportunity = opportunities.find(o => o.id === oppId);
+            
+            if (!selectedOpportunity) {
+                console.error('Opportunity not found:', oppId);
+                return;
+            }
+            
+            // Load gate approvals for this opportunity
+            await loadGateApprovals(oppId);
+            
+            // Update header
+            document.getElementById('opp-name').textContent = selectedOpportunity.name;
+            document.getElementById('opp-details').textContent = 
+                `${selectedOpportunity.solicitation_number || 'No #'} | ${formatCurrency(selectedOpportunity.value || selectedOpportunity.estimated_value || 0)} | Due: ${selectedOpportunity.due_date ? formatDate(selectedOpportunity.due_date) : 'TBD'}`;
+            
+            // Show wizard, hide selector
+            document.getElementById('opportunity-selector').classList.add('hidden');
+            document.getElementById('solo-wizard').classList.remove('hidden');
+            
+            // Render wizard
+            renderPhaseTimeline();
+            renderCurrentPhase();
+            renderCompletedPhases();
+        }
+        
+        function toggleTask(taskId) {
+            completedTasks[taskId] = !completedTasks[taskId];
+            renderCurrentPhase();
+        }
+        
+        async function approveGate(approved) {
+            const phase = PHASES[currentPhase];
+            const notes = document.getElementById('gate-notes').value;
+            
+            // Save to database
+            try {
+                const { error } = await supabase.from('solo_mode_gates').upsert({
+                    opportunity_id: selectedOpportunity.id,
+                    company_id: currentUser?.user_metadata?.company_id || 'demo-company',
+                    gate_id: phase.gate.id,
+                    gate_name: phase.gate.name,
+                    phase_number: phase.id,
+                    status: approved ? 'approved' : 'rejected',
+                    approved_at: approved ? new Date().toISOString() : null,
+                    approved_by: currentUser?.id || null,
+                    decision_notes: notes
+                });
+                
+                if (error) console.warn('Could not save gate approval:', error);
+            } catch (err) {
+                console.warn('Gate save error:', err);
+            }
+            
+            // Update local state
+            gateApprovals[phase.gate.id] = {
+                status: approved ? 'approved' : 'rejected',
+                approved_at: new Date().toISOString()
+            };
+            
+            if (approved && currentPhase < PHASES.length - 1) {
+                // Move to next phase
+                currentPhase++;
+                completedTasks = {}; // Reset tasks for new phase
+                document.getElementById('gate-notes').value = '';
+                
+                // Hide AI recommendation
+                document.getElementById('ai-recommendation-panel').classList.add('hidden');
+                document.getElementById('ai-recommendation-badge').classList.add('hidden');
+                
+                // Re-render
+                renderPhaseTimeline();
+                renderCurrentPhase();
+                renderCompletedPhases();
+            } else if (approved && currentPhase === PHASES.length - 1) {
+                // All phases complete!
+                alert('🎉 Congratulations! All proposal phases are complete. Your submission package is ready for final review.');
+            } else {
+                // No-Go decision
+                alert('No-Go decision recorded. You can revisit this opportunity later or archive it.');
+            }
+        }
+        
+        async function getAIRecommendation() {
+            const phase = PHASES[currentPhase];
+            const btn = document.getElementById('get-ai-recommendation');
+            const panel = document.getElementById('ai-recommendation-panel');
+            const content = document.getElementById('ai-recommendation-content');
+            const badge = document.getElementById('ai-recommendation-badge');
+            
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Analyzing...</span>';
+            lucide.createIcons();
+            
+            // Simulate AI response (replace with actual API call)
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Generate recommendation based on phase
+            const recommendations = {
+                'go_nogo_0': {
+                    recommendation: 'GO',
+                    confidence: 72,
+                    text: `Based on my analysis of this opportunity, I recommend **GO** with a ${72}% confidence level.\n\n**Positive Factors:**\n• Strong alignment with your core healthcare IT capabilities\n• Favorable competitive landscape (3 major competitors identified)\n• Past performance supports similar scope requirements\n\n**Risk Factors:**\n• Aggressive timeline may strain delivery capacity\n• Incumbent advantage estimated at 15%\n\n**Recommended Next Steps:**\n1. Confirm teaming partner availability\n2. Begin customer intelligence gathering\n3. Schedule capture planning kickoff`
+                },
+                'capture_readiness': {
+                    recommendation: 'GO',
+                    confidence: 78,
+                    text: `Capture planning analysis complete. I recommend **proceeding to proposal phase** with ${78}% confidence.\n\n**Win Themes Identified:**\n1. Mission-First Innovation\n2. Proven Healthcare IT Expertise\n3. Small Business Value\n\n**Competitive Position:**\n• Your discriminators effectively counter incumbent weaknesses\n• Teaming strategy addresses capability gaps\n\n**Gate Recommendation:** Proceed to RFP Analysis (Phase 2)`
+                },
+                'bid_nobid': {
+                    recommendation: 'BID',
+                    confidence: 68,
+                    text: `RFP analysis complete. I recommend **BID** with ${68}% confidence.\n\n**Compliance Status:**\n• 47 requirements extracted\n• 89% compliance coverage achieved\n• 3 gaps require resolution\n\n**Pricing Estimate:**\n• Competitive range: $42M - $48M\n• Your estimate: $45.2M (well-positioned)\n\n**Risk Assessment:** Moderate - manageable with proper mitigation planning`
+                }
+            };
+            
+            const rec = recommendations[phase.gate.id] || {
+                recommendation: 'PROCEED',
+                confidence: 75,
+                text: 'Based on current progress, I recommend proceeding to the next phase. All required tasks have been addressed and the proposal is tracking well.'
+            };
+            
+            // Show recommendation
+            panel.classList.remove('hidden');
+            content.innerHTML = rec.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+            
+            badge.classList.remove('hidden');
+            badge.className = `px-3 py-1 rounded-full text-sm font-medium ${
+                rec.recommendation === 'GO' || rec.recommendation === 'BID' || rec.recommendation === 'PROCEED'
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-red-500/20 text-red-400'
+            }`;
+            badge.textContent = `AI Recommends: ${rec.recommendation} (${rec.confidence}%)`;
+            
+            // Reset button
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="sparkles" class="w-4 h-4"></i><span>Refresh Analysis</span>';
+            lucide.createIcons();
+        }
+        
+        function openAISidebar(agent, task) {
+            aiSidebarOpen = true;
+            document.getElementById('ai-sidebar').classList.remove('translate-x-full');
+            
+            // Add initial message
+            const systemMessage = `I'm ready to help with "${task}" using the ${agent} agent. What would you like me to analyze or generate?`;
+            addChatMessage('assistant', systemMessage);
+            
+            // Focus input
+            document.getElementById('chat-input').focus();
+        }
+        
+        function closeAISidebar() {
+            aiSidebarOpen = false;
+            document.getElementById('ai-sidebar').classList.add('translate-x-full');
+        }
+        
+        function addChatMessage(role, content, cuiCategory = null) {
+            const messagesContainer = document.getElementById('chat-messages');
+            
+            const messageHtml = `
+                <div class="flex ${role === 'user' ? 'justify-end' : 'justify-start'}">
+                    <div class="max-w-[80%] ${role === 'user' ? 'bg-mmt-cyan/20 text-white' : 'bg-slate-700/50 text-slate-200'} rounded-lg px-4 py-3">
+                        ${content}
+                        ${role === 'assistant' ? '<div class="text-xs text-amber-400 mt-2">AI GENERATED - REQUIRES HUMAN REVIEW</div>' : ''}
+                    </div>
+                </div>
+            `;
+            
+            messagesContainer.innerHTML += messageHtml;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Show CUI banner if applicable
+            if (cuiCategory && cuiCategory !== 'NONE') {
+                const banner = document.getElementById('cui-banner');
+                const bannerText = document.getElementById('cui-banner-text');
+                banner.classList.remove('hidden');
+                bannerText.textContent = `CUI//${cuiCategory} - Routed to FedRAMP High`;
+            }
+        }
+        
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addChatMessage('user', message);
+            input.value = '';
+            
+            // Show typing indicator
+            const typingHtml = `
+                <div id="typing-indicator" class="flex justify-start">
+                    <div class="bg-slate-700/50 rounded-lg px-4 py-3">
+                        <span class="ai-thinking">●</span>
+                        <span class="ai-thinking" style="animation-delay: 0.2s">●</span>
+                        <span class="ai-thinking" style="animation-delay: 0.4s">●</span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('chat-messages').innerHTML += typingHtml;
+            
+            // Simulate AI response (replace with actual API call)
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Remove typing indicator
+            document.getElementById('typing-indicator')?.remove();
+            
+            // Add AI response
+            const responses = [
+                "I've analyzed your request. Based on the opportunity details and your company's past performance, here are my recommendations...",
+                "Let me help you with that. Looking at the RFP requirements and your competitive position, I suggest focusing on these key discriminators...",
+                "Great question. Here's what I found from analyzing similar successful proposals in your portfolio..."
+            ];
+            
+            addChatMessage('assistant', responses[Math.floor(Math.random() * responses.length)]);
+        }
+        
+        function updateProgress() {
+            const phase = PHASES[currentPhase];
+            const completedCount = Object.values(completedTasks).filter(v => v).length;
+            const totalTasks = phase.tasks.length;
+            
+            // Phase-level progress
+            const phaseProgress = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 0;
+            
+            // Overall progress (phases + current phase tasks)
+            const phasesComplete = currentPhase;
+            const overallProgress = ((phasesComplete + (phaseProgress / 100)) / PHASES.length) * 100;
+            
+            document.getElementById('overall-progress-bar').style.width = `${overallProgress}%`;
+            document.getElementById('overall-progress-text').textContent = `${Math.round(overallProgress)}%`;
+        }
+        
+        // =================================================================
+        // EVENT LISTENERS
+        // =================================================================
+        function setupEventListeners() {
+            // Change opportunity
+            document.getElementById('change-opp-btn')?.addEventListener('click', () => {
+                document.getElementById('opportunity-selector').classList.remove('hidden');
+                document.getElementById('solo-wizard').classList.add('hidden');
+                currentPhase = 0;
+                completedTasks = {};
+                gateApprovals = {};
+            });
+            
+            // Gate actions
+            document.getElementById('gate-approve')?.addEventListener('click', () => approveGate(true));
+            document.getElementById('gate-reject')?.addEventListener('click', () => approveGate(false));
+            document.getElementById('get-ai-recommendation')?.addEventListener('click', getAIRecommendation);
+            
+            // AI Sidebar
+            document.getElementById('toggle-ai-sidebar')?.addEventListener('click', () => {
+                if (aiSidebarOpen) {
+                    closeAISidebar();
+                } else {
+                    openAISidebar('capture', 'General Assistance');
+                }
+            });
+            document.getElementById('close-sidebar')?.addEventListener('click', closeAISidebar);
+            
+            // Chat
+            document.getElementById('send-chat')?.addEventListener('click', sendChatMessage);
+            document.getElementById('chat-input')?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendChatMessage();
+            });
+            
+            // Help modal
+            document.getElementById('help-btn')?.addEventListener('click', () => {
+                document.getElementById('help-modal').classList.remove('hidden');
+            });
+            document.getElementById('close-help')?.addEventListener('click', () => {
+                document.getElementById('help-modal').classList.add('hidden');
+            });
+            document.getElementById('help-modal')?.addEventListener('click', (e) => {
+                if (e.target.id === 'help-modal') {
+                    document.getElementById('help-modal').classList.add('hidden');
+                }
+            });
+            
+            // New opportunity
+            document.getElementById('new-opp-btn')?.addEventListener('click', () => {
+                window.location.href = 'missionpulse-m1-enhanced.html';
+            });
+        }
+        
+        // =================================================================
+        // UTILITIES
+        // =================================================================
+        function formatCurrency(value) {
+            if (!value) return '$0';
+            if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+            if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+            if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+            return `$${value.toLocaleString()}`;
+        }
+        
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        
+        function getStatusColor(status) {
+            const colors = {
+                'discovery': 'bg-blue-500/20 text-blue-400',
+                'qualification': 'bg-purple-500/20 text-purple-400',
+                'capture': 'bg-amber-500/20 text-amber-400',
+                'proposal': 'bg-mmt-cyan/20 text-mmt-cyan',
+                'submitted': 'bg-emerald-500/20 text-emerald-400',
+                'won': 'bg-green-500/20 text-green-400',
+                'lost': 'bg-red-500/20 text-red-400'
+            };
+            return colors[status?.toLowerCase()] || 'bg-slate-500/20 text-slate-400';
+        }
+        
+        function getPwinColor(pwin) {
+            if (pwin >= 70) return 'text-emerald-400';
+            if (pwin >= 50) return 'text-amber-400';
+            return 'text-red-400';
+        }
+        
+        // =================================================================
+        // BOOTSTRAP
+        // =================================================================
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
