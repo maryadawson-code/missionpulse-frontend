@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Management | MissionPulse Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .glass-card { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .role-ceo { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .role-coo { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+    .role-admin { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+    .role-cap { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+    .role-pm { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .role-sa { background: rgba(20, 184, 166, 0.2); color: #14b8a6; }
+    .role-fin { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+    .role-con { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
+    .role-del { background: rgba(99, 102, 241, 0.2); color: #6366f1; }
+    .role-qa { background: rgba(107, 114, 128, 0.2); color: #6b7280; }
+    .role-partner { background: rgba(0, 229, 250, 0.2); color: #00e5fa; }
+    .drop-zone { border: 2px dashed rgba(0, 229, 250, 0.3); transition: all 0.3s; }
+    .drop-zone.dragover { border-color: #00e5fa; background: rgba(0, 229, 250, 0.1); }
+  </style>
+</head>
+<body class="text-white">
+  <div class="min-h-screen p-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-2xl font-bold text-cyan-400">User Management</h1>
+        <p class="text-gray-400 text-sm">Manage team members and roles</p>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="openInviteModal()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium transition-colors">
+          + Invite User
+        </button>
+        <button onclick="openCSVModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors">
+          📤 Bulk Import
+        </button>
+        <a href="index.html" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">
+          ← Dashboard
+        </a>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-cyan-400" id="statTotal">-</div>
+        <div class="text-xs text-gray-400 mt-1">Total Users</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-green-400" id="statActive">-</div>
+        <div class="text-xs text-gray-400 mt-1">Active</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-yellow-400" id="statPending">-</div>
+        <div class="text-xs text-gray-400 mt-1">Pending Invite</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-red-400" id="statAdmin">-</div>
+        <div class="text-xs text-gray-400 mt-1">Admins</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-blue-400" id="statInternal">-</div>
+        <div class="text-xs text-gray-400 mt-1">Internal</div>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-purple-400" id="statPartner">-</div>
+        <div class="text-xs text-gray-400 mt-1">Partners</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-4 mb-6">
+      <select id="filterRole" class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-cyan-500 focus:outline-none">
+        <option value="">All Roles</option>
+        <option value="CEO">CEO</option>
+        <option value="COO">COO</option>
+        <option value="Admin">Admin</option>
+        <option value="CAP">Capture Manager</option>
+        <option value="PM">Project Manager</option>
+        <option value="SA">Solutions Architect</option>
+        <option value="FIN">Finance/Pricing</option>
+        <option value="CON">Contracts</option>
+        <option value="DEL">Delivery</option>
+        <option value="QA">Quality Assurance</option>
+        <option value="Partner">Partner</option>
+      </select>
+      <select id="filterStatus" class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-cyan-500 focus:outline-none">
+        <option value="">All Statuses</option>
+        <option value="active">Active</option>
+        <option value="pending">Pending</option>
+        <option value="disabled">Disabled</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="Search by name or email..."
+        class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-cyan-500 focus:outline-none flex-1 min-w-[200px]">
+    </div>
+
+    <!-- Users Table -->
+    <div class="glass-card rounded-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-800/50">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">User</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Role</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Status</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">MFA</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Last Login</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-300">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersTable" class="divide-y divide-gray-800">
+            <tr><td colspan="6" class="text-center py-8 text-gray-500">Loading users...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Invite User Modal -->
+    <div id="inviteModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+      <div class="glass-card rounded-2xl w-full max-w-md">
+        <div class="p-6 border-b border-gray-800 flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Invite User</h3>
+          <button onclick="closeInviteModal()" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Email Address *</label>
+            <input type="email" id="inviteEmail" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:border-cyan-500 focus:outline-none" placeholder="user@company.com">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Full Name *</label>
+            <input type="text" id="inviteName" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:border-cyan-500 focus:outline-none" placeholder="Jane Smith">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Role *</label>
+            <select id="inviteRole" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:border-cyan-500 focus:outline-none">
+              <option value="PM">Project Manager</option>
+              <option value="CAP">Capture Manager</option>
+              <option value="SA">Solutions Architect</option>
+              <option value="FIN">Finance/Pricing</option>
+              <option value="CON">Contracts</option>
+              <option value="DEL">Delivery</option>
+              <option value="QA">Quality Assurance</option>
+              <option value="Partner">Partner</option>
+              <option value="Admin">Admin</option>
+              <option value="COO">COO</option>
+              <option value="CEO">CEO</option>
+            </select>
+          </div>
+          <div id="inviteError" class="hidden text-red-400 text-sm"></div>
+          <button onclick="sendInvite()" class="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium transition-colors">
+            Send Invitation
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CSV Import Modal -->
+    <div id="csvModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+      <div class="glass-card rounded-2xl w-full max-w-2xl">
+        <div class="p-6 border-b border-gray-800 flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Bulk Import Users</h3>
+          <button onclick="closeCSVModal()" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+        <div class="p-6">
+          <!-- Drop Zone -->
+          <div id="dropZone" class="drop-zone rounded-xl p-8 text-center mb-4">
+            <div class="text-4xl mb-3">📄</div>
+            <p class="text-gray-300 mb-2">Drag & drop CSV file here</p>
+            <p class="text-gray-500 text-sm mb-4">or click to browse</p>
+            <input type="file" id="csvFile" accept=".csv" class="hidden">
+            <button onclick="document.getElementById('csvFile').click()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm">
+              Select File
+            </button>
+          </div>
+
+          <!-- Template Download -->
+          <div class="bg-gray-800/50 rounded-lg p-4 mb-4">
+            <p class="text-sm text-gray-400 mb-2">Required CSV format:</p>
+            <code class="text-xs text-cyan-400 block mb-3">email,full_name,role</code>
+            <button onclick="downloadTemplate()" class="text-cyan-400 hover:underline text-sm">
+              ↓ Download Template
+            </button>
+          </div>
+
+          <!-- Preview Table -->
+          <div id="csvPreview" class="hidden mb-4">
+            <h4 class="font-medium mb-2">Preview (first 5 rows)</h4>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead class="bg-gray-800">
+                  <tr>
+                    <th class="px-3 py-2 text-left">Email</th>
+                    <th class="px-3 py-2 text-left">Name</th>
+                    <th class="px-3 py-2 text-left">Role</th>
+                    <th class="px-3 py-2 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="csvPreviewBody"></tbody>
+              </table>
+            </div>
+            <p id="csvStats" class="text-sm text-gray-400 mt-2"></p>
+          </div>
+
+          <!-- Import Button -->
+          <div id="csvActions" class="hidden flex gap-3">
+            <button onclick="processCSVImport()" class="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium transition-colors">
+              Import Users
+            </button>
+            <button onclick="clearCSV()" class="px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+              Clear
+            </button>
+          </div>
+
+          <!-- Progress -->
+          <div id="importProgress" class="hidden">
+            <div class="flex items-center gap-3">
+              <div class="animate-spin w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full"></div>
+              <span id="progressText">Importing...</span>
+            </div>
+          </div>
+
+          <!-- Results -->
+          <div id="importResults" class="hidden mt-4 p-4 rounded-lg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+      <div class="glass-card rounded-2xl w-full max-w-md">
+        <div class="p-6 border-b border-gray-800 flex items-center justify-between">
+          <h3 class="text-lg font-semibold">Edit User</h3>
+          <button onclick="closeEditModal()" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+        <div class="p-6 space-y-4" id="editModalContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase Configuration
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    const DEFAULT_COMPANY_ID = '11111111-1111-1111-1111-111111111111';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    let allUsers = [];
+    let pendingInvites = [];
+    let csvData = [];
+    let currentUser = null;
+
+    // RBAC Check
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { window.location.href = 'login.html'; return false; }
+      
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      if (!profile || !['CEO', 'COO', 'Admin'].includes(profile.role)) {
+        alert('Access denied. Admin role required.');
+        window.location.href = 'index.html';
+        return false;
+      }
+      currentUser = { ...user, role: profile.role };
+      return true;
+    }
+
+    // Load Users
+    async function loadUsers() {
+      const [usersRes, invitesRes] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('user_invitations').select('*').eq('status', 'pending')
+      ]);
+      
+      allUsers = usersRes.data || [];
+      pendingInvites = invitesRes.data || [];
+      updateStats();
+      renderUsers();
+    }
+
+    // Update Stats
+    function updateStats() {
+      const admins = allUsers.filter(u => ['CEO', 'COO', 'Admin'].includes(u.role)).length;
+      const partners = allUsers.filter(u => u.role === 'Partner').length;
+      const internal = allUsers.length - partners;
+      
+      document.getElementById('statTotal').textContent = allUsers.length;
+      document.getElementById('statActive').textContent = allUsers.filter(u => u.status !== 'disabled').length;
+      document.getElementById('statPending').textContent = pendingInvites.length;
+      document.getElementById('statAdmin').textContent = admins;
+      document.getElementById('statInternal').textContent = internal;
+      document.getElementById('statPartner').textContent = partners;
+    }
+
+    // Render Users Table
+    function renderUsers() {
+      const roleFilter = document.getElementById('filterRole').value;
+      const statusFilter = document.getElementById('filterStatus').value;
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      
+      let filtered = allUsers.filter(u => {
+        const matchRole = !roleFilter || u.role === roleFilter;
+        const matchStatus = !statusFilter || (statusFilter === 'active' ? u.status !== 'disabled' : u.status === statusFilter);
+        const matchSearch = !search || u.full_name?.toLowerCase().includes(search) || u.email?.toLowerCase().includes(search);
+        return matchRole && matchStatus && matchSearch;
+      });
+
+      // Add pending invites
+      if (!statusFilter || statusFilter === 'pending') {
+        const pendingFiltered = pendingInvites.filter(i => {
+          const matchRole = !roleFilter || i.role === roleFilter;
+          const matchSearch = !search || i.email?.toLowerCase().includes(search);
+          return matchRole && matchSearch;
+        }).map(i => ({ ...i, isPending: true }));
+        filtered = [...pendingFiltered, ...filtered];
+      }
+      
+      const tbody = document.getElementById('usersTable');
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No users found</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = filtered.map(user => {
+        if (user.isPending) {
+          return `
+            <tr class="hover:bg-gray-800/30 opacity-70">
+              <td class="px-4 py-3">
+                <div class="font-medium text-gray-400">${escapeHtml(user.email)}</div>
+                <div class="text-xs text-gray-500">Pending invitation</div>
+              </td>
+              <td class="px-4 py-3">
+                <span class="role-${user.role?.toLowerCase()} px-2 py-1 rounded text-xs font-medium">${user.role}</span>
+              </td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-400">Pending</span>
+              </td>
+              <td class="px-4 py-3 text-gray-500">-</td>
+              <td class="px-4 py-3 text-gray-500">-</td>
+              <td class="px-4 py-3">
+                <button onclick="resendInvite('${user.id}')" class="text-cyan-400 hover:text-cyan-300 text-sm mr-3">Resend</button>
+                <button onclick="cancelInvite('${user.id}')" class="text-red-400 hover:text-red-300 text-sm">Cancel</button>
+              </td>
+            </tr>
+          `;
+        }
+        
+        return `
+          <tr class="hover:bg-gray-800/30">
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-sm font-medium">
+                  ${(user.full_name || user.email || '?')[0].toUpperCase()}
+                </div>
+                <div>
+                  <div class="font-medium">${escapeHtml(user.full_name || 'Unnamed')}</div>
+                  <div class="text-xs text-gray-500">${escapeHtml(user.email || '')}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <span class="role-${user.role?.toLowerCase()} px-2 py-1 rounded text-xs font-medium">${user.role || 'N/A'}</span>
+            </td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-1 rounded text-xs ${user.status === 'disabled' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}">
+                ${user.status === 'disabled' ? 'Disabled' : 'Active'}
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              ${user.mfa_enabled ? '<span class="text-green-400">✓</span>' : '<span class="text-gray-500">-</span>'}
+            </td>
+            <td class="px-4 py-3 text-gray-400 text-xs">${user.last_login ? formatDate(user.last_login) : 'Never'}</td>
+            <td class="px-4 py-3">
+              <button onclick="editUser('${user.id}')" class="text-cyan-400 hover:text-cyan-300 text-sm mr-3">Edit</button>
+              ${user.id !== currentUser?.id ? `<button onclick="toggleUserStatus('${user.id}', '${user.status}')" class="text-${user.status === 'disabled' ? 'green' : 'red'}-400 hover:opacity-80 text-sm">${user.status === 'disabled' ? 'Enable' : 'Disable'}</button>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Invite User
+    function openInviteModal() { document.getElementById('inviteModal').classList.remove('hidden'); }
+    function closeInviteModal() { document.getElementById('inviteModal').classList.add('hidden'); document.getElementById('inviteError').classList.add('hidden'); }
+
+    async function sendInvite() {
+      const email = document.getElementById('inviteEmail').value.trim().toLowerCase();
+      const name = document.getElementById('inviteName').value.trim();
+      const role = document.getElementById('inviteRole').value;
+      const errorEl = document.getElementById('inviteError');
+      
+      if (!email || !name || !role) {
+        errorEl.textContent = 'All fields are required'; errorEl.classList.remove('hidden'); return;
+      }
+      
+      // Check if already exists
+      const exists = allUsers.find(u => u.email?.toLowerCase() === email) || pendingInvites.find(i => i.email?.toLowerCase() === email);
+      if (exists) {
+        errorEl.textContent = 'User with this email already exists'; errorEl.classList.remove('hidden'); return;
+      }
+      
+      const { error } = await supabase.from('user_invitations').insert([{
+        email, role, invited_by: currentUser.id, company_id: DEFAULT_COMPANY_ID, status: 'pending'
+      }]);
+      
+      if (error) { errorEl.textContent = error.message; errorEl.classList.remove('hidden'); return; }
+      
+      closeInviteModal();
+      document.getElementById('inviteEmail').value = '';
+      document.getElementById('inviteName').value = '';
+      loadUsers();
+    }
+
+    async function resendInvite(id) { alert('Invite resent! (Email integration pending)'); }
+    async function cancelInvite(id) {
+      if (!confirm('Cancel this invitation?')) return;
+      await supabase.from('user_invitations').delete().eq('id', id);
+      loadUsers();
+    }
+
+    // Edit User
+    function editUser(id) {
+      const user = allUsers.find(u => u.id === id);
+      if (!user) return;
+      
+      document.getElementById('editModalContent').innerHTML = `
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Email</label>
+          <input type="text" value="${escapeHtml(user.email || '')}" disabled class="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 text-gray-500">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Full Name</label>
+          <input type="text" id="editName" value="${escapeHtml(user.full_name || '')}" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:border-cyan-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Role</label>
+          <select id="editRole" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:border-cyan-500 focus:outline-none">
+            ${['CEO','COO','Admin','CAP','PM','SA','FIN','CON','DEL','QA','Partner'].map(r => 
+              `<option value="${r}" ${user.role === r ? 'selected' : ''}>${r}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <button onclick="saveUserEdit('${user.id}')" class="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium transition-colors">
+          Save Changes
+        </button>
+      `;
+      document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+
+    async function saveUserEdit(id) {
+      const name = document.getElementById('editName').value.trim();
+      const role = document.getElementById('editRole').value;
+      
+      const { error } = await supabase.from('profiles').update({ full_name: name, role }).eq('id', id);
+      if (error) { alert('Error: ' + error.message); return; }
+      
+      closeEditModal();
+      loadUsers();
+    }
+
+    async function toggleUserStatus(id, currentStatus) {
+      const newStatus = currentStatus === 'disabled' ? 'active' : 'disabled';
+      if (!confirm(`${newStatus === 'disabled' ? 'Disable' : 'Enable'} this user?`)) return;
+      
+      const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', id);
+      if (error) { alert('Error: ' + error.message); return; }
+      loadUsers();
+    }
+
+    // CSV Import
+    function openCSVModal() { document.getElementById('csvModal').classList.remove('hidden'); }
+    function closeCSVModal() { document.getElementById('csvModal').classList.add('hidden'); clearCSV(); }
+
+    function clearCSV() {
+      csvData = [];
+      document.getElementById('csvFile').value = '';
+      document.getElementById('csvPreview').classList.add('hidden');
+      document.getElementById('csvActions').classList.add('hidden');
+      document.getElementById('importResults').classList.add('hidden');
+    }
+
+    function downloadTemplate() {
+      const csv = 'email,full_name,role\njane@company.com,Jane Smith,PM\njohn@company.com,John Doe,SA';
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'user_import_template.csv'; a.click();
+    }
+
+    function parseCSV(text) {
+      const lines = text.trim().split('\n');
+      const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
+      
+      const emailIdx = headers.indexOf('email');
+      const nameIdx = headers.indexOf('full_name') !== -1 ? headers.indexOf('full_name') : headers.indexOf('name');
+      const roleIdx = headers.indexOf('role');
+      
+      if (emailIdx === -1) throw new Error('Missing required column: email');
+      
+      const validRoles = ['CEO','COO','Admin','CAP','PM','SA','FIN','CON','DEL','QA','Partner'];
+      const data = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        if (!cols[emailIdx]) continue;
+        
+        const email = cols[emailIdx].toLowerCase();
+        const name = nameIdx !== -1 ? cols[nameIdx] : '';
+        let role = roleIdx !== -1 ? cols[roleIdx] : 'PM';
+        
+        // Validate/normalize role
+        role = validRoles.find(r => r.toLowerCase() === role.toLowerCase()) || 'PM';
+        
+        const existing = allUsers.find(u => u.email?.toLowerCase() === email) || pendingInvites.find(i => i.email?.toLowerCase() === email);
+        
+        data.push({ email, full_name: name, role, status: existing ? 'exists' : 'new' });
+      }
+      
+      return data;
+    }
+
+    function previewCSV() {
+      const preview = csvData.slice(0, 5);
+      document.getElementById('csvPreviewBody').innerHTML = preview.map(row => `
+        <tr class="${row.status === 'exists' ? 'text-yellow-400' : 'text-gray-300'}">
+          <td class="px-3 py-2">${escapeHtml(row.email)}</td>
+          <td class="px-3 py-2">${escapeHtml(row.full_name)}</td>
+          <td class="px-3 py-2">${row.role}</td>
+          <td class="px-3 py-2">${row.status === 'exists' ? '⚠️ Exists' : '✓ New'}</td>
+        </tr>
+      `).join('');
+      
+      const newCount = csvData.filter(r => r.status === 'new').length;
+      const existsCount = csvData.filter(r => r.status === 'exists').length;
+      document.getElementById('csvStats').textContent = `Total: ${csvData.length} | New: ${newCount} | Already exist: ${existsCount}`;
+      
+      document.getElementById('csvPreview').classList.remove('hidden');
+      document.getElementById('csvActions').classList.remove('hidden');
+    }
+
+    async function processCSVImport() {
+      const toImport = csvData.filter(r => r.status === 'new');
+      if (toImport.length === 0) { alert('No new users to import'); return; }
+      
+      document.getElementById('csvActions').classList.add('hidden');
+      document.getElementById('importProgress').classList.remove('hidden');
+      
+      let success = 0, failed = 0;
+      
+      for (const user of toImport) {
+        document.getElementById('progressText').textContent = `Importing ${success + failed + 1}/${toImport.length}...`;
+        
+        const { error } = await supabase.from('user_invitations').insert([{
+          email: user.email, role: user.role, invited_by: currentUser.id, company_id: DEFAULT_COMPANY_ID, status: 'pending'
+        }]);
+        
+        if (error) failed++; else success++;
+      }
+      
+      document.getElementById('importProgress').classList.add('hidden');
+      document.getElementById('importResults').innerHTML = `
+        <div class="${failed > 0 ? 'bg-yellow-500/20 text-yellow-300' : 'bg-green-500/20 text-green-300'}">
+          Import complete: ${success} invited, ${failed} failed
+        </div>
+      `;
+      document.getElementById('importResults').classList.remove('hidden');
+      
+      loadUsers();
+    }
+
+    // Drag & Drop
+    const dropZone = document.getElementById('dropZone');
+    const csvFile = document.getElementById('csvFile');
+
+    ['dragenter', 'dragover'].forEach(e => {
+      dropZone.addEventListener(e, (ev) => { ev.preventDefault(); dropZone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(e => {
+      dropZone.addEventListener(e, (ev) => { ev.preventDefault(); dropZone.classList.remove('dragover'); });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    csvFile.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleFile(e.target.files[0]);
+    });
+
+    function handleFile(file) {
+      if (!file.name.endsWith('.csv')) { alert('Please upload a CSV file'); return; }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          csvData = parseCSV(e.target.result);
+          previewCSV();
+        } catch (err) {
+          alert('Error parsing CSV: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Helpers
+    function escapeHtml(str) { return str ? str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    function formatDate(d) { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+
+    // Event Listeners
+    document.getElementById('filterRole').addEventListener('change', renderUsers);
+    document.getElementById('filterStatus').addEventListener('change', renderUsers);
+    document.getElementById('searchInput').addEventListener('input', renderUsers);
+
+    // Init
+    checkAuth().then(ok => { if (ok) loadUsers(); });
+  </script>
+</body>
+</html>
