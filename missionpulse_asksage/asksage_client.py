@@ -229,7 +229,7 @@ class AskSageClient:
             response.raise_for_status()
             
             data = response.json()
-            token = data.get("token") or data.get("access_token")
+            token = data.get("response", {}).get("access_token")
             
             if not token:
                 raise ValueError("No token in response")
@@ -565,3 +565,5 @@ async def create_asksage_client(config: Optional[AskSageConfig] = None) -> AskSa
     # Warm up token
     await client._ensure_token()
     return client
+
+
