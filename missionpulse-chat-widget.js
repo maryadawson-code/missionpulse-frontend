@@ -1,409 +1,382 @@
 /**
  * MissionPulse AI Chat Widget v2.0
- * Enhanced UX: Enter-to-send, suggested prompts, streaming responses
+ * Embeddable chat component with Enter-to-send and suggested prompts
  * 
- * Usage:
- * <script src="missionpulse-chat-widget.js"></script>
- * <script>
- *   MissionPulseChat.init({
- *     containerId: 'chat-container',
- *     agent: 'capture', // capture, strategy, blackhat, pricing, compliance, writer, contracts, orals
- *     opportunityId: 'opp-123' // optional context
- *   });
- * </script>
+ * Usage: Include this script and call:
+ * MissionPulseChat.init({ agent: 'capture', containerId: 'chatWidget' });
  */
 
 const MissionPulseChat = (function() {
-    // =========================================================================
-    // CONFIGURATION
-    // =========================================================================
-    const API_URL = 'https://missionpulse-api.onrender.com';
+  const API_URL = 'https://missionpulse-api.onrender.com';
+  
+  // Agent configurations with prompts
+  const agentConfig = {
+    capture: {
+      name: 'Capture Agent',
+      icon: '🎯',
+      prompts: [
+        'What win themes should we emphasize?',
+        'Analyze our competitive position',
+        'What intelligence gaps exist?',
+        'Draft capture strategy'
+      ]
+    },
+    strategy: {
+      name: 'Strategy Agent',
+      icon: '♟️',
+      prompts: [
+        'Who are likely competitors?',
+        'What are our discriminators?',
+        'Suggest teaming partners',
+        'Position against incumbent'
+      ]
+    },
+    blackhat: {
+      name: 'Black Hat Agent',
+      icon: '🎩',
+      prompts: [
+        'How would competitors ghost us?',
+        'What are our vulnerabilities?',
+        'Predict competitor strategy',
+        'Evaluator objections?'
+      ]
+    },
+    pricing: {
+      name: 'Pricing Agent',
+      icon: '💰',
+      prompts: [
+        'Estimate price-to-win',
+        'What LCATs are needed?',
+        'Review burden rates',
+        'Structure the pricing'
+      ]
+    },
+    compliance: {
+      name: 'Compliance Agent',
+      icon: '✅',
+      prompts: [
+        'List RFP requirements',
+        'Check Section L compliance',
+        'Required certifications?',
+        'Flag compliance gaps'
+      ]
+    },
+    writer: {
+      name: 'Writer Agent',
+      icon: '✍️',
+      prompts: [
+        'Draft executive summary',
+        'Write technical approach',
+        'Past performance narrative',
+        'Improve this text...'
+      ]
+    },
+    contracts: {
+      name: 'Contracts Agent',
+      icon: '📜',
+      prompts: [
+        'Explain this FAR clause',
+        'Key contract terms?',
+        'High-risk clauses?',
+        'Is this negotiable?'
+      ]
+    },
+    orals: {
+      name: 'Orals Coach',
+      icon: '🎤',
+      prompts: [
+        'Likely questions?',
+        'Structure presentation',
+        'Create talking points',
+        'Handle tough questions'
+      ]
+    }
+  };
+
+  let config = {};
+  let chatHistory = [];
+  let isTyping = false;
+
+  // Initialize widget
+  function init(options = {}) {
+    config = {
+      agent: options.agent || 'capture',
+      containerId: options.containerId || 'missionpulse-chat',
+      context: options.context || {},
+      onMessage: options.onMessage || null,
+      collapsed: options.collapsed !== false
+    };
+
+    render();
+    loadHistory();
+    setupEvents();
+  }
+
+  // Render widget HTML
+  function render() {
+    const container = document.getElementById(config.containerId);
+    if (!container) return;
+
+    const agent = agentConfig[config.agent] || agentConfig.capture;
     
-    const AGENTS = {
-        capture: {
-            name: 'Capture Agent',
-            icon: '🎯',
-            color: 'cyan',
-            description: 'Win strategy and capture planning',
-            prompts: [
-                'Analyze this opportunity for Go/No-Go',
-                'What are our key discriminators?',
-                'Identify the incumbent and their weaknesses',
-                'Draft a capture plan outline'
-            ]
-        },
-        strategy: {
-            name: 'Strategy Agent',
-            icon: '♟️',
-            color: 'purple',
-            description: 'Competitive positioning and win themes',
-            prompts: [
-                'Develop win themes for this opportunity',
-                'What questions should we ask the customer?',
-                'How do we ghost the competition?',
-                'Create a SWOT analysis'
-            ]
-        },
-        blackhat: {
-            name: 'Black Hat Agent',
-            icon: '🎩',
-            color: 'red',
-            description: 'Competitor intelligence analysis',
-            prompts: [
-                'Who are our main competitors?',
-                'What is the incumbent likely to propose?',
-                'Identify competitor weaknesses to exploit',
-                'How would competitors attack our proposal?'
-            ]
-        },
-        pricing: {
-            name: 'Pricing Agent',
-            icon: '💰',
-            color: 'emerald',
-            description: 'BOE and price-to-win analysis',
-            prompts: [
-                'What labor categories do we need?',
-                'Estimate the price-to-win range',
-                'Review our rate competitiveness',
-                'Build a rough order of magnitude'
-            ]
-        },
-        compliance: {
-            name: 'Compliance Agent',
-            icon: '📋',
-            color: 'amber',
-            description: 'RFP requirements and FAR/DFARS',
-            prompts: [
-                'Extract requirements from Section L',
-                'Check for mandatory certifications',
-                'What FAR clauses apply here?',
-                'Build a compliance matrix'
-            ]
-        },
-        writer: {
-            name: 'Writer Agent',
-            icon: '✍️',
-            color: 'blue',
-            description: 'Proposal content generation',
-            prompts: [
-                'Draft an executive summary',
-                'Write a technical approach section',
-                'Create a management plan outline',
-                'Generate past performance narrative'
-            ]
-        },
-        contracts: {
-            name: 'Contracts Agent',
-            icon: '📜',
-            color: 'rose',
-            description: 'Contract terms and negotiations',
-            prompts: [
-                'Review these contract terms',
-                'What are the key risks in the SOW?',
-                'Identify negotiable clauses',
-                'Summarize the CLIN structure'
-            ]
-        },
-        orals: {
-            name: 'Orals Agent',
-            icon: '🎤',
-            color: 'indigo',
-            description: 'Presentation prep and Q&A',
-            prompts: [
-                'Generate likely orals questions',
-                'Create talking points for the PM',
-                'How should we handle transition questions?',
-                'Draft opening remarks'
-            ]
-        }
-    };
+    container.innerHTML = `
+      <div id="mpChatWidget" class="fixed bottom-4 right-4 z-50 font-sans">
+        <!-- Toggle Button -->
+        <button 
+          id="mpChatToggle"
+          class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg flex items-center justify-center text-2xl hover:scale-105 transition-transform"
+          title="Chat with ${agent.name}"
+        >
+          ${agent.icon}
+        </button>
 
-    let currentConfig = {};
-    let messages = [];
-    let isStreaming = false;
-
-    // =========================================================================
-    // INITIALIZE
-    // =========================================================================
-    function init(config) {
-        currentConfig = {
-            containerId: config.containerId || 'chat-container',
-            agent: config.agent || 'capture',
-            opportunityId: config.opportunityId || null,
-            onMessage: config.onMessage || null
-        };
-
-        render();
-        attachListeners();
-    }
-
-    // =========================================================================
-    // RENDER
-    // =========================================================================
-    function render() {
-        const container = document.getElementById(currentConfig.containerId);
-        if (!container) return;
-
-        const agent = AGENTS[currentConfig.agent] || AGENTS.capture;
-
-        container.innerHTML = `
-            <div class="flex flex-col h-full bg-slate-900 rounded-xl overflow-hidden border border-slate-700">
-                <!-- Header -->
-                <div class="flex items-center gap-3 px-4 py-3 bg-slate-800 border-b border-slate-700">
-                    <div class="w-10 h-10 rounded-lg bg-${agent.color}-500/20 flex items-center justify-center text-xl">
-                        ${agent.icon}
-                    </div>
-                    <div class="flex-1">
-                        <div class="font-semibold text-white">${agent.name}</div>
-                        <div class="text-xs text-slate-400">${agent.description}</div>
-                    </div>
-                    <div id="chat-status" class="flex items-center gap-2 px-2 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-400">
-                        <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
-                        Ready
-                    </div>
-                </div>
-
-                <!-- Messages -->
-                <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
-                    ${messages.length === 0 ? renderWelcome(agent) : messages.map(renderMessage).join('')}
-                </div>
-
-                <!-- Suggested Prompts -->
-                <div id="chat-prompts" class="px-4 pb-2 ${messages.length > 0 ? 'hidden' : ''}">
-                    <div class="text-xs text-slate-500 mb-2">Suggested prompts:</div>
-                    <div class="flex flex-wrap gap-2">
-                        ${agent.prompts.map(p => `
-                            <button 
-                                onclick="MissionPulseChat.sendPrompt('${p.replace(/'/g, "\\'")}')"
-                                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
-                            >
-                                ${p}
-                            </button>
-                        `).join('')}
-                    </div>
-                </div>
-
-                <!-- Input -->
-                <div class="p-4 border-t border-slate-700">
-                    <div class="flex gap-2">
-                        <textarea 
-                            id="chat-input"
-                            placeholder="Ask ${agent.name.toLowerCase()}... (Enter to send, Shift+Enter for new line)"
-                            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 resize-none focus:border-${agent.color}-500 focus:outline-none"
-                            rows="1"
-                            style="min-height: 48px; max-height: 120px;"
-                        ></textarea>
-                        <button 
-                            id="chat-send"
-                            onclick="MissionPulseChat.send()"
-                            class="px-4 py-3 bg-${agent.color}-500 hover:bg-${agent.color}-400 text-slate-900 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Send
-                        </button>
-                    </div>
-                    <div class="text-xs text-slate-600 mt-2 text-center">
-                        AI responses require human review • CUI handling applies
-                    </div>
-                </div>
+        <!-- Chat Panel -->
+        <div id="mpChatPanel" class="hidden absolute bottom-16 right-0 w-80 sm:w-96 bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden" style="max-height: 500px;">
+          <!-- Header -->
+          <div class="bg-gray-800 px-4 py-3 flex items-center gap-3 border-b border-gray-700">
+            <span class="text-xl">${agent.icon}</span>
+            <div class="flex-1">
+              <div class="font-medium text-white text-sm">${agent.name}</div>
+              <div class="text-xs text-gray-400">AI Assistant</div>
             </div>
-        `;
-    }
+            <button id="mpChatClose" class="text-gray-400 hover:text-white text-lg">&times;</button>
+          </div>
 
-    function renderWelcome(agent) {
-        return `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">${agent.icon}</div>
-                <h3 class="text-lg font-semibold text-white mb-2">Welcome to ${agent.name}</h3>
-                <p class="text-slate-400 text-sm max-w-md mx-auto">
-                    ${agent.description}. Ask me anything about your proposal or select a suggested prompt below.
-                </p>
+          <!-- Messages -->
+          <div id="mpChatMessages" class="h-64 overflow-y-auto p-3 space-y-3 bg-gray-900">
+            <div class="text-center text-gray-500 text-xs py-4">
+              Start a conversation or use a prompt below
             </div>
-        `;
-    }
+          </div>
 
-    function renderMessage(msg) {
-        if (msg.role === 'user') {
-            return `
-                <div class="flex justify-end">
-                    <div class="max-w-[80%] bg-cyan-500/20 border border-cyan-500/30 rounded-xl px-4 py-3">
-                        <div class="text-white whitespace-pre-wrap">${escapeHtml(msg.content)}</div>
-                    </div>
-                </div>
-            `;
-        } else {
-            return `
-                <div class="flex justify-start">
-                    <div class="max-w-[80%] bg-slate-800 border border-slate-700 rounded-xl px-4 py-3">
-                        <div class="text-slate-300 whitespace-pre-wrap">${escapeHtml(msg.content)}</div>
-                        ${msg.isStreaming ? '<span class="inline-block w-2 h-4 bg-cyan-500 animate-pulse ml-1"></span>' : ''}
-                    </div>
-                </div>
-            `;
+          <!-- Suggested Prompts -->
+          <div id="mpChatPrompts" class="px-3 py-2 border-t border-gray-800 bg-gray-900/50">
+            <div class="flex flex-wrap gap-1">
+              ${agent.prompts.map(p => `
+                <button class="mp-prompt-btn text-xs px-2 py-1 bg-gray-800 hover:bg-cyan-600/30 border border-gray-700 hover:border-cyan-500 rounded-full text-gray-300 hover:text-cyan-300 transition-colors truncate max-w-full">
+                  ${escapeHtml(p)}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Input -->
+          <div class="p-3 border-t border-gray-700 bg-gray-800">
+            <div class="flex gap-2">
+              <textarea 
+                id="mpChatInput"
+                class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 resize-none focus:border-cyan-500 focus:outline-none"
+                placeholder="Type message... (Enter to send)"
+                rows="1"
+              ></textarea>
+              <button 
+                id="mpChatSend"
+                class="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 rounded-lg text-white text-sm font-medium transition-colors"
+              >
+                →
+              </button>
+            </div>
+            <div class="text-center text-xs text-gray-600 mt-1">AI GENERATED - REQUIRES HUMAN REVIEW</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Setup event listeners
+  function setupEvents() {
+    const toggle = document.getElementById('mpChatToggle');
+    const panel = document.getElementById('mpChatPanel');
+    const close = document.getElementById('mpChatClose');
+    const input = document.getElementById('mpChatInput');
+    const send = document.getElementById('mpChatSend');
+    const prompts = document.querySelectorAll('.mp-prompt-btn');
+
+    if (toggle) toggle.addEventListener('click', () => panel.classList.toggle('hidden'));
+    if (close) close.addEventListener('click', () => panel.classList.add('hidden'));
+    
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
         }
-    }
-
-    // =========================================================================
-    // EVENT HANDLERS
-    // =========================================================================
-    function attachListeners() {
-        const input = document.getElementById('chat-input');
-        if (!input) return;
-
-        // Enter to send (Shift+Enter for new line)
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-            }
-        });
-
-        // Auto-resize textarea
-        input.addEventListener('input', () => {
-            input.style.height = 'auto';
-            input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-        });
-    }
-
-    // =========================================================================
-    // SEND MESSAGE
-    // =========================================================================
-    async function send() {
-        const input = document.getElementById('chat-input');
-        const content = input?.value?.trim();
-        
-        if (!content || isStreaming) return;
-
-        // Add user message
-        messages.push({ role: 'user', content });
-        input.value = '';
+      });
+      
+      // Auto-resize
+      input.addEventListener('input', () => {
         input.style.height = 'auto';
-
-        // Hide prompts
-        const promptsEl = document.getElementById('chat-prompts');
-        if (promptsEl) promptsEl.classList.add('hidden');
-
-        // Update UI
-        render();
-        attachListeners();
-        scrollToBottom();
-
-        // Show streaming indicator
-        isStreaming = true;
-        updateStatus('Thinking...', 'amber');
-
-        // Add assistant message placeholder
-        messages.push({ role: 'assistant', content: '', isStreaming: true });
-        render();
-        attachListeners();
-
-        try {
-            const response = await fetch(`${API_URL}/api/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    agent: currentConfig.agent,
-                    messages: messages.slice(0, -1), // Exclude placeholder
-                    opportunity_id: currentConfig.opportunityId
-                })
-            });
-
-            if (!response.ok) throw new Error('API error');
-
-            const data = await response.json();
-            
-            // Update last message with response
-            messages[messages.length - 1] = {
-                role: 'assistant',
-                content: data.response || data.message || 'I apologize, I encountered an issue. Please try again.',
-                isStreaming: false
-            };
-
-        } catch (error) {
-            console.error('Chat error:', error);
-            
-            // Fallback demo response
-            const agent = AGENTS[currentConfig.agent];
-            messages[messages.length - 1] = {
-                role: 'assistant',
-                content: `[Demo Mode] As the ${agent.name}, I would analyze your request: "${content}"\n\nIn production, I'll provide detailed proposal guidance based on Shipley methodology, your company's knowledge base, and the specific opportunity context.\n\nKey areas I can help with:\n• ${agent.prompts.join('\n• ')}`,
-                isStreaming: false
-            };
-        }
-
-        isStreaming = false;
-        updateStatus('Ready', 'emerald');
-        render();
-        attachListeners();
-        scrollToBottom();
-
-        // Callback
-        if (currentConfig.onMessage) {
-            currentConfig.onMessage(messages[messages.length - 1]);
-        }
+        input.style.height = Math.min(input.scrollHeight, 80) + 'px';
+      });
     }
 
-    function sendPrompt(prompt) {
-        const input = document.getElementById('chat-input');
+    if (send) send.addEventListener('click', sendMessage);
+
+    prompts.forEach(btn => {
+      btn.addEventListener('click', () => {
         if (input) {
-            input.value = prompt;
-            send();
+          input.value = btn.textContent.trim();
+          input.focus();
         }
+      });
+    });
+  }
+
+  // Send message
+  async function sendMessage() {
+    const input = document.getElementById('mpChatInput');
+    const message = input?.value.trim();
+    
+    if (!message || isTyping) return;
+
+    // Add user message
+    chatHistory.push({ role: 'user', content: message });
+    input.value = '';
+    input.style.height = 'auto';
+    renderMessages();
+
+    // Hide prompts after first message
+    const promptsEl = document.getElementById('mpChatPrompts');
+    if (promptsEl) promptsEl.style.display = 'none';
+
+    // Show typing
+    isTyping = true;
+    showTyping();
+
+    try {
+      const response = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent: config.agent,
+          message: message,
+          context: config.context,
+          history: chatHistory.slice(-6)
+        })
+      });
+
+      let reply;
+      if (response.ok) {
+        const data = await response.json();
+        reply = data.response || data.message || getFallback();
+      } else {
+        reply = getFallback();
+      }
+
+      chatHistory.push({ role: 'assistant', content: reply });
+      
+      if (config.onMessage) config.onMessage(reply);
+      
+    } catch (err) {
+      chatHistory.push({ role: 'assistant', content: getFallback() });
     }
 
-    // =========================================================================
-    // UTILITIES
-    // =========================================================================
-    function updateStatus(text, color) {
-        const status = document.getElementById('chat-status');
-        if (status) {
-            status.className = `flex items-center gap-2 px-2 py-1 rounded-full text-xs bg-${color}-500/20 text-${color}-400`;
-            status.innerHTML = `<div class="w-2 h-2 rounded-full bg-${color}-400 ${color === 'amber' ? 'animate-pulse' : ''}"></div>${text}`;
-        }
-    }
+    isTyping = false;
+    renderMessages();
+    saveHistory();
+  }
 
-    function scrollToBottom() {
-        const messagesEl = document.getElementById('chat-messages');
-        if (messagesEl) {
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
-    }
+  // Fallback response
+  function getFallback() {
+    const agent = agentConfig[config.agent];
+    return `I'm ${agent?.name || 'your AI assistant'}. I can help with federal proposal questions. The API is currently warming up - please try again in a moment, or check your connection.`;
+  }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+  // Show typing indicator
+  function showTyping() {
+    const container = document.getElementById('mpChatMessages');
+    if (!container) return;
+    
+    const typing = document.createElement('div');
+    typing.id = 'mpTyping';
+    typing.className = 'flex gap-2';
+    typing.innerHTML = `
+      <div class="bg-gray-800 rounded-lg px-3 py-2">
+        <div class="flex gap-1">
+          <span class="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+          <span class="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" style="animation-delay:0.2s"></span>
+          <span class="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" style="animation-delay:0.4s"></span>
+        </div>
+      </div>
+    `;
+    container.appendChild(typing);
+    container.scrollTop = container.scrollHeight;
+  }
 
-    function clearHistory() {
-        messages = [];
-        render();
-        attachListeners();
-    }
+  // Render messages
+  function renderMessages() {
+    const container = document.getElementById('mpChatMessages');
+    if (!container) return;
+    
+    const agent = agentConfig[config.agent];
 
-    function setAgent(agentId) {
-        if (AGENTS[agentId]) {
-            currentConfig.agent = agentId;
-            messages = [];
-            render();
-            attachListeners();
-        }
-    }
+    container.innerHTML = chatHistory.map(msg => {
+      if (msg.role === 'user') {
+        return `
+          <div class="flex justify-end">
+            <div class="bg-cyan-600/30 border border-cyan-500/30 rounded-lg rounded-tr-none px-3 py-2 max-w-[85%]">
+              <div class="text-sm text-white">${escapeHtml(msg.content)}</div>
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="flex gap-2">
+            <span class="text-lg">${agent?.icon || '🤖'}</span>
+            <div class="bg-gray-800 rounded-lg rounded-tl-none px-3 py-2 max-w-[85%]">
+              <div class="text-sm text-gray-200">${formatMessage(msg.content)}</div>
+            </div>
+          </div>
+        `;
+      }
+    }).join('');
 
-    // =========================================================================
-    // PUBLIC API
-    // =========================================================================
-    return {
-        init,
-        send,
-        sendPrompt,
-        clearHistory,
-        setAgent,
-        getMessages: () => [...messages],
-        AGENTS
-    };
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // Format message
+  function formatMessage(text) {
+    return escapeHtml(text)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+  }
+
+  // Save/load history
+  function saveHistory() {
+    try {
+      localStorage.setItem(`mp_chat_${config.agent}`, JSON.stringify(chatHistory.slice(-20)));
+    } catch (e) {}
+  }
+
+  function loadHistory() {
+    try {
+      const saved = localStorage.getItem(`mp_chat_${config.agent}`);
+      if (saved) {
+        chatHistory = JSON.parse(saved);
+        renderMessages();
+      }
+    } catch (e) {}
+  }
+
+  // Escape HTML
+  function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Public API
+  return {
+    init,
+    sendMessage,
+    clearHistory: () => { chatHistory = []; renderMessages(); },
+    setContext: (ctx) => { config.context = ctx; }
+  };
 })();
 
-// Auto-expose to window
-if (typeof window !== 'undefined') {
-    window.MissionPulseChat = MissionPulseChat;
+// Auto-init if container exists
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('missionpulse-chat')) {
+      MissionPulseChat.init();
+    }
+  });
 }

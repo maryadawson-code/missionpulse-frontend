@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agent Hub | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .glass-card { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .agent-card { transition: all 0.3s; cursor: pointer; }
+    .agent-card:hover { border-color: rgba(0, 229, 250, 0.4); transform: translateY(-2px); }
+    .agent-card.active { border-color: #00e5fa; background: rgba(0, 229, 250, 0.1); }
+    .chat-bubble { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes typing { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
+    .typing-dot { animation: typing 1.4s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    .prompt-chip { transition: all 0.2s; }
+    .prompt-chip:hover { background: rgba(0, 229, 250, 0.2); border-color: #00e5fa; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .message-content { line-height: 1.6; }
+    .message-content p { margin-bottom: 0.5rem; }
+    .message-content ul, .message-content ol { margin-left: 1.5rem; margin-bottom: 0.5rem; }
+    .message-content code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  </style>
+</head>
+<body class="text-white">
+  <div class="min-h-screen flex">
+    <!-- Agent Sidebar -->
+    <div class="w-72 border-r border-gray-800 p-4 flex flex-col">
+      <div class="mb-6">
+        <h1 class="text-xl font-bold text-cyan-400">AI Agent Hub</h1>
+        <p class="text-xs text-gray-500 mt-1">Select an agent to start</p>
+      </div>
+      
+      <div class="space-y-2 flex-1 overflow-y-auto scrollbar-thin" id="agentList">
+        <!-- Agents populated by JS -->
+      </div>
+      
+      <div class="pt-4 border-t border-gray-800 mt-4">
+        <a href="index.html" class="flex items-center gap-2 text-gray-400 hover:text-white text-sm">
+          <span>←</span> Back to Dashboard
+        </a>
+      </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="flex-1 flex flex-col">
+      <!-- Chat Header -->
+      <div class="p-4 border-b border-gray-800 flex items-center gap-4">
+        <div id="agentAvatar" class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center text-xl">🤖</div>
+        <div>
+          <h2 id="agentName" class="font-semibold">Select an Agent</h2>
+          <p id="agentDesc" class="text-xs text-gray-500">Choose an AI assistant from the sidebar</p>
+        </div>
+        <div class="ml-auto flex items-center gap-3">
+          <button onclick="clearChat()" class="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
+            Clear Chat
+          </button>
+          <div id="connectionStatus" class="flex items-center gap-2 text-xs">
+            <span class="w-2 h-2 rounded-full bg-green-500"></span>
+            <span class="text-gray-400">Online</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin" id="chatMessages">
+        <div class="text-center py-12 text-gray-500">
+          <div class="text-4xl mb-4">💬</div>
+          <p>Select an agent to start chatting</p>
+        </div>
+      </div>
+
+      <!-- Suggested Prompts -->
+      <div id="suggestedPrompts" class="px-4 py-3 border-t border-gray-800 hidden">
+        <p class="text-xs text-gray-500 mb-2">Suggested prompts:</p>
+        <div class="flex flex-wrap gap-2" id="promptChips"></div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="p-4 border-t border-gray-800">
+        <div class="glass-card rounded-xl p-3">
+          <textarea 
+            id="messageInput" 
+            placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+            class="w-full bg-transparent border-0 outline-none resize-none text-white placeholder-gray-500"
+            rows="2"
+            disabled
+          ></textarea>
+          <div class="flex items-center justify-between mt-2">
+            <div class="flex items-center gap-3 text-xs text-gray-500">
+              <span>Press <kbd class="px-1.5 py-0.5 bg-gray-800 rounded">Enter</kbd> to send</span>
+              <span>•</span>
+              <span><kbd class="px-1.5 py-0.5 bg-gray-800 rounded">Shift+Enter</kbd> for new line</span>
+            </div>
+            <button 
+              id="sendBtn"
+              onclick="sendMessage()"
+              disabled
+              class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+            >
+              Send →
+            </button>
+          </div>
+        </div>
+        <p class="text-center text-xs text-gray-600 mt-2">AI GENERATED - REQUIRES HUMAN REVIEW</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase Configuration
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+    const API_URL = 'https://missionpulse-api.onrender.com';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Agent Definitions with Suggested Prompts
+    const agents = [
+      {
+        id: 'capture',
+        name: 'Capture Agent',
+        icon: '🎯',
+        color: 'blue',
+        description: 'Win strategy & capture planning',
+        prompts: [
+          'What are the key win themes for this opportunity?',
+          'Analyze our competitive position',
+          'Draft a capture strategy for this pursuit',
+          'What intelligence do we need to gather?'
+        ]
+      },
+      {
+        id: 'strategy',
+        name: 'Strategy Agent',
+        icon: '♟️',
+        color: 'purple',
+        description: 'Competitive analysis & positioning',
+        prompts: [
+          'Who are our main competitors for this bid?',
+          'What are our discriminators vs the incumbent?',
+          'Suggest teaming partner criteria',
+          'How should we position against [competitor]?'
+        ]
+      },
+      {
+        id: 'blackhat',
+        name: 'Black Hat Agent',
+        icon: '🎩',
+        color: 'gray',
+        description: 'Competitor intelligence & threats',
+        prompts: [
+          'What would [competitor] propose?',
+          'Identify vulnerabilities in our approach',
+          'What objections might evaluators have?',
+          'How would a competitor ghost us?'
+        ]
+      },
+      {
+        id: 'pricing',
+        name: 'Pricing Agent',
+        icon: '💰',
+        color: 'yellow',
+        description: 'BOE development & price-to-win',
+        prompts: [
+          'What labor categories do we need?',
+          'Estimate the price-to-win range',
+          'Review our burden rates for competitiveness',
+          'How should we structure the pricing?'
+        ]
+      },
+      {
+        id: 'compliance',
+        name: 'Compliance Agent',
+        icon: '✅',
+        color: 'green',
+        description: 'RFP requirements & compliance',
+        prompts: [
+          'List all mandatory requirements from the RFP',
+          'Check our response against Section L',
+          'What certifications are required?',
+          'Flag any compliance gaps in our draft'
+        ]
+      },
+      {
+        id: 'writer',
+        name: 'Writer Agent',
+        icon: '✍️',
+        color: 'cyan',
+        description: 'Proposal section drafting',
+        prompts: [
+          'Draft the executive summary',
+          'Write the technical approach section',
+          'Create a past performance narrative',
+          'Improve this paragraph: [paste text]'
+        ]
+      },
+      {
+        id: 'contracts',
+        name: 'Contracts Agent',
+        icon: '📜',
+        color: 'red',
+        description: 'FAR/DFARS & contract analysis',
+        prompts: [
+          'Explain FAR 52.232-25 implications',
+          'What are the key terms in this IDIQ?',
+          'Flag high-risk contract clauses',
+          'Is this clause negotiable?'
+        ]
+      },
+      {
+        id: 'orals',
+        name: 'Orals Coach',
+        icon: '🎤',
+        color: 'pink',
+        description: 'Presentation prep & Q&A',
+        prompts: [
+          'What questions might evaluators ask?',
+          'Help me structure my oral presentation',
+          'Create talking points for [topic]',
+          'How should I handle tough questions?'
+        ]
+      }
+    ];
+
+    let currentAgent = null;
+    let chatHistory = [];
+    let isTyping = false;
+
+    // Initialize
+    function init() {
+      renderAgentList();
+      setupKeyboardShortcuts();
+      
+      // Load saved chat if exists
+      const saved = localStorage.getItem('missionpulse_chat');
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.agentId) {
+          selectAgent(data.agentId);
+          chatHistory = data.history || [];
+          renderMessages();
+        }
+      }
+    }
+
+    // Render Agent List
+    function renderAgentList() {
+      document.getElementById('agentList').innerHTML = agents.map(agent => `
+        <div 
+          class="agent-card glass-card rounded-xl p-3 ${currentAgent?.id === agent.id ? 'active' : ''}"
+          onclick="selectAgent('${agent.id}')"
+          id="agent-${agent.id}"
+        >
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-${agent.color}-500/20 flex items-center justify-center text-xl">
+              ${agent.icon}
+            </div>
+            <div class="min-w-0">
+              <div class="font-medium text-sm truncate">${agent.name}</div>
+              <div class="text-xs text-gray-500 truncate">${agent.description}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Select Agent
+    function selectAgent(agentId) {
+      currentAgent = agents.find(a => a.id === agentId);
+      if (!currentAgent) return;
+
+      // Update UI
+      document.querySelectorAll('.agent-card').forEach(el => el.classList.remove('active'));
+      document.getElementById(`agent-${agentId}`).classList.add('active');
+      
+      document.getElementById('agentAvatar').innerHTML = currentAgent.icon;
+      document.getElementById('agentName').textContent = currentAgent.name;
+      document.getElementById('agentDesc').textContent = currentAgent.description;
+      
+      // Enable input
+      document.getElementById('messageInput').disabled = false;
+      document.getElementById('messageInput').placeholder = `Ask ${currentAgent.name} anything...`;
+      document.getElementById('sendBtn').disabled = false;
+      
+      // Show suggested prompts
+      renderSuggestedPrompts();
+      
+      // Clear chat for new agent or load existing
+      const savedAgent = localStorage.getItem('missionpulse_chat_agent');
+      if (savedAgent !== agentId) {
+        chatHistory = [];
+        localStorage.setItem('missionpulse_chat_agent', agentId);
+      }
+      
+      renderMessages();
+      
+      // Focus input
+      document.getElementById('messageInput').focus();
+    }
+
+    // Render Suggested Prompts
+    function renderSuggestedPrompts() {
+      if (!currentAgent) return;
+      
+      const container = document.getElementById('suggestedPrompts');
+      const chips = document.getElementById('promptChips');
+      
+      chips.innerHTML = currentAgent.prompts.map(prompt => `
+        <button 
+          onclick="usePrompt('${escapeHtml(prompt)}')"
+          class="prompt-chip px-3 py-1.5 text-xs bg-gray-800/50 border border-gray-700 rounded-full hover:text-cyan-400 transition-colors"
+        >
+          ${escapeHtml(prompt)}
+        </button>
+      `).join('');
+      
+      container.classList.remove('hidden');
+    }
+
+    // Use Suggested Prompt
+    function usePrompt(prompt) {
+      document.getElementById('messageInput').value = prompt;
+      document.getElementById('messageInput').focus();
+    }
+
+    // Setup Keyboard Shortcuts
+    function setupKeyboardShortcuts() {
+      const input = document.getElementById('messageInput');
+      
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (!isTyping && input.value.trim()) {
+            sendMessage();
+          }
+        }
+      });
+    }
+
+    // Send Message
+    async function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      
+      if (!message || !currentAgent || isTyping) return;
+      
+      // Add user message
+      chatHistory.push({ role: 'user', content: message });
+      input.value = '';
+      renderMessages();
+      
+      // Hide prompts after first message
+      document.getElementById('suggestedPrompts').classList.add('hidden');
+      
+      // Show typing indicator
+      isTyping = true;
+      showTypingIndicator();
+      
+      try {
+        // Call API
+        const response = await fetch(`${API_URL}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent: currentAgent.id,
+            message: message,
+            history: chatHistory.slice(-10) // Last 10 messages for context
+          })
+        });
+        
+        let reply;
+        if (response.ok) {
+          const data = await response.json();
+          reply = data.response || data.message || 'I received your message but couldn\'t generate a response.';
+        } else {
+          // Fallback response
+          reply = generateFallbackResponse(message);
+        }
+        
+        // Add assistant message
+        chatHistory.push({ role: 'assistant', content: reply });
+        
+      } catch (err) {
+        console.error('Chat error:', err);
+        // Fallback response
+        chatHistory.push({ 
+          role: 'assistant', 
+          content: generateFallbackResponse(message)
+        });
+      }
+      
+      isTyping = false;
+      renderMessages();
+      saveChat();
+    }
+
+    // Generate Fallback Response (when API unavailable)
+    function generateFallbackResponse(message) {
+      const responses = {
+        capture: `Based on your question about "${message.substring(0, 50)}...", here are my capture planning recommendations:\n\n1. **Customer Intimacy**: Schedule meetings with the program office to understand unstated requirements\n2. **Competitive Assessment**: Identify likely competitors and their probable strategies\n3. **Solution Development**: Align your technical approach with evaluation criteria\n4. **Team Building**: Identify gaps requiring teaming partners\n\n*Note: Connect to the full API for detailed, context-aware analysis.*`,
+        strategy: `Regarding "${message.substring(0, 50)}...":\n\n**Strategic Considerations:**\n• Evaluate incumbent strengths and weaknesses\n• Identify your unique discriminators\n• Consider price-to-win positioning\n• Assess teaming opportunities\n\n*For detailed competitive analysis, ensure the API connection is active.*`,
+        blackhat: `**Black Hat Analysis** for your query:\n\nPotential competitor moves:\n1. They may emphasize their past performance\n2. Watch for aggressive pricing strategies\n3. Expect them to ghost your weaknesses\n\n**Recommended Counter-Strategies:**\n• Strengthen your discriminators\n• Prepare for price challenges\n• Document unique qualifications\n\n*AI GENERATED - REQUIRES HUMAN REVIEW*`,
+        pricing: `**Pricing Guidance:**\n\nFor competitive federal pricing:\n1. Research comparable contract awards\n2. Apply appropriate wrap rates\n3. Consider price-to-win analysis\n4. Validate against should-cost models\n\nKey factors: labor mix, indirect rates, fee structure.\n\n*Connect to pricing database for detailed BOE support.*`,
+        compliance: `**Compliance Check:**\n\nEnsure your response addresses:\n• All Section L instructions\n• Section M evaluation criteria\n• Mandatory certifications\n• Page/format limitations\n\nCreate a compliance matrix to track all requirements.\n\n*Upload RFP for detailed compliance analysis.*`,
+        writer: `I'll help you draft that content. Here's a starting framework:\n\n**Opening:** Lead with your key discriminator\n**Body:** Provide evidence and proof points\n**Closing:** Reinforce benefits to the government\n\nRemember: Be specific, use active voice, and quantify results where possible.\n\n*AI GENERATED - REQUIRES HUMAN REVIEW*`,
+        contracts: `**Contract Analysis:**\n\nKey areas to review:\n• Payment terms and invoicing\n• Limitation of liability clauses\n• Termination provisions\n• IP rights and data ownership\n• Flow-down requirements\n\nConsult legal counsel for specific clause interpretation.\n\n*AI GENERATED - REQUIRES HUMAN REVIEW*`,
+        orals: `**Oral Presentation Guidance:**\n\n**Structure:**\n1. Opening (establish credibility)\n2. Solution overview (key themes)\n3. Proof points (past performance)\n4. Close (summarize benefits)\n\n**Preparation:**\n• Anticipate tough questions\n• Practice timing\n• Prepare backup slides\n\n*AI GENERATED - REQUIRES HUMAN REVIEW*`
+      };
+      
+      return responses[currentAgent?.id] || 'I\'m here to help with your federal proposal needs. Please try again or check the API connection.';
+    }
+
+    // Show Typing Indicator
+    function showTypingIndicator() {
+      const container = document.getElementById('chatMessages');
+      container.innerHTML += `
+        <div class="flex gap-3 chat-bubble" id="typingIndicator">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-sm flex-shrink-0">
+            ${currentAgent?.icon || '🤖'}
+          </div>
+          <div class="glass-card rounded-xl rounded-tl-none px-4 py-3">
+            <div class="flex gap-1">
+              <span class="typing-dot w-2 h-2 bg-cyan-400 rounded-full"></span>
+              <span class="typing-dot w-2 h-2 bg-cyan-400 rounded-full"></span>
+              <span class="typing-dot w-2 h-2 bg-cyan-400 rounded-full"></span>
+            </div>
+          </div>
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Render Messages
+    function renderMessages() {
+      const container = document.getElementById('chatMessages');
+      
+      if (chatHistory.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8">
+            <div class="text-4xl mb-4">${currentAgent?.icon || '💬'}</div>
+            <p class="text-gray-400 mb-2">Start a conversation with ${currentAgent?.name || 'an agent'}</p>
+            <p class="text-xs text-gray-600">Use suggested prompts below or type your own question</p>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = chatHistory.map((msg, i) => {
+        if (msg.role === 'user') {
+          return `
+            <div class="flex gap-3 justify-end chat-bubble">
+              <div class="bg-cyan-600/20 border border-cyan-500/30 rounded-xl rounded-tr-none px-4 py-3 max-w-[80%]">
+                <div class="message-content text-sm">${formatMessage(msg.content)}</div>
+              </div>
+              <div class="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center text-sm flex-shrink-0">
+                👤
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="flex gap-3 chat-bubble">
+              <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-sm flex-shrink-0">
+                ${currentAgent?.icon || '🤖'}
+              </div>
+              <div class="glass-card rounded-xl rounded-tl-none px-4 py-3 max-w-[80%]">
+                <div class="message-content text-sm text-gray-200">${formatMessage(msg.content)}</div>
+                <div class="text-xs text-gray-600 mt-2">AI GENERATED - REQUIRES HUMAN REVIEW</div>
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+      
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Format Message (basic markdown)
+    function formatMessage(text) {
+      return escapeHtml(text)
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+    }
+
+    // Clear Chat
+    function clearChat() {
+      if (!confirm('Clear chat history?')) return;
+      chatHistory = [];
+      localStorage.removeItem('missionpulse_chat');
+      renderMessages();
+      if (currentAgent) renderSuggestedPrompts();
+      document.getElementById('suggestedPrompts').classList.remove('hidden');
+    }
+
+    // Save Chat
+    function saveChat() {
+      localStorage.setItem('missionpulse_chat', JSON.stringify({
+        agentId: currentAgent?.id,
+        history: chatHistory.slice(-50) // Keep last 50 messages
+      }));
+    }
+
+    // Helpers
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>
