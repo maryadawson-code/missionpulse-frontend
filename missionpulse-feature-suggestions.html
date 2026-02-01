@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feature Suggestions | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+    .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.1); }
+    .glass-strong { background: rgba(0,229,250,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.2); }
+    .glow-text { text-shadow: 0 0 30px rgba(0,229,250,0.5); }
+    .suggestion-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,229,250,0.15); }
+    .vote-btn:hover { transform: scale(1.1); }
+    .vote-btn.voted { background: rgba(0,229,250,0.2); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+    ::-webkit-scrollbar-thumb { background: #00E5FA; border-radius: 3px; }
+  </style>
+</head>
+<body class="text-white">
+  <div id="root"></div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MDY0NTIsImV4cCI6MjA1Mjk4MjQ1Mn0.kPykOLcNowFpHLMOCkLfPC17qb2g9jvVbyUjdUSvfyg';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Categories
+    const CATEGORIES = [
+      { id: 'ai_agents', name: 'AI Agents', icon: '🤖', color: '#00E5FA' },
+      { id: 'integrations', name: 'Integrations', icon: '🔗', color: '#10B981' },
+      { id: 'reporting', name: 'Reporting', icon: '📊', color: '#F59E0B' },
+      { id: 'compliance', name: 'Compliance', icon: '🛡️', color: '#EF4444' },
+      { id: 'collaboration', name: 'Collaboration', icon: '👥', color: '#8B5CF6' },
+      { id: 'ui_ux', name: 'UI/UX', icon: '🎨', color: '#EC4899' },
+      { id: 'mobile', name: 'Mobile', icon: '📱', color: '#14B8A6' },
+      { id: 'other', name: 'Other', icon: '💡', color: '#6366F1' },
+    ];
+
+    // Statuses
+    const STATUSES = [
+      { id: 'submitted', name: 'Submitted', color: '#64748b' },
+      { id: 'under_review', name: 'Under Review', color: '#F59E0B' },
+      { id: 'planned', name: 'Planned', color: '#8B5CF6' },
+      { id: 'in_progress', name: 'In Progress', color: '#00E5FA' },
+      { id: 'completed', name: 'Completed', color: '#10B981' },
+      { id: 'declined', name: 'Declined', color: '#EF4444' },
+    ];
+
+    // Demo suggestions
+    const DEMO_SUGGESTIONS = [
+      { id: 'd1', title: 'SAM.gov Auto-Sync', description: 'Automatically pull opportunity data from SAM.gov into MissionPulse', category: 'integrations', status: 'planned', votes_up: 47, votes_down: 3, submitted_at: '2026-01-25' },
+      { id: 'd2', title: 'Mobile App', description: 'Native iOS/Android app for on-the-go proposal reviews', category: 'mobile', status: 'under_review', votes_up: 38, votes_down: 5, submitted_at: '2026-01-20' },
+      { id: 'd3', title: 'Custom AI Agent Training', description: 'Allow users to fine-tune AI agents with their own past proposals', category: 'ai_agents', status: 'in_progress', votes_up: 62, votes_down: 2, submitted_at: '2026-01-18' },
+      { id: 'd4', title: 'Slack Integration', description: 'Get notifications and interact with MissionPulse via Slack', category: 'integrations', status: 'submitted', votes_up: 29, votes_down: 4, submitted_at: '2026-01-28' },
+      { id: 'd5', title: 'Dark Mode Improvements', description: 'Better contrast ratios and more theme options', category: 'ui_ux', status: 'completed', votes_up: 55, votes_down: 1, submitted_at: '2026-01-10' },
+      { id: 'd6', title: 'CMMC 2.0 Checklist', description: 'Built-in compliance checklist for CMMC certification', category: 'compliance', status: 'planned', votes_up: 41, votes_down: 0, submitted_at: '2026-01-22' },
+      { id: 'd7', title: 'Executive Dashboard', description: 'High-level KPI dashboard for leadership', category: 'reporting', status: 'submitted', votes_up: 33, votes_down: 2, submitted_at: '2026-01-27' },
+      { id: 'd8', title: 'Real-time Collaboration', description: 'Google Docs-style simultaneous editing on sections', category: 'collaboration', status: 'under_review', votes_up: 51, votes_down: 6, submitted_at: '2026-01-15' },
+    ];
+
+    // State
+    let state = {
+      user: null,
+      userRole: null,
+      isOnline: false,
+      suggestions: DEMO_SUGGESTIONS,
+      userVotes: {},
+      filterCategory: 'all',
+      filterStatus: 'all',
+      sortBy: 'votes', // 'votes' | 'newest' | 'oldest'
+      showNewModal: false,
+      showAdminPanel: false,
+      newSuggestion: { title: '', description: '', category: 'other' },
+      editingSuggestion: null,
+    };
+
+    // Initialize
+    async function init() {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        state.user = session.user;
+        state.isOnline = true;
+        await loadUserProfile();
+        await loadSuggestions();
+        await loadUserVotes();
+      }
+      
+      render();
+    }
+
+    async function loadUserProfile() {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('role, company_id')
+          .eq('id', state.user.id)
+          .single();
+        if (data) state.userRole = data.role;
+      } catch (e) {
+        console.log('Profile load error');
+      }
+    }
+
+    async function loadSuggestions() {
+      try {
+        const { data } = await supabase
+          .from('feature_suggestions')
+          .select('*')
+          .order('votes_up', { ascending: false });
+        if (data && data.length > 0) state.suggestions = data;
+      } catch (e) {
+        console.log('Using demo suggestions');
+      }
+    }
+
+    async function loadUserVotes() {
+      if (!state.user) return;
+      try {
+        const { data } = await supabase
+          .from('feature_votes')
+          .select('suggestion_id, vote_type')
+          .eq('user_id', state.user.id);
+        if (data) {
+          state.userVotes = {};
+          data.forEach(v => state.userVotes[v.suggestion_id] = v.vote_type);
+        }
+      } catch (e) {
+        console.log('Votes load error');
+      }
+    }
+
+    function isAdmin() {
+      return ['CEO', 'COO', 'Admin'].includes(state.userRole);
+    }
+
+    async function vote(suggestionId, voteType) {
+      const suggestion = state.suggestions.find(s => s.id === suggestionId);
+      if (!suggestion) return;
+
+      const currentVote = state.userVotes[suggestionId];
+      
+      // Toggle vote
+      if (currentVote === voteType) {
+        // Remove vote
+        delete state.userVotes[suggestionId];
+        if (voteType === 'up') suggestion.votes_up--;
+        else suggestion.votes_down--;
+      } else {
+        // Change or add vote
+        if (currentVote) {
+          // Changing vote
+          if (currentVote === 'up') suggestion.votes_up--;
+          else suggestion.votes_down--;
+        }
+        state.userVotes[suggestionId] = voteType;
+        if (voteType === 'up') suggestion.votes_up++;
+        else suggestion.votes_down++;
+      }
+
+      if (state.isOnline && state.user) {
+        try {
+          if (state.userVotes[suggestionId]) {
+            await supabase.from('feature_votes').upsert({
+              suggestion_id: suggestionId,
+              user_id: state.user.id,
+              vote_type: voteType
+            });
+          } else {
+            await supabase.from('feature_votes')
+              .delete()
+              .eq('suggestion_id', suggestionId)
+              .eq('user_id', state.user.id);
+          }
+          
+          // Update suggestion vote counts
+          await supabase.from('feature_suggestions')
+            .update({ votes_up: suggestion.votes_up, votes_down: suggestion.votes_down })
+            .eq('id', suggestionId);
+        } catch (e) {
+          console.log('Vote error:', e);
+        }
+      }
+
+      render();
+    }
+
+    async function submitSuggestion() {
+      if (!state.newSuggestion.title.trim()) return;
+
+      const suggestion = {
+        id: 'new-' + Date.now(),
+        title: state.newSuggestion.title,
+        description: state.newSuggestion.description,
+        category: state.newSuggestion.category,
+        status: 'submitted',
+        votes_up: 1, // Auto-upvote own suggestion
+        votes_down: 0,
+        submitted_at: new Date().toISOString(),
+      };
+
+      if (state.isOnline && state.user) {
+        try {
+          const { data } = await supabase.from('feature_suggestions')
+            .insert({
+              title: suggestion.title,
+              description: suggestion.description,
+              category: suggestion.category,
+              submitted_by: state.user.id,
+            })
+            .select()
+            .single();
+          if (data) suggestion.id = data.id;
+          
+          // Auto-upvote
+          await supabase.from('feature_votes').insert({
+            suggestion_id: suggestion.id,
+            user_id: state.user.id,
+            vote_type: 'up'
+          });
+        } catch (e) {
+          console.log('Submit error:', e);
+        }
+      }
+
+      state.suggestions.unshift(suggestion);
+      state.userVotes[suggestion.id] = 'up';
+      state.showNewModal = false;
+      state.newSuggestion = { title: '', description: '', category: 'other' };
+      render();
+    }
+
+    async function updateSuggestionStatus(id, status) {
+      const suggestion = state.suggestions.find(s => s.id === id);
+      if (!suggestion) return;
+
+      suggestion.status = status;
+
+      if (state.isOnline) {
+        try {
+          await supabase.from('feature_suggestions')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', id);
+        } catch (e) {
+          console.log('Update error:', e);
+        }
+      }
+
+      render();
+    }
+
+    function getFilteredSuggestions() {
+      let filtered = [...state.suggestions];
+      
+      if (state.filterCategory !== 'all') {
+        filtered = filtered.filter(s => s.category === state.filterCategory);
+      }
+      
+      if (state.filterStatus !== 'all') {
+        filtered = filtered.filter(s => s.status === state.filterStatus);
+      }
+      
+      // Sort
+      if (state.sortBy === 'votes') {
+        filtered.sort((a, b) => (b.votes_up - b.votes_down) - (a.votes_up - a.votes_down));
+      } else if (state.sortBy === 'newest') {
+        filtered.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+      } else {
+        filtered.sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+      }
+      
+      return filtered;
+    }
+
+    // Render Functions
+    function render() {
+      const root = document.getElementById('root');
+      root.innerHTML = `
+        <div class="min-h-screen pb-20">
+          ${renderHeader()}
+          <div class="max-w-6xl mx-auto px-4 py-6">
+            ${renderStats()}
+            ${renderFilters()}
+            ${renderSuggestionsList()}
+          </div>
+          ${state.showNewModal ? renderNewModal() : ''}
+          ${state.showAdminPanel ? renderAdminPanel() : ''}
+          ${renderFooter()}
+        </div>
+      `;
+      attachEventListeners();
+    }
+
+    function renderHeader() {
+      return `
+        <header class="glass-strong border-b border-cyan-500/20">
+          <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <a href="missionpulse-dashboard-v12.html" class="flex items-center gap-3 hover:opacity-80 transition">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center">
+                  <span class="text-white font-bold text-lg">M</span>
+                </div>
+                <div>
+                  <h1 class="text-lg font-bold text-white">MissionPulse</h1>
+                  <p class="text-xs text-cyan-400">Feature Suggestions</p>
+                </div>
+              </a>
+            </div>
+            
+            <div class="flex items-center gap-3">
+              ${isAdmin() ? `
+                <button onclick="toggleAdminPanel()" class="px-4 py-2 border border-amber-500/50 text-amber-400 rounded-lg text-sm hover:bg-amber-500/10 transition">
+                  ⚙️ Admin Panel
+                </button>
+              ` : ''}
+              <button onclick="openNewModal()" class="px-4 py-2 bg-cyan-500 text-white rounded-lg font-medium hover:bg-cyan-400 transition">
+                + Suggest Feature
+              </button>
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-full ${state.isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">
+                <div class="w-2 h-2 rounded-full ${state.isOnline ? 'bg-emerald-400' : 'bg-amber-400'}"></div>
+                <span class="text-xs font-medium">${state.isOnline ? 'Connected' : 'Demo Mode'}</span>
+              </div>
+            </div>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderStats() {
+      const total = state.suggestions.length;
+      const planned = state.suggestions.filter(s => s.status === 'planned').length;
+      const inProgress = state.suggestions.filter(s => s.status === 'in_progress').length;
+      const completed = state.suggestions.filter(s => s.status === 'completed').length;
+      
+      return `
+        <div class="grid grid-cols-4 gap-4 mb-6">
+          ${[
+            { label: 'Total Ideas', value: total, icon: '💡', color: 'cyan' },
+            { label: 'Planned', value: planned, icon: '📋', color: 'purple' },
+            { label: 'In Progress', value: inProgress, icon: '🚀', color: 'amber' },
+            { label: 'Shipped', value: completed, icon: '✅', color: 'emerald' },
+          ].map(stat => `
+            <div class="glass rounded-xl p-4 text-center">
+              <div class="text-2xl mb-1">${stat.icon}</div>
+              <div class="text-2xl font-bold text-${stat.color}-400">${stat.value}</div>
+              <div class="text-xs text-slate-400">${stat.label}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderFilters() {
+      return `
+        <div class="flex flex-wrap items-center gap-4 mb-6">
+          <!-- Category Filter -->
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-400">Category:</span>
+            <select onchange="setFilter('category', this.value)" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white">
+              <option value="all" ${state.filterCategory === 'all' ? 'selected' : ''}>All Categories</option>
+              ${CATEGORIES.map(cat => `
+                <option value="${cat.id}" ${state.filterCategory === cat.id ? 'selected' : ''}>${cat.icon} ${cat.name}</option>
+              `).join('')}
+            </select>
+          </div>
+          
+          <!-- Status Filter -->
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-400">Status:</span>
+            <select onchange="setFilter('status', this.value)" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white">
+              <option value="all" ${state.filterStatus === 'all' ? 'selected' : ''}>All Statuses</option>
+              ${STATUSES.map(status => `
+                <option value="${status.id}" ${state.filterStatus === status.id ? 'selected' : ''}>${status.name}</option>
+              `).join('')}
+            </select>
+          </div>
+          
+          <!-- Sort -->
+          <div class="flex items-center gap-2 ml-auto">
+            <span class="text-sm text-slate-400">Sort:</span>
+            <div class="flex bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+              ${[
+                { id: 'votes', label: '🔥 Popular' },
+                { id: 'newest', label: '🆕 Newest' },
+                { id: 'oldest', label: '📅 Oldest' },
+              ].map(sort => `
+                <button onclick="setSortBy('${sort.id}')" 
+                  class="px-3 py-1.5 text-xs ${state.sortBy === sort.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'}">
+                  ${sort.label}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSuggestionsList() {
+      const suggestions = getFilteredSuggestions();
+      
+      return `
+        <div class="space-y-4">
+          ${suggestions.length === 0 ? `
+            <div class="glass rounded-xl p-12 text-center">
+              <div class="text-4xl mb-3">💡</div>
+              <p class="text-white">No suggestions match your filters</p>
+              <p class="text-sm text-slate-400 mt-1">Try adjusting the filters or submit a new idea!</p>
+            </div>
+          ` : ''}
+          
+          ${suggestions.map(suggestion => {
+            const cat = CATEGORIES.find(c => c.id === suggestion.category) || CATEGORIES[7];
+            const status = STATUSES.find(s => s.id === suggestion.status) || STATUSES[0];
+            const userVote = state.userVotes[suggestion.id];
+            const score = suggestion.votes_up - suggestion.votes_down;
+            
+            return `
+              <div class="suggestion-card glass rounded-xl p-4 transition">
+                <div class="flex gap-4">
+                  <!-- Vote Buttons -->
+                  <div class="flex flex-col items-center gap-1 min-w-[60px]">
+                    <button onclick="vote('${suggestion.id}', 'up')" 
+                      class="vote-btn w-10 h-10 rounded-lg flex items-center justify-center text-lg transition ${userVote === 'up' ? 'voted text-cyan-400 bg-cyan-500/20' : 'text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10'}">
+                      ▲
+                    </button>
+                    <span class="text-lg font-bold ${score > 0 ? 'text-cyan-400' : score < 0 ? 'text-red-400' : 'text-slate-400'}">${score}</span>
+                    <button onclick="vote('${suggestion.id}', 'down')" 
+                      class="vote-btn w-10 h-10 rounded-lg flex items-center justify-center text-lg transition ${userVote === 'down' ? 'voted text-red-400 bg-red-500/20' : 'text-slate-400 hover:text-red-400 hover:bg-red-500/10'}">
+                      ▼
+                    </button>
+                  </div>
+                  
+                  <!-- Content -->
+                  <div class="flex-1">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 class="text-white font-semibold text-lg">${suggestion.title}</h3>
+                        <p class="text-slate-400 text-sm mt-1">${suggestion.description || 'No description provided'}</p>
+                      </div>
+                      <div class="flex flex-col items-end gap-2">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium" style="background: ${status.color}20; color: ${status.color}">
+                          ${status.name}
+                        </span>
+                        <span class="px-2 py-1 rounded-full text-xs" style="background: ${cat.color}20; color: ${cat.color}">
+                          ${cat.icon} ${cat.name}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-4 mt-3 text-xs text-slate-500">
+                      <span>📅 ${new Date(suggestion.submitted_at).toLocaleDateString()}</span>
+                      <span>👍 ${suggestion.votes_up} upvotes</span>
+                      <span>👎 ${suggestion.votes_down} downvotes</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderNewModal() {
+      return `
+        <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onclick="closeNewModal(event)">
+          <div class="glass-strong rounded-2xl p-6 w-full max-w-lg mx-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-bold text-white">💡 Suggest a Feature</h2>
+              <button onclick="closeNewModal()" class="text-slate-400 hover:text-white text-xl">×</button>
+            </div>
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm text-slate-400 mb-1">Title *</label>
+                <input type="text" id="new-title" placeholder="e.g., Slack Integration" 
+                  class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none"
+                  value="${state.newSuggestion.title}">
+              </div>
+              
+              <div>
+                <label class="block text-sm text-slate-400 mb-1">Description</label>
+                <textarea id="new-description" rows="3" placeholder="Describe the feature and why it would be useful..."
+                  class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white resize-none focus:border-cyan-500 outline-none">${state.newSuggestion.description}</textarea>
+              </div>
+              
+              <div>
+                <label class="block text-sm text-slate-400 mb-2">Category</label>
+                <div class="grid grid-cols-4 gap-2">
+                  ${CATEGORIES.map(cat => `
+                    <button onclick="setNewCategory('${cat.id}')" 
+                      class="p-2 rounded-lg border text-center transition ${state.newSuggestion.category === cat.id ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-700 hover:border-slate-500'}">
+                      <div class="text-xl">${cat.icon}</div>
+                      <div class="text-xs text-slate-300 mt-1">${cat.name}</div>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex gap-3 mt-6">
+              <button onclick="closeNewModal()" class="flex-1 py-2 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-800 transition">
+                Cancel
+              </button>
+              <button onclick="submitSuggestion()" class="flex-1 py-2 bg-cyan-500 text-white rounded-lg font-medium hover:bg-cyan-400 transition">
+                Submit Suggestion
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAdminPanel() {
+      return `
+        <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onclick="toggleAdminPanel()">
+          <div class="glass-strong rounded-2xl p-6 w-full max-w-4xl mx-4 max-h-[80vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-bold text-white">⚙️ Admin Panel</h2>
+              <button onclick="toggleAdminPanel()" class="text-slate-400 hover:text-white text-xl">×</button>
+            </div>
+            
+            <p class="text-sm text-slate-400 mb-4">Manage feature suggestion statuses (CEO/COO/Admin only)</p>
+            
+            <div class="space-y-3">
+              ${state.suggestions.map(suggestion => {
+                const cat = CATEGORIES.find(c => c.id === suggestion.category) || CATEGORIES[7];
+                return `
+                  <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span>${cat.icon}</span>
+                        <span class="text-white font-medium truncate">${suggestion.title}</span>
+                        <span class="text-xs text-cyan-400">(+${suggestion.votes_up - suggestion.votes_down})</span>
+                      </div>
+                    </div>
+                    <select onchange="updateStatus('${suggestion.id}', this.value)" 
+                      class="bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-sm text-white">
+                      ${STATUSES.map(status => `
+                        <option value="${status.id}" ${suggestion.status === status.id ? 'selected' : ''}>${status.name}</option>
+                      `).join('')}
+                    </select>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFooter() {
+      return `
+        <footer class="fixed bottom-0 left-0 right-0 glass-strong border-t border-cyan-500/20 py-3">
+          <div class="max-w-6xl mx-auto px-4 flex items-center justify-between text-xs">
+            <span class="text-slate-400">
+              Your feedback shapes MissionPulse • Vote for features you want!
+            </span>
+            <span class="text-slate-500">
+              MissionPulse v2.0 • Sprint 32 • © 2026 Mission Meets Tech
+            </span>
+          </div>
+        </footer>
+      `;
+    }
+
+    function attachEventListeners() {
+      const titleInput = document.getElementById('new-title');
+      const descInput = document.getElementById('new-description');
+      
+      if (titleInput) {
+        titleInput.addEventListener('input', (e) => state.newSuggestion.title = e.target.value);
+      }
+      if (descInput) {
+        descInput.addEventListener('input', (e) => state.newSuggestion.description = e.target.value);
+      }
+    }
+
+    // Global functions
+    window.openNewModal = () => { state.showNewModal = true; render(); };
+    window.closeNewModal = (e) => { 
+      if (e && e.target !== e.currentTarget) return;
+      state.showNewModal = false; 
+      render(); 
+    };
+    window.toggleAdminPanel = () => { state.showAdminPanel = !state.showAdminPanel; render(); };
+    window.setNewCategory = (cat) => { state.newSuggestion.category = cat; render(); };
+    window.submitSuggestion = submitSuggestion;
+    window.vote = vote;
+    window.setFilter = (type, value) => { 
+      if (type === 'category') state.filterCategory = value;
+      if (type === 'status') state.filterStatus = value;
+      render(); 
+    };
+    window.setSortBy = (sort) => { state.sortBy = sort; render(); };
+    window.updateStatus = updateSuggestionStatus;
+
+    // Initialize
+    init();
+  </script>
+</body>
+</html>
