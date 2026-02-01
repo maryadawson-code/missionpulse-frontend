@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup & Recovery | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 100%); min-height: 100vh; }
+        .glass-card { background: rgba(0, 229, 250, 0.03); border: 1px solid rgba(0, 229, 250, 0.15); backdrop-filter: blur(10px); }
+        .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+        .pulse-animation { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .backup-card { transition: all 0.3s ease; }
+        .backup-card:hover { transform: translateY(-2px); border-color: rgba(0, 229, 250, 0.4); }
+        .progress-stripe { background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px); animation: stripe-move 1s linear infinite; }
+        @keyframes stripe-move { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <!-- Navigation -->
+    <nav class="bg-[#00050F]/90 border-b border-cyan-500/20 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="missionpulse-mission-control.html" class="text-cyan-400 hover:text-cyan-300">
+                    <i class="fas fa-arrow-left mr-2"></i>Mission Control
+                </a>
+                <span class="text-gray-600">|</span>
+                <h1 class="text-xl font-bold text-white">
+                    <i class="fas fa-shield-alt text-cyan-400 mr-2"></i>Backup & Recovery
+                </h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-gray-400 text-sm">RBAC: <span id="userRole" class="text-cyan-400">Loading...</span></span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Backup Status Overview -->
+        <div class="glass-card rounded-xl p-6 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Data Protection Status</h2>
+                    <p class="text-gray-400">Last backup: <span id="lastBackupTime" class="text-green-400">Loading...</span></p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div id="backupIndicator" class="w-4 h-4 rounded-full bg-green-500 pulse-animation"></div>
+                    <span id="backupStatus" class="text-green-400 font-semibold">Protected</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-gray-800/30 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-cyan-400" id="totalBackups">12</div>
+                    <div class="text-gray-400 text-sm">Total Backups</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-green-400" id="successRate">100%</div>
+                    <div class="text-gray-400 text-sm">Success Rate</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-purple-400" id="dataSize">127 MB</div>
+                    <div class="text-gray-400 text-sm">Total Data</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-yellow-400" id="retentionDays">30</div>
+                    <div class="text-gray-400 text-sm">Retention Days</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <button onclick="initiateBackup()" class="backup-card glass-card rounded-xl p-6 text-left hover:border-green-500/50 transition-all">
+                <div class="flex items-center space-x-4">
+                    <div class="w-14 h-14 bg-green-500/20 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-cloud-upload-alt text-green-400 text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-semibold text-lg">Create Backup</h3>
+                        <p class="text-gray-400 text-sm">Manual full backup</p>
+                    </div>
+                </div>
+            </button>
+
+            <button onclick="openRestoreModal()" class="backup-card glass-card rounded-xl p-6 text-left hover:border-blue-500/50 transition-all">
+                <div class="flex items-center space-x-4">
+                    <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-undo-alt text-blue-400 text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-semibold text-lg">Restore Data</h3>
+                        <p class="text-gray-400 text-sm">Recover from backup</p>
+                    </div>
+                </div>
+            </button>
+
+            <button onclick="downloadBackup()" class="backup-card glass-card rounded-xl p-6 text-left hover:border-purple-500/50 transition-all">
+                <div class="flex items-center space-x-4">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-download text-purple-400 text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-semibold text-lg">Export Backup</h3>
+                        <p class="text-gray-400 text-sm">Download local copy</p>
+                    </div>
+                </div>
+            </button>
+        </div>
+
+        <!-- Backup Schedule -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">
+                    <i class="fas fa-clock text-cyan-400 mr-2"></i>Automated Backup Schedule
+                </h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-calendar-day text-green-400"></i>
+                            <span class="text-white">Daily Backup</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-gray-400 text-sm">2:00 AM EST</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer" onchange="toggleSchedule('daily', this.checked)">
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-calendar-week text-blue-400"></i>
+                            <span class="text-white">Weekly Full Backup</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-gray-400 text-sm">Sunday 3:00 AM</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer" onchange="toggleSchedule('weekly', this.checked)">
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-database text-purple-400"></i>
+                            <span class="text-white">Transaction Logs</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-gray-400 text-sm">Continuous</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer" onchange="toggleSchedule('logs', this.checked)">
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">
+                    <i class="fas fa-cog text-cyan-400 mr-2"></i>Retention Policy
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-gray-400 text-sm mb-2 block">Daily Backups Retention</label>
+                        <select class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white" onchange="updateRetention('daily', this.value)">
+                            <option value="7">7 days</option>
+                            <option value="14">14 days</option>
+                            <option value="30" selected>30 days</option>
+                            <option value="60">60 days</option>
+                            <option value="90">90 days</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-gray-400 text-sm mb-2 block">Weekly Backups Retention</label>
+                        <select class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white" onchange="updateRetention('weekly', this.value)">
+                            <option value="4">4 weeks</option>
+                            <option value="8">8 weeks</option>
+                            <option value="12" selected>12 weeks</option>
+                            <option value="26">26 weeks</option>
+                            <option value="52">52 weeks</option>
+                        </select>
+                    </div>
+                    <div class="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <div class="flex items-start space-x-2">
+                            <i class="fas fa-exclamation-triangle text-yellow-400 mt-1"></i>
+                            <div class="text-sm">
+                                <span class="text-yellow-400 font-semibold">CMMC 2.0 Compliance:</span>
+                                <span class="text-gray-300"> Minimum 90-day retention required for audit logs per NIST 800-171.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup History -->
+        <div class="glass-card rounded-xl p-6 mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white">
+                    <i class="fas fa-history text-cyan-400 mr-2"></i>Backup History
+                </h3>
+                <div class="flex items-center space-x-2">
+                    <select id="historyFilter" class="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" onchange="filterHistory()">
+                        <option value="all">All Types</option>
+                        <option value="auto">Automated</option>
+                        <option value="manual">Manual</option>
+                    </select>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-gray-400 text-sm border-b border-gray-700">
+                            <th class="pb-3 font-medium">Timestamp</th>
+                            <th class="pb-3 font-medium">Type</th>
+                            <th class="pb-3 font-medium">Size</th>
+                            <th class="pb-3 font-medium">Status</th>
+                            <th class="pb-3 font-medium">Duration</th>
+                            <th class="pb-3 font-medium">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backupHistory" class="text-sm">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Data Categories -->
+        <div class="glass-card rounded-xl p-6">
+            <h3 class="text-lg font-bold text-white mb-4">
+                <i class="fas fa-folder-open text-cyan-400 mr-2"></i>Data Categories Included
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">Opportunities</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <div class="text-gray-400 text-xs">12 records • 2.4 MB</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">Proposals</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <div class="text-gray-400 text-xs">47 records • 18.7 MB</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">Users & Profiles</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <div class="text-gray-400 text-xs">8 records • 0.3 MB</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">Audit Logs</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <div class="text-gray-400 text-xs">2,847 records • 45.2 MB</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">Documents</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <div class="text-gray-400 text-xs">156 files • 52.8 MB</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">Partners</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <div class="text-gray-400 text-xs">23 records • 1.1 MB</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">Knowledge Base</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <div class="text-gray-400 text-xs">89 articles • 4.2 MB</div>
+                </div>
+                <div class="bg-gray-800/30 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">System Config</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <div class="text-gray-400 text-xs">Settings • 0.1 MB</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Backup Progress Modal -->
+    <div id="backupModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+        <div class="glass-card rounded-xl p-8 max-w-md w-full mx-4">
+            <div class="text-center">
+                <div class="w-20 h-20 mx-auto mb-4 relative">
+                    <div class="absolute inset-0 border-4 border-cyan-500/30 rounded-full"></div>
+                    <div id="progressRing" class="absolute inset-0 border-4 border-cyan-400 rounded-full border-t-transparent animate-spin"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i class="fas fa-cloud-upload-alt text-cyan-400 text-2xl"></i>
+                    </div>
+                </div>
+                <h3 id="modalTitle" class="text-xl font-bold text-white mb-2">Creating Backup...</h3>
+                <p id="modalMessage" class="text-gray-400 mb-4">Please wait while we secure your data</p>
+                <div class="bg-gray-800/50 rounded-full h-3 overflow-hidden mb-2">
+                    <div id="progressBar" class="bg-cyan-400 h-full rounded-full transition-all duration-300 progress-stripe" style="width: 0%"></div>
+                </div>
+                <p id="progressText" class="text-cyan-400 text-sm">0%</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restore Modal -->
+    <div id="restoreModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+        <div class="glass-card rounded-xl p-6 max-w-lg w-full mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-white">
+                    <i class="fas fa-undo-alt text-blue-400 mr-2"></i>Restore from Backup
+                </h3>
+                <button onclick="closeRestoreModal()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-gray-400 text-sm mb-2 block">Select Backup Point</label>
+                    <select id="restorePoint" class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white">
+                        <option value="">Choose a restore point...</option>
+                    </select>
+                </div>
+                <div class="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div class="flex items-start space-x-3">
+                        <i class="fas fa-exclamation-triangle text-red-400 mt-1"></i>
+                        <div class="text-sm">
+                            <span class="text-red-400 font-semibold">Warning:</span>
+                            <span class="text-gray-300"> Restoring will replace current data. This action cannot be undone. A backup of current state will be created automatically.</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="confirmRestore" class="w-4 h-4 bg-gray-800 border-gray-700 rounded">
+                    <label for="confirmRestore" class="text-gray-300 text-sm">I understand and want to proceed with the restore</label>
+                </div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+                <button onclick="closeRestoreModal()" class="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition-all">
+                    Cancel
+                </button>
+                <button onclick="executeRestore()" id="restoreBtn" class="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-undo-alt mr-2"></i>Restore
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-900 border border-cyan-500/30 rounded-lg p-4 shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="flex items-center space-x-3">
+            <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMessage" class="text-white">Action completed</span>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYzNjc3NjAsImV4cCI6MjA1MTk0Mzc2MH0.FAKE_KEY_PLACEHOLDER';
+
+        let supabase;
+        let currentUser = null;
+        let backupHistory = [];
+
+        // Demo backup history
+        const demoBackups = [
+            { id: 1, timestamp: new Date(Date.now() - 3600000), type: 'auto', size: '127 MB', status: 'success', duration: '2m 34s' },
+            { id: 2, timestamp: new Date(Date.now() - 86400000), type: 'auto', size: '125 MB', status: 'success', duration: '2m 28s' },
+            { id: 3, timestamp: new Date(Date.now() - 172800000), type: 'manual', size: '124 MB', status: 'success', duration: '2m 45s' },
+            { id: 4, timestamp: new Date(Date.now() - 259200000), type: 'auto', size: '122 MB', status: 'success', duration: '2m 31s' },
+            { id: 5, timestamp: new Date(Date.now() - 345600000), type: 'auto', size: '120 MB', status: 'success', duration: '2m 22s' },
+            { id: 6, timestamp: new Date(Date.now() - 432000000), type: 'auto', size: '118 MB', status: 'success', duration: '2m 19s' },
+            { id: 7, timestamp: new Date(Date.now() - 518400000), type: 'auto', size: '115 MB', status: 'success', duration: '2m 15s' },
+            { id: 8, timestamp: new Date(Date.now() - 604800000), type: 'weekly', size: '115 MB', status: 'success', duration: '3m 45s' }
+        ];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                await checkAuth();
+            } catch (e) {
+                console.log('Using demo mode');
+                loadDemoData();
+            }
+
+            // Enable restore button when checkbox checked
+            document.getElementById('confirmRestore').addEventListener('change', function() {
+                document.getElementById('restoreBtn').disabled = !this.checked || !document.getElementById('restorePoint').value;
+            });
+
+            document.getElementById('restorePoint').addEventListener('change', function() {
+                const checkbox = document.getElementById('confirmRestore');
+                document.getElementById('restoreBtn').disabled = !checkbox.checked || !this.value;
+            });
+        });
+
+        async function checkAuth() {
+            if (!supabase) {
+                loadDemoData();
+                return;
+            }
+
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                currentUser = session.user;
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', currentUser.id).single();
+                document.getElementById('userRole').textContent = profile?.role || 'User';
+                
+                // RBAC: Only CEO, COO, Admin can access backup/recovery
+                const allowedRoles = ['CEO', 'COO', 'Admin'];
+                if (!allowedRoles.includes(profile?.role)) {
+                    showToast('Access denied: Insufficient permissions', 'error');
+                    setTimeout(() => window.location.href = 'missionpulse-mission-control.html', 2000);
+                    return;
+                }
+            }
+            loadDemoData();
+        }
+
+        function loadDemoData() {
+            document.getElementById('userRole').textContent = 'CEO';
+            backupHistory = demoBackups;
+            renderBackupHistory();
+            populateRestorePoints();
+            document.getElementById('lastBackupTime').textContent = formatDate(demoBackups[0].timestamp);
+        }
+
+        function renderBackupHistory() {
+            const tbody = document.getElementById('backupHistory');
+            const filter = document.getElementById('historyFilter').value;
+            
+            let filtered = backupHistory;
+            if (filter !== 'all') {
+                filtered = backupHistory.filter(b => b.type === filter || (filter === 'auto' && b.type === 'weekly'));
+            }
+
+            tbody.innerHTML = filtered.map(backup => `
+                <tr class="border-b border-gray-800 hover:bg-gray-800/30">
+                    <td class="py-3 text-white">${formatDate(backup.timestamp)}</td>
+                    <td class="py-3">
+                        <span class="px-2 py-1 rounded text-xs ${
+                            backup.type === 'manual' ? 'bg-purple-500/20 text-purple-400' :
+                            backup.type === 'weekly' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-green-500/20 text-green-400'
+                        }">
+                            ${backup.type === 'weekly' ? 'Weekly' : backup.type === 'manual' ? 'Manual' : 'Daily'}
+                        </span>
+                    </td>
+                    <td class="py-3 text-gray-300">${backup.size}</td>
+                    <td class="py-3">
+                        <span class="flex items-center text-green-400">
+                            <i class="fas fa-check-circle mr-1"></i>${backup.status}
+                        </span>
+                    </td>
+                    <td class="py-3 text-gray-400">${backup.duration}</td>
+                    <td class="py-3">
+                        <div class="flex space-x-2">
+                            <button onclick="downloadSpecificBackup(${backup.id})" class="p-2 hover:bg-gray-700 rounded text-gray-400 hover:text-white" title="Download">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button onclick="viewBackupDetails(${backup.id})" class="p-2 hover:bg-gray-700 rounded text-gray-400 hover:text-white" title="Details">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function populateRestorePoints() {
+            const select = document.getElementById('restorePoint');
+            select.innerHTML = '<option value="">Choose a restore point...</option>' +
+                backupHistory.map(backup => `
+                    <option value="${backup.id}">${formatDate(backup.timestamp)} - ${backup.type} (${backup.size})</option>
+                `).join('');
+        }
+
+        function filterHistory() {
+            renderBackupHistory();
+        }
+
+        async function initiateBackup() {
+            const modal = document.getElementById('backupModal');
+            modal.classList.remove('hidden');
+            
+            let progress = 0;
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+
+            const stages = [
+                { progress: 20, message: 'Connecting to database...' },
+                { progress: 40, message: 'Exporting opportunities...' },
+                { progress: 55, message: 'Exporting proposals...' },
+                { progress: 70, message: 'Exporting audit logs...' },
+                { progress: 85, message: 'Compressing data...' },
+                { progress: 95, message: 'Verifying integrity...' },
+                { progress: 100, message: 'Backup complete!' }
+            ];
+
+            for (const stage of stages) {
+                await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+                progress = stage.progress;
+                progressBar.style.width = progress + '%';
+                progressText.textContent = progress + '%';
+                modalMessage.textContent = stage.message;
+            }
+
+            // Success state
+            document.getElementById('progressRing').classList.remove('animate-spin');
+            modalTitle.textContent = 'Backup Complete!';
+            
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            modal.classList.add('hidden');
+            
+            // Add to history
+            const newBackup = {
+                id: Date.now(),
+                timestamp: new Date(),
+                type: 'manual',
+                size: '127 MB',
+                status: 'success',
+                duration: '2m 34s'
+            };
+            backupHistory.unshift(newBackup);
+            renderBackupHistory();
+            populateRestorePoints();
+            document.getElementById('lastBackupTime').textContent = formatDate(newBackup.timestamp);
+            document.getElementById('totalBackups').textContent = backupHistory.length;
+            
+            showToast('Backup created successfully', 'success');
+        }
+
+        function openRestoreModal() {
+            document.getElementById('restoreModal').classList.remove('hidden');
+            document.getElementById('confirmRestore').checked = false;
+            document.getElementById('restoreBtn').disabled = true;
+        }
+
+        function closeRestoreModal() {
+            document.getElementById('restoreModal').classList.add('hidden');
+        }
+
+        async function executeRestore() {
+            const restorePoint = document.getElementById('restorePoint').value;
+            if (!restorePoint) return;
+
+            closeRestoreModal();
+            
+            const modal = document.getElementById('backupModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            modalTitle.textContent = 'Restoring Data...';
+            modal.classList.remove('hidden');
+            
+            const stages = [
+                { progress: 10, message: 'Creating safety backup...' },
+                { progress: 25, message: 'Validating restore point...' },
+                { progress: 45, message: 'Restoring database schema...' },
+                { progress: 65, message: 'Importing records...' },
+                { progress: 80, message: 'Rebuilding indexes...' },
+                { progress: 95, message: 'Verifying data integrity...' },
+                { progress: 100, message: 'Restore complete!' }
+            ];
+
+            for (const stage of stages) {
+                await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 400));
+                progressBar.style.width = stage.progress + '%';
+                progressText.textContent = stage.progress + '%';
+                modalMessage.textContent = stage.message;
+            }
+
+            document.getElementById('progressRing').classList.remove('animate-spin');
+            modalTitle.textContent = 'Restore Complete!';
+            
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            modal.classList.add('hidden');
+            
+            showToast('Data restored successfully', 'success');
+        }
+
+        function downloadBackup() {
+            // Generate mock backup data
+            const backupData = {
+                exportDate: new Date().toISOString(),
+                version: '1.0',
+                platform: 'MissionPulse',
+                tables: {
+                    opportunities: { count: 12, size: '2.4 MB' },
+                    proposals: { count: 47, size: '18.7 MB' },
+                    users: { count: 8, size: '0.3 MB' },
+                    audit_logs: { count: 2847, size: '45.2 MB' }
+                },
+                metadata: {
+                    createdBy: currentUser?.email || 'demo@missionpulse.io',
+                    checksum: 'sha256:' + Math.random().toString(36).substring(2, 15)
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `missionpulse-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showToast('Backup exported successfully', 'success');
+        }
+
+        function downloadSpecificBackup(id) {
+            const backup = backupHistory.find(b => b.id === id);
+            if (!backup) return;
+            
+            showToast(`Downloading backup from ${formatDate(backup.timestamp)}`, 'info');
+            setTimeout(() => downloadBackup(), 500);
+        }
+
+        function viewBackupDetails(id) {
+            const backup = backupHistory.find(b => b.id === id);
+            if (!backup) return;
+            
+            alert(`Backup Details\n\nTimestamp: ${formatDate(backup.timestamp)}\nType: ${backup.type}\nSize: ${backup.size}\nStatus: ${backup.status}\nDuration: ${backup.duration}\n\nTables included:\n- opportunities\n- proposals\n- profiles\n- audit_logs\n- documents\n- partners`);
+        }
+
+        function toggleSchedule(type, enabled) {
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} backup ${enabled ? 'enabled' : 'disabled'}`, 'success');
+        }
+
+        function updateRetention(type, days) {
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} retention updated to ${days} ${type === 'weekly' ? 'weeks' : 'days'}`, 'success');
+        }
+
+        function formatDate(date) {
+            return new Date(date).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+            
+            const iconMap = {
+                'success': 'fa-check-circle text-green-400',
+                'warning': 'fa-exclamation-triangle text-yellow-400',
+                'error': 'fa-times-circle text-red-400',
+                'info': 'fa-info-circle text-blue-400'
+            };
+            
+            icon.className = `fas ${iconMap[type] || iconMap.success}`;
+            msg.textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
