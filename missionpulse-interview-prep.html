@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Prep | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.15); }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0OTc5MzMsImV4cCI6MjA1MzA3MzkzM30.pBPpVaJmVkzhCcUvJPN2KnMGnstuc55sNv8CVsERRPg';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const DEMO_INTERVIEWS = [
+            {
+                id: '1',
+                candidate_name: 'Dr. Sarah Mitchell',
+                position_title: 'Program Manager',
+                interview_date: '2026-02-05T14:00:00',
+                interview_type: 'Technical Panel',
+                status: 'completed',
+                evaluator_names: ['John Smith', 'Mary Johnson'],
+                overall_score: 92,
+                recommendation: 'Strong Hire',
+                questions: [
+                    { id: 'q1', question_text: 'Describe your experience managing DoD healthcare IT programs.', question_category: 'Experience', expected_response: 'Should mention specific DoD/DHA programs, budget sizes, team sizes', score: 9, evaluator_notes: 'Excellent - 3 DHA programs, $50M+ budgets' },
+                    { id: 'q2', question_text: 'How would you handle a situation where a key deliverable is at risk?', question_category: 'Scenario', expected_response: 'Risk mitigation strategies, stakeholder communication, resource reallocation', score: 9, evaluator_notes: 'Strong problem-solving approach' },
+                    { id: 'q3', question_text: 'What is your approach to managing remote teams?', question_category: 'Management', expected_response: 'Communication tools, accountability measures, team building', score: 8, evaluator_notes: 'Good but could elaborate more on tools' }
+                ]
+            },
+            {
+                id: '2',
+                candidate_name: 'James Chen',
+                position_title: 'Technical Lead',
+                interview_date: '2026-02-06T10:00:00',
+                interview_type: 'Technical Deep-Dive',
+                status: 'scheduled',
+                evaluator_names: ['Tech Panel'],
+                overall_score: null,
+                recommendation: null,
+                questions: [
+                    { id: 'q4', question_text: 'Explain your experience with FedRAMP authorization process.', question_category: 'Technical', expected_response: 'Understanding of FedRAMP Moderate/High requirements, SSP development, POA&M management', score: null },
+                    { id: 'q5', question_text: 'How would you architect a solution that integrates with MHS Genesis?', question_category: 'Technical', expected_response: 'HL7 FHIR, API security, data transformation', score: null },
+                    { id: 'q6', question_text: 'Describe your CI/CD pipeline experience in a DoD environment.', question_category: 'Technical', expected_response: 'IL4/IL5 considerations, STIG compliance, automated testing', score: null }
+                ]
+            }
+        ];
+
+        const QUESTION_CATEGORIES = ['Experience', 'Technical', 'Scenario', 'Management', 'Behavioral', 'Culture Fit'];
+        const INTERVIEW_TYPES = ['Technical Panel', 'Technical Deep-Dive', 'Behavioral', 'Executive', 'Final Round'];
+
+        function InterviewPrep() {
+            const [interviews, setInterviews] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedInterview, setSelectedInterview] = useState(null);
+            const [showNewModal, setShowNewModal] = useState(false);
+            const [showQuestionModal, setShowQuestionModal] = useState(false);
+            const [newInterview, setNewInterview] = useState({ candidate_name: '', position_title: '', interview_date: '', interview_type: 'Technical Panel' });
+            const [newQuestion, setNewQuestion] = useState({ question_text: '', question_category: 'Technical', expected_response: '' });
+
+            useEffect(() => { fetchInterviews(); }, []);
+
+            async function fetchInterviews() {
+                try {
+                    const { data, error } = await supabase.from('interview_prep').select('*').order('interview_date', { ascending: true });
+                    if (error) throw error;
+                    setInterviews(data?.length > 0 ? data.map(i => ({...i, questions: []})) : DEMO_INTERVIEWS);
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setInterviews(DEMO_INTERVIEWS);
+                }
+                setLoading(false);
+            }
+
+            function handleCreateInterview() {
+                const interview = {
+                    id: Date.now().toString(),
+                    ...newInterview,
+                    status: 'scheduled',
+                    questions: [],
+                    overall_score: null,
+                    recommendation: null
+                };
+                setInterviews([...interviews, interview]);
+                setShowNewModal(false);
+                setNewInterview({ candidate_name: '', position_title: '', interview_date: '', interview_type: 'Technical Panel' });
+            }
+
+            function handleAddQuestion() {
+                if (!selectedInterview) return;
+                const question = { id: `q${Date.now()}`, ...newQuestion, score: null, evaluator_notes: '' };
+                const updatedInterviews = interviews.map(i => 
+                    i.id === selectedInterview.id 
+                        ? { ...i, questions: [...(i.questions || []), question] }
+                        : i
+                );
+                setInterviews(updatedInterviews);
+                setSelectedInterview(updatedInterviews.find(i => i.id === selectedInterview.id));
+                setShowQuestionModal(false);
+                setNewQuestion({ question_text: '', question_category: 'Technical', expected_response: '' });
+            }
+
+            function handleScoreQuestion(questionId, score, notes) {
+                const updatedInterviews = interviews.map(i => {
+                    if (i.id === selectedInterview.id) {
+                        const questions = i.questions.map(q => 
+                            q.id === questionId ? { ...q, score: parseInt(score), evaluator_notes: notes } : q
+                        );
+                        const scoredQuestions = questions.filter(q => q.score !== null);
+                        const avgScore = scoredQuestions.length > 0 
+                            ? Math.round(scoredQuestions.reduce((a, q) => a + q.score, 0) / scoredQuestions.length * 10)
+                            : null;
+                        return { ...i, questions, overall_score: avgScore };
+                    }
+                    return i;
+                });
+                setInterviews(updatedInterviews);
+                setSelectedInterview(updatedInterviews.find(i => i.id === selectedInterview.id));
+            }
+
+            function formatDateTime(dateStr) {
+                return new Date(dateStr).toLocaleString('en-US', { 
+                    month: 'short', day: 'numeric', year: 'numeric',
+                    hour: 'numeric', minute: '2-digit'
+                });
+            }
+
+            const statusColor = (status) => ({
+                'scheduled': 'bg-cyan-500/20 text-cyan-400',
+                'in_progress': 'bg-amber-500/20 text-amber-400',
+                'completed': 'bg-emerald-500/20 text-emerald-400',
+                'cancelled': 'bg-red-500/20 text-red-400'
+            }[status] || 'bg-gray-500/20 text-gray-400');
+
+            const scoreColor = (score) => {
+                if (score >= 8) return 'text-emerald-400 bg-emerald-500/20';
+                if (score >= 6) return 'text-cyan-400 bg-cyan-500/20';
+                if (score >= 4) return 'text-amber-400 bg-amber-500/20';
+                return 'text-red-400 bg-red-500/20';
+            };
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="border-b border-cyan-500/20 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300">← Back</a>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-400 to-emerald-600 flex items-center justify-center text-xl">🎯</div>
+                                    <div>
+                                        <h1 className="text-xl font-bold">Interview Prep</h1>
+                                        <p className="text-xs text-gray-400">Key Personnel • Technical Evaluations</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowNewModal(true)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium transition-all">
+                                + Schedule Interview
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-6 py-8">
+                        {/* Stats */}
+                        <div className="grid grid-cols-4 gap-4 mb-6">
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-cyan-400">{interviews.length}</div>
+                                <div className="text-sm text-gray-400">Total Interviews</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-amber-400">{interviews.filter(i => i.status === 'scheduled').length}</div>
+                                <div className="text-sm text-gray-400">Scheduled</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-emerald-400">{interviews.filter(i => i.status === 'completed').length}</div>
+                                <div className="text-sm text-gray-400">Completed</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-emerald-400">
+                                    {Math.round(interviews.filter(i => i.overall_score).reduce((a, i) => a + i.overall_score, 0) / interviews.filter(i => i.overall_score).length) || 0}%
+                                </div>
+                                <div className="text-sm text-gray-400">Avg Score</div>
+                            </div>
+                        </div>
+
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Interview List */}
+                            <div className="lg:col-span-1">
+                                <h2 className="text-lg font-semibold mb-4">Interviews</h2>
+                                <div className="space-y-3">
+                                    {interviews.map(interview => (
+                                        <div key={interview.id}
+                                            onClick={() => setSelectedInterview(interview)}
+                                            className={`glass-card rounded-xl p-4 cursor-pointer transition-all ${selectedInterview?.id === interview.id ? 'border-cyan-500/50 bg-cyan-500/10' : 'hover:border-cyan-500/30'}`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h3 className="font-medium">{interview.candidate_name}</h3>
+                                                {interview.overall_score && (
+                                                    <span className={`px-2 py-1 rounded text-sm font-bold ${scoreColor(interview.overall_score / 10)}`}>
+                                                        {interview.overall_score}%
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-gray-400 mb-2">{interview.position_title}</div>
+                                            <div className="flex items-center justify-between">
+                                                <span className={`px-2 py-0.5 rounded text-xs ${statusColor(interview.status)}`}>
+                                                    {interview.status}
+                                                </span>
+                                                <span className="text-xs text-gray-500">
+                                                    {formatDateTime(interview.interview_date)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Interview Detail */}
+                            <div className="lg:col-span-2">
+                                {selectedInterview ? (
+                                    <div className="glass-card rounded-xl p-6">
+                                        <div className="flex items-start justify-between mb-6">
+                                            <div>
+                                                <h2 className="text-xl font-bold">{selectedInterview.candidate_name}</h2>
+                                                <div className="text-gray-400">{selectedInterview.position_title}</div>
+                                                <div className="flex items-center gap-3 mt-2">
+                                                    <span className={`px-2 py-0.5 rounded text-xs ${statusColor(selectedInterview.status)}`}>
+                                                        {selectedInterview.status}
+                                                    </span>
+                                                    <span className="text-sm text-gray-500">{selectedInterview.interview_type}</span>
+                                                </div>
+                                            </div>
+                                            {selectedInterview.overall_score && (
+                                                <div className="text-right">
+                                                    <div className={`text-4xl font-bold ${selectedInterview.overall_score >= 80 ? 'text-emerald-400' : selectedInterview.overall_score >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                                                        {selectedInterview.overall_score}%
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">Overall Score</div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Interview Details */}
+                                        <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-white/5 rounded-lg">
+                                            <div>
+                                                <div className="text-xs text-gray-500">Date & Time</div>
+                                                <div className="font-medium">{formatDateTime(selectedInterview.interview_date)}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-xs text-gray-500">Evaluators</div>
+                                                <div className="font-medium">{selectedInterview.evaluator_names?.join(', ') || 'TBD'}</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Questions */}
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="font-semibold">Interview Questions</h3>
+                                            <button onClick={() => setShowQuestionModal(true)} className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30">
+                                                + Add Question
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {selectedInterview.questions?.map((question, idx) => (
+                                                <div key={question.id} className="p-4 bg-white/5 rounded-lg border border-white/10">
+                                                    <div className="flex items-start justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="w-6 h-6 bg-cyan-500/20 text-cyan-400 rounded-full flex items-center justify-center text-xs">
+                                                                {idx + 1}
+                                                            </span>
+                                                            <span className="text-xs text-gray-500 px-2 py-0.5 bg-white/10 rounded">
+                                                                {question.question_category}
+                                                            </span>
+                                                        </div>
+                                                        {question.score !== null && (
+                                                            <span className={`px-3 py-1 rounded font-bold ${scoreColor(question.score)}`}>
+                                                                {question.score}/10
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="font-medium mb-2">{question.question_text}</p>
+                                                    {question.expected_response && (
+                                                        <div className="text-sm text-gray-500 mb-3 p-2 bg-cyan-500/10 rounded">
+                                                            <span className="text-cyan-400">Expected: </span>{question.expected_response}
+                                                        </div>
+                                                    )}
+                                                    {selectedInterview.status === 'scheduled' || selectedInterview.status === 'in_progress' ? (
+                                                        <div className="flex items-center gap-2 mt-3">
+                                                            <select 
+                                                                value={question.score || ''} 
+                                                                onChange={(e) => handleScoreQuestion(question.id, e.target.value, question.evaluator_notes)}
+                                                                className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm">
+                                                                <option value="">Score</option>
+                                                                {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                                                            </select>
+                                                            <input 
+                                                                type="text" 
+                                                                placeholder="Evaluator notes..."
+                                                                value={question.evaluator_notes || ''}
+                                                                onChange={(e) => handleScoreQuestion(question.id, question.score, e.target.value)}
+                                                                className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-1 text-sm focus:outline-none focus:border-cyan-500"
+                                                            />
+                                                        </div>
+                                                    ) : question.evaluator_notes && (
+                                                        <div className="mt-2 text-sm text-gray-400">
+                                                            <span className="text-emerald-400">Notes: </span>{question.evaluator_notes}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {(!selectedInterview.questions || selectedInterview.questions.length === 0) && (
+                                                <div className="text-center py-8 text-gray-500">
+                                                    No questions added yet. Add interview questions to evaluate the candidate.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Recommendation */}
+                                        {selectedInterview.status === 'completed' && (
+                                            <div className="mt-6 p-4 bg-white/5 rounded-lg">
+                                                <h4 className="text-sm font-semibold mb-2">Recommendation</h4>
+                                                <select 
+                                                    value={selectedInterview.recommendation || ''}
+                                                    onChange={(e) => {
+                                                        const updated = interviews.map(i => i.id === selectedInterview.id ? {...i, recommendation: e.target.value} : i);
+                                                        setInterviews(updated);
+                                                        setSelectedInterview({...selectedInterview, recommendation: e.target.value});
+                                                    }}
+                                                    className="w-full bg-white/5 border border-white/10 rounded px-3 py-2">
+                                                    <option value="">Select recommendation...</option>
+                                                    <option value="Strong Hire">✅ Strong Hire</option>
+                                                    <option value="Hire">👍 Hire</option>
+                                                    <option value="Needs Discussion">🤔 Needs Discussion</option>
+                                                    <option value="No Hire">❌ No Hire</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="glass-card rounded-xl p-12 text-center">
+                                        <div className="text-6xl mb-4">🎯</div>
+                                        <h3 className="text-xl font-semibold mb-2">Select an Interview</h3>
+                                        <p className="text-gray-400">Choose an interview to view questions and scores</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* New Interview Modal */}
+                    {showNewModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-md">
+                                <h2 className="text-xl font-bold mb-6">Schedule Interview</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Candidate Name *</label>
+                                        <input type="text" value={newInterview.candidate_name} onChange={(e) => setNewInterview({...newInterview, candidate_name: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Position Title *</label>
+                                        <input type="text" value={newInterview.position_title} onChange={(e) => setNewInterview({...newInterview, position_title: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Date & Time *</label>
+                                            <input type="datetime-local" value={newInterview.interview_date} onChange={(e) => setNewInterview({...newInterview, interview_date: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Type</label>
+                                            <select value={newInterview.interview_type} onChange={(e) => setNewInterview({...newInterview, interview_type: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                                {INTERVIEW_TYPES.map(t => <option key={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowNewModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleCreateInterview} disabled={!newInterview.candidate_name || !newInterview.position_title || !newInterview.interview_date}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Schedule</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Question Modal */}
+                    {showQuestionModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-lg">
+                                <h2 className="text-xl font-bold mb-6">Add Interview Question</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Question *</label>
+                                        <textarea value={newQuestion.question_text} onChange={(e) => setNewQuestion({...newQuestion, question_text: e.target.value})}
+                                            rows={2} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Category</label>
+                                        <select value={newQuestion.question_category} onChange={(e) => setNewQuestion({...newQuestion, question_category: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                            {QUESTION_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Expected Response (Guide)</label>
+                                        <textarea value={newQuestion.expected_response} onChange={(e) => setNewQuestion({...newQuestion, expected_response: e.target.value})}
+                                            rows={2} placeholder="What should a strong answer include..."
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowQuestionModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleAddQuestion} disabled={!newQuestion.question_text}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Add Question</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<InterviewPrep />, document.getElementById('root'));
+    </script>
+</body>
+</html>

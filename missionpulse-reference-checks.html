@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reference Checks | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.15); }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0OTc5MzMsImV4cCI6MjA1MzA3MzkzM30.pBPpVaJmVkzhCcUvJPN2KnMGnstuc55sNv8CVsERRPg';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const DEMO_CHECKS = [
+            {
+                id: '1',
+                candidate_name: 'Dr. Sarah Mitchell',
+                position_title: 'Program Manager',
+                status: 'in_progress',
+                required_count: 3,
+                due_date: '2026-02-15',
+                contacts: [
+                    { id: 'r1', reference_name: 'Col. James Patterson (Ret.)', reference_title: 'Former COR', reference_company: 'DHA', reference_email: 'j.patterson@dha.mil', reference_phone: '(703) 555-1234', relationship: 'Direct Supervisor', years_known: 4, status: 'completed', rating: 9, strengths: 'Exceptional leadership, strong technical background', concerns: 'None noted', would_rehire: true, verified: true },
+                    { id: 'r2', reference_name: 'Maria Santos', reference_title: 'Deputy PM', reference_company: 'Leidos', reference_email: 'msantos@leidos.com', reference_phone: '(571) 555-5678', relationship: 'Peer', years_known: 3, status: 'completed', rating: 8, strengths: 'Collaborative, detail-oriented', concerns: 'Can be overly perfectionist', would_rehire: true, verified: true },
+                    { id: 'r3', reference_name: 'Dr. Robert Kim', reference_title: 'Chief Medical Officer', reference_company: 'VA', reference_email: 'robert.kim@va.gov', reference_phone: '(202) 555-9012', relationship: 'Stakeholder', years_known: 2, status: 'pending', rating: null, verified: false }
+                ]
+            },
+            {
+                id: '2',
+                candidate_name: 'James Chen',
+                position_title: 'Technical Lead',
+                status: 'pending',
+                required_count: 3,
+                due_date: '2026-02-20',
+                contacts: [
+                    { id: 'r4', reference_name: 'Tom Bradley', reference_title: 'VP Engineering', reference_company: 'Palantir', reference_email: 'tbradley@palantir.com', relationship: 'Direct Supervisor', years_known: 5, status: 'pending', rating: null, verified: false }
+                ]
+            }
+        ];
+
+        const RELATIONSHIPS = ['Direct Supervisor', 'Peer', 'Direct Report', 'Stakeholder', 'Client', 'Partner', 'Other'];
+        const CONTACT_STATUSES = ['pending', 'contacted', 'scheduled', 'completed', 'unresponsive'];
+
+        function ReferenceChecks() {
+            const [checks, setChecks] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedCheck, setSelectedCheck] = useState(null);
+            const [showNewModal, setShowNewModal] = useState(false);
+            const [showContactModal, setShowContactModal] = useState(false);
+            const [newCheck, setNewCheck] = useState({ candidate_name: '', position_title: '', required_count: 3, due_date: '' });
+            const [newContact, setNewContact] = useState({ reference_name: '', reference_title: '', reference_company: '', reference_email: '', reference_phone: '', relationship: 'Direct Supervisor', years_known: '' });
+
+            useEffect(() => { fetchChecks(); }, []);
+
+            async function fetchChecks() {
+                try {
+                    const { data, error } = await supabase.from('reference_checks').select('*').order('created_at', { ascending: false });
+                    if (error) throw error;
+                    setChecks(data?.length > 0 ? data.map(c => ({...c, contacts: []})) : DEMO_CHECKS);
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setChecks(DEMO_CHECKS);
+                }
+                setLoading(false);
+            }
+
+            function handleCreateCheck() {
+                const check = {
+                    id: Date.now().toString(),
+                    ...newCheck,
+                    status: 'pending',
+                    completed_count: 0,
+                    contacts: []
+                };
+                setChecks([check, ...checks]);
+                setShowNewModal(false);
+                setNewCheck({ candidate_name: '', position_title: '', required_count: 3, due_date: '' });
+            }
+
+            function handleAddContact() {
+                if (!selectedCheck) return;
+                const contact = { 
+                    id: `r${Date.now()}`, 
+                    ...newContact, 
+                    years_known: parseInt(newContact.years_known) || 0,
+                    status: 'pending', 
+                    rating: null, 
+                    verified: false 
+                };
+                const updatedChecks = checks.map(c => {
+                    if (c.id === selectedCheck.id) {
+                        return { ...c, contacts: [...(c.contacts || []), contact] };
+                    }
+                    return c;
+                });
+                setChecks(updatedChecks);
+                setSelectedCheck(updatedChecks.find(c => c.id === selectedCheck.id));
+                setShowContactModal(false);
+                setNewContact({ reference_name: '', reference_title: '', reference_company: '', reference_email: '', reference_phone: '', relationship: 'Direct Supervisor', years_known: '' });
+            }
+
+            function handleUpdateContact(contactId, updates) {
+                const updatedChecks = checks.map(c => {
+                    if (c.id === selectedCheck.id) {
+                        const contacts = c.contacts.map(r => r.id === contactId ? { ...r, ...updates } : r);
+                        const completedCount = contacts.filter(r => r.status === 'completed').length;
+                        const status = completedCount >= c.required_count ? 'completed' : completedCount > 0 ? 'in_progress' : 'pending';
+                        return { ...c, contacts, completed_count: completedCount, status };
+                    }
+                    return c;
+                });
+                setChecks(updatedChecks);
+                setSelectedCheck(updatedChecks.find(c => c.id === selectedCheck.id));
+            }
+
+            function formatDate(date) {
+                return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            }
+
+            const statusColor = (status) => ({
+                'pending': 'bg-gray-500/20 text-gray-400',
+                'contacted': 'bg-blue-500/20 text-blue-400',
+                'scheduled': 'bg-amber-500/20 text-amber-400',
+                'in_progress': 'bg-cyan-500/20 text-cyan-400',
+                'completed': 'bg-emerald-500/20 text-emerald-400',
+                'unresponsive': 'bg-red-500/20 text-red-400'
+            }[status] || 'bg-gray-500/20 text-gray-400');
+
+            const ratingColor = (rating) => {
+                if (rating >= 8) return 'text-emerald-400';
+                if (rating >= 6) return 'text-cyan-400';
+                if (rating >= 4) return 'text-amber-400';
+                return 'text-red-400';
+            };
+
+            const stats = {
+                total: checks.length,
+                pending: checks.filter(c => c.status === 'pending').length,
+                inProgress: checks.filter(c => c.status === 'in_progress').length,
+                completed: checks.filter(c => c.status === 'completed').length
+            };
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="border-b border-cyan-500/20 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300">← Back</a>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-xl">📞</div>
+                                    <div>
+                                        <h1 className="text-xl font-bold">Reference Checks</h1>
+                                        <p className="text-xs text-gray-400">Verify Key Personnel • Track Contacts</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowNewModal(true)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium transition-all">
+                                + New Check
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-6 py-8">
+                        {/* Stats */}
+                        <div className="grid grid-cols-4 gap-4 mb-6">
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-cyan-400">{stats.total}</div>
+                                <div className="text-sm text-gray-400">Total Candidates</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-gray-400">{stats.pending}</div>
+                                <div className="text-sm text-gray-400">Pending</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-amber-400">{stats.inProgress}</div>
+                                <div className="text-sm text-gray-400">In Progress</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-emerald-400">{stats.completed}</div>
+                                <div className="text-sm text-gray-400">Completed</div>
+                            </div>
+                        </div>
+
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Checks List */}
+                            <div className="lg:col-span-1">
+                                <h2 className="text-lg font-semibold mb-4">Candidates</h2>
+                                <div className="space-y-3">
+                                    {checks.map(check => {
+                                        const completedCount = check.contacts?.filter(r => r.status === 'completed').length || 0;
+                                        return (
+                                            <div key={check.id}
+                                                onClick={() => setSelectedCheck(check)}
+                                                className={`glass-card rounded-xl p-4 cursor-pointer transition-all ${selectedCheck?.id === check.id ? 'border-cyan-500/50 bg-cyan-500/10' : 'hover:border-cyan-500/30'}`}>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h3 className="font-medium">{check.candidate_name}</h3>
+                                                    <span className={`px-2 py-0.5 rounded text-xs ${statusColor(check.status)}`}>
+                                                        {check.status?.replace('_', ' ')}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-gray-400 mb-2">{check.position_title}</div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500">
+                                                        {completedCount}/{check.required_count} references
+                                                    </span>
+                                                    {check.due_date && (
+                                                        <span className="text-xs text-gray-500">Due: {formatDate(check.due_date)}</span>
+                                                    )}
+                                                </div>
+                                                {/* Progress bar */}
+                                                <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-cyan-500 transition-all" 
+                                                        style={{ width: `${(completedCount / check.required_count) * 100}%` }}></div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Check Detail */}
+                            <div className="lg:col-span-2">
+                                {selectedCheck ? (
+                                    <div className="glass-card rounded-xl p-6">
+                                        <div className="flex items-start justify-between mb-6">
+                                            <div>
+                                                <h2 className="text-xl font-bold">{selectedCheck.candidate_name}</h2>
+                                                <div className="text-gray-400">{selectedCheck.position_title}</div>
+                                                <div className="flex items-center gap-3 mt-2">
+                                                    <span className={`px-2 py-0.5 rounded text-xs ${statusColor(selectedCheck.status)}`}>
+                                                        {selectedCheck.status?.replace('_', ' ')}
+                                                    </span>
+                                                    {selectedCheck.due_date && (
+                                                        <span className="text-sm text-gray-500">Due: {formatDate(selectedCheck.due_date)}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-3xl font-bold text-cyan-400">
+                                                    {selectedCheck.contacts?.filter(r => r.status === 'completed').length || 0}/{selectedCheck.required_count}
+                                                </div>
+                                                <div className="text-xs text-gray-500">References Completed</div>
+                                            </div>
+                                        </div>
+
+                                        {/* References */}
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="font-semibold">Reference Contacts</h3>
+                                            <button onClick={() => setShowContactModal(true)} className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30">
+                                                + Add Reference
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {selectedCheck.contacts?.map((contact, idx) => (
+                                                <div key={contact.id} className={`p-4 rounded-lg border transition-all ${contact.status === 'completed' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/10'}`}>
+                                                    <div className="flex items-start justify-between mb-3">
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="font-medium">{contact.reference_name}</span>
+                                                                {contact.verified && <span className="text-emerald-400 text-xs">✓ Verified</span>}
+                                                            </div>
+                                                            <div className="text-sm text-gray-400">{contact.reference_title} at {contact.reference_company}</div>
+                                                            <div className="text-xs text-gray-500 mt-1">
+                                                                {contact.relationship} • {contact.years_known} years
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {contact.rating && (
+                                                                <span className={`text-2xl font-bold ${ratingColor(contact.rating)}`}>
+                                                                    {contact.rating}/10
+                                                                </span>
+                                                            )}
+                                                            <select 
+                                                                value={contact.status} 
+                                                                onChange={(e) => handleUpdateContact(contact.id, { status: e.target.value })}
+                                                                className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs">
+                                                                {CONTACT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Contact Info */}
+                                                    <div className="flex gap-4 text-sm mb-3">
+                                                        {contact.reference_email && (
+                                                            <a href={`mailto:${contact.reference_email}`} className="text-cyan-400 hover:underline">
+                                                                ✉️ {contact.reference_email}
+                                                            </a>
+                                                        )}
+                                                        {contact.reference_phone && (
+                                                            <span className="text-gray-400">📞 {contact.reference_phone}</span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Rating & Feedback (if completed) */}
+                                                    {contact.status === 'completed' ? (
+                                                        <div className="space-y-2">
+                                                            {contact.strengths && (
+                                                                <div className="text-sm">
+                                                                    <span className="text-emerald-400">Strengths: </span>
+                                                                    <span className="text-gray-300">{contact.strengths}</span>
+                                                                </div>
+                                                            )}
+                                                            {contact.concerns && (
+                                                                <div className="text-sm">
+                                                                    <span className="text-amber-400">Concerns: </span>
+                                                                    <span className="text-gray-300">{contact.concerns}</span>
+                                                                </div>
+                                                            )}
+                                                            {contact.would_rehire !== null && (
+                                                                <div className="text-sm">
+                                                                    <span className="text-gray-400">Would Rehire: </span>
+                                                                    <span className={contact.would_rehire ? 'text-emerald-400' : 'text-red-400'}>
+                                                                        {contact.would_rehire ? 'Yes' : 'No'}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-wrap gap-2 mt-3">
+                                                            <input 
+                                                                type="number" 
+                                                                min="1" 
+                                                                max="10"
+                                                                placeholder="Rating (1-10)"
+                                                                className="w-28 bg-white/5 border border-white/10 rounded px-2 py-1 text-sm"
+                                                                onBlur={(e) => handleUpdateContact(contact.id, { rating: parseInt(e.target.value) || null })}
+                                                            />
+                                                            <input 
+                                                                type="text" 
+                                                                placeholder="Strengths..."
+                                                                className="flex-1 min-w-[150px] bg-white/5 border border-white/10 rounded px-2 py-1 text-sm"
+                                                                onBlur={(e) => handleUpdateContact(contact.id, { strengths: e.target.value })}
+                                                            />
+                                                            <button 
+                                                                onClick={() => handleUpdateContact(contact.id, { status: 'completed', verified: true })}
+                                                                className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded text-sm hover:bg-emerald-500/30">
+                                                                ✓ Complete
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {(!selectedCheck.contacts || selectedCheck.contacts.length === 0) && (
+                                                <div className="text-center py-8 text-gray-500">
+                                                    No references added yet. Add reference contacts to begin verification.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Summary */}
+                                        {selectedCheck.contacts?.some(c => c.status === 'completed') && (
+                                            <div className="mt-6 p-4 bg-white/5 rounded-lg">
+                                                <h4 className="text-sm font-semibold mb-3">Reference Summary</h4>
+                                                <div className="grid grid-cols-3 gap-4 text-center">
+                                                    <div>
+                                                        <div className="text-2xl font-bold text-cyan-400">
+                                                            {(selectedCheck.contacts.filter(c => c.rating).reduce((a, c) => a + c.rating, 0) / selectedCheck.contacts.filter(c => c.rating).length || 0).toFixed(1)}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">Avg Rating</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-2xl font-bold text-emerald-400">
+                                                            {selectedCheck.contacts.filter(c => c.would_rehire).length}/{selectedCheck.contacts.filter(c => c.status === 'completed').length}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">Would Rehire</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-2xl font-bold text-emerald-400">
+                                                            {selectedCheck.contacts.filter(c => c.verified).length}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">Verified</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="glass-card rounded-xl p-12 text-center">
+                                        <div className="text-6xl mb-4">📞</div>
+                                        <h3 className="text-xl font-semibold mb-2">Select a Candidate</h3>
+                                        <p className="text-gray-400">Choose a candidate to manage reference checks</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* New Check Modal */}
+                    {showNewModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-md">
+                                <h2 className="text-xl font-bold mb-6">New Reference Check</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Candidate Name *</label>
+                                        <input type="text" value={newCheck.candidate_name} onChange={(e) => setNewCheck({...newCheck, candidate_name: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Position Title *</label>
+                                        <input type="text" value={newCheck.position_title} onChange={(e) => setNewCheck({...newCheck, position_title: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Required References</label>
+                                            <input type="number" value={newCheck.required_count} onChange={(e) => setNewCheck({...newCheck, required_count: parseInt(e.target.value) || 3})}
+                                                min="1" max="10"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Due Date</label>
+                                            <input type="date" value={newCheck.due_date} onChange={(e) => setNewCheck({...newCheck, due_date: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowNewModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleCreateCheck} disabled={!newCheck.candidate_name || !newCheck.position_title}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Create</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Contact Modal */}
+                    {showContactModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-lg">
+                                <h2 className="text-xl font-bold mb-6">Add Reference Contact</h2>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Name *</label>
+                                            <input type="text" value={newContact.reference_name} onChange={(e) => setNewContact({...newContact, reference_name: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Title</label>
+                                            <input type="text" value={newContact.reference_title} onChange={(e) => setNewContact({...newContact, reference_title: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Company</label>
+                                        <input type="text" value={newContact.reference_company} onChange={(e) => setNewContact({...newContact, reference_company: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Email</label>
+                                            <input type="email" value={newContact.reference_email} onChange={(e) => setNewContact({...newContact, reference_email: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Phone</label>
+                                            <input type="tel" value={newContact.reference_phone} onChange={(e) => setNewContact({...newContact, reference_phone: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Relationship</label>
+                                            <select value={newContact.relationship} onChange={(e) => setNewContact({...newContact, relationship: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                                {RELATIONSHIPS.map(r => <option key={r}>{r}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Years Known</label>
+                                            <input type="number" value={newContact.years_known} onChange={(e) => setNewContact({...newContact, years_known: e.target.value})}
+                                                min="0"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowContactModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleAddContact} disabled={!newContact.reference_name}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Add Reference</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<ReferenceChecks />, document.getElementById('root'));
+    </script>
+</body>
+</html>
