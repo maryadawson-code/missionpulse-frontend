@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit Trail | MissionPulse</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .glass-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0, 229, 250, 0.3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Demo audit logs
+    const DEMO_AUDIT_LOGS = [
+      { id: 1, timestamp: '2025-02-02T14:32:15Z', user: 'Mary Womack', role: 'CEO', action: 'APPROVE', module: 'Pipeline', target: 'DHA HCIT Opportunity', details: 'Go/No-Go decision: GO', ip: '192.168.1.105', severity: 'info' },
+      { id: 2, timestamp: '2025-02-02T14:28:42Z', user: 'John Smith', role: 'CAP', action: 'UPDATE', module: 'War Room', target: 'Win Theme #3', details: 'Modified discriminator text', ip: '192.168.1.112', severity: 'info' },
+      { id: 3, timestamp: '2025-02-02T14:15:33Z', user: 'Sarah Chen', role: 'FIN', action: 'VIEW', module: 'Pricing', target: 'BOE v2.3', details: 'Accessed CUI-marked document', ip: '192.168.1.108', severity: 'warning' },
+      { id: 4, timestamp: '2025-02-02T13:58:21Z', user: 'Mike Johnson', role: 'CON', action: 'EXPORT', module: 'Compliance', target: 'FAR Matrix', details: 'Downloaded compliance report', ip: '192.168.1.115', severity: 'info' },
+      { id: 5, timestamp: '2025-02-02T13:45:12Z', user: 'System', role: 'SYSTEM', action: 'ALERT', module: 'Security', target: 'Login Attempt', details: 'Failed login - invalid password (3rd attempt)', ip: '45.33.32.156', severity: 'critical' },
+      { id: 6, timestamp: '2025-02-02T13:30:45Z', user: 'Emily Davis', role: 'PM', action: 'CREATE', module: 'Swimlane', target: 'Task: Draft Section L', details: 'New task assigned to Writer Agent', ip: '192.168.1.120', severity: 'info' },
+      { id: 7, timestamp: '2025-02-02T13:15:28Z', user: 'Mary Womack', role: 'CEO', action: 'RBAC_CHANGE', module: 'Admin', target: 'User: Tom Wilson', details: 'Role changed from Viewer to CAP', ip: '192.168.1.105', severity: 'warning' },
+      { id: 8, timestamp: '2025-02-02T12:58:33Z', user: 'AI Agent', role: 'SYSTEM', action: 'GENERATE', module: 'Agent Hub', target: 'Capture Analysis', details: 'Generated competitor report for DHA opp', ip: 'internal', severity: 'info' },
+      { id: 9, timestamp: '2025-02-02T12:45:19Z', user: 'Partner: Acme Corp', role: 'PARTNER', action: 'VIEW', module: 'Frenemy', target: 'Teaming Agreement', details: 'Partner accessed shared documents', ip: '203.45.67.89', severity: 'info' },
+      { id: 10, timestamp: '2025-02-02T12:30:55Z', user: 'System', role: 'SYSTEM', action: 'BACKUP', module: 'Database', target: 'Full Backup', details: 'Automated daily backup completed', ip: 'internal', severity: 'info' },
+      { id: 11, timestamp: '2025-02-02T11:22:41Z', user: 'Unknown', role: 'UNKNOWN', action: 'ACCESS_DENIED', module: 'Black Hat', target: 'Competitor Intel', details: 'Unauthorized access attempt blocked', ip: '185.22.44.88', severity: 'critical' },
+      { id: 12, timestamp: '2025-02-02T10:15:33Z', user: 'Sarah Chen', role: 'FIN', action: 'UPDATE', module: 'Pricing', target: 'Labor Rates', details: 'Updated LCAT rates for 2025', ip: '192.168.1.108', severity: 'info' },
+    ];
+
+    const SEVERITY_STYLES = {
+      info: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30' },
+      warning: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30' },
+      critical: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' },
+    };
+
+    const ACTION_ICONS = {
+      APPROVE: '✓',
+      UPDATE: '↻',
+      VIEW: '👁',
+      EXPORT: '↓',
+      CREATE: '+',
+      DELETE: '×',
+      ALERT: '⚠',
+      RBAC_CHANGE: '🔐',
+      GENERATE: '🤖',
+      BACKUP: '💾',
+      ACCESS_DENIED: '🚫',
+    };
+
+    function AuditTrail() {
+      const [logs, setLogs] = useState(DEMO_AUDIT_LOGS);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [severityFilter, setSeverityFilter] = useState('all');
+      const [moduleFilter, setModuleFilter] = useState('all');
+      const [dateRange, setDateRange] = useState('today');
+      const [selectedLog, setSelectedLog] = useState(null);
+
+      const modules = [...new Set(logs.map(l => l.module))];
+
+      const filteredLogs = logs.filter(log => {
+        if (severityFilter !== 'all' && log.severity !== severityFilter) return false;
+        if (moduleFilter !== 'all' && log.module !== moduleFilter) return false;
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          return log.user.toLowerCase().includes(query) ||
+                 log.action.toLowerCase().includes(query) ||
+                 log.target.toLowerCase().includes(query) ||
+                 log.details.toLowerCase().includes(query);
+        }
+        return true;
+      });
+
+      const stats = {
+        total: logs.length,
+        critical: logs.filter(l => l.severity === 'critical').length,
+        warning: logs.filter(l => l.severity === 'warning').length,
+        today: logs.length,
+      };
+
+      const formatTime = (timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      };
+
+      const formatDate = (timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      };
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Header */}
+          <header className="glass border-b border-slate-700/50 sticky top-0 z-50">
+            <div className="max-w-[1800px] mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <a href="missionpulse-nav-hub.html" className="text-slate-400 hover:text-white transition-colors">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </a>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-white">Audit Trail</h1>
+                    <p className="text-xs text-slate-400">CMMC 2.0 Compliant Activity Logging</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button className="px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-slate-300 hover:border-cyan-500/50 transition-all flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Logs
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-[1800px] mx-auto px-6 py-8">
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-sm text-slate-400 mb-1">Total Events</p>
+                <p className="text-2xl font-bold text-white">{stats.total}</p>
+              </div>
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-sm text-slate-400 mb-1">Critical Alerts</p>
+                <p className="text-2xl font-bold text-red-400">{stats.critical}</p>
+              </div>
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-sm text-slate-400 mb-1">Warnings</p>
+                <p className="text-2xl font-bold text-amber-400">{stats.warning}</p>
+              </div>
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-sm text-slate-400 mb-1">Today's Events</p>
+                <p className="text-2xl font-bold text-cyan-400">{stats.today}</p>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative flex-1 max-w-md">
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search logs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
+              <select
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value)}
+                className="px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-white focus:outline-none"
+              >
+                <option value="all">All Severity</option>
+                <option value="critical">Critical</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+              </select>
+              <select
+                value={moduleFilter}
+                onChange={(e) => setModuleFilter(e.target.value)}
+                className="px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-white focus:outline-none"
+              >
+                <option value="all">All Modules</option>
+                {modules.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                className="px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-white focus:outline-none"
+              >
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </div>
+
+            {/* Logs Table */}
+            <div className="glass-card rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-800/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Time</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Severity</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">User</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Action</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Module</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Target</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Details</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">IP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50">
+                    {filteredLogs.map(log => (
+                      <tr 
+                        key={log.id} 
+                        onClick={() => setSelectedLog(log)}
+                        className={`hover:bg-slate-800/30 cursor-pointer transition-colors ${
+                          log.severity === 'critical' ? 'bg-red-500/5' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-white">{formatTime(log.timestamp)}</div>
+                          <div className="text-xs text-slate-500">{formatDate(log.timestamp)}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${SEVERITY_STYLES[log.severity].bg} ${SEVERITY_STYLES[log.severity].text} border ${SEVERITY_STYLES[log.severity].border}`}>
+                            {log.severity.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-white">{log.user}</div>
+                          <div className="text-xs text-slate-500">{log.role}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-2 text-sm text-slate-300">
+                            <span>{ACTION_ICONS[log.action] || '•'}</span>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-cyan-400">{log.module}</td>
+                        <td className="px-4 py-3 text-sm text-white">{log.target}</td>
+                        <td className="px-4 py-3 text-sm text-slate-400 max-w-xs truncate">{log.details}</td>
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500">{log.ip}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Log Detail Modal */}
+            {selectedLog && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedLog(null)}>
+                <div className="glass-card rounded-2xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white">Event Details</h3>
+                    <button onClick={() => setSelectedLog(null)} className="text-slate-400 hover:text-white">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Timestamp</span>
+                      <span className="text-white">{new Date(selectedLog.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Severity</span>
+                      <span className={SEVERITY_STYLES[selectedLog.severity].text}>{selectedLog.severity.toUpperCase()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">User</span>
+                      <span className="text-white">{selectedLog.user} ({selectedLog.role})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Action</span>
+                      <span className="text-white">{selectedLog.action}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Module</span>
+                      <span className="text-cyan-400">{selectedLog.module}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Target</span>
+                      <span className="text-white">{selectedLog.target}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">IP Address</span>
+                      <span className="font-mono text-slate-300">{selectedLog.ip}</span>
+                    </div>
+                    <div className="pt-3 border-t border-slate-700">
+                      <span className="text-slate-400 text-sm">Details</span>
+                      <p className="text-white mt-1">{selectedLog.details}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<AuditTrail />);
+  </script>
+</body>
+</html>
