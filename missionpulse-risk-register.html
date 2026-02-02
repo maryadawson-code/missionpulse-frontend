@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risk Register | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001029 50%, #000510 100%); min-height: 100vh; }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.1); border-radius: 16px; }
+        .glass-card:hover { border-color: rgba(0,229,250,0.3); box-shadow: 0 8px 32px rgba(0,229,250,0.1); }
+        .cyan-glow { box-shadow: 0 0 30px rgba(0,229,250,0.3); }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #00B8D4 100%); color: #00050F; font-weight: 600; }
+        .btn-primary:hover { box-shadow: 0 4px 20px rgba(0,229,250,0.4); transform: translateY(-1px); }
+        .risk-critical { background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); }
+        .risk-high { background: linear-gradient(135deg, #EA580C 0%, #C2410C 100%); }
+        .risk-medium { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); }
+        .risk-low { background: linear-gradient(135deg, #10B981 0%, #059669 100%); }
+        .heat-cell { transition: all 0.2s ease; cursor: pointer; }
+        .heat-cell:hover { transform: scale(1.1); z-index: 10; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        ::-webkit-scrollbar-thumb { background: rgba(0,229,250,0.3); border-radius: 3px; }
+    </style>
+</head>
+<body class="text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Supabase client
+        const supabaseUrl = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MTI0NjIsImV4cCI6MjA1MjM4ODQ2Mn0.w0CTO2S6OLVenus6qHdf4GJjCqg6HVDYT-fxEE0TBiw';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Constants
+        const CATEGORIES = ['Technical', 'Schedule', 'Cost', 'Programmatic', 'Organizational', 'External', 'Compliance', 'Security'];
+        const PROBABILITIES = ['Very Low', 'Low', 'Medium', 'High', 'Very High'];
+        const IMPACTS = ['Very Low', 'Low', 'Medium', 'High', 'Very High'];
+        const STATUSES = ['Open', 'Mitigating', 'Monitoring', 'Closed', 'Occurred'];
+
+        const PROB_VALUES = { 'Very Low': 1, 'Low': 2, 'Medium': 3, 'High': 4, 'Very High': 5 };
+        const IMPACT_VALUES = { 'Very Low': 1, 'Low': 2, 'Medium': 3, 'High': 4, 'Very High': 5 };
+
+        // Demo data
+        const demoRisks = [
+            { id: '1', risk_id_code: 'R-001', title: 'Key personnel availability', description: 'Solution Architect may be pulled to another priority project during proposal crunch', category: 'Organizational', probability: 'Medium', impact: 'High', status: 'Mitigating', mitigation_strategy: 'Identify backup SA, cross-train team member', mitigation_owner: 'Sarah Chen', mitigation_due_date: '2025-02-15', cost_impact_estimate: 50000, schedule_impact_days: 14, opportunity: 'DHA MHS Genesis' },
+            { id: '2', risk_id_code: 'R-002', title: 'Requirements volatility', description: 'Government may issue amendments that significantly change scope', category: 'External', probability: 'High', impact: 'High', status: 'Monitoring', mitigation_strategy: 'Monitor SAM.gov daily, attend all industry days, maintain modular proposal structure', mitigation_owner: 'Mary Womack', mitigation_due_date: '2025-02-20', cost_impact_estimate: 75000, schedule_impact_days: 21, opportunity: 'DHA MHS Genesis' },
+            { id: '3', risk_id_code: 'R-003', title: 'Subcontractor non-performance', description: 'Teaming partner may fail to deliver past performance citations on time', category: 'Programmatic', probability: 'Low', impact: 'Very High', status: 'Open', mitigation_strategy: 'Weekly check-ins with partner POC, have backup citations ready', mitigation_owner: 'Lisa Thompson', mitigation_due_date: '2025-02-10', cost_impact_estimate: 25000, schedule_impact_days: 7, opportunity: 'DHA MHS Genesis' },
+            { id: '4', risk_id_code: 'R-004', title: 'Price competitiveness', description: 'Our rates may be higher than competition due to labor category mix', category: 'Cost', probability: 'Medium', impact: 'Medium', status: 'Mitigating', mitigation_strategy: 'Conduct price-to-win analysis, optimize labor mix, consider strategic pricing', mitigation_owner: 'James Kim', mitigation_due_date: '2025-02-18', cost_impact_estimate: 100000, schedule_impact_days: 0, opportunity: 'DHA MHS Genesis' },
+            { id: '5', risk_id_code: 'R-005', title: 'Technical compliance gaps', description: 'Current solution may not fully address Section L/M requirements', category: 'Technical', probability: 'Low', impact: 'High', status: 'Closed', mitigation_strategy: 'Complete requirements traceability matrix, assign SME review for each requirement', mitigation_owner: 'Mike Rodriguez', mitigation_due_date: '2025-01-30', cost_impact_estimate: 15000, schedule_impact_days: 5, opportunity: 'DHA MHS Genesis' },
+            { id: '6', risk_id_code: 'R-006', title: 'Protest risk from incumbent', description: 'Incumbent may file protest if we win, delaying contract start', category: 'External', probability: 'Medium', impact: 'Medium', status: 'Monitoring', mitigation_strategy: 'Ensure proposal is fully compliant, document all evaluation criteria responses', mitigation_owner: 'Rachel Green', mitigation_due_date: '2025-03-01', cost_impact_estimate: 200000, schedule_impact_days: 90, opportunity: 'VA EHR Modernization' },
+            { id: '7', risk_id_code: 'R-007', title: 'Security clearance delays', description: 'New hires may not receive clearances in time for contract start', category: 'Security', probability: 'High', impact: 'Medium', status: 'Mitigating', mitigation_strategy: 'Pre-screen candidates, start clearance process early, identify cleared backup staff', mitigation_owner: 'Emily Watson', mitigation_due_date: '2025-02-28', cost_impact_estimate: 30000, schedule_impact_days: 30, opportunity: 'VA EHR Modernization' },
+            { id: '8', risk_id_code: 'R-008', title: 'CMMC certification timeline', description: 'May not achieve CMMC Level 2 certification before proposal deadline', category: 'Compliance', probability: 'Low', impact: 'Very High', status: 'Mitigating', mitigation_strategy: 'Accelerate CMMC prep, engage C3PAO early, document POA&M for any gaps', mitigation_owner: 'Rachel Green', mitigation_due_date: '2025-02-25', cost_impact_estimate: 45000, schedule_impact_days: 0, opportunity: 'DoD Cyber Support' },
+        ];
+
+        // Navigation Component
+        const Navigation = ({ currentUser }) => (
+            <nav className="glass-card mb-6 p-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                        <a href="index.html" className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                                <i className="fas fa-rocket text-white"></i>
+                            </div>
+                            <span className="text-xl font-bold text-white">Mission<span className="text-cyan-400">Pulse</span></span>
+                        </a>
+                        <span className="text-gray-500">|</span>
+                        <span className="text-gray-400"><i className="fas fa-shield-halved mr-2"></i>Risk Register</span>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        <a href="missionpulse-dashboard-v12.html" className="text-gray-400 hover:text-cyan-400 transition">
+                            <i className="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                        </a>
+                        <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-white/5">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-xs font-bold">MW</div>
+                            <span className="text-sm text-gray-300">{currentUser || 'Mary Womack'}</span>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        );
+
+        // Risk Score Badge
+        const RiskScoreBadge = ({ probability, impact }) => {
+            const score = PROB_VALUES[probability] * IMPACT_VALUES[impact];
+            let colorClass = 'risk-low';
+            let label = 'Low';
+            
+            if (score >= 20) { colorClass = 'risk-critical'; label = 'Critical'; }
+            else if (score >= 12) { colorClass = 'risk-high'; label = 'High'; }
+            else if (score >= 6) { colorClass = 'risk-medium'; label = 'Medium'; }
+            
+            return (
+                <div className={`${colorClass} px-3 py-1 rounded-full text-xs font-bold text-white inline-flex items-center`}>
+                    <span className="mr-1">{score}</span>
+                    <span className="opacity-75">({label})</span>
+                </div>
+            );
+        };
+
+        // Status Badge
+        const StatusBadge = ({ status }) => {
+            const colors = {
+                'Open': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                'Mitigating': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                'Monitoring': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+                'Closed': 'bg-green-500/20 text-green-400 border-green-500/30',
+                'Occurred': 'bg-red-500/20 text-red-400 border-red-500/30',
+            };
+            return (
+                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${colors[status]}`}>
+                    {status}
+                </span>
+            );
+        };
+
+        // Heat Map Component
+        const RiskHeatMap = ({ risks, onCellClick }) => {
+            const getCountAtPosition = (prob, imp) => {
+                return risks.filter(r => r.probability === prob && r.impact === imp).length;
+            };
+
+            const getRisksAtPosition = (prob, imp) => {
+                return risks.filter(r => r.probability === prob && r.impact === imp);
+            };
+
+            const getCellColor = (probIdx, impIdx) => {
+                const score = (probIdx + 1) * (impIdx + 1);
+                if (score >= 20) return 'bg-red-600';
+                if (score >= 12) return 'bg-orange-500';
+                if (score >= 6) return 'bg-yellow-500';
+                if (score >= 3) return 'bg-green-500';
+                return 'bg-green-600';
+            };
+
+            return (
+                <div className="glass-card p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">
+                        <i className="fas fa-fire mr-2 text-orange-400"></i>Risk Heat Map
+                    </h3>
+                    <div className="flex">
+                        {/* Y-axis label */}
+                        <div className="flex flex-col justify-center mr-2">
+                            <span className="text-xs text-gray-400 transform -rotate-90 whitespace-nowrap">← Probability →</span>
+                        </div>
+                        
+                        <div className="flex-1">
+                            {/* Grid */}
+                            <div className="grid grid-cols-6 gap-1">
+                                {/* Header row */}
+                                <div></div>
+                                {IMPACTS.map((imp, idx) => (
+                                    <div key={imp} className="text-center text-xs text-gray-400 pb-2">{imp}</div>
+                                ))}
+                                
+                                {/* Data rows */}
+                                {[...PROBABILITIES].reverse().map((prob, probIdx) => (
+                                    <React.Fragment key={prob}>
+                                        <div className="text-right text-xs text-gray-400 pr-2 flex items-center justify-end">{prob}</div>
+                                        {IMPACTS.map((imp, impIdx) => {
+                                            const count = getCountAtPosition(prob, imp);
+                                            const cellRisks = getRisksAtPosition(prob, imp);
+                                            const actualProbIdx = 4 - probIdx; // Reverse index for color calculation
+                                            
+                                            return (
+                                                <div
+                                                    key={`${prob}-${imp}`}
+                                                    className={`heat-cell h-12 rounded-lg flex items-center justify-center ${getCellColor(actualProbIdx, impIdx)} ${count > 0 ? 'opacity-100' : 'opacity-30'}`}
+                                                    onClick={() => count > 0 && onCellClick(cellRisks)}
+                                                    title={cellRisks.map(r => r.title).join(', ')}
+                                                >
+                                                    {count > 0 && (
+                                                        <span className="text-white font-bold text-lg">{count}</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                            
+                            {/* X-axis label */}
+                            <div className="text-center text-xs text-gray-400 mt-2">← Impact →</div>
+                        </div>
+                    </div>
+                    
+                    {/* Legend */}
+                    <div className="flex items-center justify-center space-x-4 mt-4 text-xs">
+                        <span className="flex items-center"><span className="w-4 h-4 rounded bg-green-600 mr-1"></span>Low (1-2)</span>
+                        <span className="flex items-center"><span className="w-4 h-4 rounded bg-green-500 mr-1"></span>Low-Med (3-5)</span>
+                        <span className="flex items-center"><span className="w-4 h-4 rounded bg-yellow-500 mr-1"></span>Medium (6-11)</span>
+                        <span className="flex items-center"><span className="w-4 h-4 rounded bg-orange-500 mr-1"></span>High (12-19)</span>
+                        <span className="flex items-center"><span className="w-4 h-4 rounded bg-red-600 mr-1"></span>Critical (20-25)</span>
+                    </div>
+                </div>
+            );
+        };
+
+        // Stats Cards
+        const StatsCard = ({ icon, label, value, subtext, colorClass = 'text-cyan-400', bgClass = 'bg-cyan-500/20' }) => (
+            <div className="glass-card p-4">
+                <div className="flex items-center justify-between mb-2">
+                    <div className={`w-10 h-10 rounded-lg ${bgClass} flex items-center justify-center`}>
+                        <i className={`fas fa-${icon} ${colorClass}`}></i>
+                    </div>
+                    <span className={`text-2xl font-bold ${colorClass}`}>{value}</span>
+                </div>
+                <p className="text-sm text-gray-400">{label}</p>
+                {subtext && <p className="text-xs text-gray-500 mt-1">{subtext}</p>}
+            </div>
+        );
+
+        // Risk Card Component
+        const RiskCard = ({ risk, onEdit, onUpdateStatus }) => (
+            <div className="glass-card p-4 hover:border-cyan-500/30 transition cursor-pointer" onClick={() => onEdit(risk)}>
+                <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                        <span className="text-cyan-400 font-mono text-sm">{risk.risk_id_code}</span>
+                        <RiskScoreBadge probability={risk.probability} impact={risk.impact} />
+                    </div>
+                    <StatusBadge status={risk.status} />
+                </div>
+                
+                <h4 className="font-medium text-white mb-2">{risk.title}</h4>
+                <p className="text-sm text-gray-400 mb-3 line-clamp-2">{risk.description}</p>
+                
+                <div className="flex flex-wrap gap-2 mb-3">
+                    <span className="px-2 py-1 rounded bg-white/5 text-xs text-gray-300">
+                        <i className="fas fa-folder mr-1 text-cyan-400"></i>{risk.category}
+                    </span>
+                    <span className="px-2 py-1 rounded bg-white/5 text-xs text-gray-300">
+                        <i className="fas fa-briefcase mr-1 text-purple-400"></i>{risk.opportunity}
+                    </span>
+                </div>
+                
+                <div className="border-t border-white/5 pt-3">
+                    <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center space-x-2 text-gray-400">
+                            <i className="fas fa-user"></i>
+                            <span>{risk.mitigation_owner}</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-gray-400">
+                            <i className="fas fa-calendar"></i>
+                            <span>Due: {risk.mitigation_due_date}</span>
+                        </div>
+                    </div>
+                    {risk.mitigation_strategy && (
+                        <p className="text-xs text-cyan-400/80 mt-2 line-clamp-1">
+                            <i className="fas fa-shield-alt mr-1"></i>{risk.mitigation_strategy}
+                        </p>
+                    )}
+                </div>
+            </div>
+        );
+
+        // Risk Modal Component
+        const RiskModal = ({ isOpen, onClose, risk, onSave }) => {
+            const [formData, setFormData] = useState({
+                title: '',
+                description: '',
+                category: 'Technical',
+                probability: 'Medium',
+                impact: 'Medium',
+                status: 'Open',
+                mitigation_strategy: '',
+                mitigation_owner: '',
+                mitigation_due_date: '',
+                contingency_plan: '',
+                trigger_conditions: '',
+                cost_impact_estimate: '',
+                schedule_impact_days: '',
+            });
+
+            useEffect(() => {
+                if (risk) {
+                    setFormData({
+                        title: risk.title || '',
+                        description: risk.description || '',
+                        category: risk.category || 'Technical',
+                        probability: risk.probability || 'Medium',
+                        impact: risk.impact || 'Medium',
+                        status: risk.status || 'Open',
+                        mitigation_strategy: risk.mitigation_strategy || '',
+                        mitigation_owner: risk.mitigation_owner || '',
+                        mitigation_due_date: risk.mitigation_due_date || '',
+                        contingency_plan: risk.contingency_plan || '',
+                        trigger_conditions: risk.trigger_conditions || '',
+                        cost_impact_estimate: risk.cost_impact_estimate || '',
+                        schedule_impact_days: risk.schedule_impact_days || '',
+                    });
+                } else {
+                    setFormData({
+                        title: '',
+                        description: '',
+                        category: 'Technical',
+                        probability: 'Medium',
+                        impact: 'Medium',
+                        status: 'Open',
+                        mitigation_strategy: '',
+                        mitigation_owner: '',
+                        mitigation_due_date: '',
+                        contingency_plan: '',
+                        trigger_conditions: '',
+                        cost_impact_estimate: '',
+                        schedule_impact_days: '',
+                    });
+                }
+            }, [risk]);
+
+            if (!isOpen) return null;
+
+            const handleChange = (field, value) => {
+                setFormData(prev => ({ ...prev, [field]: value }));
+            };
+
+            const score = PROB_VALUES[formData.probability] * IMPACT_VALUES[formData.impact];
+
+            return (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="glass-card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto cyan-glow">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-semibold text-white">
+                                {risk ? `Edit Risk: ${risk.risk_id_code}` : 'Add New Risk'}
+                            </h3>
+                            <button onClick={onClose} className="text-gray-400 hover:text-white">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Title */}
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Risk Title *</label>
+                                <input
+                                    type="text"
+                                    value={formData.title}
+                                    onChange={(e) => handleChange('title', e.target.value)}
+                                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    placeholder="Brief risk title"
+                                />
+                            </div>
+
+                            {/* Description */}
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Description</label>
+                                <textarea
+                                    value={formData.description}
+                                    onChange={(e) => handleChange('description', e.target.value)}
+                                    rows={3}
+                                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    placeholder="Detailed description of the risk"
+                                />
+                            </div>
+
+                            {/* Category & Status */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Category</label>
+                                    <select
+                                        value={formData.category}
+                                        onChange={(e) => handleChange('category', e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    >
+                                        {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Status</label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => handleChange('status', e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    >
+                                        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Probability & Impact with Score */}
+                            <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-sm text-gray-400">Risk Assessment</span>
+                                    <RiskScoreBadge probability={formData.probability} impact={formData.impact} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs text-gray-500 mb-1">Probability</label>
+                                        <select
+                                            value={formData.probability}
+                                            onChange={(e) => handleChange('probability', e.target.value)}
+                                            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                                        >
+                                            {PROBABILITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-gray-500 mb-1">Impact</label>
+                                        <select
+                                            value={formData.impact}
+                                            onChange={(e) => handleChange('impact', e.target.value)}
+                                            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                                        >
+                                            {IMPACTS.map(i => <option key={i} value={i}>{i}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Mitigation */}
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Mitigation Strategy</label>
+                                <textarea
+                                    value={formData.mitigation_strategy}
+                                    onChange={(e) => handleChange('mitigation_strategy', e.target.value)}
+                                    rows={2}
+                                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    placeholder="How will this risk be mitigated?"
+                                />
+                            </div>
+
+                            {/* Owner & Due Date */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Mitigation Owner</label>
+                                    <input
+                                        type="text"
+                                        value={formData.mitigation_owner}
+                                        onChange={(e) => handleChange('mitigation_owner', e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                        placeholder="Assigned owner"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Due Date</label>
+                                    <input
+                                        type="date"
+                                        value={formData.mitigation_due_date}
+                                        onChange={(e) => handleChange('mitigation_due_date', e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Impact Estimates */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Cost Impact ($)</label>
+                                    <input
+                                        type="number"
+                                        value={formData.cost_impact_estimate}
+                                        onChange={(e) => handleChange('cost_impact_estimate', e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Schedule Impact (days)</label>
+                                    <input
+                                        type="number"
+                                        value={formData.schedule_impact_days}
+                                        onChange={(e) => handleChange('schedule_impact_days', e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Contingency */}
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Contingency Plan</label>
+                                <textarea
+                                    value={formData.contingency_plan}
+                                    onChange={(e) => handleChange('contingency_plan', e.target.value)}
+                                    rows={2}
+                                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    placeholder="What's the backup plan if the risk occurs?"
+                                />
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex justify-end space-x-3 pt-4">
+                                <button
+                                    onClick={onClose}
+                                    className="px-4 py-2 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => onSave({ ...risk, ...formData })}
+                                    className="btn-primary px-4 py-2 rounded-lg transition"
+                                >
+                                    <i className="fas fa-check mr-2"></i>Save Risk
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Main App Component
+        const RiskRegisterApp = () => {
+            const [risks, setRisks] = useState(demoRisks);
+            const [modalOpen, setModalOpen] = useState(false);
+            const [selectedRisk, setSelectedRisk] = useState(null);
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [filterCategory, setFilterCategory] = useState('all');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [view, setView] = useState('cards');
+
+            // Stats calculations
+            const stats = useMemo(() => {
+                const open = risks.filter(r => r.status === 'Open').length;
+                const mitigating = risks.filter(r => r.status === 'Mitigating').length;
+                const critical = risks.filter(r => PROB_VALUES[r.probability] * IMPACT_VALUES[r.impact] >= 20).length;
+                const high = risks.filter(r => {
+                    const score = PROB_VALUES[r.probability] * IMPACT_VALUES[r.impact];
+                    return score >= 12 && score < 20;
+                }).length;
+                const totalCostImpact = risks.reduce((sum, r) => sum + (r.cost_impact_estimate || 0), 0);
+                
+                return { total: risks.length, open, mitigating, critical, high, totalCostImpact };
+            }, [risks]);
+
+            // Filtered risks
+            const filteredRisks = useMemo(() => {
+                return risks.filter(r => {
+                    if (filterStatus !== 'all' && r.status !== filterStatus) return false;
+                    if (filterCategory !== 'all' && r.category !== filterCategory) return false;
+                    if (searchTerm && !r.title.toLowerCase().includes(searchTerm.toLowerCase()) && 
+                        !r.description?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                    return true;
+                }).sort((a, b) => {
+                    const scoreA = PROB_VALUES[a.probability] * IMPACT_VALUES[a.impact];
+                    const scoreB = PROB_VALUES[b.probability] * IMPACT_VALUES[b.impact];
+                    return scoreB - scoreA;
+                });
+            }, [risks, filterStatus, filterCategory, searchTerm]);
+
+            const handleEdit = (risk) => {
+                setSelectedRisk(risk);
+                setModalOpen(true);
+            };
+
+            const handleAdd = () => {
+                setSelectedRisk(null);
+                setModalOpen(true);
+            };
+
+            const handleSave = (riskData) => {
+                if (riskData.id) {
+                    setRisks(prev => prev.map(r => r.id === riskData.id ? riskData : r));
+                } else {
+                    const newRisk = {
+                        ...riskData,
+                        id: Date.now().toString(),
+                        risk_id_code: `R-${String(risks.length + 1).padStart(3, '0')}`,
+                        opportunity: 'DHA MHS Genesis',
+                    };
+                    setRisks(prev => [...prev, newRisk]);
+                }
+                setModalOpen(false);
+            };
+
+            const handleHeatMapClick = (cellRisks) => {
+                if (cellRisks.length === 1) {
+                    handleEdit(cellRisks[0]);
+                } else {
+                    // Could show a list modal, for now just edit first
+                    handleEdit(cellRisks[0]);
+                }
+            };
+
+            return (
+                <div className="min-h-screen p-6">
+                    <Navigation currentUser="Mary Womack" />
+
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-white">Risk Register</h1>
+                            <p className="text-gray-400">Track, assess, and mitigate proposal risks</p>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                            <div className="flex rounded-lg overflow-hidden border border-white/10">
+                                <button
+                                    onClick={() => setView('cards')}
+                                    className={`px-4 py-2 text-sm ${view === 'cards' ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    <i className="fas fa-th-large mr-2"></i>Cards
+                                </button>
+                                <button
+                                    onClick={() => setView('table')}
+                                    className={`px-4 py-2 text-sm ${view === 'table' ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    <i className="fas fa-table mr-2"></i>Table
+                                </button>
+                            </div>
+                            <button onClick={handleAdd} className="btn-primary px-4 py-2 rounded-lg transition">
+                                <i className="fas fa-plus mr-2"></i>Add Risk
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                        <StatsCard icon="exclamation-triangle" label="Total Risks" value={stats.total} colorClass="text-cyan-400" bgClass="bg-cyan-500/20" />
+                        <StatsCard icon="door-open" label="Open" value={stats.open} colorClass="text-blue-400" bgClass="bg-blue-500/20" />
+                        <StatsCard icon="shield-alt" label="Mitigating" value={stats.mitigating} colorClass="text-yellow-400" bgClass="bg-yellow-500/20" />
+                        <StatsCard icon="fire" label="Critical/High" value={stats.critical + stats.high} subtext={`${stats.critical} critical, ${stats.high} high`} colorClass="text-red-400" bgClass="bg-red-500/20" />
+                        <StatsCard icon="dollar-sign" label="Total Exposure" value={`$${(stats.totalCostImpact / 1000).toFixed(0)}K`} colorClass="text-orange-400" bgClass="bg-orange-500/20" />
+                    </div>
+
+                    {/* Heat Map & Filters */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div className="lg:col-span-2">
+                            <RiskHeatMap risks={risks.filter(r => r.status !== 'Closed')} onCellClick={handleHeatMapClick} />
+                        </div>
+                        <div className="glass-card p-6">
+                            <h3 className="text-lg font-semibold text-white mb-4">
+                                <i className="fas fa-filter mr-2 text-cyan-400"></i>Filters
+                            </h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Search</label>
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        placeholder="Search risks..."
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Status</label>
+                                    <select
+                                        value={filterStatus}
+                                        onChange={(e) => setFilterStatus(e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    >
+                                        <option value="all">All Statuses</option>
+                                        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Category</label>
+                                    <select
+                                        value={filterCategory}
+                                        onChange={(e) => setFilterCategory(e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:border-cyan-500 focus:outline-none"
+                                    >
+                                        <option value="all">All Categories</option>
+                                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <button 
+                                    onClick={() => { setFilterStatus('all'); setFilterCategory('all'); setSearchTerm(''); }}
+                                    className="w-full px-4 py-2 rounded-lg bg-white/5 text-gray-400 hover:text-white transition"
+                                >
+                                    <i className="fas fa-undo mr-2"></i>Clear Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Risk Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredRisks.map(risk => (
+                            <RiskCard key={risk.id} risk={risk} onEdit={handleEdit} />
+                        ))}
+                    </div>
+
+                    {filteredRisks.length === 0 && (
+                        <div className="glass-card p-12 text-center">
+                            <i className="fas fa-shield-check text-4xl text-green-400 mb-4"></i>
+                            <p className="text-gray-400">No risks match your filters</p>
+                        </div>
+                    )}
+
+                    {/* Modal */}
+                    <RiskModal
+                        isOpen={modalOpen}
+                        onClose={() => setModalOpen(false)}
+                        risk={selectedRisk}
+                        onSave={handleSave}
+                    />
+
+                    {/* Footer */}
+                    <footer className="mt-8 text-center text-gray-500 text-sm">
+                        <p>MissionPulse v12 • Sprint 53 • Risk Register</p>
+                        <p className="mt-1">© 2025 Mission Meets Tech. All rights reserved.</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<RiskRegisterApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
