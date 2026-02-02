@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse | RFP Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.15); }
+        .glass-dark { background: rgba(0, 5, 15, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.2); }
+        .glow { box-shadow: 0 0 30px rgba(0, 229, 250, 0.15); }
+        .glow-text { text-shadow: 0 0 20px rgba(0, 229, 250, 0.5); }
+        .req-row { transition: all 0.2s ease; }
+        .req-row:hover { background: rgba(0, 229, 250, 0.08); }
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(0, 229, 250, 0.3); } 50% { box-shadow: 0 0 20px rgba(0, 229, 250, 0.6); } }
+        .live-indicator { animation: pulse-glow 2s infinite; }
+        .tab-active { border-bottom: 2px solid #00E5FA; color: #00E5FA; }
+    </style>
+</head>
+<body class="text-white p-6">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const supabaseUrl = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgwMTk1MjMsImV4cCI6MjA1MzU5NTUyM30.GFHJh-yID3FwkcKtiQMX3DEdJfe7IilFRpvILpvIASM';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        const REQ_TYPES = ['Shall', 'Should', 'May', 'Will', 'Must'];
+        const REQ_STATUS = ['Open', 'Mapped', 'Compliant', 'Exception'];
+        const AMENDMENT_STATUS = ['Pending Review', 'Reviewed', 'Incorporated', 'N/A'];
+        
+        const DEMO_OPPORTUNITIES = [
+            { id: 'demo-1', title: 'DHA EHRM Support Services', nickname: 'DHA-EHRM', solicitation_number: 'W81K04-24-R-0001' },
+            { id: 'demo-2', title: 'VA Digital Transformation', nickname: 'VA-DT', solicitation_number: '36C10X24R0015' },
+            { id: 'demo-3', title: 'CMS Data Analytics Platform', nickname: 'CMS-DAP', solicitation_number: '75FCMC24R0008' }
+        ];
+        
+        const DEMO_REQUIREMENTS = [
+            { id: 'req-1', opportunity_id: 'demo-1', requirement_type: 'Shall', section_reference: 'L.5.1', requirement_text: 'The contractor shall provide 24/7 help desk support with response time not exceeding 15 minutes for Priority 1 incidents.', compliance_approach: 'Leverage existing NOC with 99.9% SLA track record', status: 'Compliant', assignee_role: 'SA' },
+            { id: 'req-2', opportunity_id: 'demo-1', requirement_type: 'Shall', section_reference: 'L.5.2', requirement_text: 'The contractor shall maintain CMMC Level 2 certification throughout the period of performance.', compliance_approach: 'Current CMMC L2 certified, annual reassessment scheduled', status: 'Compliant', assignee_role: 'CON' },
+            { id: 'req-3', opportunity_id: 'demo-1', requirement_type: 'Shall', section_reference: 'L.5.3', requirement_text: 'The contractor shall provide a Program Manager with 10+ years of healthcare IT experience and active Secret clearance.', compliance_approach: 'Proposed PM: John Smith - 15 yrs healthcare IT, TS/SCI', status: 'Compliant', assignee_role: 'PM' },
+            { id: 'req-4', opportunity_id: 'demo-1', requirement_type: 'Should', section_reference: 'L.6.1', requirement_text: 'The contractor should demonstrate experience with MHS GENESIS implementation at 3+ MTFs.', compliance_approach: 'Relevant experience at 5 MTFs - PP citations prepared', status: 'Mapped', assignee_role: 'CAP' },
+            { id: 'req-5', opportunity_id: 'demo-1', requirement_type: 'Must', section_reference: 'M.2.1', requirement_text: 'The contractor must submit Cost Volume in accordance with FAR 15.403-4 certified cost or pricing data requirements.', compliance_approach: 'FIN preparing certified data per FAR requirements', status: 'Open', assignee_role: 'FIN' },
+            { id: 'req-6', opportunity_id: 'demo-1', requirement_type: 'Shall', section_reference: 'L.5.4', requirement_text: 'The contractor shall comply with HIPAA Privacy and Security Rules for all PHI handling.', compliance_approach: 'BAA template ready, HIPAA training current for all staff', status: 'Compliant', assignee_role: 'CON' },
+            { id: 'req-7', opportunity_id: 'demo-1', requirement_type: 'Will', section_reference: 'C.3.1', requirement_text: 'The Government will provide access to DHA network infrastructure within 30 days of contract award.', compliance_approach: 'N/A - Government responsibility', status: 'Mapped', assignee_role: 'PM' },
+            { id: 'req-8', opportunity_id: 'demo-2', requirement_type: 'Shall', section_reference: 'L.4.1', requirement_text: 'The contractor shall implement VA Enterprise Cloud environment within 90 days of task order award.', compliance_approach: 'Migration plan drafted, 60-day aggressive timeline proposed', status: 'Open', assignee_role: 'SA' }
+        ];
+        
+        const DEMO_AMENDMENTS = [
+            { id: 'amd-1', opportunity_id: 'demo-1', amendment_number: '0001', amendment_type: 'Administrative', summary: 'Extended proposal due date from Feb 15 to Feb 28, 2026', status: 'Incorporated', effective_date: '2026-01-20', impact_areas: ['Schedule'] },
+            { id: 'amd-2', opportunity_id: 'demo-1', amendment_number: '0002', amendment_type: 'Technical', summary: 'Added requirement for FedRAMP High authorization for cloud services', status: 'Pending Review', effective_date: '2026-01-25', impact_areas: ['Technical', 'Compliance', 'Cost'] },
+            { id: 'amd-3', opportunity_id: 'demo-1', amendment_number: '0003', amendment_type: 'Q&A Response', summary: 'Government responses to industry questions from Jan 10 deadline', status: 'Reviewed', effective_date: '2026-01-28', impact_areas: ['Technical', 'Cost'] },
+            { id: 'amd-4', opportunity_id: 'demo-2', amendment_number: '0001', amendment_type: 'Administrative', summary: 'Correction to NAICS code from 541512 to 541511', status: 'Incorporated', effective_date: '2026-01-15', impact_areas: ['Administrative'] }
+        ];
+        
+        function RFPScannerApp() {
+            const [opportunities, setOpportunities] = useState([]);
+            const [requirements, setRequirements] = useState([]);
+            const [amendments, setAmendments] = useState([]);
+            const [selectedOpp, setSelectedOpp] = useState(null);
+            const [isDemo, setIsDemo] = useState(true);
+            const [loading, setLoading] = useState(true);
+            const [activeTab, setActiveTab] = useState('requirements');
+            const [showModal, setShowModal] = useState(false);
+            const [modalType, setModalType] = useState('requirement');
+            const [editingItem, setEditingItem] = useState(null);
+            const [filterType, setFilterType] = useState('all');
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [searchTerm, setSearchTerm] = useState('');
+            
+            useEffect(() => { loadOpportunities(); }, []);
+            useEffect(() => { if (selectedOpp) { loadRequirements(selectedOpp.id); loadAmendments(selectedOpp.id); } }, [selectedOpp]);
+            
+            const loadOpportunities = async () => {
+                try {
+                    const { data, error } = await supabase.from('opportunities').select('id, title, nickname, solicitation_number').order('due_date');
+                    if (error) throw error;
+                    if (data?.length > 0) { setOpportunities(data); setIsDemo(false); }
+                    else { setOpportunities(DEMO_OPPORTUNITIES); setIsDemo(true); }
+                } catch { setOpportunities(DEMO_OPPORTUNITIES); setIsDemo(true); }
+                setLoading(false);
+            };
+            
+            const loadRequirements = async (oppId) => {
+                if (isDemo) { setRequirements(DEMO_REQUIREMENTS.filter(r => r.opportunity_id === oppId)); return; }
+                try {
+                    const { data, error } = await supabase.from('rfp_requirements').select('*').eq('opportunity_id', oppId).order('section_reference');
+                    if (error) throw error;
+                    setRequirements(data || []);
+                } catch { setRequirements(DEMO_REQUIREMENTS.filter(r => r.opportunity_id === oppId)); }
+            };
+            
+            const loadAmendments = async (oppId) => {
+                if (isDemo) { setAmendments(DEMO_AMENDMENTS.filter(a => a.opportunity_id === oppId)); return; }
+                try {
+                    const { data, error } = await supabase.from('rfp_amendments').select('*').eq('opportunity_id', oppId).order('amendment_number');
+                    if (error) throw error;
+                    setAmendments(data || []);
+                } catch { setAmendments(DEMO_AMENDMENTS.filter(a => a.opportunity_id === oppId)); }
+            };
+            
+            const saveRequirement = async (data) => {
+                if (isDemo) {
+                    if (editingItem) setRequirements(prev => prev.map(r => r.id === editingItem.id ? { ...r, ...data } : r));
+                    else setRequirements(prev => [...prev, { ...data, id: `req-${Date.now()}`, opportunity_id: selectedOpp.id }]);
+                } else {
+                    try {
+                        if (editingItem) await supabase.from('rfp_requirements').update(data).eq('id', editingItem.id);
+                        else await supabase.from('rfp_requirements').insert([{ ...data, opportunity_id: selectedOpp.id }]);
+                        loadRequirements(selectedOpp.id);
+                    } catch (err) { console.error(err); }
+                }
+                closeModal();
+            };
+            
+            const saveAmendment = async (data) => {
+                if (isDemo) {
+                    if (editingItem) setAmendments(prev => prev.map(a => a.id === editingItem.id ? { ...a, ...data } : a));
+                    else setAmendments(prev => [...prev, { ...data, id: `amd-${Date.now()}`, opportunity_id: selectedOpp.id }]);
+                } else {
+                    try {
+                        if (editingItem) await supabase.from('rfp_amendments').update(data).eq('id', editingItem.id);
+                        else await supabase.from('rfp_amendments').insert([{ ...data, opportunity_id: selectedOpp.id }]);
+                        loadAmendments(selectedOpp.id);
+                    } catch (err) { console.error(err); }
+                }
+                closeModal();
+            };
+            
+            const deleteItem = async (id, type) => {
+                if (!confirm(`Delete this ${type}?`)) return;
+                if (isDemo) {
+                    if (type === 'requirement') setRequirements(prev => prev.filter(r => r.id !== id));
+                    else setAmendments(prev => prev.filter(a => a.id !== id));
+                    return;
+                }
+                try {
+                    const table = type === 'requirement' ? 'rfp_requirements' : 'rfp_amendments';
+                    await supabase.from(table).delete().eq('id', id);
+                    if (type === 'requirement') loadRequirements(selectedOpp.id);
+                    else loadAmendments(selectedOpp.id);
+                } catch (err) { console.error(err); }
+            };
+            
+            const updateReqStatus = async (reqId, newStatus) => {
+                if (isDemo) { setRequirements(prev => prev.map(r => r.id === reqId ? { ...r, status: newStatus } : r)); return; }
+                try { await supabase.from('rfp_requirements').update({ status: newStatus }).eq('id', reqId); loadRequirements(selectedOpp.id); } catch (err) { console.error(err); }
+            };
+            
+            const openModal = (type, item = null) => { setModalType(type); setEditingItem(item); setShowModal(true); };
+            const closeModal = () => { setShowModal(false); setEditingItem(null); };
+            
+            const filteredReqs = requirements.filter(r => {
+                if (filterType !== 'all' && r.requirement_type !== filterType) return false;
+                if (filterStatus !== 'all' && r.status !== filterStatus) return false;
+                if (searchTerm && !r.requirement_text.toLowerCase().includes(searchTerm.toLowerCase()) && !r.section_reference.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                return true;
+            });
+            
+            const getReqTypeColor = (type) => {
+                const colors = { 'Shall': 'bg-red-500/20 text-red-400', 'Must': 'bg-red-500/20 text-red-400', 'Should': 'bg-amber-500/20 text-amber-400', 'May': 'bg-green-500/20 text-green-400', 'Will': 'bg-blue-500/20 text-blue-400' };
+                return colors[type] || 'bg-gray-500/20 text-gray-400';
+            };
+            
+            const getStatusColor = (status) => {
+                const colors = { 'Compliant': 'text-green-400 bg-green-400/20', 'Mapped': 'text-cyan-400 bg-cyan-400/20', 'Open': 'text-amber-400 bg-amber-400/20', 'Exception': 'text-red-400 bg-red-400/20' };
+                return colors[status] || 'text-gray-400 bg-gray-400/20';
+            };
+            
+            const getAmendmentStatusColor = (status) => {
+                const colors = { 'Incorporated': 'text-green-400 bg-green-400/20', 'Reviewed': 'text-cyan-400 bg-cyan-400/20', 'Pending Review': 'text-amber-400 bg-amber-400/20', 'N/A': 'text-gray-400 bg-gray-400/20' };
+                return colors[status] || 'text-gray-400 bg-gray-400/20';
+            };
+            
+            const complianceStats = {
+                total: requirements.length,
+                compliant: requirements.filter(r => r.status === 'Compliant').length,
+                mapped: requirements.filter(r => r.status === 'Mapped').length,
+                open: requirements.filter(r => r.status === 'Open').length,
+                shalls: requirements.filter(r => r.requirement_type === 'Shall' || r.requirement_type === 'Must').length
+            };
+            
+            if (loading) return <div className="flex items-center justify-center h-screen"><div className="text-cyan-400 text-xl">Loading RFP Scanner...</div></div>;
+            
+            return (
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-4">
+                            <a href="missionpulse-nav-hub.html" className="text-cyan-400 hover:text-cyan-300">← Hub</a>
+                            <h1 className="text-3xl font-bold text-white glow-text">🔍 RFP Scanner</h1>
+                            <span className={`px-3 py-1 rounded-full text-xs ${isDemo ? 'bg-amber-500/20 text-amber-400' : 'bg-green-500/20 text-green-400 live-indicator'}`}>
+                                {isDemo ? '○ Demo Mode' : '● Live'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    {!selectedOpp ? (
+                        <div className="glass rounded-xl p-6 glow">
+                            <h2 className="text-xl font-semibold text-cyan-400 mb-4">Select Opportunity</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {opportunities.map(opp => (
+                                    <div key={opp.id} onClick={() => setSelectedOpp(opp)} className="glass-dark p-4 rounded-lg cursor-pointer hover:border-cyan-400 transition-all">
+                                        <div className="font-semibold text-white">{opp.nickname || opp.title}</div>
+                                        <div className="text-sm text-gray-400 mt-1">{opp.title}</div>
+                                        <div className="text-xs text-cyan-400 mt-2 font-mono">{opp.solicitation_number}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="glass rounded-xl p-4 mb-6 glow">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <button onClick={() => setSelectedOpp(null)} className="text-cyan-400 hover:text-cyan-300">← Back</button>
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white">{selectedOpp.nickname || selectedOpp.title}</h2>
+                                            <div className="text-sm text-gray-400 font-mono">{selectedOpp.solicitation_number}</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="text-right">
+                                            <div className="text-2xl font-bold text-cyan-400">{complianceStats.total > 0 ? Math.round((complianceStats.compliant / complianceStats.total) * 100) : 0}%</div>
+                                            <div className="text-xs text-gray-400">Compliance Rate</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Stats Cards */}
+                            <div className="grid grid-cols-5 gap-4 mb-6">
+                                <div className="glass-dark p-4 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-white">{complianceStats.total}</div>
+                                    <div className="text-xs text-gray-400">Total Requirements</div>
+                                </div>
+                                <div className="glass-dark p-4 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-red-400">{complianceStats.shalls}</div>
+                                    <div className="text-xs text-gray-400">Shall/Must</div>
+                                </div>
+                                <div className="glass-dark p-4 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-green-400">{complianceStats.compliant}</div>
+                                    <div className="text-xs text-gray-400">Compliant</div>
+                                </div>
+                                <div className="glass-dark p-4 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-cyan-400">{complianceStats.mapped}</div>
+                                    <div className="text-xs text-gray-400">Mapped</div>
+                                </div>
+                                <div className="glass-dark p-4 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-amber-400">{amendments.length}</div>
+                                    <div className="text-xs text-gray-400">Amendments</div>
+                                </div>
+                            </div>
+                            
+                            {/* Tabs */}
+                            <div className="flex gap-4 mb-4 border-b border-gray-700">
+                                <button onClick={() => setActiveTab('requirements')} className={`pb-2 px-4 ${activeTab === 'requirements' ? 'tab-active' : 'text-gray-400'}`}>
+                                    Requirements ({requirements.length})
+                                </button>
+                                <button onClick={() => setActiveTab('amendments')} className={`pb-2 px-4 ${activeTab === 'amendments' ? 'tab-active' : 'text-gray-400'}`}>
+                                    Amendments ({amendments.length})
+                                </button>
+                            </div>
+                            
+                            {activeTab === 'requirements' ? (
+                                <>
+                                    <div className="flex gap-4 mb-4 flex-wrap">
+                                        <input type="text" placeholder="Search requirements..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]" />
+                                        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                                            <option value="all">All Types</option>
+                                            {REQ_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                                            <option value="all">All Statuses</option>
+                                            {REQ_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                        <button onClick={() => openModal('requirement')} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-lg">+ Add Requirement</button>
+                                    </div>
+                                    
+                                    <div className="glass rounded-xl overflow-hidden glow">
+                                        <table className="w-full">
+                                            <thead className="bg-gray-800/50">
+                                                <tr className="text-left text-xs text-gray-400 uppercase">
+                                                    <th className="p-3">Type</th>
+                                                    <th className="p-3">Section</th>
+                                                    <th className="p-3">Requirement</th>
+                                                    <th className="p-3">Approach</th>
+                                                    <th className="p-3">Owner</th>
+                                                    <th className="p-3">Status</th>
+                                                    <th className="p-3">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredReqs.length === 0 ? (
+                                                    <tr><td colSpan="7" className="p-8 text-center text-gray-400">No requirements found. Start by adding RFP requirements.</td></tr>
+                                                ) : filteredReqs.map(req => (
+                                                    <tr key={req.id} className="border-t border-gray-700/50 req-row">
+                                                        <td className="p-3"><span className={`px-2 py-1 rounded text-xs font-medium ${getReqTypeColor(req.requirement_type)}`}>{req.requirement_type}</span></td>
+                                                        <td className="p-3 font-mono text-sm text-cyan-400">{req.section_reference}</td>
+                                                        <td className="p-3 max-w-md">
+                                                            <div className="text-sm text-white line-clamp-2">{req.requirement_text}</div>
+                                                        </td>
+                                                        <td className="p-3 max-w-xs">
+                                                            <div className="text-xs text-gray-400 line-clamp-2">{req.compliance_approach || '—'}</div>
+                                                        </td>
+                                                        <td className="p-3"><span className="px-2 py-1 bg-gray-700 rounded text-xs">{req.assignee_role}</span></td>
+                                                        <td className="p-3">
+                                                            <select value={req.status} onChange={(e) => updateReqStatus(req.id, e.target.value)} className={`px-2 py-1 rounded text-xs font-medium border-0 ${getStatusColor(req.status)}`}>
+                                                                {REQ_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                                                            </select>
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <button onClick={() => openModal('requirement', req)} className="text-cyan-400 hover:text-cyan-300 text-sm mr-2">Edit</button>
+                                                            <button onClick={() => deleteItem(req.id, 'requirement')} className="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex justify-end mb-4">
+                                        <button onClick={() => openModal('amendment')} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-lg">+ Add Amendment</button>
+                                    </div>
+                                    
+                                    <div className="space-y-4">
+                                        {amendments.length === 0 ? (
+                                            <div className="glass rounded-xl p-8 text-center text-gray-400">No amendments tracked yet.</div>
+                                        ) : amendments.map(amd => (
+                                            <div key={amd.id} className="glass rounded-xl p-4 glow">
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-3 mb-2">
+                                                            <span className="text-xl font-bold text-cyan-400">Amendment {amd.amendment_number}</span>
+                                                            <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">{amd.amendment_type}</span>
+                                                            <span className={`px-2 py-1 rounded text-xs ${getAmendmentStatusColor(amd.status)}`}>{amd.status}</span>
+                                                        </div>
+                                                        <p className="text-white mb-2">{amd.summary}</p>
+                                                        <div className="flex items-center gap-4 text-xs text-gray-400">
+                                                            <span>📅 Effective: {new Date(amd.effective_date).toLocaleDateString()}</span>
+                                                            {amd.impact_areas && <span>⚡ Impact: {amd.impact_areas.join(', ')}</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => openModal('amendment', amd)} className="text-cyan-400 hover:text-cyan-300 text-sm">Edit</button>
+                                                        <button onClick={() => deleteItem(amd.id, 'amendment')} className="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </>
+                    )}
+                    
+                    {showModal && (modalType === 'requirement' ? 
+                        <RequirementModal item={editingItem} onSave={saveRequirement} onClose={closeModal} /> :
+                        <AmendmentModal item={editingItem} onSave={saveAmendment} onClose={closeModal} />
+                    )}
+                    
+                    <div className="text-center text-xs text-gray-500 mt-8 pt-4 border-t border-gray-800">MissionPulse v12 • RFP Scanner • AI outputs require human review</div>
+                </div>
+            );
+        }
+        
+        function RequirementModal({ item, onSave, onClose }) {
+            const ROLES = ['CEO', 'COO', 'CAP', 'PM', 'SA', 'FIN', 'CON', 'DEL', 'QA'];
+            const [formData, setFormData] = useState(item || { requirement_type: 'Shall', section_reference: '', requirement_text: '', compliance_approach: '', status: 'Open', assignee_role: 'SA' });
+            
+            return (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                    <div className="glass-dark rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-bold text-cyan-400 mb-4">{item ? 'Edit Requirement' : 'Add Requirement'}</h3>
+                        <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-4">
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Type *</label>
+                                    <select value={formData.requirement_type} onChange={(e) => setFormData({ ...formData, requirement_type: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                                        {REQ_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Section Ref *</label>
+                                    <input type="text" required value={formData.section_reference} onChange={(e) => setFormData({ ...formData, section_reference: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white" placeholder="e.g., L.5.1" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Owner</label>
+                                    <select value={formData.assignee_role} onChange={(e) => setFormData({ ...formData, assignee_role: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Requirement Text *</label>
+                                <textarea required value={formData.requirement_text} onChange={(e) => setFormData({ ...formData, requirement_text: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white h-24" placeholder="The contractor shall..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Compliance Approach</label>
+                                <textarea value={formData.compliance_approach} onChange={(e) => setFormData({ ...formData, compliance_approach: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white h-20" placeholder="How we will comply..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Status</label>
+                                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                                    {REQ_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button type="submit" className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-2 rounded-lg">{item ? 'Update' : 'Create'}</button>
+                                <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+        
+        function AmendmentModal({ item, onSave, onClose }) {
+            const TYPES = ['Administrative', 'Technical', 'Cost/Price', 'Q&A Response', 'Schedule', 'Other'];
+            const IMPACTS = ['Technical', 'Cost', 'Schedule', 'Compliance', 'Administrative', 'Staffing'];
+            const [formData, setFormData] = useState(item || { amendment_number: '', amendment_type: 'Administrative', summary: '', status: 'Pending Review', effective_date: new Date().toISOString().split('T')[0], impact_areas: [] });
+            
+            const toggleImpact = (impact) => {
+                const current = formData.impact_areas || [];
+                if (current.includes(impact)) setFormData({ ...formData, impact_areas: current.filter(i => i !== impact) });
+                else setFormData({ ...formData, impact_areas: [...current, impact] });
+            };
+            
+            return (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                    <div className="glass-dark rounded-xl p-6 w-full max-w-lg">
+                        <h3 className="text-xl font-bold text-cyan-400 mb-4">{item ? 'Edit Amendment' : 'Add Amendment'}</h3>
+                        <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Amendment # *</label>
+                                    <input type="text" required value={formData.amendment_number} onChange={(e) => setFormData({ ...formData, amendment_number: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white" placeholder="e.g., 0001" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Type</label>
+                                    <select value={formData.amendment_type} onChange={(e) => setFormData({ ...formData, amendment_type: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                                        {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Summary *</label>
+                                <textarea required value={formData.summary} onChange={(e) => setFormData({ ...formData, summary: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white h-20" placeholder="Brief description of amendment..." />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Effective Date</label>
+                                    <input type="date" value={formData.effective_date} onChange={(e) => setFormData({ ...formData, effective_date: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-1">Status</label>
+                                    <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                                        {AMENDMENT_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Impact Areas</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {IMPACTS.map(impact => (
+                                        <button key={impact} type="button" onClick={() => toggleImpact(impact)} className={`px-3 py-1 rounded text-xs ${(formData.impact_areas || []).includes(impact) ? 'bg-cyan-500 text-black' : 'bg-gray-700 text-gray-300'}`}>{impact}</button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button type="submit" className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-2 rounded-lg">{item ? 'Update' : 'Create'}</button>
+                                <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+        
+        ReactDOM.render(<RFPScannerApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
