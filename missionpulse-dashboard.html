@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse | Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.1); }
+        .glass-hover:hover { background: rgba(0, 229, 250, 0.08); border-color: rgba(0, 229, 250, 0.3); }
+        .cyan-glow { box-shadow: 0 0 30px rgba(0, 229, 250, 0.15); }
+        .text-cyan { color: #00E5FA; }
+        .bg-cyan { background-color: #00E5FA; }
+        .status-connected { color: #22c55e; }
+        .status-demo { color: #fbbf24; }
+        .status-disconnected { color: #ef4444; }
+    </style>
+</head>
+<body class="text-gray-100">
+    <div id="root"></div>
+
+    <!-- CRUD Module -->
+    <script src="missionpulse-crud.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        // ============================================================
+        // MAIN DASHBOARD COMPONENT
+        // ============================================================
+        function Dashboard() {
+            const [loading, setLoading] = useState(true);
+            const [connectionStatus, setConnectionStatus] = useState('disconnected');
+            const [opportunities, setOpportunities] = useState([]);
+            const [stats, setStats] = useState(null);
+            const [isDemo, setIsDemo] = useState(false);
+            const [error, setError] = useState(null);
+            const [selectedPhase, setSelectedPhase] = useState('all');
+
+            // Load data on mount
+            useEffect(() => {
+                loadData();
+                
+                // Subscribe to connection changes
+                const unsubscribe = MissionPulse.onConnectionChange(status => {
+                    setConnectionStatus(status);
+                });
+
+                return () => unsubscribe();
+            }, []);
+
+            const loadData = useCallback(async () => {
+                setLoading(true);
+                setError(null);
+
+                try {
+                    // Fetch opportunities and stats in parallel
+                    const [oppResult, statsResult] = await Promise.all([
+                        MissionPulse.opportunities.getAll({ orderBy: 'due_date' }),
+                        MissionPulse.getPipelineStats()
+                    ]);
+
+                    if (oppResult.error && !oppResult.data) {
+                        throw oppResult.error;
+                    }
+
+                    setOpportunities(oppResult.data || []);
+                    setStats(statsResult.data);
+                    setIsDemo(oppResult.isDemo);
+                } catch (err) {
+                    console.error('Error loading dashboard:', err);
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            }, []);
+
+            // Filter opportunities by phase
+            const filteredOpportunities = selectedPhase === 'all' 
+                ? opportunities 
+                : opportunities.filter(opp => (opp.phase || opp.shipleyPhase) === selectedPhase);
+
+            // Calculate days remaining
+            const getDaysRemaining = (dueDate) => {
+                if (!dueDate) return null;
+                const days = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                return days;
+            };
+
+            const getPriorityColor = (priority) => {
+                const colors = { critical: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-green-400' };
+                return colors[priority?.toLowerCase()] || 'text-gray-400';
+            };
+
+            if (loading) {
+                return (
+                    <div className="flex items-center justify-center min-h-screen">
+                        <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-cyan border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-gray-400">Loading pipeline data...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen p-6">
+                    {/* Header */}
+                    <header className="glass rounded-xl p-6 mb-6 cyan-glow">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-cyan rounded-lg flex items-center justify-center text-black font-bold text-xl">
+                                    MP
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl font-bold text-white">MissionPulse Dashboard</h1>
+                                    <p className="text-gray-400 text-sm">Mission. Technology. Transformation.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {/* Connection Status */}
+                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full glass ${
+                                    connectionStatus === 'connected' ? 'status-connected' :
+                                    connectionStatus === 'demo' ? 'status-demo' : 'status-disconnected'
+                                }`}>
+                                    <span className={`w-2 h-2 rounded-full ${
+                                        connectionStatus === 'connected' ? 'bg-green-400' :
+                                        connectionStatus === 'demo' ? 'bg-yellow-400' : 'bg-red-400'
+                                    }`}></span>
+                                    <span className="text-sm">
+                                        {connectionStatus === 'connected' ? 'Live' :
+                                         connectionStatus === 'demo' ? 'Demo Mode' : 'Offline'}
+                                    </span>
+                                </div>
+                                {isDemo && (
+                                    <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded">
+                                        Using Demo Data
+                                    </span>
+                                )}
+                                <button onClick={loadData} className="text-cyan hover:text-white transition">
+                                    ↻ Refresh
+                                </button>
+                                <a href="missionpulse-nav-hub.html" className="text-gray-400 hover:text-cyan">
+                                    All Modules →
+                                </a>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Error Banner */}
+                    {error && (
+                        <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6">
+                            <p className="text-red-400">⚠️ {error}</p>
+                            <button onClick={loadData} className="text-red-300 underline text-sm mt-1">
+                                Retry Connection
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Stats Cards */}
+                    {stats && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="glass rounded-xl p-5">
+                                <p className="text-gray-400 text-sm mb-1">Total Pipeline</p>
+                                <p className="text-3xl font-bold text-cyan">{MissionPulse.formatCurrency(stats.totalValue)}</p>
+                                <p className="text-gray-500 text-xs mt-1">{stats.totalCount} opportunities</p>
+                            </div>
+                            <div className="glass rounded-xl p-5">
+                                <p className="text-gray-400 text-sm mb-1">Avg Win Probability</p>
+                                <p className="text-3xl font-bold text-white">{stats.avgPwin}%</p>
+                                <p className="text-gray-500 text-xs mt-1">Weighted average</p>
+                            </div>
+                            <div className="glass rounded-xl p-5">
+                                <p className="text-gray-400 text-sm mb-1">Due This Month</p>
+                                <p className="text-3xl font-bold text-orange-400">{stats.dueThisMonth}</p>
+                                <p className="text-gray-500 text-xs mt-1">Proposals pending</p>
+                            </div>
+                            <div className="glass rounded-xl p-5">
+                                <p className="text-gray-400 text-sm mb-1">Active Pursuits</p>
+                                <p className="text-3xl font-bold text-green-400">{stats.byStatus?.active || 0}</p>
+                                <p className="text-gray-500 text-xs mt-1">In progress</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Phase Filter */}
+                    <div className="glass rounded-xl p-4 mb-6">
+                        <div className="flex flex-wrap gap-2">
+                            <button 
+                                onClick={() => setSelectedPhase('all')}
+                                className={`px-4 py-2 rounded-lg transition ${
+                                    selectedPhase === 'all' ? 'bg-cyan text-black' : 'bg-white/5 hover:bg-white/10'
+                                }`}
+                            >
+                                All ({opportunities.length})
+                            </button>
+                            {['gate_1', 'blue_team', 'pink_team', 'red_team', 'gold_team', 'submitted'].map(phase => {
+                                const count = opportunities.filter(o => (o.phase || o.shipleyPhase) === phase).length;
+                                return (
+                                    <button 
+                                        key={phase}
+                                        onClick={() => setSelectedPhase(phase)}
+                                        className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                                            selectedPhase === phase ? 'bg-cyan text-black' : 'bg-white/5 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: MissionPulse.getPhaseColor(phase) }}></span>
+                                        {MissionPulse.formatPhaseName(phase)} ({count})
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Opportunities Table */}
+                    <div className="glass rounded-xl overflow-hidden">
+                        <div className="p-4 border-b border-white/10">
+                            <h2 className="text-lg font-semibold text-white">Pipeline Opportunities</h2>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-white/5">
+                                    <tr>
+                                        <th className="text-left p-4 text-gray-400 font-medium">Opportunity</th>
+                                        <th className="text-left p-4 text-gray-400 font-medium">Agency</th>
+                                        <th className="text-left p-4 text-gray-400 font-medium">Value</th>
+                                        <th className="text-left p-4 text-gray-400 font-medium">Phase</th>
+                                        <th className="text-left p-4 text-gray-400 font-medium">Win Prob</th>
+                                        <th className="text-left p-4 text-gray-400 font-medium">Due</th>
+                                        <th className="text-left p-4 text-gray-400 font-medium">Priority</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredOpportunities.map((opp, idx) => {
+                                        const daysLeft = getDaysRemaining(opp.dueDate);
+                                        const phase = opp.phase || opp.shipleyPhase || 'gate_1';
+                                        const value = opp.estimatedValue || opp.contractValue || 0;
+                                        const pwin = opp.pwin || opp.winProbability || 0;
+                                        
+                                        return (
+                                            <tr key={opp.id || idx} className="border-t border-white/5 hover:bg-white/5 transition cursor-pointer">
+                                                <td className="p-4">
+                                                    <p className="font-medium text-white">{opp.title || opp.name}</p>
+                                                    <p className="text-xs text-gray-500">{opp.solicitationNumber}</p>
+                                                </td>
+                                                <td className="p-4 text-gray-300">{opp.agency}</td>
+                                                <td className="p-4 text-cyan font-medium">{MissionPulse.formatCurrency(value)}</td>
+                                                <td className="p-4">
+                                                    <span className="px-2 py-1 rounded text-xs font-medium" 
+                                                          style={{ backgroundColor: `${MissionPulse.getPhaseColor(phase)}20`, color: MissionPulse.getPhaseColor(phase) }}>
+                                                        {MissionPulse.formatPhaseName(phase)}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-16 h-2 bg-white/10 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-cyan rounded-full" style={{ width: `${pwin}%` }}></div>
+                                                        </div>
+                                                        <span className="text-sm text-gray-300">{pwin}%</span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-4">
+                                                    {daysLeft !== null && (
+                                                        <span className={`${daysLeft <= 7 ? 'text-red-400' : daysLeft <= 30 ? 'text-yellow-400' : 'text-gray-300'}`}>
+                                                            {daysLeft <= 0 ? 'Overdue' : `${daysLeft}d`}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className={`font-medium ${getPriorityColor(opp.priority)}`}>
+                                                        {opp.priority || 'Medium'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        {filteredOpportunities.length === 0 && (
+                            <div className="p-8 text-center text-gray-500">
+                                No opportunities found for this filter.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                        <a href="missionpulse-m1-enhanced.html" className="glass glass-hover rounded-xl p-4 text-center">
+                            <span className="text-2xl mb-2 block">➕</span>
+                            <span className="text-sm font-medium">New Opportunity</span>
+                        </a>
+                        <a href="missionpulse-m2-warroom-enhanced.html" className="glass glass-hover rounded-xl p-4 text-center">
+                            <span className="text-2xl mb-2 block">🎯</span>
+                            <span className="text-sm font-medium">War Room</span>
+                        </a>
+                        <a href="missionpulse-agent-hub.html" className="glass glass-hover rounded-xl p-4 text-center">
+                            <span className="text-2xl mb-2 block">🤖</span>
+                            <span className="text-sm font-medium">AI Agents</span>
+                        </a>
+                        <a href="missionpulse-launch.html" className="glass glass-hover rounded-xl p-4 text-center">
+                            <span className="text-2xl mb-2 block">🚀</span>
+                            <span className="text-sm font-medium">Submit Proposal</span>
+                        </a>
+                    </div>
+
+                    {/* Footer */}
+                    <footer className="mt-8 text-center text-gray-500 text-sm">
+                        <p>MissionPulse v12.0 • Shield & Pulse UX v8.0</p>
+                        <p className="mt-1">© 2025 Mission Meets Tech. All rights reserved.</p>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<Dashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
