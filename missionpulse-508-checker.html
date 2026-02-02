@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>508 Accessibility Checker | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.15); }
+        .glass-card:hover { border-color: rgba(0,229,250,0.3); }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0OTc5MzMsImV4cCI6MjA1MzA3MzkzM30.pBPpVaJmVkzhCcUvJPN2KnMGnstuc55sNv8CVsERRPg';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const DEMO_CHECKS = [
+            { 
+                id: '1', 
+                document_name: 'Technical Volume v2.1.docx', 
+                document_type: 'Word Document',
+                check_date: '2026-02-01T10:00:00Z',
+                overall_score: 85,
+                status: 'issues_found',
+                issues: [
+                    { id: 'i1', issue_type: 'Missing Alt Text', severity: 'high', description: 'Figure 3.2 lacks alternative text description', location: 'Page 12', wcag_reference: 'WCAG 1.1.1', remediation: 'Add descriptive alt text explaining the system architecture diagram', status: 'open' },
+                    { id: 'i2', issue_type: 'Color Contrast', severity: 'medium', description: 'Gray text on light background fails contrast ratio', location: 'Page 5, Table 2', wcag_reference: 'WCAG 1.4.3', remediation: 'Increase text darkness to meet 4.5:1 ratio', status: 'open' },
+                    { id: 'i3', issue_type: 'Table Headers', severity: 'medium', description: 'Data table missing header row designation', location: 'Page 8', wcag_reference: 'WCAG 1.3.1', remediation: 'Mark first row as table header in Word', status: 'resolved' }
+                ]
+            },
+            { 
+                id: '2', 
+                document_name: 'Management Volume v1.0.docx', 
+                document_type: 'Word Document',
+                check_date: '2026-01-30T14:30:00Z',
+                overall_score: 92,
+                status: 'issues_found',
+                issues: [
+                    { id: 'i4', issue_type: 'Reading Order', severity: 'low', description: 'Text box reading order unclear', location: 'Page 3', wcag_reference: 'WCAG 1.3.2', remediation: 'Reposition text box inline with document flow', status: 'open' }
+                ]
+            },
+            { 
+                id: '3', 
+                document_name: 'Past Performance Volume.pdf', 
+                document_type: 'PDF',
+                check_date: '2026-01-28T09:15:00Z',
+                overall_score: 100,
+                status: 'passed',
+                issues: []
+            }
+        ];
+
+        const ISSUE_TYPES = [
+            'Missing Alt Text', 'Color Contrast', 'Table Headers', 'Reading Order',
+            'Document Title', 'Language Tag', 'Link Text', 'Heading Structure',
+            'List Markup', 'Form Labels', 'Bookmarks', 'Tagged PDF'
+        ];
+
+        const SEVERITIES = ['low', 'medium', 'high', 'critical'];
+
+        function AccessibilityChecker() {
+            const [checks, setChecks] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedCheck, setSelectedCheck] = useState(null);
+            const [showNewModal, setShowNewModal] = useState(false);
+            const [showIssueModal, setShowIssueModal] = useState(false);
+            const [newCheck, setNewCheck] = useState({ document_name: '', document_type: 'Word Document' });
+            const [newIssue, setNewIssue] = useState({ issue_type: 'Missing Alt Text', severity: 'medium', description: '', location: '', wcag_reference: '', remediation: '' });
+
+            useEffect(() => { fetchChecks(); }, []);
+
+            async function fetchChecks() {
+                try {
+                    const { data, error } = await supabase.from('accessibility_checks').select('*').order('check_date', { ascending: false });
+                    if (error) throw error;
+                    setChecks(data?.length > 0 ? data.map(c => ({...c, issues: []})) : DEMO_CHECKS);
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setChecks(DEMO_CHECKS);
+                }
+                setLoading(false);
+            }
+
+            async function handleCreateCheck() {
+                const checkData = { 
+                    ...newCheck, 
+                    check_date: new Date().toISOString(),
+                    overall_score: 100,
+                    status: 'pending',
+                    issues: []
+                };
+                setChecks([{ id: Date.now().toString(), ...checkData }, ...checks]);
+                setShowNewModal(false);
+                setNewCheck({ document_name: '', document_type: 'Word Document' });
+            }
+
+            function handleAddIssue() {
+                if (!selectedCheck) return;
+                const issue = { id: Date.now().toString(), ...newIssue, status: 'open' };
+                const updatedChecks = checks.map(c => {
+                    if (c.id === selectedCheck.id) {
+                        const issues = [...(c.issues || []), issue];
+                        const openIssues = issues.filter(i => i.status === 'open');
+                        const score = Math.max(0, 100 - (openIssues.length * 5));
+                        return { ...c, issues, overall_score: score, status: openIssues.length > 0 ? 'issues_found' : 'passed' };
+                    }
+                    return c;
+                });
+                setChecks(updatedChecks);
+                setSelectedCheck(updatedChecks.find(c => c.id === selectedCheck.id));
+                setShowIssueModal(false);
+                setNewIssue({ issue_type: 'Missing Alt Text', severity: 'medium', description: '', location: '', wcag_reference: '', remediation: '' });
+            }
+
+            function handleResolveIssue(issueId) {
+                const updatedChecks = checks.map(c => {
+                    if (c.id === selectedCheck.id) {
+                        const issues = c.issues.map(i => i.id === issueId ? { ...i, status: 'resolved' } : i);
+                        const openIssues = issues.filter(i => i.status === 'open');
+                        const score = Math.max(0, 100 - (openIssues.length * 5));
+                        return { ...c, issues, overall_score: score, status: openIssues.length > 0 ? 'issues_found' : 'passed' };
+                    }
+                    return c;
+                });
+                setChecks(updatedChecks);
+                setSelectedCheck(updatedChecks.find(c => c.id === selectedCheck.id));
+            }
+
+            const stats = {
+                total: checks.length,
+                passed: checks.filter(c => c.status === 'passed').length,
+                issues: checks.filter(c => c.status === 'issues_found').length,
+                avgScore: Math.round(checks.reduce((a, c) => a + (c.overall_score || 0), 0) / checks.length || 0)
+            };
+
+            const severityColor = (severity) => ({
+                'low': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                'medium': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                'high': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+                'critical': 'bg-red-500/20 text-red-400 border-red-500/30'
+            }[severity] || 'bg-gray-500/20 text-gray-400');
+
+            const statusColor = (status) => ({
+                'passed': 'bg-emerald-500/20 text-emerald-400',
+                'issues_found': 'bg-amber-500/20 text-amber-400',
+                'pending': 'bg-gray-500/20 text-gray-400'
+            }[status] || 'bg-gray-500/20 text-gray-400');
+
+            const scoreColor = (score) => {
+                if (score >= 90) return 'text-emerald-400';
+                if (score >= 70) return 'text-amber-400';
+                return 'text-red-400';
+            };
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="border-b border-cyan-500/20 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300">← Back</a>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-xl">♿</div>
+                                    <div>
+                                        <h1 className="text-xl font-bold">Section 508 Checker</h1>
+                                        <p className="text-xs text-gray-400">WCAG 2.1 Compliance • Accessibility Audit</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowNewModal(true)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium transition-all">
+                                + New Check
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-6 py-8">
+                        {/* Stats */}
+                        <div className="grid grid-cols-4 gap-4 mb-8">
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-cyan-400">{stats.total}</div>
+                                <div className="text-sm text-gray-400">Documents Checked</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-emerald-400">{stats.passed}</div>
+                                <div className="text-sm text-gray-400">Fully Compliant</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className="text-3xl font-bold text-amber-400">{stats.issues}</div>
+                                <div className="text-sm text-gray-400">Need Remediation</div>
+                            </div>
+                            <div className="glass-card rounded-xl p-4 text-center">
+                                <div className={`text-3xl font-bold ${scoreColor(stats.avgScore)}`}>{stats.avgScore}%</div>
+                                <div className="text-sm text-gray-400">Avg Score</div>
+                            </div>
+                        </div>
+
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Checks List */}
+                            <div className="lg:col-span-1">
+                                <h2 className="text-lg font-semibold mb-4">Document Checks</h2>
+                                <div className="space-y-3">
+                                    {checks.map(check => (
+                                        <div key={check.id}
+                                            onClick={() => setSelectedCheck(check)}
+                                            className={`glass-card rounded-xl p-4 cursor-pointer transition-all ${selectedCheck?.id === check.id ? 'border-cyan-500/50 bg-cyan-500/10' : 'hover:border-cyan-500/30'}`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h3 className="font-medium truncate flex-1">{check.document_name}</h3>
+                                                <span className={`text-2xl font-bold ${scoreColor(check.overall_score)}`}>{check.overall_score}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-500">{check.document_type}</span>
+                                                <span className={`px-2 py-0.5 rounded text-xs ${statusColor(check.status)}`}>
+                                                    {check.status === 'issues_found' ? `${check.issues?.filter(i => i.status === 'open').length || 0} issues` : check.status}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Check Detail */}
+                            <div className="lg:col-span-2">
+                                {selectedCheck ? (
+                                    <div className="glass-card rounded-xl p-6">
+                                        <div className="flex items-start justify-between mb-6">
+                                            <div>
+                                                <h2 className="text-xl font-bold">{selectedCheck.document_name}</h2>
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <span className="text-sm text-gray-400">{selectedCheck.document_type}</span>
+                                                    <span className={`px-2 py-0.5 rounded text-xs ${statusColor(selectedCheck.status)}`}>
+                                                        {selectedCheck.status?.replace('_', ' ')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className={`text-4xl font-bold ${scoreColor(selectedCheck.overall_score)}`}>
+                                                    {selectedCheck.overall_score}%
+                                                </div>
+                                                <div className="text-xs text-gray-500">Compliance Score</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Progress Bar */}
+                                        <div className="mb-6">
+                                            <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                                                <div className={`h-full transition-all ${selectedCheck.overall_score >= 90 ? 'bg-emerald-500' : selectedCheck.overall_score >= 70 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                                    style={{ width: `${selectedCheck.overall_score}%` }}></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Issues */}
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="font-semibold">Accessibility Issues</h3>
+                                            <button onClick={() => setShowIssueModal(true)} className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30">
+                                                + Add Issue
+                                            </button>
+                                        </div>
+
+                                        {selectedCheck.issues?.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {selectedCheck.issues.map(issue => (
+                                                    <div key={issue.id} className={`rounded-lg p-4 border ${issue.status === 'resolved' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-white/5 border-white/10'}`}>
+                                                        <div className="flex items-start justify-between mb-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`px-2 py-0.5 rounded text-xs border ${severityColor(issue.severity)}`}>
+                                                                    {issue.severity?.toUpperCase()}
+                                                                </span>
+                                                                <span className="font-medium">{issue.issue_type}</span>
+                                                                {issue.status === 'resolved' && <span className="text-emerald-400">✓</span>}
+                                                            </div>
+                                                            {issue.status === 'open' && (
+                                                                <button onClick={() => handleResolveIssue(issue.id)} className="text-xs text-emerald-400 hover:underline">
+                                                                    Mark Resolved
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-gray-300 mb-2">{issue.description}</p>
+                                                        <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                                                            {issue.location && <span>📍 {issue.location}</span>}
+                                                            {issue.wcag_reference && <span>📋 {issue.wcag_reference}</span>}
+                                                        </div>
+                                                        {issue.remediation && (
+                                                            <div className="mt-2 p-2 bg-cyan-500/10 rounded text-sm">
+                                                                <span className="text-cyan-400">Fix: </span>{issue.remediation}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-8 text-emerald-400">
+                                                ✅ No accessibility issues found!
+                                            </div>
+                                        )}
+
+                                        {/* WCAG Quick Reference */}
+                                        <div className="mt-6 pt-4 border-t border-white/10">
+                                            <h4 className="text-sm font-semibold mb-3">Quick WCAG 2.1 Checklist</h4>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                {['Alt Text (1.1.1)', 'Captions (1.2.2)', 'Color Contrast (1.4.3)', 'Resize Text (1.4.4)', 'Keyboard Access (2.1.1)', 'Page Titles (2.4.2)', 'Link Purpose (2.4.4)', 'Language (3.1.1)'].map(item => (
+                                                    <div key={item} className="flex items-center gap-2 text-gray-400">
+                                                        <span className="w-4 h-4 rounded border border-white/20 flex items-center justify-center">✓</span>
+                                                        {item}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="glass-card rounded-xl p-12 text-center">
+                                        <div className="text-6xl mb-4">♿</div>
+                                        <h3 className="text-xl font-semibold mb-2">Select a Document</h3>
+                                        <p className="text-gray-400">Choose a document check to view accessibility issues</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* New Check Modal */}
+                    {showNewModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-md">
+                                <h2 className="text-xl font-bold mb-6">New Accessibility Check</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Document Name *</label>
+                                        <input type="text" value={newCheck.document_name} onChange={(e) => setNewCheck({...newCheck, document_name: e.target.value})}
+                                            placeholder="e.g., Technical Volume v2.docx"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Document Type</label>
+                                        <select value={newCheck.document_type} onChange={(e) => setNewCheck({...newCheck, document_type: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                            <option>Word Document</option>
+                                            <option>PDF</option>
+                                            <option>PowerPoint</option>
+                                            <option>Excel</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowNewModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleCreateCheck} disabled={!newCheck.document_name}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Create Check</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Issue Modal */}
+                    {showIssueModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-lg">
+                                <h2 className="text-xl font-bold mb-6">Add Accessibility Issue</h2>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Issue Type</label>
+                                            <select value={newIssue.issue_type} onChange={(e) => setNewIssue({...newIssue, issue_type: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                                {ISSUE_TYPES.map(t => <option key={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Severity</label>
+                                            <select value={newIssue.severity} onChange={(e) => setNewIssue({...newIssue, severity: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                                {SEVERITIES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Description *</label>
+                                        <textarea value={newIssue.description} onChange={(e) => setNewIssue({...newIssue, description: e.target.value})}
+                                            rows={2} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Location</label>
+                                            <input type="text" value={newIssue.location} onChange={(e) => setNewIssue({...newIssue, location: e.target.value})}
+                                                placeholder="e.g., Page 12"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">WCAG Reference</label>
+                                            <input type="text" value={newIssue.wcag_reference} onChange={(e) => setNewIssue({...newIssue, wcag_reference: e.target.value})}
+                                                placeholder="e.g., WCAG 1.1.1"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Remediation Steps</label>
+                                        <textarea value={newIssue.remediation} onChange={(e) => setNewIssue({...newIssue, remediation: e.target.value})}
+                                            rows={2} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowIssueModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleAddIssue} disabled={!newIssue.description}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Add Issue</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<AccessibilityChecker />, document.getElementById('root'));
+    </script>
+</body>
+</html>

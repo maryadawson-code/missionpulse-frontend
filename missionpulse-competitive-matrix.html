@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitive Matrix | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.15); }
+        .score-cell { min-width: 80px; text-align: center; }
+        .matrix-table { border-collapse: separate; border-spacing: 2px; }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0OTc5MzMsImV4cCI6MjA1MzA3MzkzM30.pBPpVaJmVkzhCcUvJPN2KnMGnstuc55sNv8CVsERRPg';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const DEMO_MATRIX = {
+            id: '1',
+            matrix_name: 'DHA MHS Genesis - Competitive Analysis',
+            description: 'Competitive assessment for HT0015-24-R-0001',
+            status: 'active',
+            criteria: [
+                { id: 'c1', criteria_name: 'Technical Approach', weight: 3, category: 'Technical' },
+                { id: 'c2', criteria_name: 'Healthcare IT Experience', weight: 3, category: 'Experience' },
+                { id: 'c3', criteria_name: 'FedRAMP Certification', weight: 2, category: 'Compliance' },
+                { id: 'c4', criteria_name: 'AI/ML Capabilities', weight: 3, category: 'Technical' },
+                { id: 'c5', criteria_name: 'Past Performance (DHA)', weight: 3, category: 'Experience' },
+                { id: 'c6', criteria_name: 'Price Competitiveness', weight: 2, category: 'Price' },
+                { id: 'c7', criteria_name: 'Small Business Status', weight: 1, category: 'Socioeconomic' },
+                { id: 'c8', criteria_name: 'Key Personnel', weight: 2, category: 'Management' }
+            ],
+            competitors: [
+                { id: 'us', competitor_name: 'MMT (Us)', competitor_type: 'Prime', isUs: true },
+                { id: 'comp1', competitor_name: 'Leidos', competitor_type: 'Large', strengths: 'Scale, incumbency', weaknesses: 'Price, agility' },
+                { id: 'comp2', competitor_name: 'Booz Allen', competitor_type: 'Large', strengths: 'AI expertise, clearances', weaknesses: 'Cost structure' },
+                { id: 'comp3', competitor_name: 'Accenture Fed', competitor_type: 'Large', strengths: 'Healthcare experience', weaknesses: 'Federal focus' }
+            ],
+            scores: {
+                'c1-us': 9, 'c1-comp1': 8, 'c1-comp2': 8, 'c1-comp3': 7,
+                'c2-us': 9, 'c2-comp1': 9, 'c2-comp2': 7, 'c2-comp3': 8,
+                'c3-us': 8, 'c3-comp1': 9, 'c3-comp2': 9, 'c3-comp3': 8,
+                'c4-us': 9, 'c4-comp1': 7, 'c4-comp2': 9, 'c4-comp3': 7,
+                'c5-us': 7, 'c5-comp1': 9, 'c5-comp2': 8, 'c5-comp3': 6,
+                'c6-us': 8, 'c6-comp1': 5, 'c6-comp2': 5, 'c6-comp3': 6,
+                'c7-us': 10, 'c7-comp1': 0, 'c7-comp2': 0, 'c7-comp3': 0,
+                'c8-us': 8, 'c8-comp1': 8, 'c8-comp2': 9, 'c8-comp3': 7
+            }
+        };
+
+        function CompetitiveMatrix() {
+            const [matrix, setMatrix] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [showCriteriaModal, setShowCriteriaModal] = useState(false);
+            const [showCompetitorModal, setShowCompetitorModal] = useState(false);
+            const [newCriteria, setNewCriteria] = useState({ criteria_name: '', weight: 2, category: 'Technical' });
+            const [newCompetitor, setNewCompetitor] = useState({ competitor_name: '', competitor_type: 'Large', strengths: '', weaknesses: '' });
+
+            useEffect(() => { fetchMatrix(); }, []);
+
+            async function fetchMatrix() {
+                try {
+                    const { data, error } = await supabase.from('competitive_matrix').select('*').limit(1).single();
+                    if (error) throw error;
+                    setMatrix(data || DEMO_MATRIX);
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setMatrix(DEMO_MATRIX);
+                }
+                setLoading(false);
+            }
+
+            function handleScoreChange(criteriaId, competitorId, score) {
+                const key = `${criteriaId}-${competitorId}`;
+                setMatrix({
+                    ...matrix,
+                    scores: { ...matrix.scores, [key]: parseInt(score) || 0 }
+                });
+            }
+
+            function handleAddCriteria() {
+                const criteria = { id: `c${Date.now()}`, ...newCriteria };
+                setMatrix({
+                    ...matrix,
+                    criteria: [...matrix.criteria, criteria]
+                });
+                setShowCriteriaModal(false);
+                setNewCriteria({ criteria_name: '', weight: 2, category: 'Technical' });
+            }
+
+            function handleAddCompetitor() {
+                const competitor = { id: `comp${Date.now()}`, ...newCompetitor };
+                setMatrix({
+                    ...matrix,
+                    competitors: [...matrix.competitors, competitor]
+                });
+                setShowCompetitorModal(false);
+                setNewCompetitor({ competitor_name: '', competitor_type: 'Large', strengths: '', weaknesses: '' });
+            }
+
+            function calculateWeightedScore(competitorId) {
+                if (!matrix) return 0;
+                let totalScore = 0;
+                let totalWeight = 0;
+                matrix.criteria.forEach(c => {
+                    const score = matrix.scores[`${c.id}-${competitorId}`] || 0;
+                    totalScore += score * c.weight;
+                    totalWeight += c.weight * 10; // Max score is 10
+                });
+                return totalWeight > 0 ? Math.round((totalScore / totalWeight) * 100) : 0;
+            }
+
+            function getScoreColor(score) {
+                if (score >= 8) return 'bg-emerald-500/30 text-emerald-400';
+                if (score >= 6) return 'bg-cyan-500/30 text-cyan-400';
+                if (score >= 4) return 'bg-amber-500/30 text-amber-400';
+                return 'bg-red-500/30 text-red-400';
+            }
+
+            function getRankColor(rank) {
+                if (rank === 1) return 'text-emerald-400';
+                if (rank === 2) return 'text-cyan-400';
+                if (rank === 3) return 'text-amber-400';
+                return 'text-gray-400';
+            }
+
+            if (loading) {
+                return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading...</div>;
+            }
+
+            // Calculate rankings
+            const rankings = matrix.competitors.map(comp => ({
+                ...comp,
+                score: calculateWeightedScore(comp.id)
+            })).sort((a, b) => b.score - a.score);
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="border-b border-cyan-500/20 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300">← Back</a>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center text-xl">⚔️</div>
+                                    <div>
+                                        <h1 className="text-xl font-bold">Competitive Matrix</h1>
+                                        <p className="text-xs text-gray-400">Analyze Competition • Find Advantages</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setShowCriteriaModal(true)} className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm">
+                                    + Criteria
+                                </button>
+                                <button onClick={() => setShowCompetitorModal(true)} className="px-3 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg text-sm font-medium">
+                                    + Competitor
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-6 py-8">
+                        {/* Matrix Header */}
+                        <div className="glass-card rounded-xl p-6 mb-6">
+                            <h2 className="text-xl font-bold mb-2">{matrix.matrix_name}</h2>
+                            <p className="text-gray-400 text-sm">{matrix.description}</p>
+                        </div>
+
+                        {/* Rankings Summary */}
+                        <div className="grid grid-cols-4 gap-4 mb-6">
+                            {rankings.slice(0, 4).map((comp, idx) => (
+                                <div key={comp.id} className={`glass-card rounded-xl p-4 ${comp.isUs ? 'border-cyan-500/50' : ''}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className={`text-2xl font-bold ${getRankColor(idx + 1)}`}>#{idx + 1}</span>
+                                        {comp.isUs && <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-xs">US</span>}
+                                    </div>
+                                    <div className="font-medium truncate">{comp.competitor_name}</div>
+                                    <div className="text-2xl font-bold mt-1">{comp.score}%</div>
+                                    <div className="text-xs text-gray-500">Weighted Score</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Matrix Table */}
+                        <div className="glass-card rounded-xl p-6 overflow-x-auto">
+                            <table className="w-full matrix-table">
+                                <thead>
+                                    <tr>
+                                        <th className="text-left p-3 bg-white/5 rounded-lg">Criteria</th>
+                                        <th className="text-center p-3 bg-white/5 rounded-lg w-16">Weight</th>
+                                        {matrix.competitors.map(comp => (
+                                            <th key={comp.id} className={`p-3 rounded-lg score-cell ${comp.isUs ? 'bg-cyan-500/20' : 'bg-white/5'}`}>
+                                                <div className="font-medium">{comp.competitor_name}</div>
+                                                <div className="text-xs text-gray-500">{comp.competitor_type}</div>
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {matrix.criteria.map(criteria => (
+                                        <tr key={criteria.id}>
+                                            <td className="p-3 bg-white/5 rounded-lg">
+                                                <div className="font-medium">{criteria.criteria_name}</div>
+                                                <div className="text-xs text-gray-500">{criteria.category}</div>
+                                            </td>
+                                            <td className="p-3 bg-white/5 rounded-lg text-center">
+                                                <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-sm">
+                                                    ×{criteria.weight}
+                                                </span>
+                                            </td>
+                                            {matrix.competitors.map(comp => {
+                                                const score = matrix.scores[`${criteria.id}-${comp.id}`] || 0;
+                                                return (
+                                                    <td key={comp.id} className={`p-2 rounded-lg score-cell ${comp.isUs ? 'bg-cyan-500/10' : 'bg-white/5'}`}>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="10"
+                                                            value={score}
+                                                            onChange={(e) => handleScoreChange(criteria.id, comp.id, e.target.value)}
+                                                            className={`w-16 h-10 text-center rounded-lg font-bold ${getScoreColor(score)} bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                        />
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                    {/* Totals Row */}
+                                    <tr className="border-t-2 border-white/20">
+                                        <td className="p-3 bg-white/10 rounded-lg font-bold" colSpan="2">
+                                            Weighted Total
+                                        </td>
+                                        {matrix.competitors.map(comp => {
+                                            const score = calculateWeightedScore(comp.id);
+                                            return (
+                                                <td key={comp.id} className={`p-3 rounded-lg text-center font-bold text-xl ${comp.isUs ? 'bg-cyan-500/20' : 'bg-white/10'}`}>
+                                                    <span className={score >= 70 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400'}>
+                                                        {score}%
+                                                    </span>
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Competitor Details */}
+                        <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {matrix.competitors.filter(c => !c.isUs).map(comp => (
+                                <div key={comp.id} className="glass-card rounded-xl p-4">
+                                    <h3 className="font-semibold mb-2">{comp.competitor_name}</h3>
+                                    <div className="text-xs text-gray-500 mb-3">{comp.competitor_type}</div>
+                                    {comp.strengths && (
+                                        <div className="mb-2">
+                                            <div className="text-xs text-emerald-400 mb-1">Strengths</div>
+                                            <div className="text-sm">{comp.strengths}</div>
+                                        </div>
+                                    )}
+                                    {comp.weaknesses && (
+                                        <div>
+                                            <div className="text-xs text-red-400 mb-1">Weaknesses</div>
+                                            <div className="text-sm">{comp.weaknesses}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Legend */}
+                        <div className="mt-6 glass-card rounded-xl p-4">
+                            <h4 className="text-sm font-semibold mb-3">Score Legend</h4>
+                            <div className="flex gap-4 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-8 h-6 bg-emerald-500/30 rounded"></span>
+                                    <span>8-10: Strong</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-8 h-6 bg-cyan-500/30 rounded"></span>
+                                    <span>6-7: Competitive</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-8 h-6 bg-amber-500/30 rounded"></span>
+                                    <span>4-5: Neutral</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-8 h-6 bg-red-500/30 rounded"></span>
+                                    <span>0-3: Weak</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Add Criteria Modal */}
+                    {showCriteriaModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-md">
+                                <h2 className="text-xl font-bold mb-6">Add Evaluation Criteria</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Criteria Name *</label>
+                                        <input type="text" value={newCriteria.criteria_name} onChange={(e) => setNewCriteria({...newCriteria, criteria_name: e.target.value})}
+                                            placeholder="e.g., Technical Approach"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Weight (1-5)</label>
+                                            <select value={newCriteria.weight} onChange={(e) => setNewCriteria({...newCriteria, weight: parseInt(e.target.value)})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                                {[1,2,3,4,5].map(w => <option key={w} value={w}>{w}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Category</label>
+                                            <select value={newCriteria.category} onChange={(e) => setNewCriteria({...newCriteria, category: e.target.value})}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                                <option>Technical</option>
+                                                <option>Experience</option>
+                                                <option>Management</option>
+                                                <option>Price</option>
+                                                <option>Compliance</option>
+                                                <option>Socioeconomic</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowCriteriaModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleAddCriteria} disabled={!newCriteria.criteria_name}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Competitor Modal */}
+                    {showCompetitorModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-md">
+                                <h2 className="text-xl font-bold mb-6">Add Competitor</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Competitor Name *</label>
+                                        <input type="text" value={newCompetitor.competitor_name} onChange={(e) => setNewCompetitor({...newCompetitor, competitor_name: e.target.value})}
+                                            placeholder="e.g., SAIC"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Type</label>
+                                        <select value={newCompetitor.competitor_type} onChange={(e) => setNewCompetitor({...newCompetitor, competitor_type: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                            <option>Large</option>
+                                            <option>Small</option>
+                                            <option>SDVOSB</option>
+                                            <option>8(a)</option>
+                                            <option>HUBZone</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Known Strengths</label>
+                                        <textarea value={newCompetitor.strengths} onChange={(e) => setNewCompetitor({...newCompetitor, strengths: e.target.value})}
+                                            rows={2} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Known Weaknesses</label>
+                                        <textarea value={newCompetitor.weaknesses} onChange={(e) => setNewCompetitor({...newCompetitor, weaknesses: e.target.value})}
+                                            rows={2} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowCompetitorModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleAddCompetitor} disabled={!newCompetitor.competitor_name}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<CompetitiveMatrix />, document.getElementById('root'));
+    </script>
+</body>
+</html>
