@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse | Competitor Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.1); }
+        .glass-hover:hover { background: rgba(0, 229, 250, 0.08); border-color: rgba(0, 229, 250, 0.3); }
+        .text-cyan { color: #00E5FA; }
+        .bg-cyan { background-color: #00E5FA; }
+        .cyan-glow { box-shadow: 0 0 30px rgba(0, 229, 250, 0.15); }
+        .private-banner { background: linear-gradient(90deg, #7c3aed 0%, #5b21b6 100%); }
+    </style>
+</head>
+<body class="text-gray-100">
+    <div id="root"></div>
+    <script src="missionpulse-crud.js"></script>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function CompetitorAnalysis() {
+            const [opportunities, setOpportunities] = useState([]);
+            const [competitors, setCompetitors] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [isDemo, setIsDemo] = useState(false);
+            const [selectedOpp, setSelectedOpp] = useState(null);
+            const [showModal, setShowModal] = useState(false);
+            const [editingComp, setEditingComp] = useState(null);
+            const [viewMode, setViewMode] = useState('list'); // list, matrix
+
+            useEffect(() => { loadData(); }, []);
+
+            const loadData = async () => {
+                setLoading(true);
+                const [oppResult, compResult] = await Promise.all([
+                    MissionPulse.opportunities.getAll({ orderBy: 'due_date' }),
+                    MissionPulse.competitors.getAll()
+                ]);
+                setOpportunities(oppResult.data || []);
+                setCompetitors(compResult.data || []);
+                setIsDemo(oppResult.isDemo);
+                
+                if (oppResult.data?.length > 0 && !selectedOpp) {
+                    setSelectedOpp(oppResult.data[0]);
+                }
+                setLoading(false);
+            };
+
+            const handleSave = async (formData) => {
+                const data = { ...formData, opportunityId: selectedOpp.id };
+                if (editingComp?.id) {
+                    await MissionPulse.competitors.update(editingComp.id, data);
+                } else {
+                    await MissionPulse.competitors.create(data);
+                }
+                setShowModal(false);
+                setEditingComp(null);
+                loadData();
+            };
+
+            const handleDelete = async (id) => {
+                if (confirm('Delete this competitor?')) {
+                    await MissionPulse.competitors.delete(id);
+                    loadData();
+                }
+            };
+
+            const getOppCompetitors = () => {
+                if (!selectedOpp) return [];
+                return competitors.filter(c => c.opportunityId === selectedOpp.id);
+            };
+
+            const getThreatColor = (level) => {
+                switch(level?.toLowerCase()) {
+                    case 'high': return 'bg-red-500/20 text-red-400';
+                    case 'medium': return 'bg-yellow-500/20 text-yellow-400';
+                    case 'low': return 'bg-green-500/20 text-green-400';
+                    default: return 'bg-gray-500/20 text-gray-400';
+                }
+            };
+
+            if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="w-12 h-12 border-4 border-cyan border-t-transparent rounded-full animate-spin"></div></div>;
+
+            const oppCompetitors = getOppCompetitors();
+            const incumbents = oppCompetitors.filter(c => c.incumbent);
+            const avgPwin = oppCompetitors.length > 0 
+                ? Math.round(oppCompetitors.reduce((sum, c) => sum + (c.pwinEstimate || 0), 0) / oppCompetitors.length)
+                : 0;
+
+            return (
+                <div className="min-h-screen">
+                    {/* Private Data Banner */}
+                    <div className="private-banner text-white text-center py-2 text-sm font-medium">
+                        🔒 PRIVATE — Competitive Intelligence — Internal Use Only
+                    </div>
+
+                    <div className="p-6">
+                        {/* Header */}
+                        <header className="glass rounded-xl p-6 mb-6 cyan-glow">
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-4">
+                                    <a href="missionpulse-nav-hub.html" className="text-gray-400 hover:text-cyan">← Hub</a>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h1 className="text-2xl font-bold text-white">Competitor Analysis</h1>
+                                            <span className="bg-purple-500/20 text-purple-400 text-xs px-2 py-0.5 rounded border border-purple-500/30">PRIVATE</span>
+                                        </div>
+                                        <p className="text-gray-400 text-sm">Track competitors & develop counter-strategies</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {isDemo && <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded">Demo Mode</span>}
+                                    <div className="flex bg-white/5 rounded-lg p-1">
+                                        <button onClick={() => setViewMode('list')} className={`px-3 py-1 rounded text-sm ${viewMode === 'list' ? 'bg-cyan text-black' : 'text-gray-400'}`}>List</button>
+                                        <button onClick={() => setViewMode('matrix')} className={`px-3 py-1 rounded text-sm ${viewMode === 'matrix' ? 'bg-cyan text-black' : 'text-gray-400'}`}>Matrix</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                            {/* Opportunity Selector */}
+                            <div className="lg:col-span-1">
+                                <div className="glass rounded-xl p-4">
+                                    <h3 className="font-semibold text-white mb-4">Select Opportunity</h3>
+                                    <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                        {opportunities.map(opp => {
+                                            const compCount = competitors.filter(c => c.opportunityId === opp.id).length;
+                                            const isSelected = selectedOpp?.id === opp.id;
+                                            
+                                            return (
+                                                <div 
+                                                    key={opp.id}
+                                                    onClick={() => setSelectedOpp(opp)}
+                                                    className={`glass-hover rounded-lg p-3 cursor-pointer transition ${isSelected ? 'border-cyan bg-cyan/5' : ''}`}
+                                                >
+                                                    <p className="font-medium text-white text-sm line-clamp-1">{opp.title || opp.name}</p>
+                                                    <div className="flex justify-between mt-1">
+                                                        <span className="text-xs text-gray-500">{opp.agency}</span>
+                                                        <span className="text-xs text-cyan">{compCount} competitors</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Competitor Analysis */}
+                            <div className="lg:col-span-3">
+                                {selectedOpp && (
+                                    <>
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-4 gap-4 mb-6">
+                                            <div className="glass rounded-lg p-4 text-center">
+                                                <p className="text-2xl font-bold text-cyan">{oppCompetitors.length}</p>
+                                                <p className="text-gray-400 text-sm">Competitors</p>
+                                            </div>
+                                            <div className="glass rounded-lg p-4 text-center">
+                                                <p className="text-2xl font-bold text-orange-400">{incumbents.length}</p>
+                                                <p className="text-gray-400 text-sm">Incumbents</p>
+                                            </div>
+                                            <div className="glass rounded-lg p-4 text-center">
+                                                <p className="text-2xl font-bold text-red-400">{oppCompetitors.filter(c => c.threatLevel === 'high').length}</p>
+                                                <p className="text-gray-400 text-sm">High Threat</p>
+                                            </div>
+                                            <div className="glass rounded-lg p-4 text-center">
+                                                <p className="text-2xl font-bold text-white">{avgPwin}%</p>
+                                                <p className="text-gray-400 text-sm">Avg Est. pWin</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Header with Add Button */}
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h2 className="text-lg font-semibold text-white">
+                                                Competitors for: {selectedOpp.title || selectedOpp.name}
+                                            </h2>
+                                            <button onClick={() => { setEditingComp(null); setShowModal(true); }} className="bg-cyan text-black px-4 py-2 rounded-lg font-medium hover:bg-cyan/80">
+                                                + Add Competitor
+                                            </button>
+                                        </div>
+
+                                        {viewMode === 'list' ? (
+                                            /* List View */
+                                            <div className="space-y-4">
+                                                {oppCompetitors.length === 0 ? (
+                                                    <div className="glass rounded-xl p-8 text-center">
+                                                        <span className="text-4xl mb-4 block">🎯</span>
+                                                        <p className="text-gray-400">No competitors tracked yet</p>
+                                                    </div>
+                                                ) : (
+                                                    oppCompetitors.map(comp => (
+                                                        <div key={comp.id} className="glass rounded-xl p-5">
+                                                            <div className="flex justify-between items-start mb-3">
+                                                                <div className="flex items-center gap-3">
+                                                                    <h3 className="text-lg font-semibold text-white">{comp.name}</h3>
+                                                                    {comp.incumbent && (
+                                                                        <span className="bg-orange-500/20 text-orange-400 text-xs px-2 py-0.5 rounded">INCUMBENT</span>
+                                                                    )}
+                                                                    <span className={`text-xs px-2 py-0.5 rounded ${getThreatColor(comp.threatLevel)}`}>
+                                                                        {comp.threatLevel?.toUpperCase() || 'UNKNOWN'} THREAT
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <button onClick={() => { setEditingComp(comp); setShowModal(true); }} className="text-cyan hover:text-white text-sm">Edit</button>
+                                                                    <button onClick={() => handleDelete(comp.id)} className="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <p className="text-xs text-gray-500 mb-1">STRENGTHS</p>
+                                                                    <p className="text-sm text-green-400">{comp.strengths || '-'}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs text-gray-500 mb-1">WEAKNESSES (Ghost Themes)</p>
+                                                                    <p className="text-sm text-red-400">{comp.weaknesses || '-'}</p>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="mt-3 pt-3 border-t border-white/10 flex justify-between items-center">
+                                                                <span className="text-sm text-gray-400">Est. Win Probability:</span>
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
+                                                                        <div className="h-full bg-cyan rounded-full" style={{ width: `${comp.pwinEstimate || 0}%` }}></div>
+                                                                    </div>
+                                                                    <span className="text-cyan font-medium">{comp.pwinEstimate || 0}%</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        ) : (
+                                            /* Matrix View */
+                                            <div className="glass rounded-xl overflow-hidden">
+                                                <table className="w-full">
+                                                    <thead className="bg-white/5">
+                                                        <tr>
+                                                            <th className="text-left p-4 text-gray-400 font-medium">Competitor</th>
+                                                            <th className="text-left p-4 text-gray-400 font-medium">Incumbent</th>
+                                                            <th className="text-left p-4 text-gray-400 font-medium">Threat</th>
+                                                            <th className="text-left p-4 text-gray-400 font-medium">Est. pWin</th>
+                                                            <th className="text-left p-4 text-gray-400 font-medium">Strengths</th>
+                                                            <th className="text-left p-4 text-gray-400 font-medium">Weaknesses</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {oppCompetitors.map(comp => (
+                                                            <tr key={comp.id} className="border-t border-white/5 hover:bg-white/5">
+                                                                <td className="p-4 font-medium text-white">{comp.name}</td>
+                                                                <td className="p-4">
+                                                                    {comp.incumbent ? <span className="text-orange-400">✓</span> : <span className="text-gray-600">-</span>}
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <span className={`px-2 py-1 rounded text-xs ${getThreatColor(comp.threatLevel)}`}>
+                                                                        {comp.threatLevel || 'Unknown'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-4 text-cyan">{comp.pwinEstimate || 0}%</td>
+                                                                <td className="p-4 text-green-400 text-sm max-w-xs truncate">{comp.strengths || '-'}</td>
+                                                                <td className="p-4 text-red-400 text-sm max-w-xs truncate">{comp.weaknesses || '-'}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Modal */}
+                        {showModal && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                                <div className="glass rounded-xl p-6 w-full max-w-lg">
+                                    <h2 className="text-xl font-bold mb-4">{editingComp ? 'Edit Competitor' : 'Add Competitor'}</h2>
+                                    <CompetitorForm initial={editingComp} onSave={handleSave} onCancel={() => { setShowModal(false); setEditingComp(null); }} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function CompetitorForm({ initial, onSave, onCancel }) {
+            const [form, setForm] = useState({
+                name: initial?.name || '',
+                incumbent: initial?.incumbent || false,
+                threatLevel: initial?.threatLevel || 'medium',
+                pwinEstimate: initial?.pwinEstimate || 50,
+                strengths: initial?.strengths || '',
+                weaknesses: initial?.weaknesses || ''
+            });
+
+            const handleSubmit = (e) => { e.preventDefault(); onSave(form); };
+
+            return (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm text-gray-400 mb-1">Company Name *</label>
+                        <input type="text" required value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white" placeholder="e.g., Leidos" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">Threat Level</label>
+                            <select value={form.threatLevel} onChange={e => setForm({...form, threatLevel: e.target.value})}
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white">
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">Est. pWin (%)</label>
+                            <input type="number" min="0" max="100" value={form.pwinEstimate} onChange={e => setForm({...form, pwinEstimate: parseInt(e.target.value) || 0})}
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white" />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input type="checkbox" id="incumbent" checked={form.incumbent} onChange={e => setForm({...form, incumbent: e.target.checked})}
+                            className="w-4 h-4 rounded" />
+                        <label htmlFor="incumbent" className="text-sm text-gray-400">Current Incumbent</label>
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-400 mb-1">Strengths</label>
+                        <textarea value={form.strengths} onChange={e => setForm({...form, strengths: e.target.value})} rows="2"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white" placeholder="What makes them strong?"></textarea>
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-400 mb-1">Weaknesses (Ghost Themes)</label>
+                        <textarea value={form.weaknesses} onChange={e => setForm({...form, weaknesses: e.target.value})} rows="2"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white" placeholder="Vulnerabilities to exploit..."></textarea>
+                    </div>
+                    <div className="flex gap-3 pt-4">
+                        <button type="submit" className="flex-1 bg-cyan text-black py-2 rounded-lg font-medium hover:bg-cyan/80">Save</button>
+                        <button type="button" onClick={onCancel} className="flex-1 bg-white/10 py-2 rounded-lg hover:bg-white/20">Cancel</button>
+                    </div>
+                </form>
+            );
+        }
+
+        ReactDOM.render(<CompetitorAnalysis />, document.getElementById('root'));
+    </script>
+</body>
+</html>

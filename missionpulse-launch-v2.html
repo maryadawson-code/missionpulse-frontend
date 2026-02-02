@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse | Launch Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.1); }
+        .glass-hover:hover { background: rgba(0, 229, 250, 0.08); border-color: rgba(0, 229, 250, 0.3); }
+        .text-cyan { color: #00E5FA; }
+        .bg-cyan { background-color: #00E5FA; }
+        .cyan-glow { box-shadow: 0 0 30px rgba(0, 229, 250, 0.15); }
+        .progress-bar { background: linear-gradient(90deg, #00E5FA 0%, #22c55e 100%); }
+    </style>
+</head>
+<body class="text-gray-100">
+    <div id="root"></div>
+    <script src="missionpulse-crud.js"></script>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function LaunchTracker() {
+            const [opportunities, setOpportunities] = useState([]);
+            const [checklist, setChecklist] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [isDemo, setIsDemo] = useState(false);
+            const [selectedOpp, setSelectedOpp] = useState(null);
+
+            useEffect(() => { loadData(); }, []);
+
+            const loadData = async () => {
+                setLoading(true);
+                const [oppResult, checkResult] = await Promise.all([
+                    MissionPulse.opportunities.getAll({ orderBy: 'due_date' }),
+                    MissionPulse.launchChecklist.getAll()
+                ]);
+                
+                // Filter to Gold Team and near-submission opps
+                const submissionReady = (oppResult.data || []).filter(o => 
+                    ['gold_team', 'submitted'].includes(o.phase || o.shipleyPhase) ||
+                    (o.dueDate && (new Date(o.dueDate) - new Date()) < 14 * 24 * 60 * 60 * 1000)
+                );
+                
+                setOpportunities(submissionReady);
+                setChecklist(checkResult.data || []);
+                setIsDemo(oppResult.isDemo);
+                
+                if (submissionReady.length > 0 && !selectedOpp) {
+                    setSelectedOpp(submissionReady[0]);
+                }
+                setLoading(false);
+            };
+
+            const handleChecklistToggle = async (item) => {
+                const newStatus = item.status === 'complete' ? 'pending' : 'complete';
+                await MissionPulse.launchChecklist.update(item.id, { status: newStatus });
+                loadData();
+            };
+
+            const getOppChecklist = (oppId) => {
+                return checklist.filter(c => c.opportunityId === oppId);
+            };
+
+            const getReadinessScore = (oppId) => {
+                const items = getOppChecklist(oppId);
+                if (items.length === 0) return 0;
+                const complete = items.filter(i => i.status === 'complete').length;
+                return Math.round((complete / items.length) * 100);
+            };
+
+            const getDaysRemaining = (dueDate) => {
+                if (!dueDate) return null;
+                return Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+            };
+
+            const getUrgencyColor = (days) => {
+                if (days === null) return 'text-gray-400';
+                if (days <= 0) return 'text-red-500';
+                if (days <= 3) return 'text-red-400';
+                if (days <= 7) return 'text-orange-400';
+                if (days <= 14) return 'text-yellow-400';
+                return 'text-green-400';
+            };
+
+            if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="w-12 h-12 border-4 border-cyan border-t-transparent rounded-full animate-spin"></div></div>;
+
+            const selectedChecklist = selectedOpp ? getOppChecklist(selectedOpp.id) : [];
+            const readiness = selectedOpp ? getReadinessScore(selectedOpp.id) : 0;
+
+            return (
+                <div className="min-h-screen p-6">
+                    {/* Header */}
+                    <header className="glass rounded-xl p-6 mb-6 cyan-glow">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <a href="missionpulse-nav-hub.html" className="text-gray-400 hover:text-cyan">← Hub</a>
+                                <div>
+                                    <h1 className="text-2xl font-bold text-white">🚀 Launch Tracker</h1>
+                                    <p className="text-gray-400 text-sm">Submission readiness & final checklist</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {isDemo && <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded">Demo Mode</span>}
+                                <button onClick={loadData} className="text-cyan hover:text-white">↻ Refresh</button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {opportunities.length === 0 ? (
+                        <div className="glass rounded-xl p-12 text-center">
+                            <span className="text-6xl mb-4 block">🎯</span>
+                            <h2 className="text-xl font-semibold text-white mb-2">No Proposals Ready for Launch</h2>
+                            <p className="text-gray-400">Move opportunities to Gold Team phase to begin launch preparation</p>
+                            <a href="missionpulse-swimlane.html" className="inline-block mt-4 text-cyan hover:underline">Go to Swimlane Board →</a>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Opportunity Selector */}
+                            <div className="lg:col-span-1">
+                                <div className="glass rounded-xl p-4">
+                                    <h3 className="font-semibold text-white mb-4">Upcoming Submissions</h3>
+                                    <div className="space-y-3">
+                                        {opportunities.map(opp => {
+                                            const days = getDaysRemaining(opp.dueDate);
+                                            const score = getReadinessScore(opp.id);
+                                            const isSelected = selectedOpp?.id === opp.id;
+                                            
+                                            return (
+                                                <div 
+                                                    key={opp.id}
+                                                    onClick={() => setSelectedOpp(opp)}
+                                                    className={`glass-hover rounded-lg p-4 cursor-pointer transition ${isSelected ? 'border-cyan bg-cyan/5' : ''}`}
+                                                >
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <p className="font-medium text-white text-sm line-clamp-1">{opp.title || opp.name}</p>
+                                                        <span className={`text-xs font-bold ${getUrgencyColor(days)}`}>
+                                                            {days === null ? '-' : days <= 0 ? 'OVERDUE' : `${days}d`}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mb-2">{opp.agency}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                                                            <div className="h-full progress-bar rounded-full transition-all" style={{ width: `${score}%` }}></div>
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">{score}%</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Launch Checklist */}
+                            <div className="lg:col-span-2">
+                                {selectedOpp && (
+                                    <div className="glass rounded-xl">
+                                        {/* Opp Header */}
+                                        <div className="p-6 border-b border-white/10">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h2 className="text-xl font-bold text-white">{selectedOpp.title || selectedOpp.name}</h2>
+                                                    <p className="text-gray-400">{selectedOpp.agency} • {selectedOpp.solicitationNumber}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className={`text-2xl font-bold ${getUrgencyColor(getDaysRemaining(selectedOpp.dueDate))}`}>
+                                                        {getDaysRemaining(selectedOpp.dueDate) <= 0 ? 'OVERDUE' : `${getDaysRemaining(selectedOpp.dueDate)} days`}
+                                                    </p>
+                                                    <p className="text-sm text-gray-400">until submission</p>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Readiness Meter */}
+                                            <div className="mt-4">
+                                                <div className="flex justify-between text-sm mb-1">
+                                                    <span className="text-gray-400">Launch Readiness</span>
+                                                    <span className={`font-bold ${readiness >= 80 ? 'text-green-400' : readiness >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                                        {readiness}%
+                                                    </span>
+                                                </div>
+                                                <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                                                    <div className="h-full progress-bar rounded-full transition-all" style={{ width: `${readiness}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Checklist */}
+                                        <div className="p-6">
+                                            <h3 className="font-semibold text-white mb-4">Submission Checklist</h3>
+                                            
+                                            {selectedChecklist.length === 0 ? (
+                                                <div className="text-center py-8">
+                                                    <p className="text-gray-500 mb-4">No checklist items yet</p>
+                                                    <DefaultChecklist oppId={selectedOpp.id} onCreated={loadData} />
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {selectedChecklist.map(item => (
+                                                        <div 
+                                                            key={item.id}
+                                                            onClick={() => handleChecklistToggle(item)}
+                                                            className={`glass-hover rounded-lg p-4 cursor-pointer flex items-center gap-4 ${item.status === 'complete' ? 'opacity-60' : ''}`}
+                                                        >
+                                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                                                                item.status === 'complete' ? 'bg-green-500 border-green-500' : 'border-gray-500'
+                                                            }`}>
+                                                                {item.status === 'complete' && <span className="text-white text-sm">✓</span>}
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className={`font-medium ${item.status === 'complete' ? 'text-gray-400 line-through' : 'text-white'}`}>
+                                                                    {item.item}
+                                                                </p>
+                                                                {item.owner && <p className="text-xs text-gray-500">Owner: {item.owner}</p>}
+                                                            </div>
+                                                            {item.dueDate && (
+                                                                <span className={`text-xs ${getUrgencyColor(getDaysRemaining(item.dueDate))}`}>
+                                                                    {new Date(item.dueDate).toLocaleDateString()}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Launch Button */}
+                                        {readiness >= 80 && (
+                                            <div className="p-6 border-t border-white/10">
+                                                <button className="w-full bg-gradient-to-r from-cyan to-green-500 text-black py-4 rounded-xl font-bold text-lg hover:opacity-90 transition">
+                                                    🚀 Mark as Submitted
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function DefaultChecklist({ oppId, onCreated }) {
+            const DEFAULT_ITEMS = [
+                'Final PDF compilation complete',
+                'Executive summary reviewed by CEO',
+                'Pricing validation complete',
+                'All compliance checkboxes verified',
+                'Past performance citations confirmed',
+                'Teaming agreements signed',
+                'Submission portal credentials verified',
+                'Backup submission method ready',
+                'Final page count within limits',
+                'All required forms included'
+            ];
+
+            const handleCreate = async () => {
+                for (const item of DEFAULT_ITEMS) {
+                    await MissionPulse.launchChecklist.create({
+                        opportunityId: oppId,
+                        item: item,
+                        status: 'pending'
+                    });
+                }
+                onCreated();
+            };
+
+            return (
+                <button onClick={handleCreate} className="bg-cyan text-black px-6 py-2 rounded-lg font-medium hover:bg-cyan/80">
+                    + Create Default Checklist
+                </button>
+            );
+        }
+
+        ReactDOM.render(<LaunchTracker />, document.getElementById('root'));
+    </script>
+</body>
+</html>
