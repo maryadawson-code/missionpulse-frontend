@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compliance Checklist Builder | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+    .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.1); }
+    .cyan-glow { box-shadow: 0 0 30px rgba(0,229,250,0.15); }
+    .progress-bar { background: linear-gradient(90deg, #00E5FA 0%, #0066FF 100%); }
+  </style>
+</head>
+<body class="text-white">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    
+    const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4NTU0NjIsImV4cCI6MjA1MzQzMTQ2Mn0.Xj4_wfgnHdegN2jBcMh1cTBfvZhQxuF8FPxcE-krcHY';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    const DEMO_CHECKLISTS = [
+      {
+        id: '1',
+        checklist_name: 'DHA EHR Modernization RFP Requirements',
+        checklist_type: 'RFP Requirements',
+        total_items: 45,
+        completed_items: 32,
+        status: 'In Progress',
+        due_date: '2026-02-15',
+        items: [
+          { id: 'i1', item_number: 'L.1.a', requirement_text: 'Offeror shall provide a Technical Volume not to exceed 50 pages', rfp_reference: 'Section L.1', category: 'Format', priority: 'Critical', status: 'Complete', assigned_to: 'Sarah Chen' },
+          { id: 'i2', item_number: 'L.1.b', requirement_text: 'Technical approach shall address all PWS requirements in Section C', rfp_reference: 'Section L.1', category: 'Technical', priority: 'Critical', status: 'Complete', assigned_to: 'Mike Torres' },
+          { id: 'i3', item_number: 'L.2.a', requirement_text: 'Past Performance Volume shall include 3-5 relevant contracts', rfp_reference: 'Section L.2', category: 'Past Performance', priority: 'High', status: 'In Progress', assigned_to: 'Lisa Park' },
+          { id: 'i4', item_number: 'L.3.a', requirement_text: 'Cost Volume shall use Government-provided CLIN structure', rfp_reference: 'Section L.3', category: 'Pricing', priority: 'Critical', status: 'Pending', assigned_to: 'Finance Team' },
+          { id: 'i5', item_number: 'M.1.a', requirement_text: 'Technical approach rated as Outstanding, Good, Acceptable, or Unacceptable', rfp_reference: 'Section M.1', category: 'Evaluation', priority: 'High', status: 'Complete', assigned_to: 'Sarah Chen' },
+        ]
+      },
+      {
+        id: '2',
+        checklist_name: 'FAR/DFARS Compliance',
+        checklist_type: 'FAR/DFARS',
+        total_items: 28,
+        completed_items: 28,
+        status: 'Complete',
+        due_date: '2026-02-10',
+        items: []
+      },
+      {
+        id: '3',
+        checklist_name: 'Security Requirements (CMMC Level 2)',
+        checklist_type: 'Security',
+        total_items: 110,
+        completed_items: 85,
+        status: 'In Progress',
+        due_date: '2026-02-20',
+        items: []
+      },
+    ];
+
+    function ComplianceChecklist() {
+      const [checklists, setChecklists] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [selectedChecklist, setSelectedChecklist] = useState(null);
+      const [showModal, setShowModal] = useState(false);
+      const [expandedChecklist, setExpandedChecklist] = useState(null);
+
+      useEffect(() => {
+        loadChecklists();
+      }, []);
+
+      async function loadChecklists() {
+        try {
+          const { data, error } = await supabase.from('compliance_checklists').select('*').order('created_at', { ascending: false });
+          if (error) throw error;
+          setChecklists(data?.length ? data : DEMO_CHECKLISTS);
+        } catch (err) {
+          console.log('Using demo data:', err.message);
+          setChecklists(DEMO_CHECKLISTS);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      const totalItems = checklists.reduce((sum, c) => sum + c.total_items, 0);
+      const completedItems = checklists.reduce((sum, c) => sum + c.completed_items, 0);
+      const overallProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+      const getStatusColor = (status) => {
+        const colors = { 'Not Started': 'text-gray-400', 'In Progress': 'text-yellow-400', 'Complete': 'text-green-400' };
+        return colors[status] || 'text-gray-400';
+      };
+
+      const getStatusBg = (status) => {
+        const colors = { 'Not Started': 'bg-gray-500/20', 'In Progress': 'bg-yellow-500/20', 'Complete': 'bg-green-500/20', 'Pending': 'bg-gray-500/20', 'N/A': 'bg-gray-700/20' };
+        return colors[status] || 'bg-gray-500/20';
+      };
+
+      const getPriorityColor = (priority) => {
+        const colors = { 'Critical': 'text-red-400', 'High': 'text-orange-400', 'Medium': 'text-yellow-400', 'Low': 'text-gray-400' };
+        return colors[priority] || 'text-gray-400';
+      };
+
+      const getTypeIcon = (type) => {
+        const icons = { 'RFP Requirements': '📋', 'FAR/DFARS': '📜', 'Security': '🔒', 'Custom': '⚙️' };
+        return icons[type] || '📄';
+      };
+
+      return (
+        <div className="min-h-screen p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-4">
+              <a href="index.html" className="text-gray-400 hover:text-cyan-400 transition">← Back</a>
+              <div>
+                <h1 className="text-3xl font-bold text-white">Compliance Checklist Builder</h1>
+                <p className="text-gray-400">Track RFP requirements and compliance status</p>
+              </div>
+            </div>
+            <button onClick={() => { setSelectedChecklist(null); setShowModal(true); }} className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-semibold hover:opacity-90 transition">
+              + New Checklist
+            </button>
+          </div>
+
+          {/* Overall Progress Card */}
+          <div className="glass-card rounded-2xl p-6 mb-8 cyan-glow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Overall Compliance Progress</h2>
+              <span className={`text-2xl font-bold ${overallProgress >= 90 ? 'text-green-400' : overallProgress >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {overallProgress}%
+              </span>
+            </div>
+            <div className="h-3 bg-gray-700 rounded-full overflow-hidden mb-4">
+              <div className="h-full progress-bar rounded-full transition-all duration-500" style={{ width: `${overallProgress}%` }}></div>
+            </div>
+            <div className="grid grid-cols-4 gap-6">
+              <div>
+                <div className="text-gray-400 text-sm mb-1">Total Checklists</div>
+                <div className="text-2xl font-bold text-cyan-400">{checklists.length}</div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">Total Items</div>
+                <div className="text-2xl font-bold text-white">{totalItems}</div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">Completed</div>
+                <div className="text-2xl font-bold text-green-400">{completedItems}</div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">Remaining</div>
+                <div className="text-2xl font-bold text-yellow-400">{totalItems - completedItems}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Checklists */}
+          <div className="space-y-4">
+            {loading ? (
+              <div className="text-center py-12 text-gray-400">Loading...</div>
+            ) : checklists.map((checklist) => {
+              const progress = checklist.total_items > 0 ? Math.round((checklist.completed_items / checklist.total_items) * 100) : 0;
+              const isExpanded = expandedChecklist === checklist.id;
+              
+              return (
+                <div key={checklist.id} className="glass-card rounded-2xl overflow-hidden">
+                  {/* Checklist Header */}
+                  <div 
+                    className="p-5 flex items-center justify-between cursor-pointer hover:bg-gray-800/30 transition"
+                    onClick={() => setExpandedChecklist(isExpanded ? null : checklist.id)}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="text-3xl">{getTypeIcon(checklist.checklist_type)}</div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">{checklist.checklist_name}</h3>
+                        <div className="flex items-center space-x-4 text-sm">
+                          <span className="text-gray-400">{checklist.checklist_type}</span>
+                          <span className="text-gray-400">Due: {new Date(checklist.due_date).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-6">
+                      <div className="text-right">
+                        <div className="text-sm text-gray-400">Progress</div>
+                        <div className="font-semibold">{checklist.completed_items} / {checklist.total_items}</div>
+                      </div>
+                      <div className="w-32">
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-full progress-bar rounded-full" style={{ width: `${progress}%` }}></div>
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1 text-center">{progress}%</div>
+                      </div>
+                      <span className={`px-4 py-1 rounded-full text-sm font-medium ${getStatusBg(checklist.status)} ${getStatusColor(checklist.status)}`}>
+                        {checklist.status}
+                      </span>
+                      <span className="text-gray-400 text-xl">{isExpanded ? '▼' : '▶'}</span>
+                    </div>
+                  </div>
+
+                  {/* Checklist Items (Expanded) */}
+                  {isExpanded && checklist.items && (
+                    <div className="p-5 bg-gray-900/30 border-t border-gray-800">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-semibold text-gray-300">Requirements</h4>
+                        <button className="text-cyan-400 hover:text-cyan-300 text-sm">+ Add Item</button>
+                      </div>
+                      <div className="space-y-2">
+                        {checklist.items.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg hover:bg-gray-800/50 transition">
+                            <div className="flex items-center space-x-4 flex-1">
+                              <input 
+                                type="checkbox" 
+                                checked={item.status === 'Complete'} 
+                                className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-cyan-500"
+                                readOnly
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-mono text-cyan-400 text-sm">{item.item_number}</span>
+                                  <span className={`text-xs ${getPriorityColor(item.priority)}`}>● {item.priority}</span>
+                                </div>
+                                <p className="text-white text-sm mt-1">{item.requirement_text}</p>
+                                <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
+                                  <span>Ref: {item.rfp_reference}</span>
+                                  <span>Category: {item.category}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <div className="text-sm text-gray-400">{item.assigned_to}</div>
+                              <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusBg(item.status)} ${getStatusColor(item.status)}`}>
+                                {item.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* New Checklist Modal */}
+          {showModal && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+              <div className="glass-card rounded-2xl w-full max-w-lg">
+                <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+                  <h2 className="text-xl font-bold">Create New Checklist</h2>
+                  <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <input type="text" placeholder="Checklist Name" className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white" />
+                  <select className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white">
+                    <option>RFP Requirements</option>
+                    <option>FAR/DFARS</option>
+                    <option>Security</option>
+                    <option>Custom</option>
+                  </select>
+                  <input type="date" className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white" />
+                  <div className="p-4 bg-gray-800/30 rounded-lg">
+                    <p className="text-sm text-gray-400 mb-2">Quick Start Templates:</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded text-sm hover:bg-cyan-500/30">FAR 52.212-1</button>
+                      <button className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded text-sm hover:bg-cyan-500/30">DFARS 252.204</button>
+                      <button className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded text-sm hover:bg-cyan-500/30">CMMC L2</button>
+                    </div>
+                  </div>
+                  <button className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-semibold hover:opacity-90 transition">
+                    Create Checklist
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<ComplianceChecklist />, document.getElementById('root'));
+  </script>
+</body>
+</html>
