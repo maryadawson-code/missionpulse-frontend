@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract Scanner | MissionPulse</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(0, 5, 15, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.2); }
+        .glow { box-shadow: 0 0 30px rgba(0, 229, 250, 0.3); }
+        .cyber-grid { background-image: linear-gradient(rgba(0, 229, 250, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 229, 250, 0.03) 1px, transparent 1px); background-size: 50px 50px; }
+        .risk-critical { background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1)); border-left: 4px solid #ef4444; }
+        .risk-high { background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(249, 115, 22, 0.1)); border-left: 4px solid #f97316; }
+        .risk-medium { background: linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(234, 179, 8, 0.1)); border-left: 4px solid #eab308; }
+        .risk-low { background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1)); border-left: 4px solid #22c55e; }
+    </style>
+</head>
+<body class="bg-[#00050F] text-white min-h-screen cyber-grid">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMjgsImV4cCI6MjA1MzM5OTAyOH0.S0LKvPzVIfBsLv-2qjXRdMGhnYyRLvOFlo9ihaQuqHE';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const DEMO_CLAUSES = [
+            { id: 1, clause_number: 'FAR 52.204-21', title: 'Basic Safeguarding of Covered Contractor Information Systems', category: 'Cybersecurity', risk_level: 'critical', compliance_status: 'compliant', notes: 'CMMC Level 2 required', opportunity_id: 1 },
+            { id: 2, clause_number: 'DFARS 252.204-7012', title: 'Safeguarding Covered Defense Information', category: 'Cybersecurity', risk_level: 'critical', compliance_status: 'partial', notes: 'SSP needs update', opportunity_id: 1 },
+            { id: 3, clause_number: 'FAR 52.219-14', title: 'Limitations on Subcontracting', category: 'Small Business', risk_level: 'high', compliance_status: 'compliant', notes: '50% labor threshold', opportunity_id: 1 },
+            { id: 4, clause_number: 'DFARS 252.227-7013', title: 'Rights in Technical Data - Noncommercial Items', category: 'IP Rights', risk_level: 'medium', compliance_status: 'review', notes: 'Negotiate data rights', opportunity_id: 2 },
+            { id: 5, clause_number: 'FAR 52.222-50', title: 'Combating Trafficking in Persons', category: 'Labor', risk_level: 'low', compliance_status: 'compliant', notes: 'Standard compliance', opportunity_id: 2 },
+            { id: 6, clause_number: 'DFARS 252.239-7010', title: 'Cloud Computing Services', category: 'IT Services', risk_level: 'critical', compliance_status: 'non-compliant', notes: 'FedRAMP Moderate required', opportunity_id: 3 },
+            { id: 7, clause_number: 'FAR 52.232-40', title: 'Providing Accelerated Payments to Small Business', category: 'Finance', risk_level: 'low', compliance_status: 'compliant', notes: '15-day payment terms', opportunity_id: 3 },
+            { id: 8, clause_number: 'DFARS 252.204-7018', title: 'Prohibition on the Acquisition of Covered Defense Telecommunications', category: 'Supply Chain', risk_level: 'high', compliance_status: 'compliant', notes: 'No prohibited vendors', opportunity_id: 1 },
+        ];
+
+        function ContractScanner() {
+            const [clauses, setClauses] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [filter, setFilter] = useState('all');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [showModal, setShowModal] = useState(false);
+            const [editingClause, setEditingClause] = useState(null);
+            const [formData, setFormData] = useState({
+                clause_number: '', title: '', category: 'Cybersecurity', risk_level: 'medium', compliance_status: 'review', notes: '', opportunity_id: 1
+            });
+
+            useEffect(() => {
+                fetchClauses();
+            }, []);
+
+            async function fetchClauses() {
+                try {
+                    const { data, error } = await supabase.from('contract_clauses').select('*').order('risk_level');
+                    if (error) throw error;
+                    setClauses(data?.length ? data : DEMO_CLAUSES);
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setClauses(DEMO_CLAUSES);
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            async function handleSave() {
+                try {
+                    if (editingClause) {
+                        const { error } = await supabase.from('contract_clauses').update(formData).eq('id', editingClause.id);
+                        if (error) throw error;
+                    } else {
+                        const { error } = await supabase.from('contract_clauses').insert([formData]);
+                        if (error) throw error;
+                    }
+                    fetchClauses();
+                    closeModal();
+                } catch (err) {
+                    console.log('Demo mode - simulating save');
+                    if (editingClause) {
+                        setClauses(clauses.map(c => c.id === editingClause.id ? { ...c, ...formData } : c));
+                    } else {
+                        setClauses([...clauses, { ...formData, id: Date.now() }]);
+                    }
+                    closeModal();
+                }
+            }
+
+            async function handleDelete(id) {
+                if (!confirm('Delete this clause?')) return;
+                try {
+                    const { error } = await supabase.from('contract_clauses').delete().eq('id', id);
+                    if (error) throw error;
+                    fetchClauses();
+                } catch (err) {
+                    setClauses(clauses.filter(c => c.id !== id));
+                }
+            }
+
+            function openModal(clause = null) {
+                setEditingClause(clause);
+                setFormData(clause || { clause_number: '', title: '', category: 'Cybersecurity', risk_level: 'medium', compliance_status: 'review', notes: '', opportunity_id: 1 });
+                setShowModal(true);
+            }
+
+            function closeModal() {
+                setShowModal(false);
+                setEditingClause(null);
+            }
+
+            const getRiskBadge = (level) => {
+                const styles = {
+                    critical: 'bg-red-500/20 text-red-400 border-red-500',
+                    high: 'bg-orange-500/20 text-orange-400 border-orange-500',
+                    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500',
+                    low: 'bg-green-500/20 text-green-400 border-green-500'
+                };
+                return styles[level] || styles.medium;
+            };
+
+            const getStatusBadge = (status) => {
+                const styles = {
+                    compliant: 'bg-green-500/20 text-green-400',
+                    partial: 'bg-yellow-500/20 text-yellow-400',
+                    'non-compliant': 'bg-red-500/20 text-red-400',
+                    review: 'bg-blue-500/20 text-blue-400'
+                };
+                return styles[status] || styles.review;
+            };
+
+            const filteredClauses = clauses.filter(c => {
+                const matchesFilter = filter === 'all' || c.risk_level === filter || c.compliance_status === filter;
+                const matchesSearch = c.clause_number.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                     c.title.toLowerCase().includes(searchTerm.toLowerCase());
+                return matchesFilter && matchesSearch;
+            });
+
+            const stats = {
+                total: clauses.length,
+                critical: clauses.filter(c => c.risk_level === 'critical').length,
+                nonCompliant: clauses.filter(c => c.compliance_status === 'non-compliant').length,
+                compliant: clauses.filter(c => c.compliance_status === 'compliant').length
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-[#00E5FA] text-xl">Loading Contract Scanner...</div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen p-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                                <span className="text-4xl">📜</span> Contract Scanner
+                            </h1>
+                            <p className="text-gray-400 mt-1">FAR/DFARS Clause Analysis & Compliance Mapping</p>
+                        </div>
+                        <button onClick={() => openModal()} className="px-6 py-3 bg-[#00E5FA] text-[#00050F] font-semibold rounded-lg hover:bg-[#00E5FA]/80 transition flex items-center gap-2">
+                            <span>+</span> Add Clause
+                        </button>
+                    </div>
+
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-4 gap-4 mb-8">
+                        <div className="glass rounded-xl p-4">
+                            <div className="text-gray-400 text-sm">Total Clauses</div>
+                            <div className="text-3xl font-bold text-white">{stats.total}</div>
+                        </div>
+                        <div className="glass rounded-xl p-4 border-l-4 border-red-500">
+                            <div className="text-gray-400 text-sm">Critical Risk</div>
+                            <div className="text-3xl font-bold text-red-400">{stats.critical}</div>
+                        </div>
+                        <div className="glass rounded-xl p-4 border-l-4 border-orange-500">
+                            <div className="text-gray-400 text-sm">Non-Compliant</div>
+                            <div className="text-3xl font-bold text-orange-400">{stats.nonCompliant}</div>
+                        </div>
+                        <div className="glass rounded-xl p-4 border-l-4 border-green-500">
+                            <div className="text-gray-400 text-sm">Compliant</div>
+                            <div className="text-3xl font-bold text-green-400">{stats.compliant}</div>
+                        </div>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="glass rounded-xl p-4 mb-6 flex items-center gap-4">
+                        <input type="text" placeholder="Search clauses..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                            className="flex-1 bg-[#00050F]/50 border border-[#00E5FA]/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#00E5FA]" />
+                        <select value={filter} onChange={(e) => setFilter(e.target.value)}
+                            className="bg-[#00050F]/50 border border-[#00E5FA]/30 rounded-lg px-4 py-2 text-white focus:outline-none">
+                            <option value="all">All Clauses</option>
+                            <option value="critical">Critical Risk</option>
+                            <option value="high">High Risk</option>
+                            <option value="medium">Medium Risk</option>
+                            <option value="low">Low Risk</option>
+                            <option value="compliant">Compliant</option>
+                            <option value="non-compliant">Non-Compliant</option>
+                        </select>
+                    </div>
+
+                    {/* Clauses Table */}
+                    <div className="glass rounded-xl overflow-hidden">
+                        <table className="w-full">
+                            <thead className="bg-[#00E5FA]/10">
+                                <tr>
+                                    <th className="text-left p-4 text-[#00E5FA] font-semibold">Clause</th>
+                                    <th className="text-left p-4 text-[#00E5FA] font-semibold">Title</th>
+                                    <th className="text-left p-4 text-[#00E5FA] font-semibold">Category</th>
+                                    <th className="text-left p-4 text-[#00E5FA] font-semibold">Risk</th>
+                                    <th className="text-left p-4 text-[#00E5FA] font-semibold">Status</th>
+                                    <th className="text-left p-4 text-[#00E5FA] font-semibold">Notes</th>
+                                    <th className="text-center p-4 text-[#00E5FA] font-semibold">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredClauses.map((clause) => (
+                                    <tr key={clause.id} className={`border-t border-[#00E5FA]/10 hover:bg-[#00E5FA]/5 risk-${clause.risk_level}`}>
+                                        <td className="p-4 font-mono text-[#00E5FA]">{clause.clause_number}</td>
+                                        <td className="p-4 text-white">{clause.title}</td>
+                                        <td className="p-4 text-gray-300">{clause.category}</td>
+                                        <td className="p-4">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getRiskBadge(clause.risk_level)}`}>
+                                                {clause.risk_level.toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(clause.compliance_status)}`}>
+                                                {clause.compliance_status.replace('-', ' ').toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-gray-400 text-sm">{clause.notes}</td>
+                                        <td className="p-4 text-center">
+                                            <button onClick={() => openModal(clause)} className="text-[#00E5FA] hover:text-white mr-3">Edit</button>
+                                            <button onClick={() => handleDelete(clause.id)} className="text-red-400 hover:text-red-300">Delete</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Modal */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                            <div className="glass rounded-xl p-6 w-full max-w-2xl glow">
+                                <h2 className="text-xl font-bold text-white mb-4">{editingClause ? 'Edit Clause' : 'Add New Clause'}</h2>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-gray-400 text-sm">Clause Number</label>
+                                        <input type="text" value={formData.clause_number} onChange={(e) => setFormData({...formData, clause_number: e.target.value})}
+                                            className="w-full bg-[#00050F] border border-[#00E5FA]/30 rounded-lg px-4 py-2 text-white mt-1" placeholder="FAR 52.XXX-XX" />
+                                    </div>
+                                    <div>
+                                        <label className="text-gray-400 text-sm">Category</label>
+                                        <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})}
+                                            className="w-full bg-[#00050F] border border-[#00E5FA]/30 rounded-lg px-4 py-2 text-white mt-1">
+                                            <option>Cybersecurity</option>
+                                            <option>Small Business</option>
+                                            <option>IP Rights</option>
+                                            <option>Labor</option>
+                                            <option>IT Services</option>
+                                            <option>Finance</option>
+                                            <option>Supply Chain</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-gray-400 text-sm">Title</label>
+                                        <input type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})}
+                                            className="w-full bg-[#00050F] border border-[#00E5FA]/30 rounded-lg px-4 py-2 text-white mt-1" />
+                                    </div>
+                                    <div>
+                                        <label className="text-gray-400 text-sm">Risk Level</label>
+                                        <select value={formData.risk_level} onChange={(e) => setFormData({...formData, risk_level: e.target.value})}
+                                            className="w-full bg-[#00050F] border border-[#00E5FA]/30 rounded-lg px-4 py-2 text-white mt-1">
+                                            <option value="critical">Critical</option>
+                                            <option value="high">High</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="low">Low</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-gray-400 text-sm">Compliance Status</label>
+                                        <select value={formData.compliance_status} onChange={(e) => setFormData({...formData, compliance_status: e.target.value})}
+                                            className="w-full bg-[#00050F] border border-[#00E5FA]/30 rounded-lg px-4 py-2 text-white mt-1">
+                                            <option value="compliant">Compliant</option>
+                                            <option value="partial">Partial</option>
+                                            <option value="non-compliant">Non-Compliant</option>
+                                            <option value="review">Under Review</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-gray-400 text-sm">Notes</label>
+                                        <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                                            className="w-full bg-[#00050F] border border-[#00E5FA]/30 rounded-lg px-4 py-2 text-white mt-1 h-24" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={closeModal} className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800">Cancel</button>
+                                    <button onClick={handleSave} className="px-6 py-2 bg-[#00E5FA] text-[#00050F] font-semibold rounded-lg hover:bg-[#00E5FA]/80">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<ContractScanner />);
+    </script>
+</body>
+</html>
