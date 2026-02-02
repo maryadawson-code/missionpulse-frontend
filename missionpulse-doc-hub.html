@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Hub | MissionPulse</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .glass { background: rgba(0,229,250,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.1); }
+    .glass-card { background: rgba(15,23,42,0.6); backdrop-filter: blur(20px); border: 1px solid rgba(51,65,85,0.5); }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    .animate-presence { animation: pulse 2s ease-in-out infinite; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: rgba(51,65,85,0.3); }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,229,250,0.3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Supabase
+    const supabaseUrl = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjY0MDcsImV4cCI6MjA1Mzk0MjQwN30.lyr1BUD7vMuuWT_HjqWnhVP_JSrgVx1f7i_yc2VFE44';
+    const supabase = window.supabase?.createClient(supabaseUrl, supabaseKey);
+
+    // Demo data
+    const DEMO_DOCS = [
+      { id: '1', title: 'DHA EHR Technical Volume', doc_type: 'volume', status: 'review', word_count: 4520, collaborators: [{ id: '1', name: 'Sarah Chen', role: 'Lead Author', avatar: 'SC' }, { id: '2', name: 'Mike Johnson', role: 'Reviewer', avatar: 'MJ' }], last_edited_at: new Date(Date.now() - 15*60*1000).toISOString(), comments_count: 12 },
+      { id: '2', title: 'Management Volume Draft', doc_type: 'volume', status: 'draft', word_count: 3200, collaborators: [{ id: '1', name: 'Sarah Chen', role: 'Author', avatar: 'SC' }], last_edited_at: new Date(Date.now() - 2*60*60*1000).toISOString(), comments_count: 5 },
+      { id: '3', title: 'Past Performance Section', doc_type: 'section', status: 'approved', word_count: 2100, collaborators: [{ id: '3', name: 'Emily Davis', role: 'SME', avatar: 'ED' }], last_edited_at: new Date(Date.now() - 24*60*60*1000).toISOString(), comments_count: 0 },
+      { id: '4', title: 'Cost Narrative', doc_type: 'section', status: 'draft', word_count: 1800, collaborators: [{ id: '4', name: 'Tom Wilson', role: 'Financial Analyst', avatar: 'TW' }], last_edited_at: new Date(Date.now() - 30*60*1000).toISOString(), comments_count: 3 },
+      { id: '5', title: 'Executive Summary', doc_type: 'section', status: 'review', word_count: 850, collaborators: [{ id: '1', name: 'Sarah Chen', role: 'Author', avatar: 'SC' }, { id: '5', name: 'Mary Womack', role: 'Approver', avatar: 'MW' }], last_edited_at: new Date(Date.now() - 5*60*1000).toISOString(), comments_count: 8 }
+    ];
+
+    const DEMO_COMMENTS = [
+      { id: '1', doc_id: '1', user_name: 'Mike Johnson', user_avatar: 'MJ', content: 'Great technical approach. Can we add more detail on the FHIR integration?', status: 'open', created_at: new Date(Date.now() - 30*60*1000).toISOString() },
+      { id: '2', doc_id: '1', user_name: 'Sarah Chen', user_avatar: 'SC', content: 'Added section 3.2 with FHIR R4 implementation details.', status: 'resolved', created_at: new Date(Date.now() - 15*60*1000).toISOString() },
+      { id: '3', doc_id: '5', user_name: 'Mary Womack', user_avatar: 'MW', content: 'Excellent summary. Ready for final review.', status: 'open', created_at: new Date(Date.now() - 10*60*1000).toISOString() }
+    ];
+
+    // Active users simulation
+    const ACTIVE_USERS = [
+      { id: '1', name: 'Sarah Chen', avatar: 'SC', color: '#00E5FA', doc_id: '1', cursor: { section: 'Technical Approach', line: 45 } },
+      { id: '2', name: 'Mike Johnson', avatar: 'MJ', color: '#8B5CF6', doc_id: '1', cursor: { section: 'Technical Approach', line: 128 } },
+      { id: '5', name: 'Mary Womack', avatar: 'MW', color: '#10B981', doc_id: '5', cursor: { section: 'Executive Summary', line: 12 } }
+    ];
+
+    // Icons
+    const Icons = {
+      file: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      folder: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      message: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      edit: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      search: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+      eye: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+      lock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+      history: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      home: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    // Components
+    const Badge = ({ children, variant = 'default', size = 'sm' }) => {
+      const variants = {
+        default: 'bg-slate-700 text-slate-300',
+        primary: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        danger: 'bg-red-500/20 text-red-400 border border-red-500/30',
+        purple: 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+      };
+      const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+      return <span className={`inline-flex items-center gap-1 rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>{children}</span>;
+    };
+
+    const Avatar = ({ name, color, size = 'md', showRing = false }) => {
+      const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2);
+      const sizes = { sm: 'w-6 h-6 text-xs', md: 'w-8 h-8 text-sm', lg: 'w-10 h-10 text-base' };
+      return (
+        <div 
+          className={`${sizes[size]} rounded-full flex items-center justify-center font-semibold text-white ${showRing ? 'ring-2 ring-offset-2 ring-offset-slate-900' : ''}`}
+          style={{ backgroundColor: color || '#475569', ringColor: color }}
+        >
+          {initials}
+        </div>
+      );
+    };
+
+    // Document Card
+    const DocCard = ({ doc, activeUsers, onOpen }) => {
+      const statusColors = {
+        draft: 'warning',
+        review: 'primary',
+        approved: 'success',
+        final: 'purple'
+      };
+      
+      const docActiveUsers = activeUsers.filter(u => u.doc_id === doc.id);
+      const timeAgo = (date) => {
+        const mins = Math.floor((Date.now() - new Date(date)) / 60000);
+        if (mins < 60) return `${mins}m ago`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `${hours}h ago`;
+        return `${Math.floor(hours / 24)}d ago`;
+      };
+
+      return (
+        <div 
+          onClick={() => onOpen(doc)}
+          className="glass-card rounded-xl p-4 hover:border-cyan-500/30 transition-all cursor-pointer group"
+        >
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-lg ${doc.doc_type === 'volume' ? 'bg-purple-500/20' : 'bg-cyan-500/20'} flex items-center justify-center`}>
+              <Icon name={doc.doc_type === 'volume' ? 'folder' : 'file'} className={`w-5 h-5 ${doc.doc_type === 'volume' ? 'text-purple-400' : 'text-cyan-400'}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-semibold text-white truncate group-hover:text-cyan-400 transition-colors">{doc.title}</h3>
+                <Badge variant={statusColors[doc.status]}>{doc.status}</Badge>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-slate-400">
+                <span className="flex items-center gap-1">
+                  <Icon name="clock" className="w-3.5 h-3.5" />
+                  {timeAgo(doc.last_edited_at)}
+                </span>
+                <span>{doc.word_count.toLocaleString()} words</span>
+                {doc.comments_count > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Icon name="message" className="w-3.5 h-3.5" />
+                    {doc.comments_count}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/50">
+            <div className="flex -space-x-2">
+              {doc.collaborators?.slice(0, 4).map((c, i) => (
+                <Avatar key={i} name={c.name} size="sm" />
+              ))}
+              {doc.collaborators?.length > 4 && (
+                <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs text-slate-400">
+                  +{doc.collaborators.length - 4}
+                </div>
+              )}
+            </div>
+            {docActiveUsers.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Editing now:</span>
+                <div className="flex -space-x-2">
+                  {docActiveUsers.map((u, i) => (
+                    <div key={i} className="relative">
+                      <Avatar name={u.name} color={u.color} size="sm" showRing />
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-slate-900 animate-presence" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // Comment Component
+    const Comment = ({ comment }) => {
+      const timeAgo = (date) => {
+        const mins = Math.floor((Date.now() - new Date(date)) / 60000);
+        if (mins < 60) return `${mins}m ago`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `${hours}h ago`;
+        return `${Math.floor(hours / 24)}d ago`;
+      };
+
+      return (
+        <div className={`p-3 rounded-lg ${comment.status === 'resolved' ? 'bg-slate-800/30 opacity-60' : 'bg-slate-800/50'}`}>
+          <div className="flex items-start gap-3">
+            <Avatar name={comment.user_name} size="sm" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-medium text-white text-sm">{comment.user_name}</span>
+                <span className="text-xs text-slate-500">{timeAgo(comment.created_at)}</span>
+                {comment.status === 'resolved' && <Badge variant="success" size="xs">Resolved</Badge>}
+              </div>
+              <p className="text-sm text-slate-300">{comment.content}</p>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Main App
+    function DocumentHub() {
+      const [docs, setDocs] = useState([]);
+      const [comments, setComments] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [filter, setFilter] = useState('all');
+      const [selectedDoc, setSelectedDoc] = useState(null);
+      const [view, setView] = useState('grid');
+
+      useEffect(() => {
+        const loadData = async () => {
+          try {
+            if (supabase) {
+              const { data: docsData, error } = await supabase
+                .from('doc_collaborations')
+                .select('*')
+                .order('last_edited_at', { ascending: false });
+              if (!error && docsData?.length > 0) {
+                setDocs(docsData);
+              } else {
+                setDocs(DEMO_DOCS);
+              }
+            } else {
+              setDocs(DEMO_DOCS);
+            }
+          } catch (e) {
+            setDocs(DEMO_DOCS);
+          }
+          setComments(DEMO_COMMENTS);
+          setLoading(false);
+        };
+        loadData();
+      }, []);
+
+      const filteredDocs = useMemo(() => {
+        return docs.filter(doc => {
+          if (searchTerm && !doc.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+          if (filter !== 'all' && doc.status !== filter) return false;
+          return true;
+        });
+      }, [docs, searchTerm, filter]);
+
+      const stats = useMemo(() => ({
+        total: docs.length,
+        draft: docs.filter(d => d.status === 'draft').length,
+        review: docs.filter(d => d.status === 'review').length,
+        approved: docs.filter(d => d.status === 'approved').length,
+        totalWords: docs.reduce((sum, d) => sum + (d.word_count || 0), 0)
+      }), [docs]);
+
+      const recentComments = comments.filter(c => c.status === 'open').slice(0, 5);
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Header */}
+          <header className="glass border-b border-slate-700/50 sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <a href="index.html" className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 transition-colors">
+                    <Icon name="home" className="w-5 h-5 text-slate-400" />
+                  </a>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center">
+                      <Icon name="file" className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-bold text-white">Document Hub</h1>
+                      <p className="text-sm text-slate-400">Real-time Collaboration</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 rounded-full">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-emerald-400">{ACTIVE_USERS.length} Online</span>
+                  </div>
+                  <button className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-xl flex items-center gap-2 font-semibold hover:from-cyan-400 hover:to-teal-400 transition-all">
+                    <Icon name="plus" className="w-4 h-4" /> New Document
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-6 py-8">
+            {/* Stats */}
+            <div className="grid grid-cols-5 gap-4 mb-8">
+              {[
+                { label: 'Total Documents', value: stats.total, icon: 'file', color: 'cyan' },
+                { label: 'In Draft', value: stats.draft, icon: 'edit', color: 'amber' },
+                { label: 'Under Review', value: stats.review, icon: 'eye', color: 'purple' },
+                { label: 'Approved', value: stats.approved, icon: 'check', color: 'emerald' },
+                { label: 'Total Words', value: stats.totalWords.toLocaleString(), icon: 'file', color: 'slate' }
+              ].map((stat, i) => (
+                <div key={i} className="glass-card rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-lg bg-${stat.color}-500/20 flex items-center justify-center`}>
+                      <Icon name={stat.icon} className={`w-4 h-4 text-${stat.color}-400`} />
+                    </div>
+                    <div>
+                      <div className="text-xl font-bold text-white">{stat.value}</div>
+                      <div className="text-xs text-slate-400">{stat.label}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-6">
+              {/* Documents List */}
+              <div className="col-span-2">
+                {/* Search & Filters */}
+                <div className="glass-card rounded-xl p-4 mb-4">
+                  <div className="flex gap-4">
+                    <div className="flex-1 relative">
+                      <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search documents..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500/50"
+                      />
+                    </div>
+                    <select
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500/50"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="draft">Draft</option>
+                      <option value="review">Under Review</option>
+                      <option value="approved">Approved</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Documents Grid */}
+                {loading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredDocs.map(doc => (
+                      <DocCard 
+                        key={doc.id} 
+                        doc={doc} 
+                        activeUsers={ACTIVE_USERS}
+                        onOpen={setSelectedDoc}
+                      />
+                    ))}
+                    {filteredDocs.length === 0 && (
+                      <div className="text-center py-12 text-slate-400">
+                        No documents match your search
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-4">
+                {/* Active Collaborators */}
+                <div className="glass-card rounded-xl p-4">
+                  <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                    <Icon name="users" className="w-4 h-4 text-cyan-400" />
+                    Active Now
+                  </h3>
+                  <div className="space-y-3">
+                    {ACTIVE_USERS.map((user, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/30">
+                        <div className="relative">
+                          <Avatar name={user.name} color={user.color} size="md" />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-white text-sm">{user.name}</div>
+                          <div className="text-xs text-slate-500 truncate">Editing {user.cursor.section}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Comments */}
+                <div className="glass-card rounded-xl p-4">
+                  <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                    <Icon name="message" className="w-4 h-4 text-amber-400" />
+                    Recent Comments
+                  </h3>
+                  <div className="space-y-2">
+                    {recentComments.map(comment => (
+                      <Comment key={comment.id} comment={comment} />
+                    ))}
+                    {recentComments.length === 0 && (
+                      <div className="text-center py-4 text-slate-500 text-sm">No open comments</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="glass-card rounded-xl p-4">
+                  <h3 className="font-semibold text-white mb-4">Quick Actions</h3>
+                  <div className="space-y-2">
+                    {[
+                      { icon: 'plus', label: 'Create Document', color: 'cyan' },
+                      { icon: 'folder', label: 'Browse Templates', color: 'purple' },
+                      { icon: 'history', label: 'Version History', color: 'amber' },
+                      { icon: 'lock', label: 'Locked Documents', color: 'red' }
+                    ].map((action, i) => (
+                      <button 
+                        key={i}
+                        className="w-full flex items-center gap-3 p-2.5 rounded-lg bg-slate-800/30 hover:bg-slate-700/50 transition-colors text-left"
+                      >
+                        <Icon name={action.icon} className={`w-4 h-4 text-${action.color}-400`} />
+                        <span className="text-sm text-slate-300">{action.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="glass border-t border-slate-700/50 mt-12">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-400 text-sm">
+                <Icon name="shield" className="w-4 h-4" />
+                <span>Mission Meets Tech • MissionPulse v12</span>
+              </div>
+              <div className="text-xs text-slate-500">Real-time sync enabled</div>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<DocumentHub />);
+  </script>
+</body>
+</html>
