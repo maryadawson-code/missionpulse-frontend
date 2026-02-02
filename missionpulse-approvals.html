@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approval Workflows - MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyan: { 400: '#00E5FA', 500: '#00C4D4', 600: '#00A3B4' },
+                        navy: { 900: '#00050F', 800: '#000A1A', 700: '#001025' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001025 50%, #00050F 100%); }
+        .glass { background: rgba(0, 229, 250, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NjIsImV4cCI6MjA1MzQxMDQ2Mn0.zKdMYwjn6Gj9p1fY-4kWxLsYwBvmFg6I9-OxFJJx-V4';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const DEMO_WORKFLOWS = [
+            { id: '1', name: 'Proposal Submission', description: 'Final approval before submitting proposal to customer', workflow_type: 'proposal_submission', is_active: true, steps: [
+                { order: 1, role: 'QA', action: 'Review', timeout_hours: 24 },
+                { order: 2, role: 'CON', action: 'Compliance Check', timeout_hours: 12 },
+                { order: 3, role: 'COO', action: 'Approve', timeout_hours: 8 },
+                { order: 4, role: 'CEO', action: 'Final Sign-off', timeout_hours: 4 }
+            ]},
+            { id: '2', name: 'Pricing Approval', description: 'Review and approve pricing before inclusion in proposal', workflow_type: 'pricing_approval', is_active: true, steps: [
+                { order: 1, role: 'FIN', action: 'Cost Review', timeout_hours: 24 },
+                { order: 2, role: 'CAP', action: 'Competitive Review', timeout_hours: 12 },
+                { order: 3, role: 'CEO', action: 'Approve Rates', timeout_hours: 8 }
+            ]},
+            { id: '3', name: 'Go/No-Go Decision', description: 'Decision to pursue or decline opportunity', workflow_type: 'go_no_go', is_active: true, steps: [
+                { order: 1, role: 'CAP', action: 'Capture Assessment', timeout_hours: 48 },
+                { order: 2, role: 'COO', action: 'Resource Review', timeout_hours: 24 },
+                { order: 3, role: 'CEO', action: 'Final Decision', timeout_hours: 24 }
+            ]},
+            { id: '4', name: 'Partner Access', description: 'Grant teaming partner access to proposal documents', workflow_type: 'partner_access', is_active: true, steps: [
+                { order: 1, role: 'PM', action: 'Verify NDA', timeout_hours: 12 },
+                { order: 2, role: 'CON', action: 'Compliance Clear', timeout_hours: 8 },
+                { order: 3, role: 'COO', action: 'Approve Access', timeout_hours: 4 }
+            ]},
+            { id: '5', name: 'Document Release', description: 'Release documents for customer delivery', workflow_type: 'document_release', is_active: false, steps: [
+                { order: 1, role: 'QA', action: 'Quality Check', timeout_hours: 8 },
+                { order: 2, role: 'PM', action: 'Approve Release', timeout_hours: 4 }
+            ]}
+        ];
+
+        const DEMO_REQUESTS = [
+            { id: '1', workflow_id: '1', workflow_name: 'Proposal Submission', entity_name: 'DHA EHRM Support - Final Proposal', current_step: 3, total_steps: 4, status: 'in_progress', requested_by: 'John Smith', requested_at: '2025-02-01T10:00:00Z', current_approver: 'Sarah Chen (COO)', actions: [
+                { step: 1, approver: 'Mike Lee', action: 'approve', acted_at: '2025-02-01T12:30:00Z' },
+                { step: 2, approver: 'Lisa Park', action: 'approve', acted_at: '2025-02-01T14:15:00Z' }
+            ]},
+            { id: '2', workflow_id: '2', workflow_name: 'Pricing Approval', entity_name: 'VA Telehealth - Cost Volume', current_step: 2, total_steps: 3, status: 'in_progress', requested_by: 'Mike Johnson', requested_at: '2025-01-31T09:00:00Z', current_approver: 'John Smith (CAP)', actions: [
+                { step: 1, approver: 'Mike Johnson', action: 'approve', acted_at: '2025-01-31T16:00:00Z' }
+            ]},
+            { id: '3', workflow_id: '3', workflow_name: 'Go/No-Go Decision', entity_name: 'CMS Data Analytics Opportunity', current_step: 1, total_steps: 3, status: 'pending', requested_by: 'Sarah Chen', requested_at: '2025-02-01T14:30:00Z', current_approver: 'John Smith (CAP)', actions: [] },
+            { id: '4', workflow_id: '1', workflow_name: 'Proposal Submission', entity_name: 'IHS Modernization - Tech Volume', current_step: 4, total_steps: 4, status: 'approved', requested_by: 'John Smith', requested_at: '2025-01-28T08:00:00Z', completed_at: '2025-01-30T16:00:00Z', actions: [
+                { step: 1, approver: 'Mike Lee', action: 'approve', acted_at: '2025-01-28T14:00:00Z' },
+                { step: 2, approver: 'Lisa Park', action: 'approve', acted_at: '2025-01-29T10:00:00Z' },
+                { step: 3, approver: 'Sarah Chen', action: 'approve', acted_at: '2025-01-29T16:00:00Z' },
+                { step: 4, approver: 'Mary Womack', action: 'approve', acted_at: '2025-01-30T16:00:00Z' }
+            ]},
+            { id: '5', workflow_id: '4', workflow_name: 'Partner Access', entity_name: 'TechPartner Inc - NDA Access', current_step: 2, total_steps: 3, status: 'rejected', requested_by: 'John Smith', requested_at: '2025-01-27T11:00:00Z', completed_at: '2025-01-27T16:00:00Z', actions: [
+                { step: 1, approver: 'John Smith', action: 'approve', acted_at: '2025-01-27T13:00:00Z' },
+                { step: 2, approver: 'Lisa Park', action: 'reject', acted_at: '2025-01-27T16:00:00Z', comments: 'NDA not executed - missing signatures' }
+            ]}
+        ];
+
+        function ApprovalWorkflows() {
+            const [activeTab, setActiveTab] = useState('requests');
+            const [workflows, setWorkflows] = useState([]);
+            const [requests, setRequests] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedRequest, setSelectedRequest] = useState(null);
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [showNewRequest, setShowNewRequest] = useState(false);
+
+            useEffect(() => {
+                loadData();
+            }, []);
+
+            async function loadData() {
+                try {
+                    const [wfRes, reqRes] = await Promise.all([
+                        supabase.from('approval_workflows').select('*').order('name'),
+                        supabase.from('approval_requests').select('*').order('requested_at', { ascending: false })
+                    ]);
+                    setWorkflows(wfRes.data?.length ? wfRes.data : DEMO_WORKFLOWS);
+                    setRequests(reqRes.data?.length ? reqRes.data : DEMO_REQUESTS);
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setWorkflows(DEMO_WORKFLOWS);
+                    setRequests(DEMO_REQUESTS);
+                }
+                setLoading(false);
+            }
+
+            const filteredRequests = requests.filter(r => filterStatus === 'all' || r.status === filterStatus);
+
+            const stats = {
+                pending: requests.filter(r => r.status === 'pending' || r.status === 'in_progress').length,
+                approved: requests.filter(r => r.status === 'approved').length,
+                rejected: requests.filter(r => r.status === 'rejected').length,
+                myPending: requests.filter(r => (r.status === 'pending' || r.status === 'in_progress')).length // Simplified - would check current user
+            };
+
+            function getStatusColor(status) {
+                switch (status) {
+                    case 'pending': return 'bg-yellow-500/20 text-yellow-400';
+                    case 'in_progress': return 'bg-blue-500/20 text-blue-400';
+                    case 'approved': return 'bg-green-500/20 text-green-400';
+                    case 'rejected': return 'bg-red-500/20 text-red-400';
+                    case 'cancelled': return 'bg-gray-500/20 text-gray-400';
+                    default: return 'bg-gray-500/20 text-gray-400';
+                }
+            }
+
+            function getWorkflowIcon(type) {
+                const icons = { proposal_submission: 'fa-paper-plane', pricing_approval: 'fa-dollar-sign', go_no_go: 'fa-traffic-light', partner_access: 'fa-handshake', document_release: 'fa-file-export' };
+                return icons[type] || 'fa-clipboard-check';
+            }
+
+            function formatDate(dateStr) {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            }
+
+            return (
+                <div className="min-h-screen p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300"><i className="fas fa-arrow-left"></i></a>
+                                <div><h1 className="text-3xl font-bold">Approval Workflows</h1><p className="text-gray-400">Manage multi-step approval processes</p></div>
+                            </div>
+                            <button onClick={() => setShowNewRequest(true)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium">
+                                <i className="fas fa-plus mr-2"></i>New Request
+                            </button>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="glass rounded-xl p-4">
+                                <div className="text-3xl font-bold text-yellow-400">{stats.myPending}</div>
+                                <div className="text-sm text-gray-400">Awaiting My Action</div>
+                            </div>
+                            <div className="glass rounded-xl p-4">
+                                <div className="text-3xl font-bold text-blue-400">{stats.pending}</div>
+                                <div className="text-sm text-gray-400">In Progress</div>
+                            </div>
+                            <div className="glass rounded-xl p-4">
+                                <div className="text-3xl font-bold text-green-400">{stats.approved}</div>
+                                <div className="text-sm text-gray-400">Approved</div>
+                            </div>
+                            <div className="glass rounded-xl p-4">
+                                <div className="text-3xl font-bold text-red-400">{stats.rejected}</div>
+                                <div className="text-sm text-gray-400">Rejected</div>
+                            </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex gap-4 mb-6">
+                            <button onClick={() => setActiveTab('requests')} className={`px-4 py-2 rounded-lg transition-all ${activeTab === 'requests' ? 'bg-cyan-500 text-white' : 'glass hover:bg-cyan-500/20'}`}>
+                                <i className="fas fa-inbox mr-2"></i>Requests
+                            </button>
+                            <button onClick={() => setActiveTab('workflows')} className={`px-4 py-2 rounded-lg transition-all ${activeTab === 'workflows' ? 'bg-cyan-500 text-white' : 'glass hover:bg-cyan-500/20'}`}>
+                                <i className="fas fa-project-diagram mr-2"></i>Workflows
+                            </button>
+                        </div>
+
+                        {activeTab === 'requests' && (
+                            <>
+                                {/* Filters */}
+                                <div className="glass rounded-xl p-4 mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400">
+                                            <option value="all">All Status</option>
+                                            <option value="pending">Pending</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="approved">Approved</option>
+                                            <option value="rejected">Rejected</option>
+                                        </select>
+                                        <div className="flex-1"></div>
+                                        <span className="text-sm text-gray-400">{filteredRequests.length} requests</span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Requests List */}
+                                    <div className="lg:col-span-2 space-y-4">
+                                        {loading ? (
+                                            <div className="text-center py-12"><i className="fas fa-spinner fa-spin text-2xl text-cyan-400"></i></div>
+                                        ) : filteredRequests.length === 0 ? (
+                                            <div className="glass rounded-xl p-12 text-center">
+                                                <i className="fas fa-clipboard-list text-4xl text-gray-500 mb-4"></i>
+                                                <p className="text-gray-400">No approval requests found</p>
+                                            </div>
+                                        ) : (
+                                            filteredRequests.map(request => (
+                                                <div key={request.id} onClick={() => setSelectedRequest(request)} className={`glass rounded-xl p-4 cursor-pointer transition-all ${selectedRequest?.id === request.id ? 'border-cyan-400 bg-cyan-500/10' : 'hover:bg-cyan-500/5'}`}>
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-12 h-12 flex items-center justify-center bg-cyan-500/20 text-cyan-400 rounded-xl">
+                                                            <i className={`fas ${getWorkflowIcon(workflows.find(w => w.id === request.workflow_id)?.workflow_type)}`}></i>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                                <span className="font-medium">{request.entity_name}</span>
+                                                                <span className={`px-2 py-0.5 text-xs rounded ${getStatusColor(request.status)}`}>{request.status.replace('_', ' ')}</span>
+                                                            </div>
+                                                            <p className="text-sm text-gray-400 mb-2">{request.workflow_name}</p>
+                                                            <div className="flex items-center gap-4">
+                                                                {/* Progress bar */}
+                                                                <div className="flex-1 h-2 bg-navy-800 rounded-full overflow-hidden">
+                                                                    <div className="h-full bg-cyan-500 transition-all" style={{ width: `${(request.current_step / request.total_steps) * 100}%` }}></div>
+                                                                </div>
+                                                                <span className="text-xs text-gray-400">Step {request.current_step}/{request.total_steps}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                                                <span><i className="fas fa-user mr-1"></i>{request.requested_by}</span>
+                                                                <span><i className="fas fa-clock mr-1"></i>{formatDate(request.requested_at)}</span>
+                                                                {request.current_approver && (<span className="text-cyan-400"><i className="fas fa-user-check mr-1"></i>{request.current_approver}</span>)}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {/* Request Detail */}
+                                    <div className="lg:col-span-1">
+                                        {selectedRequest ? (
+                                            <div className="glass rounded-xl p-4 sticky top-6">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="font-semibold">Request Details</h3>
+                                                    <button onClick={() => setSelectedRequest(null)} className="text-gray-400 hover:text-white"><i className="fas fa-times"></i></button>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <div className="text-sm text-gray-500 mb-1">Item</div>
+                                                        <div className="font-medium">{selectedRequest.entity_name}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm text-gray-500 mb-1">Workflow</div>
+                                                        <div>{selectedRequest.workflow_name}</div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-1 text-xs rounded ${getStatusColor(selectedRequest.status)}`}>{selectedRequest.status.replace('_', ' ')}</span>
+                                                    </div>
+
+                                                    {/* Workflow Steps */}
+                                                    <div>
+                                                        <div className="text-sm text-gray-500 mb-2">Progress</div>
+                                                        <div className="space-y-2">
+                                                            {workflows.find(w => w.id === selectedRequest.workflow_id)?.steps.map((step, index) => {
+                                                                const action = selectedRequest.actions?.find(a => a.step === step.order);
+                                                                const isCurrent = step.order === selectedRequest.current_step;
+                                                                const isCompleted = step.order < selectedRequest.current_step || (action && action.action === 'approve');
+                                                                const isRejected = action && action.action === 'reject';
+
+                                                                return (
+                                                                    <div key={index} className={`flex items-center gap-3 p-2 rounded-lg ${isCurrent ? 'bg-cyan-500/20' : ''}`}>
+                                                                        <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs ${isCompleted ? 'bg-green-500 text-white' : isRejected ? 'bg-red-500 text-white' : isCurrent ? 'bg-cyan-500 text-white' : 'bg-gray-600 text-gray-300'}`}>
+                                                                            {isCompleted ? <i className="fas fa-check"></i> : isRejected ? <i className="fas fa-times"></i> : step.order}
+                                                                        </div>
+                                                                        <div className="flex-1">
+                                                                            <div className="text-sm font-medium">{step.action}</div>
+                                                                            <div className="text-xs text-gray-500">{step.role}</div>
+                                                                        </div>
+                                                                        {action && (
+                                                                            <div className="text-xs text-gray-500">{formatDate(action.acted_at)}</div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Actions for pending */}
+                                                    {(selectedRequest.status === 'pending' || selectedRequest.status === 'in_progress') && (
+                                                        <div className="flex gap-2 pt-4 border-t border-cyan-500/20">
+                                                            <button className="flex-1 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-sm font-medium">
+                                                                <i className="fas fa-check mr-1"></i>Approve
+                                                            </button>
+                                                            <button className="flex-1 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg text-sm">
+                                                                <i className="fas fa-times mr-1"></i>Reject
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="glass rounded-xl p-8 text-center">
+                                                <i className="fas fa-clipboard-check text-4xl text-gray-500 mb-3"></i>
+                                                <p className="text-gray-400">Select a request to view details</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {activeTab === 'workflows' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {workflows.map(workflow => (
+                                    <div key={workflow.id} className="glass rounded-xl p-6">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="w-12 h-12 flex items-center justify-center bg-cyan-500/20 text-cyan-400 rounded-xl">
+                                                <i className={`fas ${getWorkflowIcon(workflow.workflow_type)} text-xl`}></i>
+                                            </div>
+                                            <span className={`px-2 py-1 text-xs rounded ${workflow.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                                {workflow.is_active ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </div>
+                                        <h3 className="font-semibold mb-2">{workflow.name}</h3>
+                                        <p className="text-sm text-gray-400 mb-4">{workflow.description}</p>
+                                        <div className="flex flex-wrap gap-2 mb-4">
+                                            {workflow.steps?.map((step, index) => (
+                                                <span key={index} className="px-2 py-1 bg-navy-800 text-xs rounded">
+                                                    {step.order}. {step.role}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-gray-500">{workflow.steps?.length} steps</span>
+                                            <button className="text-cyan-400 hover:text-cyan-300">
+                                                <i className="fas fa-edit mr-1"></i>Edit
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {/* Add New Workflow */}
+                                <div className="glass rounded-xl p-6 border-2 border-dashed border-cyan-500/30 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/10">
+                                    <div className="w-12 h-12 flex items-center justify-center bg-cyan-500/20 text-cyan-400 rounded-xl mb-4">
+                                        <i className="fas fa-plus text-xl"></i>
+                                    </div>
+                                    <span className="text-gray-400">Create New Workflow</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* New Request Modal */}
+                    {showNewRequest && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="glass rounded-xl p-6 w-full max-w-lg">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-xl font-semibold">New Approval Request</h2>
+                                    <button onClick={() => setShowNewRequest(false)} className="text-gray-400 hover:text-white"><i className="fas fa-times"></i></button>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Workflow Type</label>
+                                        <select className="w-full bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400">
+                                            {workflows.filter(w => w.is_active).map(w => (
+                                                <option key={w.id} value={w.id}>{w.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Item Name</label>
+                                        <input type="text" className="w-full bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400" placeholder="e.g., DHA EHRM - Final Proposal" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Notes (Optional)</label>
+                                        <textarea className="w-full bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400 h-24" placeholder="Additional context for approvers..."></textarea>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowNewRequest(false)} className="px-4 py-2 glass rounded-lg hover:bg-cyan-500/10">Cancel</button>
+                                    <button onClick={() => setShowNewRequest(false)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium">Submit Request</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<ApprovalWorkflows />, document.getElementById('root'));
+    </script>
+</body>
+</html>

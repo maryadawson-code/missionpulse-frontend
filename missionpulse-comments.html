@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comments & Reviews - MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyan: { 400: '#00E5FA', 500: '#00C4D4', 600: '#00A3B4' },
+                        navy: { 900: '#00050F', 800: '#000A1A', 700: '#001025' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001025 50%, #00050F 100%); }
+        .glass { background: rgba(0, 229, 250, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NjIsImV4cCI6MjA1MzQxMDQ2Mn0.zKdMYwjn6Gj9p1fY-4kWxLsYwBvmFg6I9-OxFJJx-V4';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const DEMO_COMMENTS = [
+            { id: '1', document_type: 'tech_volume', document_name: 'Technical Volume', opportunity: 'DHA EHRM Support', user_name: 'Sarah Chen', content: 'Need to strengthen the transition plan section. Current approach lacks specificity on knowledge transfer timeline.', status: 'open', priority: 'high', assigned_to: 'John Smith', created_at: '2025-02-01T14:30:00Z', replies: [
+                { id: '1a', user_name: 'John Smith', content: 'Working on this now. Will add detailed 90-day transition timeline.', created_at: '2025-02-01T15:45:00Z' },
+                { id: '1b', user_name: 'Sarah Chen', content: 'Great, also include staffing ramp-up milestones.', created_at: '2025-02-01T16:00:00Z' }
+            ]},
+            { id: '2', document_type: 'tech_volume', document_name: 'Technical Volume', opportunity: 'DHA EHRM Support', user_name: 'Mary Womack', content: 'Excellent work on the technical approach. The EHRM integration methodology is well-articulated.', status: 'resolved', priority: 'normal', created_at: '2025-02-01T10:15:00Z', resolved_at: '2025-02-01T11:00:00Z', replies: [] },
+            { id: '3', document_type: 'pricing', document_name: 'Cost Volume', opportunity: 'DHA EHRM Support', user_name: 'Mike Johnson', content: 'Labor rates need review - some categories are above GSA schedule rates. Check competitive positioning.', status: 'open', priority: 'critical', assigned_to: 'Mary Womack', created_at: '2025-01-31T09:00:00Z', replies: [
+                { id: '3a', user_name: 'Mary Womack', content: 'Reviewing against latest GSA data. Will have updated rates by EOD.', created_at: '2025-01-31T10:30:00Z' }
+            ]},
+            { id: '4', document_type: 'mgmt_volume', document_name: 'Management Volume', opportunity: 'DHA EHRM Support', user_name: 'John Smith', content: 'Risk matrix needs updating. Add cybersecurity risk row for CUI handling.', status: 'open', priority: 'normal', assigned_to: 'Sarah Chen', created_at: '2025-01-30T16:45:00Z', replies: [] },
+            { id: '5', document_type: 'past_perf', document_name: 'Past Performance', opportunity: 'VA Telehealth', user_name: 'Sarah Chen', content: 'Contract 2 relevancy could be stronger. Consider swapping with the CMS project.', status: 'wont_fix', priority: 'low', created_at: '2025-01-29T11:00:00Z', replies: [
+                { id: '5a', user_name: 'Mary Womack', content: 'Discussed with team - keeping current selection due to stronger CPARS ratings.', created_at: '2025-01-29T14:00:00Z' }
+            ]},
+            { id: '6', document_type: 'exec_summary', document_name: 'Executive Summary', opportunity: 'VA Telehealth', user_name: 'Mary Womack', content: 'Win theme #3 needs punchier language. Current version is too generic.', status: 'open', priority: 'high', assigned_to: 'John Smith', created_at: '2025-01-28T13:30:00Z', replies: [] }
+        ];
+
+        function CommentsReviews() {
+            const [comments, setComments] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [filterPriority, setFilterPriority] = useState('all');
+            const [filterDocument, setFilterDocument] = useState('all');
+            const [selectedComment, setSelectedComment] = useState(null);
+            const [newReply, setNewReply] = useState('');
+            const [showNewComment, setShowNewComment] = useState(false);
+
+            useEffect(() => {
+                loadComments();
+            }, []);
+
+            async function loadComments() {
+                try {
+                    const { data, error } = await supabase.from('document_comments').select('*').order('created_at', { ascending: false });
+                    if (error) throw error;
+                    setComments(data?.length ? data : DEMO_COMMENTS);
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setComments(DEMO_COMMENTS);
+                }
+                setLoading(false);
+            }
+
+            const filteredComments = comments.filter(c => {
+                const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
+                const matchesPriority = filterPriority === 'all' || c.priority === filterPriority;
+                const matchesDocument = filterDocument === 'all' || c.document_type === filterDocument;
+                return matchesStatus && matchesPriority && matchesDocument;
+            });
+
+            const stats = {
+                total: comments.length,
+                open: comments.filter(c => c.status === 'open').length,
+                resolved: comments.filter(c => c.status === 'resolved').length,
+                critical: comments.filter(c => c.priority === 'critical' && c.status === 'open').length
+            };
+
+            function formatDate(dateStr) {
+                const date = new Date(dateStr);
+                const now = new Date();
+                const diff = (now - date) / 1000 / 60;
+                if (diff < 60) return Math.floor(diff) + 'm ago';
+                if (diff < 1440) return Math.floor(diff / 60) + 'h ago';
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+
+            function getStatusColor(status) {
+                switch (status) {
+                    case 'open': return 'bg-blue-500/20 text-blue-400';
+                    case 'resolved': return 'bg-green-500/20 text-green-400';
+                    case 'wont_fix': return 'bg-gray-500/20 text-gray-400';
+                    default: return 'bg-gray-500/20 text-gray-400';
+                }
+            }
+
+            function getPriorityColor(priority) {
+                switch (priority) {
+                    case 'critical': return 'bg-red-500/20 text-red-400';
+                    case 'high': return 'bg-orange-500/20 text-orange-400';
+                    case 'normal': return 'bg-cyan-500/20 text-cyan-400';
+                    case 'low': return 'bg-gray-500/20 text-gray-400';
+                    default: return 'bg-gray-500/20 text-gray-400';
+                }
+            }
+
+            function getDocIcon(type) {
+                const icons = { tech_volume: 'fa-microchip', mgmt_volume: 'fa-sitemap', pricing: 'fa-dollar-sign', past_perf: 'fa-history', exec_summary: 'fa-file-contract' };
+                return icons[type] || 'fa-file';
+            }
+
+            return (
+                <div className="min-h-screen p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300"><i className="fas fa-arrow-left"></i></a>
+                                <div><h1 className="text-3xl font-bold">Comments & Reviews</h1><p className="text-gray-400">Track feedback and review comments across proposals</p></div>
+                            </div>
+                            <button onClick={() => setShowNewComment(true)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium">
+                                <i className="fas fa-plus mr-2"></i>New Comment
+                            </button>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="glass rounded-xl p-4">
+                                <div className="text-3xl font-bold text-cyan-400">{stats.total}</div>
+                                <div className="text-sm text-gray-400">Total Comments</div>
+                            </div>
+                            <div className="glass rounded-xl p-4">
+                                <div className="text-3xl font-bold text-blue-400">{stats.open}</div>
+                                <div className="text-sm text-gray-400">Open</div>
+                            </div>
+                            <div className="glass rounded-xl p-4">
+                                <div className="text-3xl font-bold text-green-400">{stats.resolved}</div>
+                                <div className="text-sm text-gray-400">Resolved</div>
+                            </div>
+                            <div className="glass rounded-xl p-4">
+                                <div className="text-3xl font-bold text-red-400">{stats.critical}</div>
+                                <div className="text-sm text-gray-400">Critical Open</div>
+                            </div>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="glass rounded-xl p-4 mb-6">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400">
+                                    <option value="all">All Status</option>
+                                    <option value="open">Open</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="wont_fix">Won't Fix</option>
+                                </select>
+                                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400">
+                                    <option value="all">All Priorities</option>
+                                    <option value="critical">Critical</option>
+                                    <option value="high">High</option>
+                                    <option value="normal">Normal</option>
+                                    <option value="low">Low</option>
+                                </select>
+                                <select value={filterDocument} onChange={e => setFilterDocument(e.target.value)} className="bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400">
+                                    <option value="all">All Documents</option>
+                                    <option value="tech_volume">Technical Volume</option>
+                                    <option value="mgmt_volume">Management Volume</option>
+                                    <option value="pricing">Pricing</option>
+                                    <option value="past_perf">Past Performance</option>
+                                    <option value="exec_summary">Executive Summary</option>
+                                </select>
+                                <div className="flex-1"></div>
+                                <span className="text-sm text-gray-400">{filteredComments.length} comments</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Comments List */}
+                            <div className="lg:col-span-2 space-y-4">
+                                {loading ? (
+                                    <div className="text-center py-12"><i className="fas fa-spinner fa-spin text-2xl text-cyan-400"></i></div>
+                                ) : filteredComments.length === 0 ? (
+                                    <div className="glass rounded-xl p-12 text-center">
+                                        <i className="fas fa-comments text-4xl text-gray-500 mb-4"></i>
+                                        <p className="text-gray-400">No comments found</p>
+                                    </div>
+                                ) : (
+                                    filteredComments.map(comment => (
+                                        <div key={comment.id} onClick={() => setSelectedComment(comment)} className={`glass rounded-xl p-4 cursor-pointer transition-all ${selectedComment?.id === comment.id ? 'border-cyan-400 bg-cyan-500/10' : 'hover:bg-cyan-500/5'}`}>
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-10 h-10 flex items-center justify-center bg-cyan-500/20 text-cyan-400 rounded-full">
+                                                    {comment.user_name.charAt(0)}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                        <span className="font-medium">{comment.user_name}</span>
+                                                        <span className={`px-2 py-0.5 text-xs rounded ${getStatusColor(comment.status)}`}>{comment.status}</span>
+                                                        <span className={`px-2 py-0.5 text-xs rounded ${getPriorityColor(comment.priority)}`}>{comment.priority}</span>
+                                                        <span className="text-xs text-gray-500">{formatDate(comment.created_at)}</span>
+                                                    </div>
+                                                    <p className="text-gray-300 mb-2">{comment.content}</p>
+                                                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                                                        <span><i className={`fas ${getDocIcon(comment.document_type)} mr-1`}></i>{comment.document_name}</span>
+                                                        <span><i className="fas fa-briefcase mr-1"></i>{comment.opportunity}</span>
+                                                        {comment.assigned_to && (<span><i className="fas fa-user mr-1"></i>{comment.assigned_to}</span>)}
+                                                        {comment.replies?.length > 0 && (<span><i className="fas fa-reply mr-1"></i>{comment.replies.length} replies</span>)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Comment Detail */}
+                            <div className="lg:col-span-1">
+                                {selectedComment ? (
+                                    <div className="glass rounded-xl p-4 sticky top-6">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="font-semibold">Comment Details</h3>
+                                            <button onClick={() => setSelectedComment(null)} className="text-gray-400 hover:text-white"><i className="fas fa-times"></i></button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="w-8 h-8 flex items-center justify-center bg-cyan-500/20 text-cyan-400 rounded-full text-sm">{selectedComment.user_name.charAt(0)}</div>
+                                                    <span className="font-medium">{selectedComment.user_name}</span>
+                                                    <span className="text-xs text-gray-500">{formatDate(selectedComment.created_at)}</span>
+                                                </div>
+                                                <p className="text-gray-300">{selectedComment.content}</p>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2 py-1 text-xs rounded ${getStatusColor(selectedComment.status)}`}>{selectedComment.status}</span>
+                                                <span className={`px-2 py-1 text-xs rounded ${getPriorityColor(selectedComment.priority)}`}>{selectedComment.priority}</span>
+                                            </div>
+
+                                            <div className="text-sm">
+                                                <div className="text-gray-500 mb-1">Document</div>
+                                                <div className="flex items-center gap-2">
+                                                    <i className={`fas ${getDocIcon(selectedComment.document_type)} text-cyan-400`}></i>
+                                                    <span>{selectedComment.document_name}</span>
+                                                </div>
+                                            </div>
+
+                                            {selectedComment.assigned_to && (
+                                                <div className="text-sm">
+                                                    <div className="text-gray-500 mb-1">Assigned To</div>
+                                                    <div>{selectedComment.assigned_to}</div>
+                                                </div>
+                                            )}
+
+                                            {/* Replies */}
+                                            {selectedComment.replies?.length > 0 && (
+                                                <div>
+                                                    <div className="text-sm text-gray-500 mb-2">Replies ({selectedComment.replies.length})</div>
+                                                    <div className="space-y-3 pl-4 border-l-2 border-cyan-500/30">
+                                                        {selectedComment.replies.map(reply => (
+                                                            <div key={reply.id}>
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <span className="text-sm font-medium">{reply.user_name}</span>
+                                                                    <span className="text-xs text-gray-500">{formatDate(reply.created_at)}</span>
+                                                                </div>
+                                                                <p className="text-sm text-gray-300">{reply.content}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Reply input */}
+                                            {selectedComment.status === 'open' && (
+                                                <div>
+                                                    <textarea value={newReply} onChange={e => setNewReply(e.target.value)} placeholder="Write a reply..." className="w-full bg-navy-800 border border-cyan-500/30 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-400 h-20 resize-none"></textarea>
+                                                    <div className="flex justify-end gap-2 mt-2">
+                                                        <button className="px-3 py-1 text-sm glass rounded hover:bg-cyan-500/20">Cancel</button>
+                                                        <button className="px-3 py-1 text-sm bg-cyan-500 hover:bg-cyan-600 rounded">Reply</button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Actions */}
+                                            {selectedComment.status === 'open' && (
+                                                <div className="flex gap-2 pt-4 border-t border-cyan-500/20">
+                                                    <button className="flex-1 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 text-sm">
+                                                        <i className="fas fa-check mr-1"></i>Resolve
+                                                    </button>
+                                                    <button className="flex-1 py-2 bg-gray-500/20 text-gray-400 rounded-lg hover:bg-gray-500/30 text-sm">
+                                                        <i className="fas fa-ban mr-1"></i>Won't Fix
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="glass rounded-xl p-8 text-center">
+                                        <i className="fas fa-comment-dots text-4xl text-gray-500 mb-3"></i>
+                                        <p className="text-gray-400">Select a comment to view details</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* New Comment Modal */}
+                    {showNewComment && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="glass rounded-xl p-6 w-full max-w-lg">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-xl font-semibold">New Comment</h2>
+                                    <button onClick={() => setShowNewComment(false)} className="text-gray-400 hover:text-white"><i className="fas fa-times"></i></button>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Document</label>
+                                        <select className="w-full bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400">
+                                            <option>Technical Volume - DHA EHRM Support</option>
+                                            <option>Management Volume - DHA EHRM Support</option>
+                                            <option>Cost Volume - DHA EHRM Support</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Comment</label>
+                                        <textarea className="w-full bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400 h-32" placeholder="Enter your comment..."></textarea>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Priority</label>
+                                            <select className="w-full bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400">
+                                                <option value="normal">Normal</option>
+                                                <option value="low">Low</option>
+                                                <option value="high">High</option>
+                                                <option value="critical">Critical</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Assign To</label>
+                                            <select className="w-full bg-navy-800 border border-cyan-500/30 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-400">
+                                                <option value="">Unassigned</option>
+                                                <option>John Smith</option>
+                                                <option>Sarah Chen</option>
+                                                <option>Mike Johnson</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowNewComment(false)} className="px-4 py-2 glass rounded-lg hover:bg-cyan-500/10">Cancel</button>
+                                    <button onClick={() => setShowNewComment(false)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium">Add Comment</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<CommentsReviews />, document.getElementById('root'));
+    </script>
+</body>
+</html>
