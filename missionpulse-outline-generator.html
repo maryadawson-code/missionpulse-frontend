@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outline Generator | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.15); }
+        .section-indent { margin-left: 1.5rem; border-left: 2px solid rgba(0,229,250,0.2); padding-left: 1rem; }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0OTc5MzMsImV4cCI6MjA1MzA3MzkzM30.pBPpVaJmVkzhCcUvJPN2KnMGnstuc55sNv8CVsERRPg';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const DEMO_OUTLINES = [
+            {
+                id: '1', outline_name: 'DHA MHS Genesis Support - Technical Volume', volume_type: 'technical',
+                rfp_reference: 'HT0015-24-R-0001', status: 'in_progress',
+                sections: [
+                    { id: 's1', section_number: '1', title: 'Executive Summary', page_limit: 2, status: 'final', instructions: 'High-level overview of technical approach' },
+                    { id: 's2', section_number: '2', title: 'Technical Approach', page_limit: 25, status: 'drafting', children: [
+                        { id: 's2a', section_number: '2.1', title: 'Understanding of Requirements', page_limit: 5, status: 'drafting' },
+                        { id: 's2b', section_number: '2.2', title: 'Technical Solution', page_limit: 10, status: 'not_started' },
+                        { id: 's2c', section_number: '2.3', title: 'Innovation & Modernization', page_limit: 5, status: 'not_started' },
+                        { id: 's2d', section_number: '2.4', title: 'Transition Approach', page_limit: 5, status: 'not_started' }
+                    ]},
+                    { id: 's3', section_number: '3', title: 'Staffing Plan', page_limit: 10, status: 'not_started' },
+                    { id: 's4', section_number: '4', title: 'Quality Assurance', page_limit: 5, status: 'not_started' }
+                ]
+            },
+            {
+                id: '2', outline_name: 'VA EHR Migration - Management Volume', volume_type: 'management',
+                rfp_reference: '36C10X24R0045', status: 'draft',
+                sections: [
+                    { id: 'm1', section_number: '1', title: 'Management Approach', page_limit: 15, status: 'not_started' },
+                    { id: 'm2', section_number: '2', title: 'Risk Management', page_limit: 5, status: 'not_started' },
+                    { id: 'm3', section_number: '3', title: 'Schedule & Milestones', page_limit: 5, status: 'not_started' }
+                ]
+            }
+        ];
+
+        const VOLUME_TYPES = ['technical', 'management', 'past_performance', 'cost', 'oral', 'other'];
+        const SECTION_STATUSES = ['not_started', 'drafting', 'review', 'final'];
+
+        function OutlineGenerator() {
+            const [outlines, setOutlines] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedOutline, setSelectedOutline] = useState(null);
+            const [showNewModal, setShowNewModal] = useState(false);
+            const [showSectionModal, setShowSectionModal] = useState(false);
+            const [newOutline, setNewOutline] = useState({ outline_name: '', volume_type: 'technical', rfp_reference: '' });
+            const [newSection, setNewSection] = useState({ section_number: '', title: '', page_limit: '', instructions: '' });
+            const [expandedSections, setExpandedSections] = useState({});
+
+            useEffect(() => { fetchOutlines(); }, []);
+
+            async function fetchOutlines() {
+                try {
+                    const { data, error } = await supabase.from('proposal_outlines').select('*').order('created_at', { ascending: false });
+                    if (error) throw error;
+                    setOutlines(data?.length > 0 ? data.map(o => ({ ...o, sections: [] })) : DEMO_OUTLINES);
+                    if (data?.length > 0) {
+                        // In production, fetch sections separately
+                    }
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setOutlines(DEMO_OUTLINES);
+                }
+                setLoading(false);
+            }
+
+            async function handleCreateOutline() {
+                const outlineData = { ...newOutline, status: 'draft' };
+                try {
+                    const { error } = await supabase.from('proposal_outlines').insert([outlineData]);
+                    if (error) throw error;
+                    fetchOutlines();
+                } catch (err) {
+                    setOutlines([{ id: Date.now().toString(), ...outlineData, sections: [] }, ...outlines]);
+                }
+                setShowNewModal(false);
+                setNewOutline({ outline_name: '', volume_type: 'technical', rfp_reference: '' });
+            }
+
+            function handleAddSection() {
+                if (!selectedOutline) return;
+                const section = { id: Date.now().toString(), ...newSection, status: 'not_started' };
+                setOutlines(outlines.map(o => 
+                    o.id === selectedOutline.id 
+                        ? { ...o, sections: [...(o.sections || []), section] }
+                        : o
+                ));
+                setSelectedOutline(prev => ({ ...prev, sections: [...(prev.sections || []), section] }));
+                setShowSectionModal(false);
+                setNewSection({ section_number: '', title: '', page_limit: '', instructions: '' });
+            }
+
+            function toggleExpand(id) {
+                setExpandedSections(prev => ({ ...prev, [id]: !prev[id] }));
+            }
+
+            const statusColor = (status) => ({
+                'not_started': 'bg-gray-500/20 text-gray-400',
+                'drafting': 'bg-amber-500/20 text-amber-400',
+                'review': 'bg-blue-500/20 text-blue-400',
+                'final': 'bg-emerald-500/20 text-emerald-400',
+                'draft': 'bg-gray-500/20 text-gray-400',
+                'in_progress': 'bg-cyan-500/20 text-cyan-400',
+                'submitted': 'bg-emerald-500/20 text-emerald-400'
+            }[status] || 'bg-gray-500/20 text-gray-400');
+
+            const volumeIcon = (type) => ({
+                'technical': '⚙️',
+                'management': '📋',
+                'past_performance': '📊',
+                'cost': '💰',
+                'oral': '🎤',
+                'other': '📄'
+            }[type] || '📄');
+
+            function renderSection(section, depth = 0) {
+                const hasChildren = section.children?.length > 0;
+                const isExpanded = expandedSections[section.id];
+                
+                return (
+                    <div key={section.id} className={depth > 0 ? 'section-indent' : ''}>
+                        <div className="flex items-center justify-between py-3 hover:bg-white/5 rounded-lg px-3 -mx-3">
+                            <div className="flex items-center gap-3">
+                                {hasChildren && (
+                                    <button onClick={() => toggleExpand(section.id)} className="text-gray-400 hover:text-white">
+                                        {isExpanded ? '▼' : '▶'}
+                                    </button>
+                                )}
+                                {!hasChildren && <span className="w-4"></span>}
+                                <span className="font-mono text-cyan-400 text-sm">{section.section_number}</span>
+                                <span className="font-medium">{section.title}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {section.page_limit && (
+                                    <span className="text-xs text-gray-500">{section.page_limit} pages</span>
+                                )}
+                                <span className={`px-2 py-0.5 rounded text-xs ${statusColor(section.status)}`}>
+                                    {section.status?.replace('_', ' ')}
+                                </span>
+                            </div>
+                        </div>
+                        {hasChildren && isExpanded && (
+                            <div className="mt-1">
+                                {section.children.map(child => renderSection(child, depth + 1))}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            function calculateProgress(sections) {
+                if (!sections?.length) return 0;
+                const flatSections = sections.flatMap(s => s.children ? [s, ...s.children] : [s]);
+                const completed = flatSections.filter(s => s.status === 'final').length;
+                return Math.round((completed / flatSections.length) * 100);
+            }
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="border-b border-cyan-500/20 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300">← Back</a>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center text-xl">📐</div>
+                                    <div>
+                                        <h1 className="text-xl font-bold">Proposal Outline Generator</h1>
+                                        <p className="text-xs text-gray-400">Structure Proposals • Track Sections</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowNewModal(true)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium transition-all">
+                                + New Outline
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-6 py-8">
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Outlines List */}
+                            <div className="lg:col-span-1">
+                                <h2 className="text-lg font-semibold mb-4">Proposal Outlines</h2>
+                                {loading ? (
+                                    <div className="text-gray-400">Loading...</div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {outlines.map(outline => (
+                                            <div key={outline.id} 
+                                                onClick={() => setSelectedOutline(outline)}
+                                                className={`glass-card rounded-xl p-4 cursor-pointer transition-all ${selectedOutline?.id === outline.id ? 'border-cyan-500/50 bg-cyan-500/10' : 'hover:border-cyan-500/30'}`}>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className="text-2xl">{volumeIcon(outline.volume_type)}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="font-medium truncate">{outline.outline_name}</h3>
+                                                        <div className="text-xs text-gray-500">{outline.rfp_reference}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`px-2 py-0.5 rounded text-xs ${statusColor(outline.status)}`}>
+                                                        {outline.status?.replace('_', ' ')}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500">
+                                                        {outline.sections?.length || 0} sections
+                                                    </span>
+                                                </div>
+                                                {/* Progress bar */}
+                                                <div className="mt-3 h-1 bg-white/10 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-cyan-500 transition-all" style={{ width: `${calculateProgress(outline.sections)}%` }}></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {outlines.length === 0 && (
+                                            <div className="text-center py-8 text-gray-500">No outlines yet. Create one!</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Outline Detail */}
+                            <div className="lg:col-span-2">
+                                {selectedOutline ? (
+                                    <div className="glass-card rounded-xl p-6">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <div>
+                                                <h2 className="text-xl font-bold">{selectedOutline.outline_name}</h2>
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <span className="text-sm text-gray-400">{selectedOutline.rfp_reference}</span>
+                                                    <span className={`px-2 py-0.5 rounded text-xs ${statusColor(selectedOutline.status)}`}>
+                                                        {selectedOutline.status?.replace('_', ' ')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setShowSectionModal(true)} className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30">
+                                                + Add Section
+                                            </button>
+                                        </div>
+
+                                        {/* Progress Stats */}
+                                        <div className="grid grid-cols-4 gap-4 mb-6">
+                                            <div className="bg-white/5 rounded-lg p-3 text-center">
+                                                <div className="text-xl font-bold text-cyan-400">{selectedOutline.sections?.length || 0}</div>
+                                                <div className="text-xs text-gray-500">Sections</div>
+                                            </div>
+                                            <div className="bg-white/5 rounded-lg p-3 text-center">
+                                                <div className="text-xl font-bold text-emerald-400">
+                                                    {selectedOutline.sections?.filter(s => s.status === 'final').length || 0}
+                                                </div>
+                                                <div className="text-xs text-gray-500">Complete</div>
+                                            </div>
+                                            <div className="bg-white/5 rounded-lg p-3 text-center">
+                                                <div className="text-xl font-bold text-amber-400">
+                                                    {selectedOutline.sections?.filter(s => s.status === 'drafting').length || 0}
+                                                </div>
+                                                <div className="text-xs text-gray-500">In Progress</div>
+                                            </div>
+                                            <div className="bg-white/5 rounded-lg p-3 text-center">
+                                                <div className="text-xl font-bold text-gray-400">
+                                                    {selectedOutline.sections?.reduce((a, s) => a + (s.page_limit || 0) + (s.children?.reduce((b, c) => b + (c.page_limit || 0), 0) || 0), 0) || 0}
+                                                </div>
+                                                <div className="text-xs text-gray-500">Total Pages</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Sections Tree */}
+                                        <div className="border-t border-white/10 pt-4">
+                                            <h3 className="font-semibold mb-4">Outline Structure</h3>
+                                            {selectedOutline.sections?.length > 0 ? (
+                                                <div className="space-y-1">
+                                                    {selectedOutline.sections.map(section => renderSection(section))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-8 text-gray-500">
+                                                    No sections yet. Add your first section!
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Quick Actions */}
+                                        <div className="flex gap-3 mt-6 pt-4 border-t border-white/10">
+                                            <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm">
+                                                📤 Export to Word
+                                            </button>
+                                            <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm">
+                                                🤖 AI Generate Sections
+                                            </button>
+                                            <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm">
+                                                📋 Compliance Check
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="glass-card rounded-xl p-12 text-center">
+                                        <div className="text-6xl mb-4">📐</div>
+                                        <h3 className="text-xl font-semibold mb-2">Select an Outline</h3>
+                                        <p className="text-gray-400">Choose an outline from the list or create a new one</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* New Outline Modal */}
+                    {showNewModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-md">
+                                <h2 className="text-xl font-bold mb-6">Create New Outline</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Outline Name *</label>
+                                        <input type="text" value={newOutline.outline_name} onChange={(e) => setNewOutline({...newOutline, outline_name: e.target.value})}
+                                            placeholder="e.g., DHA Technical Volume"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Volume Type</label>
+                                        <select value={newOutline.volume_type} onChange={(e) => setNewOutline({...newOutline, volume_type: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                                            {VOLUME_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ')}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">RFP Reference</label>
+                                        <input type="text" value={newOutline.rfp_reference} onChange={(e) => setNewOutline({...newOutline, rfp_reference: e.target.value})}
+                                            placeholder="e.g., HT0015-24-R-0001"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowNewModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleCreateOutline} disabled={!newOutline.outline_name}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Create</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Section Modal */}
+                    {showSectionModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                            <div className="glass-card rounded-2xl p-6 w-full max-w-md">
+                                <h2 className="text-xl font-bold mb-6">Add Section</h2>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Section # *</label>
+                                            <input type="text" value={newSection.section_number} onChange={(e) => setNewSection({...newSection, section_number: e.target.value})}
+                                                placeholder="1.1"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm text-gray-400 mb-1">Title *</label>
+                                            <input type="text" value={newSection.title} onChange={(e) => setNewSection({...newSection, title: e.target.value})}
+                                                placeholder="Technical Approach"
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Page Limit</label>
+                                        <input type="number" value={newSection.page_limit} onChange={(e) => setNewSection({...newSection, page_limit: e.target.value})}
+                                            placeholder="10"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Instructions</label>
+                                        <textarea value={newSection.instructions} onChange={(e) => setNewSection({...newSection, instructions: e.target.value})}
+                                            rows={2} placeholder="Writing guidance for this section..."
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowSectionModal(false)} className="px-4 py-2 border border-white/20 rounded-lg hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleAddSection} disabled={!newSection.section_number || !newSection.title}
+                                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-medium disabled:opacity-50">Add Section</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<OutlineGenerator />, document.getElementById('root'));
+    </script>
+</body>
+</html>
