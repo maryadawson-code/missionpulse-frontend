@@ -3,563 +3,322 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MissionPulse | Sign In</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <title>Sign In | MissionPulse</title>
+  <link rel="icon" type="image/png" href="MMT_icon_32px.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
-    .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.1); }
-    .glow-cyan { box-shadow: 0 0 40px rgba(0, 229, 250, 0.2); }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
     .animate-float { animation: float 6s ease-in-out infinite; }
-    .bg-grid { background-image: radial-gradient(rgba(0, 229, 250, 0.1) 1px, transparent 1px); background-size: 40px 40px; }
+    .animate-pulse-slow { animation: pulse 3s ease-in-out infinite; }
+    .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .glow { box-shadow: 0 0 40px rgba(0, 229, 250, 0.15); }
+    .input-glow:focus { box-shadow: 0 0 0 2px rgba(0, 229, 250, 0.3); }
+    .btn-primary { background: linear-gradient(135deg, #00E5FA 0%, #00B8D4 100%); }
+    .btn-primary:hover { background: linear-gradient(135deg, #00D4E8 0%, #00A7C3 100%); }
+    .grid-bg {
+      background-image: 
+        linear-gradient(rgba(0, 229, 250, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 250, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
   </style>
-  <script>
-    // CRITICAL: Use var to avoid conflicts with supabase-client.js
-    var sbClient = null;
-    var SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzI3MTIsImV4cCI6MjA1MzQwODcxMn0.G2JhvsEBPHTnGhOFbX8JsZMRYHnVz0lOVz2rCJqD5vE';
-    
-    try {
-      sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    } catch (e) {
-      console.error('Supabase init error:', e);
-    }
-  </script>
 </head>
-<body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect } = React;
-
-    // Auth modes
-    const AUTH_MODES = {
-      SIGN_IN: 'signin',
-      SIGN_UP: 'signup',
-      FORGOT_PASSWORD: 'forgot',
-      RESET_PASSWORD: 'reset',
-    };
-
-    function LoginApp() {
-      const [mode, setMode] = useState(AUTH_MODES.SIGN_IN);
-      const [email, setEmail] = useState('');
-      const [password, setPassword] = useState('');
-      const [confirmPassword, setConfirmPassword] = useState('');
-      const [fullName, setFullName] = useState('');
-      const [loading, setLoading] = useState(false);
-      const [error, setError] = useState('');
-      const [success, setSuccess] = useState('');
-      const [showPassword, setShowPassword] = useState(false);
-      const [rememberMe, setRememberMe] = useState(false);
-
-      // Check for existing session on mount
-      useEffect(() => {
-        checkSession();
-        
-        // Check for password reset token in URL
-        const hash = window.location.hash;
-        if (hash && hash.includes('type=recovery')) {
-          setMode(AUTH_MODES.RESET_PASSWORD);
-        }
-      }, []);
-
-      const checkSession = async () => {
-        if (!sbClient) return;
-        
-        try {
-          const { data: { session } } = await sbClient.auth.getSession();
-          if (session) {
-            // Already logged in - redirect to hub
-            window.location.href = 'missionpulse-nav-hub.html';
-          }
-        } catch (err) {
-          console.error('Session check error:', err);
-        }
-      };
-
-      const handleSignIn = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        // Demo mode bypass
-        if (email === 'demo@missionpulse.io' && password === 'demo123') {
-          localStorage.setItem('mp_demo_mode', 'true');
-          localStorage.setItem('mp_user', JSON.stringify({ email, name: 'Demo User', role: 'Viewer' }));
-          window.location.href = 'missionpulse-nav-hub.html';
-          return;
-        }
-
-        if (!sbClient) {
-          setError('Authentication service unavailable. Try again in 10 seconds.');
-          setLoading(false);
-          return;
-        }
-
-        try {
-          const { data, error: authError } = await sbClient.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-          if (authError) {
-            if (authError.message.includes('Invalid login')) {
-              setError('Invalid email or password. Please try again.');
-            } else if (authError.message.includes('Email not confirmed')) {
-              setError('Please check your email and confirm your account first.');
-            } else {
-              setError(authError.message);
-            }
-            setLoading(false);
-            return;
-          }
-
-          // Success - store session info
-          if (rememberMe) {
-            localStorage.setItem('mp_remember', 'true');
-          }
-          
-          // Redirect to navigation hub
-          window.location.href = 'missionpulse-nav-hub.html';
-        } catch (err) {
-          console.error('Sign in error:', err);
-          setError('Connection error. Please try again.');
-          setLoading(false);
-        }
-      };
-
-      const handleSignUp = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        if (password !== confirmPassword) {
-          setError('Passwords do not match.');
-          setLoading(false);
-          return;
-        }
-
-        if (password.length < 8) {
-          setError('Password must be at least 8 characters.');
-          setLoading(false);
-          return;
-        }
-
-        if (!sbClient) {
-          setError('Authentication service unavailable. Try again in 10 seconds.');
-          setLoading(false);
-          return;
-        }
-
-        try {
-          const { data, error: authError } = await sbClient.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                full_name: fullName,
-              },
-            },
-          });
-
-          if (authError) {
-            setError(authError.message);
-            setLoading(false);
-            return;
-          }
-
-          setSuccess('Account created! Please check your email to confirm your account.');
-          setMode(AUTH_MODES.SIGN_IN);
-        } catch (err) {
-          console.error('Sign up error:', err);
-          setError('Connection error. Please try again.');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const handleForgotPassword = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        if (!sbClient) {
-          setError('Authentication service unavailable. Try again in 10 seconds.');
-          setLoading(false);
-          return;
-        }
-
-        try {
-          const { error: resetError } = await sbClient.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/login.html`,
-          });
-
-          if (resetError) {
-            setError(resetError.message);
-            setLoading(false);
-            return;
-          }
-
-          setSuccess('Password reset email sent! Check your inbox.');
-        } catch (err) {
-          console.error('Password reset error:', err);
-          setError('Connection error. Please try again.');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const handleResetPassword = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        if (password !== confirmPassword) {
-          setError('Passwords do not match.');
-          setLoading(false);
-          return;
-        }
-
-        if (password.length < 8) {
-          setError('Password must be at least 8 characters.');
-          setLoading(false);
-          return;
-        }
-
-        if (!sbClient) {
-          setError('Authentication service unavailable.');
-          setLoading(false);
-          return;
-        }
-
-        try {
-          const { error: updateError } = await sbClient.auth.updateUser({
-            password,
-          });
-
-          if (updateError) {
-            setError(updateError.message);
-            setLoading(false);
-            return;
-          }
-
-          setSuccess('Password updated! Redirecting...');
-          setTimeout(() => {
-            window.location.href = 'missionpulse-nav-hub.html';
-          }, 2000);
-        } catch (err) {
-          console.error('Password update error:', err);
-          setError('Connection error. Please try again.');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const renderForm = () => {
-        switch (mode) {
-          case AUTH_MODES.SIGN_UP:
-            return (
-              <form onSubmit={handleSignUp} className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                    placeholder="John Smith"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                    placeholder="you@company.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={8}
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                    placeholder="Min. 8 characters"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Confirm Password</label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                    placeholder="Confirm password"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl hover:from-cyan-400 hover:to-teal-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating Account...
-                    </>
-                  ) : (
-                    'Create Account'
-                  )}
-                </button>
-                <p className="text-center text-sm text-slate-400">
-                  Already have an account?{' '}
-                  <button type="button" onClick={() => setMode(AUTH_MODES.SIGN_IN)} className="text-cyan-400 hover:text-cyan-300">
-                    Sign In
-                  </button>
-                </p>
-              </form>
-            );
-
-          case AUTH_MODES.FORGOT_PASSWORD:
-            return (
-              <form onSubmit={handleForgotPassword} className="space-y-5">
-                <p className="text-sm text-slate-400 mb-4">
-                  Enter your email and we'll send you a link to reset your password.
-                </p>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                    placeholder="you@company.com"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl hover:from-cyan-400 hover:to-teal-400 transition-all disabled:opacity-50"
-                >
-                  {loading ? 'Sending...' : 'Send Reset Link'}
-                </button>
-                <p className="text-center text-sm text-slate-400">
-                  <button type="button" onClick={() => setMode(AUTH_MODES.SIGN_IN)} className="text-cyan-400 hover:text-cyan-300">
-                    ← Back to Sign In
-                  </button>
-                </p>
-              </form>
-            );
-
-          case AUTH_MODES.RESET_PASSWORD:
-            return (
-              <form onSubmit={handleResetPassword} className="space-y-5">
-                <p className="text-sm text-slate-400 mb-4">
-                  Enter your new password below.
-                </p>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">New Password</label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={8}
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                    placeholder="Min. 8 characters"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Confirm Password</label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                    placeholder="Confirm password"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl hover:from-cyan-400 hover:to-teal-400 transition-all disabled:opacity-50"
-                >
-                  {loading ? 'Updating...' : 'Update Password'}
-                </button>
-              </form>
-            );
-
-          default: // SIGN_IN
-            return (
-              <form onSubmit={handleSignIn} className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                    placeholder="you@company.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all pr-12"
-                      placeholder="Enter password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                    >
-                      {showPassword ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20"
-                    />
-                    <span className="text-slate-400">Remember me</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setMode(AUTH_MODES.FORGOT_PASSWORD)}
-                    className="text-cyan-400 hover:text-cyan-300"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl hover:from-cyan-400 hover:to-teal-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 glow-cyan"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Signing In...
-                    </>
-                  ) : (
-                    'Sign In'
-                  )}
-                </button>
-                <p className="text-center text-sm text-slate-400">
-                  Don't have an account?{' '}
-                  <button type="button" onClick={() => setMode(AUTH_MODES.SIGN_UP)} className="text-cyan-400 hover:text-cyan-300">
-                    Create Account
-                  </button>
-                </p>
-                
-                {/* Demo Access */}
-                <div className="pt-4 border-t border-slate-700/50">
-                  <p className="text-xs text-slate-500 text-center mb-3">Quick Demo Access</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail('demo@missionpulse.io');
-                      setPassword('demo123');
-                    }}
-                    className="w-full py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition-all"
-                  >
-                    Use Demo Credentials
-                  </button>
-                </div>
-              </form>
-            );
-        }
-      };
-
-      return (
-        <div className="min-h-screen bg-[#00050F] bg-grid flex items-center justify-center p-4">
-          {/* Background Effects */}
-          <div className="fixed inset-0 pointer-events-none">
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-float"></div>
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
-          </div>
-
-          {/* Login Card */}
-          <div className="relative w-full max-w-md">
-            <div className="glass rounded-2xl p-8 glow-cyan">
-              {/* Logo */}
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center mb-4 glow-cyan">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <h1 className="text-2xl font-bold text-white mb-1">MissionPulse</h1>
-                <p className="text-sm text-cyan-400">Mission. Technology. Transformation.</p>
-              </div>
-
-              {/* Error/Success Messages */}
-              {error && (
-                <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
-              {success && (
-                <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
-                  {success}
-                </div>
-              )}
-
-              {/* Form */}
-              {renderForm()}
-            </div>
-
-            {/* Footer */}
-            <p className="text-center text-xs text-slate-600 mt-6">
-              Mission Meets Tech © 2025 • CMMC 2.0 Ready
-            </p>
-          </div>
+<body class="grid-bg">
+  <div id="app" class="min-h-screen flex items-center justify-center p-4">
+    <!-- Loading State -->
+    <div id="loading" class="text-center">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center animate-pulse-slow glow">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      </div>
+      <p class="text-slate-400">Initializing secure session...</p>
+    </div>
+    
+    <!-- Login Form (hidden initially) -->
+    <div id="login-card" class="hidden w-full max-w-md">
+      <div class="text-center mb-8">
+        <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center glow animate-float">
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
         </div>
-      );
+        <h1 class="text-3xl font-bold text-white mb-2">MissionPulse</h1>
+        <p class="text-slate-400">Mission. Technology. Transformation.</p>
+      </div>
+      
+      <div class="glass rounded-2xl p-8 glow">
+        <h2 class="text-xl font-semibold text-white mb-6">Sign in to continue</h2>
+        
+        <!-- Error Message -->
+        <div id="error-msg" class="hidden mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm"></div>
+        
+        <!-- Success Message -->
+        <div id="success-msg" class="hidden mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm"></div>
+        
+        <form id="login-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-400 mb-2">Email Address</label>
+            <input 
+              type="email" 
+              id="email" 
+              required
+              placeholder="you@company.com"
+              class="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 input-glow transition-all"
+            >
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-slate-400 mb-2">Password</label>
+            <input 
+              type="password" 
+              id="password" 
+              required
+              placeholder="••••••••"
+              class="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 input-glow transition-all"
+            >
+          </div>
+          
+          <div class="flex items-center justify-between text-sm">
+            <label class="flex items-center gap-2 text-slate-400 cursor-pointer">
+              <input type="checkbox" id="remember" class="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-500">
+              <span>Remember me</span>
+            </label>
+            <a href="#" id="forgot-link" class="text-cyan-400 hover:text-cyan-300 transition-colors">Forgot password?</a>
+          </div>
+          
+          <button 
+            type="submit" 
+            id="login-btn"
+            class="w-full py-3 px-4 rounded-xl btn-primary text-slate-900 font-semibold hover:shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center justify-center gap-2"
+          >
+            <span>Sign In</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </button>
+        </form>
+        
+        <!-- Divider -->
+        <div class="flex items-center gap-4 my-6">
+          <div class="flex-1 h-px bg-slate-700"></div>
+          <span class="text-xs text-slate-500 uppercase">or</span>
+          <div class="flex-1 h-px bg-slate-700"></div>
+        </div>
+        
+        <!-- Demo Access -->
+        <button 
+          id="demo-btn"
+          class="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-medium transition-all flex items-center justify-center gap-2"
+        >
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Continue as Demo User</span>
+        </button>
+        
+        <!-- Magic Link Section -->
+        <div id="magic-link-section" class="hidden mt-6 pt-6 border-t border-slate-700">
+          <p class="text-sm text-slate-400 mb-3">Check your email for a magic link to sign in.</p>
+          <button id="resend-link" class="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
+            Resend magic link
+          </button>
+        </div>
+      </div>
+      
+      <!-- Footer -->
+      <div class="mt-8 text-center">
+        <p class="text-xs text-slate-600">
+          © 2026 Mission Meets Tech. All rights reserved.
+        </p>
+        <div class="flex items-center justify-center gap-4 mt-2 text-xs text-slate-600">
+          <span class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            CMMC 2.0 Compliant
+          </span>
+          <span>•</span>
+          <span>FedRAMP Ready</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // SUPABASE CONFIGURATION
+    // Using var to avoid conflicts with supabase-client.js
+    // ============================================================
+    var SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMjgsImV4cCI6MjA1MzM5OTAyOH0.S0LKvPzVIfBsLv-2qjXRdMGhnYyRLvOFlo9ihaQuqHE';
+    
+    var sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================================================
+    // DOM ELEMENTS
+    // ============================================================
+    const loadingEl = document.getElementById('loading');
+    const loginCard = document.getElementById('login-card');
+    const loginForm = document.getElementById('login-form');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('login-btn');
+    const demoBtn = document.getElementById('demo-btn');
+    const errorMsg = document.getElementById('error-msg');
+    const successMsg = document.getElementById('success-msg');
+    const forgotLink = document.getElementById('forgot-link');
+    const magicLinkSection = document.getElementById('magic-link-section');
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+    async function init() {
+      try {
+        // Check for existing session
+        const { data: { session }, error } = await sbClient.auth.getSession();
+        
+        if (session?.user) {
+          // Already logged in - redirect to home
+          window.location.href = 'missionpulse-production-home.html';
+          return;
+        }
+      } catch (err) {
+        console.log('Session check:', err.message);
+      }
+      
+      // Show login form
+      loadingEl.classList.add('hidden');
+      loginCard.classList.remove('hidden');
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<LoginApp />);
+    // ============================================================
+    // AUTH FUNCTIONS
+    // ============================================================
+    async function handleLogin(e) {
+      e.preventDefault();
+      
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      
+      if (!email || !password) {
+        showError('Please enter both email and password.');
+        return;
+      }
+      
+      // Show loading state
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = `
+        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Signing in...</span>
+      `;
+      
+      hideMessages();
+      
+      try {
+        const { data, error } = await sbClient.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        if (error) throw error;
+        
+        if (data.session) {
+          showSuccess('Success! Redirecting...');
+          setTimeout(() => {
+            window.location.href = 'missionpulse-production-home.html';
+          }, 500);
+        }
+      } catch (err) {
+        console.error('Login error:', err);
+        showError(err.message || 'Invalid email or password. Please try again.');
+        resetButton();
+      }
+    }
+
+    async function handleMagicLink() {
+      const email = emailInput.value.trim();
+      
+      if (!email) {
+        showError('Please enter your email address.');
+        return;
+      }
+      
+      hideMessages();
+      
+      try {
+        const { error } = await sbClient.auth.signInWithOtp({
+          email,
+          options: {
+            emailRedirectTo: window.location.origin + '/missionpulse-production-home.html'
+          }
+        });
+        
+        if (error) throw error;
+        
+        showSuccess('Magic link sent! Check your email.');
+        magicLinkSection.classList.remove('hidden');
+      } catch (err) {
+        showError(err.message || 'Failed to send magic link.');
+      }
+    }
+
+    function handleDemoAccess() {
+      // Set demo flag in localStorage and redirect
+      localStorage.setItem('missionpulse_demo', 'true');
+      window.location.href = 'missionpulse-production-home.html';
+    }
+
+    // ============================================================
+    // UI HELPERS
+    // ============================================================
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.remove('hidden');
+      successMsg.classList.add('hidden');
+    }
+
+    function showSuccess(msg) {
+      successMsg.textContent = msg;
+      successMsg.classList.remove('hidden');
+      errorMsg.classList.add('hidden');
+    }
+
+    function hideMessages() {
+      errorMsg.classList.add('hidden');
+      successMsg.classList.add('hidden');
+    }
+
+    function resetButton() {
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = `
+        <span>Sign In</span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+        </svg>
+      `;
+    }
+
+    // ============================================================
+    // EVENT LISTENERS
+    // ============================================================
+    loginForm.addEventListener('submit', handleLogin);
+    demoBtn.addEventListener('click', handleDemoAccess);
+    forgotLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleMagicLink();
+    });
+
+    // Initialize on load
+    init();
   </script>
 </body>
 </html>
