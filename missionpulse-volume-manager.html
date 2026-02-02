@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volume Manager | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+    .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.1); }
+    .cyan-glow { box-shadow: 0 0 30px rgba(0,229,250,0.15); }
+    .progress-bar { background: linear-gradient(90deg, #00E5FA 0%, #0066FF 100%); }
+  </style>
+</head>
+<body class="text-white">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    
+    const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4NTU0NjIsImV4cCI6MjA1MzQzMTQ2Mn0.Xj4_wfgnHdegN2jBcMh1cTBfvZhQxuF8FPxcE-krcHY';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    const DEMO_VOLUMES = [
+      { 
+        id: '1', volume_number: 1, volume_name: 'Technical Volume', page_limit: 50, current_pages: 38, status: 'Review', owner: 'Sarah Chen', due_date: '2026-02-10', compliance_score: 92,
+        sections: [
+          { id: 's1', section_number: '1.0', title: 'Executive Summary', page_allocation: 5, current_pages: 4, status: 'Final', assigned_to: 'Sarah Chen' },
+          { id: 's2', section_number: '2.0', title: 'Technical Approach', page_allocation: 20, current_pages: 18, status: 'Review', assigned_to: 'Mike Torres' },
+          { id: 's3', section_number: '3.0', title: 'Management Approach', page_allocation: 15, current_pages: 12, status: 'Draft', assigned_to: 'Lisa Park' },
+          { id: 's4', section_number: '4.0', title: 'Transition Plan', page_allocation: 10, current_pages: 4, status: 'Outline', assigned_to: 'Sarah Chen' },
+        ]
+      },
+      { 
+        id: '2', volume_number: 2, volume_name: 'Past Performance', page_limit: 30, current_pages: 28, status: 'Final', owner: 'Lisa Park', due_date: '2026-02-08', compliance_score: 100,
+        sections: [
+          { id: 's5', section_number: '1.0', title: 'Past Performance Matrix', page_allocation: 5, current_pages: 5, status: 'Final', assigned_to: 'Lisa Park' },
+          { id: 's6', section_number: '2.0', title: 'Contract 1: DHA MHS Genesis', page_allocation: 8, current_pages: 8, status: 'Final', assigned_to: 'Lisa Park' },
+          { id: 's7', section_number: '3.0', title: 'Contract 2: VA EHR Support', page_allocation: 8, current_pages: 7, status: 'Final', assigned_to: 'Lisa Park' },
+          { id: 's8', section_number: '4.0', title: 'Contract 3: CMS Data Analytics', page_allocation: 9, current_pages: 8, status: 'Final', assigned_to: 'Lisa Park' },
+        ]
+      },
+      { 
+        id: '3', volume_number: 3, volume_name: 'Cost/Price Volume', page_limit: 25, current_pages: 15, status: 'Draft', owner: 'Mike Torres', due_date: '2026-02-12', compliance_score: 78,
+        sections: [
+          { id: 's9', section_number: '1.0', title: 'Pricing Summary', page_allocation: 3, current_pages: 2, status: 'Draft', assigned_to: 'Mike Torres' },
+          { id: 's10', section_number: '2.0', title: 'Basis of Estimate', page_allocation: 10, current_pages: 8, status: 'Draft', assigned_to: 'Mike Torres' },
+          { id: 's11', section_number: '3.0', title: 'Labor Categories', page_allocation: 7, current_pages: 5, status: 'Outline', assigned_to: 'Finance Team' },
+          { id: 's12', section_number: '4.0', title: 'Cost Assumptions', page_allocation: 5, current_pages: 0, status: 'Not Started', assigned_to: 'Finance Team' },
+        ]
+      },
+    ];
+
+    function VolumeManager() {
+      const [volumes, setVolumes] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [selectedVolume, setSelectedVolume] = useState(null);
+      const [showModal, setShowModal] = useState(false);
+
+      useEffect(() => {
+        loadVolumes();
+      }, []);
+
+      async function loadVolumes() {
+        try {
+          const { data, error } = await supabase.from('proposal_volumes').select('*').order('volume_number', { ascending: true });
+          if (error) throw error;
+          setVolumes(data?.length ? data : DEMO_VOLUMES);
+        } catch (err) {
+          console.log('Using demo data:', err.message);
+          setVolumes(DEMO_VOLUMES);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      const getStatusColor = (status) => {
+        const colors = { 'Not Started': 'text-gray-400', 'Outline': 'text-purple-400', 'Draft': 'text-yellow-400', 'Review': 'text-blue-400', 'Final': 'text-green-400' };
+        return colors[status] || 'text-gray-400';
+      };
+
+      const getStatusBg = (status) => {
+        const colors = { 'Not Started': 'bg-gray-500/20', 'Outline': 'bg-purple-500/20', 'Draft': 'bg-yellow-500/20', 'Review': 'bg-blue-500/20', 'Final': 'bg-green-500/20' };
+        return colors[status] || 'bg-gray-500/20';
+      };
+
+      const getComplianceColor = (score) => {
+        if (score >= 90) return 'text-green-400';
+        if (score >= 70) return 'text-yellow-400';
+        return 'text-red-400';
+      };
+
+      const totalPages = volumes.reduce((sum, v) => sum + v.current_pages, 0);
+      const totalLimit = volumes.reduce((sum, v) => sum + v.page_limit, 0);
+      const avgCompliance = Math.round(volumes.reduce((sum, v) => sum + v.compliance_score, 0) / (volumes.length || 1));
+
+      return (
+        <div className="min-h-screen p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-4">
+              <a href="index.html" className="text-gray-400 hover:text-cyan-400 transition">← Back</a>
+              <div>
+                <h1 className="text-3xl font-bold text-white">Volume Manager</h1>
+                <p className="text-gray-400">Organize proposal sections and track progress</p>
+              </div>
+            </div>
+            <button onClick={() => { setSelectedVolume(null); setShowModal(true); }} className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-semibold hover:opacity-90 transition">
+              + Add Volume
+            </button>
+          </div>
+
+          {/* Overall Progress */}
+          <div className="glass-card rounded-2xl p-6 mb-8 cyan-glow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Overall Proposal Progress</h2>
+              <span className={`text-2xl font-bold ${getComplianceColor(avgCompliance)}`}>{avgCompliance}% Compliant</span>
+            </div>
+            <div className="grid grid-cols-4 gap-6">
+              <div>
+                <div className="text-gray-400 text-sm mb-1">Total Pages</div>
+                <div className="text-2xl font-bold text-white">{totalPages} / {totalLimit}</div>
+                <div className="h-2 bg-gray-700 rounded-full mt-2 overflow-hidden">
+                  <div className="h-full progress-bar rounded-full" style={{ width: `${(totalPages / totalLimit) * 100}%` }}></div>
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">Volumes</div>
+                <div className="text-2xl font-bold text-cyan-400">{volumes.length}</div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">Sections</div>
+                <div className="text-2xl font-bold text-blue-400">{volumes.reduce((sum, v) => sum + (v.sections?.length || 0), 0)}</div>
+              </div>
+              <div>
+                <div className="text-gray-400 text-sm mb-1">Final Sections</div>
+                <div className="text-2xl font-bold text-green-400">{volumes.reduce((sum, v) => sum + (v.sections?.filter(s => s.status === 'Final').length || 0), 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Volumes */}
+          <div className="space-y-6">
+            {loading ? (
+              <div className="text-center py-12 text-gray-400">Loading...</div>
+            ) : volumes.map((volume) => (
+              <div key={volume.id} className="glass-card rounded-2xl overflow-hidden">
+                {/* Volume Header */}
+                <div className="p-5 border-b border-gray-800 flex items-center justify-between cursor-pointer hover:bg-gray-800/30 transition" onClick={() => setSelectedVolume(selectedVolume?.id === volume.id ? null : volume)}>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xl font-bold">
+                      {volume.volume_number}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">{volume.volume_name}</h3>
+                      <div className="flex items-center space-x-4 text-sm">
+                        <span className="text-gray-400">Owner: {volume.owner}</span>
+                        <span className="text-gray-400">Due: {new Date(volume.due_date).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-6">
+                    <div className="text-right">
+                      <div className="text-sm text-gray-400">Pages</div>
+                      <div className="font-semibold">{volume.current_pages} / {volume.page_limit}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-400">Compliance</div>
+                      <div className={`font-semibold ${getComplianceColor(volume.compliance_score)}`}>{volume.compliance_score}%</div>
+                    </div>
+                    <span className={`px-4 py-1 rounded-full text-sm font-medium ${getStatusBg(volume.status)} ${getStatusColor(volume.status)}`}>{volume.status}</span>
+                    <span className="text-gray-400 text-xl">{selectedVolume?.id === volume.id ? '▼' : '▶'}</span>
+                  </div>
+                </div>
+
+                {/* Sections (Expanded) */}
+                {selectedVolume?.id === volume.id && (
+                  <div className="p-5 bg-gray-900/30">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-semibold text-gray-300">Sections</h4>
+                      <button className="text-cyan-400 hover:text-cyan-300 text-sm">+ Add Section</button>
+                    </div>
+                    <div className="space-y-2">
+                      {volume.sections?.map((section) => (
+                        <div key={section.id} className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg hover:bg-gray-800/50 transition">
+                          <div className="flex items-center space-x-4">
+                            <span className="font-mono text-cyan-400 text-sm w-12">{section.section_number}</span>
+                            <span className="text-white">{section.title}</span>
+                          </div>
+                          <div className="flex items-center space-x-6">
+                            <div className="text-sm text-gray-400">{section.assigned_to}</div>
+                            <div className="text-sm">
+                              <span className="text-white">{section.current_pages}</span>
+                              <span className="text-gray-500"> / {section.page_allocation} pg</span>
+                            </div>
+                            <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                              <div className="h-full progress-bar rounded-full" style={{ width: `${(section.current_pages / section.page_allocation) * 100}%` }}></div>
+                            </div>
+                            <span className={`px-3 py-1 rounded text-xs font-medium ${getStatusBg(section.status)} ${getStatusColor(section.status)}`}>{section.status}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add Volume Modal */}
+          {showModal && !selectedVolume && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+              <div className="glass-card rounded-2xl w-full max-w-lg">
+                <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+                  <h2 className="text-xl font-bold">Add New Volume</h2>
+                  <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <input type="number" placeholder="#" className="p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-center" min="1" />
+                    <input type="text" placeholder="Volume Name" className="col-span-3 p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <input type="number" placeholder="Page Limit" className="p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white" />
+                    <input type="date" className="p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white" />
+                  </div>
+                  <select className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white">
+                    <option>Select Owner</option>
+                    <option>Sarah Chen</option>
+                    <option>Mike Torres</option>
+                    <option>Lisa Park</option>
+                  </select>
+                  <button className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-semibold hover:opacity-90 transition">Create Volume</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<VolumeManager />, document.getElementById('root'));
+  </script>
+</body>
+</html>
