@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Executive Reports</title>
+  <link rel="icon" type="image/png" href="MMT_icon_64px.png">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #fff; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-slideUp { animation: slideUp 0.5s ease-out forwards; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #111C2E; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #243656; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00E5FA; }
+    .glass-card {
+      background: rgba(17, 28, 46, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    @media print {
+      body { background: white; color: black; }
+      .glass-card { background: white; border: 1px solid #ddd; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Supabase Config
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+    const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Icons
+    const Icons = {
+      home: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>,
+      chart: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>,
+      pie: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>,
+      trending: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>,
+      download: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>,
+      print: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>,
+      calendar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
+      refresh: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+      trophy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2"/></svg>,
+      mail: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>,
+      x: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    const REPORT_TYPES = [
+      { key: 'pipeline_summary', name: 'Pipeline Summary', icon: 'chart', color: '#00E5FA' },
+      { key: 'win_rate', name: 'Win Rate Analysis', icon: 'trophy', color: '#00D29F' },
+      { key: 'revenue_forecast', name: 'Revenue Forecast', icon: 'dollar', color: '#F59E0B' },
+      { key: 'resource_utilization', name: 'Resource Utilization', icon: 'users', color: '#8B5CF6' },
+      { key: 'compliance_status', name: 'Compliance Status', icon: 'shield', color: '#EC4899' },
+      { key: 'partner_performance', name: 'Partner Performance', icon: 'users', color: '#06B6D4' },
+    ];
+
+    const DATE_RANGES = [
+      { key: 'today', name: 'Today' },
+      { key: 'week', name: 'This Week' },
+      { key: 'month', name: 'This Month' },
+      { key: 'quarter', name: 'This Quarter' },
+      { key: 'year', name: 'This Year' },
+      { key: 'custom', name: 'Custom Range' },
+    ];
+
+    // Demo Pipeline Data
+    const DEMO_PIPELINE = [
+      { phase: 'Gate 1', count: 8, value: 45000000, color: '#6B7280' },
+      { phase: 'Blue Team', count: 5, value: 32000000, color: '#3B82F6' },
+      { phase: 'Pink Team', count: 4, value: 28000000, color: '#EC4899' },
+      { phase: 'Red Team', count: 3, value: 25000000, color: '#EF4444' },
+      { phase: 'Gold Team', count: 2, value: 18000000, color: '#F59E0B' },
+      { phase: 'Submitted', count: 3, value: 22000000, color: '#8B5CF6' },
+      { phase: 'Won', count: 2, value: 15000000, color: '#00D29F' },
+    ];
+
+    const DEMO_WIN_RATES = [
+      { agency: 'DHA', submitted: 12, won: 8, rate: 67 },
+      { agency: 'VA', submitted: 8, won: 5, rate: 63 },
+      { agency: 'CMS', submitted: 6, won: 3, rate: 50 },
+      { agency: 'IHS', submitted: 4, won: 2, rate: 50 },
+    ];
+
+    const DEMO_FORECASTS = [
+      { month: 'Feb 2025', probable: 12000000, possible: 18000000, pipeline: 45000000 },
+      { month: 'Mar 2025', probable: 15000000, possible: 22000000, pipeline: 52000000 },
+      { month: 'Apr 2025', probable: 18000000, possible: 28000000, pipeline: 58000000 },
+      { month: 'May 2025', probable: 22000000, possible: 35000000, pipeline: 65000000 },
+      { month: 'Jun 2025', probable: 25000000, possible: 40000000, pipeline: 72000000 },
+    ];
+
+    function ExecutiveReportsApp() {
+      const [activeReport, setActiveReport] = useState('pipeline_summary');
+      const [dateRange, setDateRange] = useState('quarter');
+      const [loading, setLoading] = useState(false);
+      const [opportunities, setOpportunities] = useState([]);
+      const reportRef = useRef(null);
+
+      useEffect(() => {
+        loadData();
+      }, []);
+
+      const loadData = async () => {
+        setLoading(true);
+        try {
+          const { data, error } = await sbClient
+            .from('opportunities')
+            .select('*');
+          
+          if (error) throw error;
+          if (data) setOpportunities(data);
+        } catch (err) {
+          console.log('Using demo data:', err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const formatCurrency = (value) => {
+        if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+        return `$${value}`;
+      };
+
+      const handlePrint = () => {
+        window.print();
+      };
+
+      const handleExport = () => {
+        const reportData = {
+          type: activeReport,
+          dateRange,
+          generatedAt: new Date().toISOString(),
+          pipeline: DEMO_PIPELINE,
+          winRates: DEMO_WIN_RATES,
+          forecasts: DEMO_FORECASTS,
+        };
+        
+        const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `missionpulse-${activeReport}-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      const totalPipelineValue = DEMO_PIPELINE.reduce((acc, p) => acc + p.value, 0);
+      const totalOpportunities = DEMO_PIPELINE.reduce((acc, p) => acc + p.count, 0);
+      const avgWinRate = Math.round(DEMO_WIN_RATES.reduce((acc, w) => acc + w.rate, 0) / DEMO_WIN_RATES.length);
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Header */}
+          <header className="glass-card border-b border-white/10 sticky top-0 z-50 no-print">
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <a href="index.html" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+                    <Icon name="home" className="w-5 h-5" />
+                  </a>
+                  <div className="w-px h-6 bg-white/20" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                      <Icon name="chart" className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-bold text-white">Executive Reports</h1>
+                      <p className="text-xs text-gray-400">Pipeline & Performance Analytics</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <select
+                    value={dateRange}
+                    onChange={(e) => setDateRange(e.target.value)}
+                    className="px-4 py-2 bg-[#0A1628] border border-white/10 rounded-lg text-white focus:outline-none focus:border-amber-500"
+                  >
+                    {DATE_RANGES.map(range => (
+                      <option key={range.key} value={range.key}>{range.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleExport}
+                    className="px-4 py-2 bg-[#0A1628] border border-white/10 text-gray-300 rounded-lg hover:text-white transition-colors flex items-center gap-2"
+                  >
+                    <Icon name="download" className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
+                  >
+                    <Icon name="print" className="w-4 h-4" />
+                    Print
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-6 py-8" ref={reportRef}>
+            {/* Report Type Tabs */}
+            <div className="flex gap-2 mb-8 overflow-x-auto pb-2 no-print">
+              {REPORT_TYPES.map(type => (
+                <button
+                  key={type.key}
+                  onClick={() => setActiveReport(type.key)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
+                    activeReport === type.key
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500'
+                      : 'bg-[#111C2E] text-gray-400 border border-white/10 hover:text-white'
+                  }`}
+                >
+                  <Icon name={type.icon} className="w-4 h-4" />
+                  {type.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-4 gap-4 mb-8">
+              <div className="glass-card rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-gray-400 text-sm">Total Pipeline</span>
+                  <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                    <Icon name="dollar" className="w-5 h-5 text-cyan-400" />
+                  </div>
+                </div>
+                <div className="text-3xl font-bold text-white">{formatCurrency(totalPipelineValue)}</div>
+                <div className="text-xs text-emerald-400 mt-1">↑ 12% vs last quarter</div>
+              </div>
+
+              <div className="glass-card rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-gray-400 text-sm">Active Opportunities</span>
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                    <Icon name="chart" className="w-5 h-5 text-blue-400" />
+                  </div>
+                </div>
+                <div className="text-3xl font-bold text-white">{totalOpportunities}</div>
+                <div className="text-xs text-emerald-400 mt-1">↑ 3 new this month</div>
+              </div>
+
+              <div className="glass-card rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-gray-400 text-sm">Avg Win Rate</span>
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <Icon name="trophy" className="w-5 h-5 text-emerald-400" />
+                  </div>
+                </div>
+                <div className="text-3xl font-bold text-white">{avgWinRate}%</div>
+                <div className="text-xs text-emerald-400 mt-1">↑ 5% vs industry avg</div>
+              </div>
+
+              <div className="glass-card rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-gray-400 text-sm">Projected Revenue</span>
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                    <Icon name="trending" className="w-5 h-5 text-amber-400" />
+                  </div>
+                </div>
+                <div className="text-3xl font-bold text-white">{formatCurrency(DEMO_FORECASTS[4].probable)}</div>
+                <div className="text-xs text-gray-400 mt-1">Next 6 months (probable)</div>
+              </div>
+            </div>
+
+            {/* Pipeline Summary Report */}
+            {activeReport === 'pipeline_summary' && (
+              <div className="space-y-6 animate-slideUp">
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-6">Pipeline by Phase</h3>
+                  <div className="space-y-4">
+                    {DEMO_PIPELINE.map((phase, idx) => (
+                      <div key={idx} className="flex items-center gap-4">
+                        <div className="w-28 text-sm text-gray-400">{phase.phase}</div>
+                        <div className="flex-1 relative">
+                          <div className="h-8 bg-white/5 rounded-lg overflow-hidden">
+                            <div 
+                              className="h-full rounded-lg transition-all duration-500"
+                              style={{ 
+                                width: `${(phase.value / totalPipelineValue) * 100}%`,
+                                backgroundColor: phase.color 
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="w-20 text-right text-sm font-medium" style={{ color: phase.color }}>
+                          {phase.count} opps
+                        </div>
+                        <div className="w-24 text-right text-sm text-white font-medium">
+                          {formatCurrency(phase.value)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="glass-card rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Phase Distribution</h3>
+                    <div className="flex items-center justify-center h-48">
+                      <div className="relative w-40 h-40">
+                        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                          {(() => {
+                            let accumulated = 0;
+                            return DEMO_PIPELINE.map((phase, idx) => {
+                              const percentage = (phase.count / totalOpportunities) * 100;
+                              const dashArray = percentage * 3.14159;
+                              const dashOffset = accumulated * 3.14159;
+                              accumulated += percentage;
+                              return (
+                                <circle
+                                  key={idx}
+                                  cx="50"
+                                  cy="50"
+                                  r="45"
+                                  fill="none"
+                                  stroke={phase.color}
+                                  strokeWidth="10"
+                                  strokeDasharray={`${dashArray} ${314.159 - dashArray}`}
+                                  strokeDashoffset={-dashOffset}
+                                />
+                              );
+                            });
+                          })()}
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center flex-col">
+                          <span className="text-2xl font-bold text-white">{totalOpportunities}</span>
+                          <span className="text-xs text-gray-400">Total</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                      {DEMO_PIPELINE.slice(0, 6).map((phase, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: phase.color }} />
+                          <span className="text-gray-400">{phase.phase}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="glass-card rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Value Distribution</h3>
+                    <div className="space-y-3">
+                      {DEMO_PIPELINE.map((phase, idx) => {
+                        const percentage = (phase.value / totalPipelineValue) * 100;
+                        return (
+                          <div key={idx}>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-gray-400">{phase.phase}</span>
+                              <span className="text-white">{percentage.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full rounded-full"
+                                style={{ width: `${percentage}%`, backgroundColor: phase.color }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Win Rate Report */}
+            {activeReport === 'win_rate' && (
+              <div className="space-y-6 animate-slideUp">
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-6">Win Rate by Agency</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Agency</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Submitted</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Won</th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Win Rate</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Performance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {DEMO_WIN_RATES.map((agency, idx) => (
+                          <tr key={idx} className="border-b border-white/5">
+                            <td className="px-4 py-4 font-medium text-white">{agency.agency}</td>
+                            <td className="px-4 py-4 text-center text-gray-300">{agency.submitted}</td>
+                            <td className="px-4 py-4 text-center text-emerald-400">{agency.won}</td>
+                            <td className="px-4 py-4 text-center">
+                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                agency.rate >= 60 ? 'bg-emerald-500/20 text-emerald-400' :
+                                agency.rate >= 40 ? 'bg-amber-500/20 text-amber-400' :
+                                'bg-red-500/20 text-red-400'
+                              }`}>
+                                {agency.rate}%
+                              </span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="w-32 h-2 bg-white/5 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full rounded-full"
+                                  style={{ 
+                                    width: `${agency.rate}%`,
+                                    backgroundColor: agency.rate >= 60 ? '#00D29F' : agency.rate >= 40 ? '#F59E0B' : '#EF4444'
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Win Rate Trend</h3>
+                  <div className="h-48 flex items-end gap-4 px-4">
+                    {['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024', 'Q1 2025'].map((quarter, idx) => {
+                      const rate = 45 + (idx * 5) + Math.random() * 10;
+                      return (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2">
+                          <div 
+                            className="w-full bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t transition-all"
+                            style={{ height: `${rate * 1.5}px` }}
+                          />
+                          <span className="text-xs text-gray-400">{quarter}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Revenue Forecast Report */}
+            {activeReport === 'revenue_forecast' && (
+              <div className="space-y-6 animate-slideUp">
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-6">6-Month Revenue Forecast</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Month</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Probable</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Possible</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase">Total Pipeline</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {DEMO_FORECASTS.map((forecast, idx) => (
+                          <tr key={idx} className="border-b border-white/5">
+                            <td className="px-4 py-4 font-medium text-white">{forecast.month}</td>
+                            <td className="px-4 py-4 text-right text-emerald-400">{formatCurrency(forecast.probable)}</td>
+                            <td className="px-4 py-4 text-right text-amber-400">{formatCurrency(forecast.possible)}</td>
+                            <td className="px-4 py-4 text-right text-gray-300">{formatCurrency(forecast.pipeline)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-white/10">
+                          <td className="px-4 py-4 font-semibold text-white">Total</td>
+                          <td className="px-4 py-4 text-right font-semibold text-emerald-400">
+                            {formatCurrency(DEMO_FORECASTS.reduce((acc, f) => acc + f.probable, 0))}
+                          </td>
+                          <td className="px-4 py-4 text-right font-semibold text-amber-400">
+                            {formatCurrency(DEMO_FORECASTS.reduce((acc, f) => acc + f.possible, 0))}
+                          </td>
+                          <td className="px-4 py-4 text-right font-semibold text-gray-300">
+                            {formatCurrency(DEMO_FORECASTS.reduce((acc, f) => acc + f.pipeline, 0))}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Forecast Visualization</h3>
+                  <div className="h-64 flex items-end gap-2 px-4">
+                    {DEMO_FORECASTS.map((forecast, idx) => (
+                      <div key={idx} className="flex-1 flex flex-col gap-1">
+                        <div className="flex flex-col gap-0.5 h-48">
+                          <div 
+                            className="w-full bg-gray-600/30 rounded-t"
+                            style={{ height: `${(forecast.pipeline / 80000000) * 100}%` }}
+                          />
+                          <div 
+                            className="w-full bg-amber-500/50"
+                            style={{ height: `${(forecast.possible / 80000000) * 100}%` }}
+                          />
+                          <div 
+                            className="w-full bg-emerald-500 rounded-b"
+                            style={{ height: `${(forecast.probable / 80000000) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-400 text-center">{forecast.month.split(' ')[0]}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-center gap-6 mt-4">
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="w-3 h-3 rounded bg-emerald-500" />
+                      <span className="text-gray-400">Probable</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="w-3 h-3 rounded bg-amber-500/50" />
+                      <span className="text-gray-400">Possible</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="w-3 h-3 rounded bg-gray-600/30" />
+                      <span className="text-gray-400">Pipeline</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Other report types - Placeholder */}
+            {['resource_utilization', 'compliance_status', 'partner_performance'].includes(activeReport) && (
+              <div className="glass-card rounded-xl p-12 text-center animate-slideUp">
+                <Icon name={REPORT_TYPES.find(t => t.key === activeReport)?.icon || 'chart'} className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-400 mb-2">
+                  {REPORT_TYPES.find(t => t.key === activeReport)?.name} Report
+                </h3>
+                <p className="text-gray-500 mb-6">This report will display data from the respective modules</p>
+                <button
+                  onClick={loadData}
+                  className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors flex items-center gap-2 mx-auto"
+                >
+                  <Icon name="refresh" className="w-4 h-4" />
+                  Load Data
+                </button>
+              </div>
+            )}
+
+            {/* Report Footer */}
+            <div className="glass-card rounded-xl p-4 mt-8 text-center">
+              <p className="text-xs text-gray-500">
+                Report generated on {new Date().toLocaleString()} • 
+                Data range: {DATE_RANGES.find(r => r.key === dateRange)?.name} • 
+                MissionPulse Executive Reports v2.0
+              </p>
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-white/10 py-4 mt-12 no-print">
+            <div className="max-w-7xl mx-auto px-6 text-center text-xs text-gray-500">
+              © 2026 Mission Meets Tech • MissionPulse v2.0 • Sprint 57
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<ExecutiveReportsApp />, document.getElementById('root'));
+  </script>
+</body>
+</html>
