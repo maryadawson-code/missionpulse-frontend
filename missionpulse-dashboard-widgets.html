@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Widgets - MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(0, 5, 15, 0.9); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 255, 0.1); }
+        .cyan-glow { box-shadow: 0 0 30px rgba(0, 229, 255, 0.3); }
+        .widget-drag { cursor: grab; }
+        .widget-drag:active { cursor: grabbing; }
+    </style>
+</head>
+<body class="min-h-screen bg-[#00050F] text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NTk4MjQsImV4cCI6MjA2NDEzNTgyNH0.kC-W7yt8aGj1U8WaoJJQCy_41iU1mR_YyOgc5Y8iWWE';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const widgetCatalog = [
+            { type: 'pipeline_value', title: 'Pipeline Value', icon: '💰', description: 'Total value of active opportunities', size: 'small' },
+            { type: 'win_rate', title: 'Win Rate', icon: '🎯', description: 'Historical win percentage', size: 'small' },
+            { type: 'upcoming_deadlines', title: 'Upcoming Deadlines', icon: '📅', description: 'Next 5 proposal deadlines', size: 'medium' },
+            { type: 'team_activity', title: 'Team Activity', icon: '👥', description: 'Recent team actions', size: 'medium' },
+            { type: 'compliance_status', title: 'Compliance Status', icon: '✅', description: 'Iron Dome compliance overview', size: 'small' },
+            { type: 'recent_opportunities', title: 'Recent Opportunities', icon: '🎯', description: 'Latest opportunity updates', size: 'large' },
+            { type: 'quick_actions', title: 'Quick Actions', icon: '⚡', description: 'Common shortcuts', size: 'small' },
+            { type: 'stage_breakdown', title: 'Stage Breakdown', icon: '📊', description: 'Pipeline by stage', size: 'medium' },
+            { type: 'ai_insights', title: 'AI Insights', icon: '🤖', description: 'AI-powered recommendations', size: 'medium' }
+        ];
+
+        const demoData = {
+            pipeline_value: { total: 847000000, change: 12.5 },
+            win_rate: { rate: 42, trend: 'up', change: 3 },
+            deadlines: [
+                { name: 'DHA EHR Modernization', date: '2026-02-15', days: 13 },
+                { name: 'VA Claims Processing', date: '2026-02-20', days: 18 },
+                { name: 'CMS Analytics Platform', date: '2026-03-01', days: 27 },
+                { name: 'IHS Telehealth', date: '2026-03-10', days: 36 },
+                { name: 'DoD Cyber Defense', date: '2026-03-15', days: 41 }
+            ],
+            recent_activity: [
+                { user: 'Mary W.', action: 'Updated pricing', time: '2h ago' },
+                { user: 'John C.', action: 'Submitted compliance', time: '3h ago' },
+                { user: 'Sarah M.', action: 'Added win theme', time: '5h ago' },
+                { user: 'Mike T.', action: 'Uploaded document', time: '1d ago' }
+            ],
+            compliance: { passed: 48, total: 52, score: 92 },
+            stages: { identify: 3, qualify: 4, capture: 2, proposal: 2, submitted: 1 },
+            insights: [
+                'DHA opportunity has 78% win probability',
+                'Consider adding cybersecurity SME to VA team',
+                'Compliance deadline approaching for CMS'
+            ]
+        };
+
+        function DashboardWidgets() {
+            const [widgets, setWidgets] = useState([
+                { id: '1', type: 'pipeline_value', is_visible: true },
+                { id: '2', type: 'win_rate', is_visible: true },
+                { id: '3', type: 'compliance_status', is_visible: true },
+                { id: '4', type: 'upcoming_deadlines', is_visible: true },
+                { id: '5', type: 'team_activity', is_visible: true },
+                { id: '6', type: 'stage_breakdown', is_visible: true },
+                { id: '7', type: 'ai_insights', is_visible: true },
+                { id: '8', type: 'quick_actions', is_visible: true }
+            ]);
+            const [editMode, setEditMode] = useState(false);
+            const [showCatalog, setShowCatalog] = useState(false);
+            const [loading, setLoading] = useState(false);
+
+            function toggleWidget(widgetId) {
+                setWidgets(prev => prev.map(w => 
+                    w.id === widgetId ? { ...w, is_visible: !w.is_visible } : w
+                ));
+            }
+
+            function addWidget(type) {
+                const newWidget = {
+                    id: Date.now().toString(),
+                    type,
+                    is_visible: true
+                };
+                setWidgets(prev => [...prev, newWidget]);
+                setShowCatalog(false);
+            }
+
+            function removeWidget(widgetId) {
+                setWidgets(prev => prev.filter(w => w.id !== widgetId));
+            }
+
+            function renderWidget(widget) {
+                const catalog = widgetCatalog.find(c => c.type === widget.type);
+                if (!catalog) return null;
+
+                const sizeClass = {
+                    small: 'col-span-1',
+                    medium: 'col-span-1 lg:col-span-2',
+                    large: 'col-span-1 lg:col-span-3'
+                }[catalog.size];
+
+                return (
+                    <div key={widget.id} className={`glass rounded-xl p-5 relative group ${sizeClass} ${editMode ? 'ring-2 ring-cyan-500/30' : ''}`}>
+                        {editMode && (
+                            <button
+                                onClick={() => removeWidget(widget.id)}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            >
+                                ×
+                            </button>
+                        )}
+                        
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold text-white flex items-center gap-2">
+                                <span>{catalog.icon}</span>
+                                {catalog.title}
+                            </h3>
+                            {editMode && (
+                                <span className="text-xs text-cyan-400 cursor-move widget-drag">⋮⋮</span>
+                            )}
+                        </div>
+
+                        {/* Widget Content */}
+                        {widget.type === 'pipeline_value' && (
+                            <div>
+                                <p className="text-3xl font-bold text-cyan-400">${(demoData.pipeline_value.total / 1000000).toFixed(0)}M</p>
+                                <p className="text-sm text-green-400 mt-1">↑ {demoData.pipeline_value.change}% from last month</p>
+                            </div>
+                        )}
+
+                        {widget.type === 'win_rate' && (
+                            <div>
+                                <p className="text-3xl font-bold text-emerald-400">{demoData.win_rate.rate}%</p>
+                                <p className="text-sm text-green-400 mt-1">↑ {demoData.win_rate.change}% improvement</p>
+                            </div>
+                        )}
+
+                        {widget.type === 'compliance_status' && (
+                            <div>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative w-16 h-16">
+                                        <svg className="w-16 h-16 transform -rotate-90">
+                                            <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.1)" strokeWidth="6" fill="none" />
+                                            <circle cx="32" cy="32" r="28" stroke="#00E5FA" strokeWidth="6" fill="none" 
+                                                strokeDasharray={`${demoData.compliance.score * 1.76} 176`} />
+                                        </svg>
+                                        <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-cyan-400">
+                                            {demoData.compliance.score}%
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-400">{demoData.compliance.passed}/{demoData.compliance.total} checks passed</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {widget.type === 'upcoming_deadlines' && (
+                            <div className="space-y-3">
+                                {demoData.deadlines.slice(0, 4).map((d, i) => (
+                                    <div key={i} className="flex items-center justify-between">
+                                        <span className="text-sm text-gray-300 truncate flex-1">{d.name}</span>
+                                        <span className={`text-xs px-2 py-1 rounded-full ml-2 ${
+                                            d.days <= 14 ? 'bg-red-500/20 text-red-400' :
+                                            d.days <= 30 ? 'bg-yellow-500/20 text-yellow-400' :
+                                            'bg-green-500/20 text-green-400'
+                                        }`}>
+                                            {d.days}d
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {widget.type === 'team_activity' && (
+                            <div className="space-y-3">
+                                {demoData.recent_activity.map((a, i) => (
+                                    <div key={i} className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-xs font-bold">
+                                            {a.user.split(' ').map(n => n[0]).join('')}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-sm text-gray-300">{a.action}</p>
+                                            <p className="text-xs text-gray-500">{a.time}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {widget.type === 'stage_breakdown' && (
+                            <div className="space-y-3">
+                                {Object.entries(demoData.stages).map(([stage, count]) => (
+                                    <div key={stage}>
+                                        <div className="flex items-center justify-between text-sm mb-1">
+                                            <span className="text-gray-300 capitalize">{stage}</span>
+                                            <span className="text-cyan-400">{count}</span>
+                                        </div>
+                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                            <div 
+                                                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                                                style={{ width: `${(count / 5) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {widget.type === 'ai_insights' && (
+                            <div className="space-y-3">
+                                {demoData.insights.map((insight, i) => (
+                                    <div key={i} className="flex items-start gap-2">
+                                        <span className="text-cyan-400">💡</span>
+                                        <p className="text-sm text-gray-300">{insight}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {widget.type === 'quick_actions' && (
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    { label: 'New Opp', icon: '➕' },
+                                    { label: 'Upload', icon: '📤' },
+                                    { label: 'Reports', icon: '📊' },
+                                    { label: 'Search', icon: '🔍' }
+                                ].map(action => (
+                                    <button 
+                                        key={action.label}
+                                        className="p-3 bg-white/5 hover:bg-white/10 rounded-lg text-center transition-colors"
+                                    >
+                                        <span className="text-lg">{action.icon}</span>
+                                        <p className="text-xs text-gray-400 mt-1">{action.label}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300 text-sm mb-2 inline-block">← Back to Command Center</a>
+                                <h1 className="text-3xl font-bold">
+                                    <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Dashboard Widgets</span>
+                                </h1>
+                                <p className="text-gray-400 mt-1">Customize your dashboard with widgets</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setShowCatalog(true)}
+                                    className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors flex items-center gap-2"
+                                >
+                                    ➕ Add Widget
+                                </button>
+                                <button
+                                    onClick={() => setEditMode(!editMode)}
+                                    className={`px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${
+                                        editMode 
+                                            ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
+                                            : 'bg-white/10 hover:bg-white/20'
+                                    }`}
+                                >
+                                    {editMode ? '✓ Done Editing' : '✏️ Edit Layout'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Widget Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {widgets.filter(w => w.is_visible).map(widget => renderWidget(widget))}
+                        </div>
+
+                        {/* Empty State */}
+                        {widgets.filter(w => w.is_visible).length === 0 && (
+                            <div className="glass rounded-xl p-12 text-center">
+                                <p className="text-4xl mb-4">📊</p>
+                                <p className="text-gray-400 mb-4">No widgets added yet</p>
+                                <button
+                                    onClick={() => setShowCatalog(true)}
+                                    className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-lg text-white font-semibold"
+                                >
+                                    Add Your First Widget
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Widget Catalog Modal */}
+                        {showCatalog && (
+                            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6">
+                                <div className="glass rounded-2xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h2 className="text-xl font-bold text-white">Widget Catalog</h2>
+                                        <button 
+                                            onClick={() => setShowCatalog(false)}
+                                            className="text-gray-400 hover:text-white text-2xl"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {widgetCatalog.map(widget => {
+                                            const isAdded = widgets.some(w => w.type === widget.type && w.is_visible);
+                                            return (
+                                                <div 
+                                                    key={widget.type}
+                                                    className={`p-4 rounded-xl border transition-all ${
+                                                        isAdded 
+                                                            ? 'bg-cyan-500/10 border-cyan-500/30' 
+                                                            : 'bg-white/5 border-white/10 hover:border-cyan-500/30 cursor-pointer'
+                                                    }`}
+                                                    onClick={() => !isAdded && addWidget(widget.type)}
+                                                >
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <span className="text-2xl">{widget.icon}</span>
+                                                        <div>
+                                                            <h3 className="font-semibold text-white">{widget.title}</h3>
+                                                            <span className="text-xs text-gray-500 capitalize">{widget.size} widget</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-sm text-gray-400">{widget.description}</p>
+                                                    {isAdded && (
+                                                        <span className="mt-2 inline-block text-xs text-cyan-400">✓ Added</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<DashboardWidgets />);
+    </script>
+</body>
+</html>

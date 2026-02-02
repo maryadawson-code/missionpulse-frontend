@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(0, 5, 15, 0.9); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 255, 0.1); }
+        .cyan-glow { box-shadow: 0 0 30px rgba(0, 229, 255, 0.3); }
+        .search-highlight { background: rgba(0, 229, 255, 0.2); border-radius: 2px; }
+    </style>
+</head>
+<body class="min-h-screen bg-[#00050F] text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+        
+        const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NTk4MjQsImV4cCI6MjA2NDEzNTgyNH0.kC-W7yt8aGj1U8WaoJJQCy_41iU1mR_YyOgc5Y8iWWE';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const demoSearchData = [
+            { id: '1', entity_type: 'opportunity', title: 'DHA EHR Modernization', content: 'Defense Health Agency electronic health record modernization program IDIQ vehicle', tags: ['DHA', 'EHR', 'Healthcare IT'], metadata: { status: 'Proposal', value: '$125M' } },
+            { id: '2', entity_type: 'opportunity', title: 'VA Claims Processing Automation', content: 'Veterans Affairs claims automation and AI-powered processing system', tags: ['VA', 'AI', 'Automation'], metadata: { status: 'Capture', value: '$89M' } },
+            { id: '3', entity_type: 'opportunity', title: 'CMS Data Analytics Platform', content: 'Centers for Medicare and Medicaid Services analytics and reporting modernization', tags: ['CMS', 'Analytics', 'Data'], metadata: { status: 'Qualify', value: '$156M' } },
+            { id: '4', entity_type: 'document', title: 'Technical Volume - DHA EHR.docx', content: 'Technical approach for EHR modernization including cloud migration strategy', tags: ['Technical', 'Draft'], metadata: { size: '2.4 MB', updated: '2026-01-28' } },
+            { id: '5', entity_type: 'document', title: 'Past Performance - VA Projects.pdf', content: 'Past performance citations for VA healthcare IT projects', tags: ['Past Performance', 'VA'], metadata: { size: '1.8 MB', updated: '2026-01-25' } },
+            { id: '6', entity_type: 'team_member', title: 'John Chen - Technical Lead', content: 'Senior architect with 15 years federal healthcare IT experience CMMC certified', tags: ['Technical', 'SME'], metadata: { role: 'Tech Lead', clearance: 'Secret' } },
+            { id: '7', entity_type: 'team_member', title: 'Sarah Martinez - Capture Manager', content: 'Capture manager specializing in DHA and VA opportunities', tags: ['Capture', 'Healthcare'], metadata: { role: 'Capture', clearance: 'TS/SCI' } },
+            { id: '8', entity_type: 'compliance', title: 'Section L Compliance - DHA', content: 'Compliance checklist for Section L requirements including CMMC Level 2', tags: ['Compliance', 'Section L'], metadata: { score: '94%', status: 'Complete' } },
+            { id: '9', entity_type: 'compliance', title: 'FAR/DFARS Review - VA Claims', content: 'Federal Acquisition Regulation and DFARS compliance review', tags: ['FAR', 'DFARS'], metadata: { score: '87%', status: 'In Progress' } },
+            { id: '10', entity_type: 'pricing', title: 'Cost Volume - DHA EHR', content: 'Basis of estimate and pricing breakdown for DHA EHR modernization', tags: ['Pricing', 'BOE', 'CUI'], metadata: { total: '$125M', margin: '12%' } },
+            { id: '11', entity_type: 'opportunity', title: 'IHS Telehealth Expansion', content: 'Indian Health Service telehealth platform expansion and rural connectivity', tags: ['IHS', 'Telehealth'], metadata: { status: 'Identify', value: '$67M' } },
+            { id: '12', entity_type: 'document', title: 'Management Volume - CMS.docx', content: 'Management approach and staffing plan for CMS data analytics', tags: ['Management', 'Staffing'], metadata: { size: '3.1 MB', updated: '2026-01-30' } }
+        ];
+
+        const recentSearches = ['DHA EHR', 'compliance checklist', 'John Chen', 'pricing'];
+        const suggestedSearches = ['upcoming deadlines', 'draft documents', 'team availability', 'win themes'];
+
+        const entityIcons = {
+            opportunity: { icon: '🎯', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
+            document: { icon: '📄', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+            team_member: { icon: '👤', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+            compliance: { icon: '✅', color: 'text-green-400', bg: 'bg-green-500/20' },
+            pricing: { icon: '💰', color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+            comment: { icon: '💬', color: 'text-pink-400', bg: 'bg-pink-500/20' }
+        };
+
+        function GlobalSearch() {
+            const [query, setQuery] = useState('');
+            const [results, setResults] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [filter, setFilter] = useState('all');
+            const [showFilters, setShowFilters] = useState(false);
+            const [sortBy, setSortBy] = useState('relevance');
+            const [searched, setSearched] = useState(false);
+
+            const debounce = (fn, delay) => {
+                let timeout;
+                return (...args) => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => fn(...args), delay);
+                };
+            };
+
+            const performSearch = useCallback(async (searchQuery) => {
+                if (!searchQuery.trim()) {
+                    setResults([]);
+                    setSearched(false);
+                    return;
+                }
+
+                setLoading(true);
+                setSearched(true);
+
+                try {
+                    // Try Supabase full-text search
+                    const { data, error } = await supabase
+                        .from('search_index')
+                        .select('*')
+                        .textSearch('search_vector', searchQuery.split(' ').join(' & '))
+                        .limit(20);
+
+                    if (error) throw error;
+                    
+                    if (data?.length) {
+                        setResults(data);
+                    } else {
+                        // Fall back to demo data search
+                        const term = searchQuery.toLowerCase();
+                        const filtered = demoSearchData.filter(item =>
+                            item.title.toLowerCase().includes(term) ||
+                            item.content.toLowerCase().includes(term) ||
+                            item.tags.some(t => t.toLowerCase().includes(term))
+                        );
+                        setResults(filtered);
+                    }
+                } catch (err) {
+                    console.log('Using demo search:', err.message);
+                    const term = searchQuery.toLowerCase();
+                    const filtered = demoSearchData.filter(item =>
+                        item.title.toLowerCase().includes(term) ||
+                        item.content.toLowerCase().includes(term) ||
+                        item.tags.some(t => t.toLowerCase().includes(term))
+                    );
+                    setResults(filtered);
+                } finally {
+                    setLoading(false);
+                }
+            }, []);
+
+            const debouncedSearch = useMemo(
+                () => debounce(performSearch, 300),
+                [performSearch]
+            );
+
+            useEffect(() => {
+                debouncedSearch(query);
+            }, [query, debouncedSearch]);
+
+            const filteredResults = useMemo(() => {
+                let filtered = results;
+                if (filter !== 'all') {
+                    filtered = filtered.filter(r => r.entity_type === filter);
+                }
+                return filtered;
+            }, [results, filter]);
+
+            const resultCounts = useMemo(() => {
+                const counts = { all: results.length };
+                results.forEach(r => {
+                    counts[r.entity_type] = (counts[r.entity_type] || 0) + 1;
+                });
+                return counts;
+            }, [results]);
+
+            function highlightMatch(text, query) {
+                if (!query.trim()) return text;
+                const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                return text.replace(regex, '<span class="search-highlight">$1</span>');
+            }
+
+            function handleKeyDown(e) {
+                if (e.key === 'Escape') {
+                    setQuery('');
+                }
+            }
+
+            return (
+                <div className="min-h-screen p-6">
+                    <div className="max-w-5xl mx-auto">
+                        {/* Header */}
+                        <div className="mb-8">
+                            <a href="index.html" className="text-cyan-400 hover:text-cyan-300 text-sm mb-2 inline-block">← Back to Command Center</a>
+                            <h1 className="text-3xl font-bold">
+                                <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Global Search</span>
+                            </h1>
+                            <p className="text-gray-400 mt-1">Search across all opportunities, documents, and team members</p>
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="glass rounded-2xl p-6 mb-6 cyan-glow">
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">🔍</span>
+                                <input
+                                    type="text"
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Search opportunities, documents, team members, compliance..."
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-12 py-4 text-lg text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none"
+                                    autoFocus
+                                />
+                                {query && (
+                                    <button
+                                        onClick={() => setQuery('')}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Quick Search Tags */}
+                            {!query && (
+                                <div className="mt-4">
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        <span className="text-xs text-gray-500">Recent:</span>
+                                        {recentSearches.map(term => (
+                                            <button
+                                                key={term}
+                                                onClick={() => setQuery(term)}
+                                                className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded-full text-sm text-gray-300 transition-colors"
+                                            >
+                                                {term}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-xs text-gray-500">Suggested:</span>
+                                        {suggestedSearches.map(term => (
+                                            <button
+                                                key={term}
+                                                onClick={() => setQuery(term)}
+                                                className="px-3 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 rounded-full text-sm text-cyan-400 transition-colors"
+                                            >
+                                                {term}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Keyboard Hint */}
+                            <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
+                                <span><kbd className="px-2 py-0.5 bg-white/10 rounded">↵</kbd> to search</span>
+                                <span><kbd className="px-2 py-0.5 bg-white/10 rounded">ESC</kbd> to clear</span>
+                                <span><kbd className="px-2 py-0.5 bg-white/10 rounded">⌘K</kbd> quick search anywhere</span>
+                            </div>
+                        </div>
+
+                        {/* Filters */}
+                        {searched && (
+                            <div className="flex items-center gap-4 mb-6 overflow-x-auto pb-2">
+                                {[
+                                    { id: 'all', label: 'All Results' },
+                                    { id: 'opportunity', label: 'Opportunities' },
+                                    { id: 'document', label: 'Documents' },
+                                    { id: 'team_member', label: 'Team' },
+                                    { id: 'compliance', label: 'Compliance' },
+                                    { id: 'pricing', label: 'Pricing' }
+                                ].map(f => (
+                                    <button
+                                        key={f.id}
+                                        onClick={() => setFilter(f.id)}
+                                        className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors flex items-center gap-2 ${
+                                            filter === f.id
+                                                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                                                : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {f.label}
+                                        {resultCounts[f.id] > 0 && (
+                                            <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">
+                                                {resultCounts[f.id]}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Loading State */}
+                        {loading && (
+                            <div className="glass rounded-xl p-12 text-center">
+                                <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
+                                <p className="text-gray-400">Searching...</p>
+                            </div>
+                        )}
+
+                        {/* Results */}
+                        {!loading && searched && (
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <p className="text-sm text-gray-400">
+                                        {filteredResults.length} result{filteredResults.length !== 1 ? 's' : ''} for "{query}"
+                                    </p>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-sm text-white focus:outline-none"
+                                    >
+                                        <option value="relevance">Sort by Relevance</option>
+                                        <option value="date">Sort by Date</option>
+                                        <option value="type">Sort by Type</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {filteredResults.map(result => {
+                                        const style = entityIcons[result.entity_type] || entityIcons.document;
+                                        return (
+                                            <div 
+                                                key={result.id} 
+                                                className="glass rounded-xl p-5 hover:border-cyan-500/30 transition-all cursor-pointer group"
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <div className={`w-12 h-12 rounded-xl ${style.bg} flex items-center justify-center text-2xl flex-shrink-0`}>
+                                                        {style.icon}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <h3 
+                                                                className="font-semibold text-white group-hover:text-cyan-400 transition-colors"
+                                                                dangerouslySetInnerHTML={{ __html: highlightMatch(result.title, query) }}
+                                                            />
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${style.bg} ${style.color} capitalize`}>
+                                                                {result.entity_type.replace('_', ' ')}
+                                                            </span>
+                                                        </div>
+                                                        <p 
+                                                            className="text-sm text-gray-400 line-clamp-2"
+                                                            dangerouslySetInnerHTML={{ __html: highlightMatch(result.content, query) }}
+                                                        />
+                                                        <div className="flex items-center gap-4 mt-3">
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {result.tags?.map(tag => (
+                                                                    <span 
+                                                                        key={tag} 
+                                                                        className="text-xs bg-white/5 px-2 py-0.5 rounded text-gray-400"
+                                                                        dangerouslySetInnerHTML={{ __html: highlightMatch(tag, query) }}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                            {result.metadata && (
+                                                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                                                    {Object.entries(result.metadata).map(([key, value]) => (
+                                                                        <span key={key}>{key}: <span className="text-gray-300">{value}</span></span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <button className="opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400 hover:text-cyan-300">
+                                                        →
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* No Results */}
+                                {filteredResults.length === 0 && (
+                                    <div className="glass rounded-xl p-12 text-center">
+                                        <p className="text-4xl mb-4">🔍</p>
+                                        <p className="text-gray-400 mb-2">No results found for "{query}"</p>
+                                        <p className="text-sm text-gray-500">Try different keywords or remove filters</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Initial State - Search Tips */}
+                        {!searched && !loading && (
+                            <div className="glass rounded-xl p-6">
+                                <h3 className="font-semibold text-white mb-4">Search Tips</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {[
+                                        { tip: 'Use quotes for exact phrases', example: '"healthcare IT"' },
+                                        { tip: 'Search by document type', example: 'type:document' },
+                                        { tip: 'Filter by status', example: 'status:proposal' },
+                                        { tip: 'Find by team member', example: 'assignee:John' },
+                                        { tip: 'Search compliance items', example: 'compliance CMMC' },
+                                        { tip: 'Find recent items', example: 'updated:today' }
+                                    ].map((item, i) => (
+                                        <div key={i} className="flex items-start gap-3">
+                                            <span className="text-cyan-400">💡</span>
+                                            <div>
+                                                <p className="text-sm text-gray-300">{item.tip}</p>
+                                                <code 
+                                                    className="text-xs text-cyan-400 cursor-pointer hover:underline"
+                                                    onClick={() => setQuery(item.example)}
+                                                >
+                                                    {item.example}
+                                                </code>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<GlobalSearch />);
+    </script>
+</body>
+</html>
