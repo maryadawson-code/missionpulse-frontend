@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Opportunity Timeline</title>
+  <link rel="icon" type="image/png" href="MMT_icon_64px.png">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; color: #fff; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-slideUp { animation: slideUp 0.5s ease-out forwards; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #111C2E; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #243656; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00E5FA; }
+    .glass-card { background: rgba(17, 28, 46, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+    const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const Icons = {
+      home: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>,
+      calendar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
+      chevronLeft: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>,
+      chevronRight: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>,
+      flag: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2"/></svg>,
+    };
+
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const IconComponent = Icons[name];
+      return IconComponent ? <span className={`inline-block ${className}`}><IconComponent /></span> : null;
+    };
+
+    const PHASES = [
+      { key: 'gate1', name: 'Gate 1', color: '#6B7280' },
+      { key: 'blue', name: 'Blue Team', color: '#3B82F6' },
+      { key: 'pink', name: 'Pink Team', color: '#EC4899' },
+      { key: 'red', name: 'Red Team', color: '#EF4444' },
+      { key: 'gold', name: 'Gold Team', color: '#F59E0B' },
+      { key: 'submitted', name: 'Submitted', color: '#8B5CF6' },
+    ];
+
+    const DEMO_OPPORTUNITIES = [
+      { id: 'opp-1', name: 'MHS GENESIS Support', phase: 'red', startDate: '2025-01-15', dueDate: '2025-02-15', value: 45000000, pwin: 75 },
+      { id: 'opp-2', name: 'VA Telehealth Platform', phase: 'blue', startDate: '2025-02-01', dueDate: '2025-03-15', value: 32000000, pwin: 65 },
+      { id: 'opp-3', name: 'CMS Data Analytics', phase: 'pink', startDate: '2025-01-20', dueDate: '2025-02-28', value: 28000000, pwin: 70 },
+      { id: 'opp-4', name: 'IHS EHR Modernization', phase: 'gate1', startDate: '2025-02-10', dueDate: '2025-04-01', value: 18000000, pwin: 55 },
+      { id: 'opp-5', name: 'DHA Cybersecurity', phase: 'gold', startDate: '2025-01-05', dueDate: '2025-02-10', value: 22000000, pwin: 80 },
+      { id: 'opp-6', name: 'VA Claims Processing', phase: 'submitted', startDate: '2024-12-15', dueDate: '2025-01-31', value: 15000000, pwin: 60 },
+    ];
+
+    function OpportunityTimelineApp() {
+      const [opportunities, setOpportunities] = useState(DEMO_OPPORTUNITIES);
+      const [loading, setLoading] = useState(false);
+      const [viewStartDate, setViewStartDate] = useState(new Date('2025-01-01'));
+      const [zoomLevel, setZoomLevel] = useState('month');
+      const timelineRef = useRef(null);
+
+      const daysToShow = zoomLevel === 'week' ? 14 : zoomLevel === 'month' ? 45 : 90;
+      
+      const formatCurrency = (value) => {
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(0)}M`;
+        if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+        return `$${value}`;
+      };
+
+      const getDaysBetween = (start, end) => {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        return Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+      };
+
+      const getBarPosition = (opp) => {
+        const startDays = getDaysBetween(viewStartDate, opp.startDate);
+        const duration = getDaysBetween(opp.startDate, opp.dueDate);
+        const left = Math.max(0, (startDays / daysToShow) * 100);
+        const width = Math.min((duration / daysToShow) * 100, 100 - left);
+        return { left: `${left}%`, width: `${Math.max(width, 2)}%` };
+      };
+
+      const generateDateHeaders = () => {
+        const headers = [];
+        const currentDate = new Date(viewStartDate);
+        
+        for (let i = 0; i < daysToShow; i += (zoomLevel === 'week' ? 1 : zoomLevel === 'month' ? 7 : 14)) {
+          const date = new Date(currentDate);
+          date.setDate(date.getDate() + i);
+          headers.push({
+            date,
+            label: zoomLevel === 'week' 
+              ? date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
+              : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          });
+        }
+        return headers;
+      };
+
+      const navigateTimeline = (direction) => {
+        const newDate = new Date(viewStartDate);
+        const offset = direction * (zoomLevel === 'week' ? 7 : zoomLevel === 'month' ? 30 : 60);
+        newDate.setDate(newDate.getDate() + offset);
+        setViewStartDate(newDate);
+      };
+
+      const isOverdue = (dueDate) => new Date(dueDate) < new Date();
+      const isDueSoon = (dueDate) => {
+        const due = new Date(dueDate);
+        const now = new Date();
+        const diff = getDaysBetween(now, due);
+        return diff <= 7 && diff > 0;
+      };
+
+      const todayPosition = () => {
+        const days = getDaysBetween(viewStartDate, new Date());
+        if (days < 0 || days > daysToShow) return null;
+        return `${(days / daysToShow) * 100}%`;
+      };
+
+      const dateHeaders = generateDateHeaders();
+      const todayPos = todayPosition();
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          <header className="glass-card border-b border-white/10 sticky top-0 z-50">
+            <div className="max-w-full mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <a href="index.html" className="text-gray-400 hover:text-white transition-colors">
+                    <Icon name="home" className="w-5 h-5" />
+                  </a>
+                  <div className="w-px h-6 bg-white/20" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                      <Icon name="calendar" className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-bold text-white">Opportunity Timeline</h1>
+                      <p className="text-xs text-gray-400">Gantt view of proposal deadlines</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 bg-[#0A1628] rounded-lg p-1">
+                    {['week', 'month', 'quarter'].map(level => (
+                      <button
+                        key={level}
+                        onClick={() => setZoomLevel(level)}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all capitalize ${
+                          zoomLevel === level 
+                            ? 'bg-violet-500 text-white' 
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => navigateTimeline(-1)}
+                      className="p-2 bg-[#0A1628] rounded-lg text-gray-400 hover:text-white transition-colors"
+                    >
+                      <Icon name="chevronLeft" className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => setViewStartDate(new Date())}
+                      className="px-3 py-2 bg-[#0A1628] rounded-lg text-gray-400 hover:text-white transition-colors text-sm"
+                    >
+                      Today
+                    </button>
+                    <button 
+                      onClick={() => navigateTimeline(1)}
+                      className="p-2 bg-[#0A1628] rounded-lg text-gray-400 hover:text-white transition-colors"
+                    >
+                      <Icon name="chevronRight" className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="p-6">
+            {/* Phase Legend */}
+            <div className="flex items-center gap-4 mb-6 flex-wrap">
+              {PHASES.map(phase => (
+                <div key={phase.key} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded" style={{ backgroundColor: phase.color }} />
+                  <span className="text-sm text-gray-400">{phase.name}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Timeline Container */}
+            <div className="glass-card rounded-xl overflow-hidden">
+              {/* Date Headers */}
+              <div className="flex border-b border-white/10">
+                <div className="w-64 flex-shrink-0 px-4 py-3 bg-[#0A1628] border-r border-white/10">
+                  <span className="text-sm font-medium text-gray-400">Opportunity</span>
+                </div>
+                <div className="flex-1 relative">
+                  <div className="flex">
+                    {dateHeaders.map((header, idx) => (
+                      <div 
+                        key={idx} 
+                        className="flex-1 px-2 py-3 text-center text-xs text-gray-500 border-r border-white/5"
+                      >
+                        {header.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Timeline Rows */}
+              <div ref={timelineRef}>
+                {opportunities.map((opp, idx) => {
+                  const phase = PHASES.find(p => p.key === opp.phase);
+                  const barPos = getBarPosition(opp);
+                  const overdue = isOverdue(opp.dueDate);
+                  const dueSoon = isDueSoon(opp.dueDate);
+
+                  return (
+                    <div 
+                      key={opp.id}
+                      className="flex border-b border-white/5 hover:bg-white/5 transition-colors animate-slideUp"
+                      style={{ animationDelay: `${idx * 50}ms` }}
+                    >
+                      <div className="w-64 flex-shrink-0 px-4 py-4 border-r border-white/10">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-2 h-10 rounded-full"
+                            style={{ backgroundColor: phase?.color }}
+                          />
+                          <div className="min-w-0">
+                            <h3 className="font-medium text-white truncate">{opp.name}</h3>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span>{formatCurrency(opp.value)}</span>
+                              <span>•</span>
+                              <span className={opp.pwin >= 70 ? 'text-emerald-400' : opp.pwin >= 50 ? 'text-amber-400' : 'text-gray-400'}>
+                                {opp.pwin}% pWin
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 relative py-4 px-2">
+                        {/* Today marker */}
+                        {todayPos && (
+                          <div 
+                            className="absolute top-0 bottom-0 w-0.5 bg-cyan-500 z-10"
+                            style={{ left: todayPos }}
+                          />
+                        )}
+
+                        {/* Opportunity bar */}
+                        <div
+                          className="absolute h-8 rounded-lg flex items-center px-3 cursor-pointer transition-all hover:brightness-110"
+                          style={{
+                            left: barPos.left,
+                            width: barPos.width,
+                            backgroundColor: phase?.color,
+                            top: '50%',
+                            transform: 'translateY(-50%)'
+                          }}
+                        >
+                          <span className="text-xs font-medium text-white truncate">
+                            {phase?.name}
+                          </span>
+                          {(overdue || dueSoon) && (
+                            <span className={`ml-auto text-xs ${overdue ? 'text-red-200' : 'text-amber-200'}`}>
+                              {overdue ? '⚠️' : '⏰'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Due date marker */}
+                        <div
+                          className="absolute w-0.5 h-full bg-white/30"
+                          style={{ left: `${(getDaysBetween(viewStartDate, opp.dueDate) / daysToShow) * 100}%` }}
+                        >
+                          <div className="absolute -top-1 -left-1 w-2 h-2 bg-white rounded-full" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-4 gap-4 mt-6">
+              {[
+                { label: 'Active Opportunities', value: opportunities.length, color: '#00E5FA' },
+                { label: 'Due This Week', value: opportunities.filter(o => isDueSoon(o.dueDate)).length, color: '#F59E0B' },
+                { label: 'Overdue', value: opportunities.filter(o => isOverdue(o.dueDate)).length, color: '#EF4444' },
+                { label: 'Total Pipeline', value: formatCurrency(opportunities.reduce((acc, o) => acc + o.value, 0)), color: '#00D29F' },
+              ].map((stat, idx) => (
+                <div key={idx} className="glass-card rounded-xl p-4">
+                  <div className="text-sm text-gray-400 mb-1">{stat.label}</div>
+                  <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
+                </div>
+              ))}
+            </div>
+          </main>
+
+          <footer className="border-t border-white/10 py-4 mt-12">
+            <div className="max-w-7xl mx-auto px-6 text-center text-xs text-gray-500">
+              © 2026 Mission Meets Tech • MissionPulse v2.0 • Sprint 62
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<OpportunityTimelineApp />, document.getElementById('root'));
+  </script>
+</body>
+</html>
