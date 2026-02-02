@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amendment Tracker | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); min-height: 100vh; }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.1); }
+        .glass-card:hover { border-color: rgba(0,229,250,0.3); box-shadow: 0 0 30px rgba(0,229,250,0.1); }
+        .cyan-glow { text-shadow: 0 0 20px rgba(0,229,250,0.5); }
+        .impact-none { background: rgba(107,114,128,0.2); color: #9ca3af; }
+        .impact-low { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .impact-medium { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .impact-high { background: rgba(239,68,68,0.2); color: #f87171; }
+        .impact-critical { background: rgba(168,85,247,0.2); color: #c084fc; }
+        .type-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        .urgent-pulse { animation: urgentPulse 1s infinite; }
+        @keyframes urgentPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } }
+    </style>
+</head>
+<body class="text-white font-sans">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NDQ0NjUsImV4cCI6MjA4NTAyMDQ2NX0.3s8ufDDN2aWfkW0RBsAyJyacb2tjB7M550WSFIohHcA';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const demoAmendments = [
+            { id: '1', opportunity_id: '1', opportunity_title: 'DHA MHS GENESIS Support', amendment_number: 1, title: 'Clarification on Personnel Requirements', description: 'Clarifies minimum experience requirements for Key Personnel positions', received_date: '2026-01-20', response_due: '2026-01-27', amendment_type: 'technical', impact_level: 'medium', requires_response: true, response_submitted: true, response_date: '2026-01-25', affected_sections: ['L.5.2', 'M.3'], changes_summary: 'Key Personnel now require 8+ years vs 5+ years experience', status: 'incorporated', assigned_to: 'Sarah Chen' },
+            { id: '2', opportunity_id: '1', opportunity_title: 'DHA MHS GENESIS Support', amendment_number: 2, title: 'Extended Submission Deadline', description: 'Proposal due date extended by 2 weeks due to holiday schedule', received_date: '2026-01-28', response_due: null, amendment_type: 'schedule', impact_level: 'low', requires_response: false, response_submitted: false, affected_sections: ['L.2'], changes_summary: 'New due date: March 15, 2026 (was March 1)', status: 'acknowledged', assigned_to: 'Project Manager' },
+            { id: '3', opportunity_id: '1', opportunity_title: 'DHA MHS GENESIS Support', amendment_number: 3, title: 'Revised Pricing Instructions', description: 'Updated pricing template and cost volume instructions', received_date: '2026-02-01', response_due: '2026-02-08', amendment_type: 'pricing', impact_level: 'high', requires_response: true, response_submitted: false, affected_sections: ['L.7', 'L.8', 'Attachment J-2'], changes_summary: 'New labor rate ceiling structure and SCA WD compliance requirements', status: 'under_review', assigned_to: 'Finance Lead' },
+            { id: '4', opportunity_id: '2', opportunity_title: 'VA Claims Processing', amendment_number: 1, title: 'Q&A Response Publication', description: 'Government responses to industry questions', received_date: '2026-01-15', response_due: null, amendment_type: 'administrative', impact_level: 'medium', requires_response: false, response_submitted: false, affected_sections: [], changes_summary: '47 questions answered; several clarify evaluation criteria', status: 'incorporated', assigned_to: 'Capture Manager' },
+            { id: '5', opportunity_id: '2', opportunity_title: 'VA Claims Processing', amendment_number: 2, title: 'Scope Modification - AI Requirements', description: 'Added AI/ML component to technical requirements', received_date: '2026-02-02', response_due: '2026-02-09', amendment_type: 'scope', impact_level: 'critical', requires_response: true, response_submitted: false, affected_sections: ['C.3', 'C.4', 'L.5.4', 'M.2'], changes_summary: 'New requirement for AI-driven claims processing capability demonstration', status: 'pending', assigned_to: 'Tech Lead' },
+        ];
+
+        const demoOpportunities = [
+            { id: '1', title: 'DHA MHS GENESIS Support', nickname: 'GENESIS' },
+            { id: '2', title: 'VA Claims Processing Modernization', nickname: 'VA Claims' },
+            { id: '3', title: 'CMS Data Analytics Platform', nickname: 'CMS Analytics' },
+        ];
+
+        const typeConfig = {
+            administrative: { label: 'Administrative', icon: 'fa-file-alt', color: 'bg-gray-500/20 text-gray-400' },
+            technical: { label: 'Technical', icon: 'fa-cogs', color: 'bg-blue-500/20 text-blue-400' },
+            pricing: { label: 'Pricing', icon: 'fa-dollar-sign', color: 'bg-emerald-500/20 text-emerald-400' },
+            schedule: { label: 'Schedule', icon: 'fa-calendar', color: 'bg-purple-500/20 text-purple-400' },
+            scope: { label: 'Scope', icon: 'fa-expand-arrows-alt', color: 'bg-amber-500/20 text-amber-400' },
+            terms: { label: 'Terms & Conditions', icon: 'fa-gavel', color: 'bg-red-500/20 text-red-400' },
+        };
+
+        const statusConfig = {
+            pending: { label: 'Pending Review', icon: 'fa-clock', color: 'text-amber-400' },
+            under_review: { label: 'Under Review', icon: 'fa-search', color: 'text-blue-400' },
+            incorporated: { label: 'Incorporated', icon: 'fa-check-circle', color: 'text-emerald-400' },
+            response_submitted: { label: 'Response Submitted', icon: 'fa-paper-plane', color: 'text-cyan-400' },
+            acknowledged: { label: 'Acknowledged', icon: 'fa-thumbs-up', color: 'text-gray-400' },
+        };
+
+        function App() {
+            const [amendments, setAmendments] = useState([]);
+            const [opportunities, setOpportunities] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedAmendment, setSelectedAmendment] = useState(null);
+            const [filterOpp, setFilterOpp] = useState('all');
+            const [filterImpact, setFilterImpact] = useState('all');
+            const [showModal, setShowModal] = useState(false);
+
+            useEffect(() => {
+                loadData();
+            }, []);
+
+            async function loadData() {
+                try {
+                    const [amendRes, oppsRes] = await Promise.all([
+                        supabase.from('amendments').select('*, opportunities(title, nickname)').order('received_date', { ascending: false }),
+                        supabase.from('opportunities').select('id, title, nickname')
+                    ]);
+                    
+                    if (amendRes.data?.length > 0) {
+                        setAmendments(amendRes.data.map(a => ({...a, opportunity_title: a.opportunities?.title || a.opportunities?.nickname})));
+                    } else {
+                        setAmendments(demoAmendments);
+                    }
+                    setOpportunities(oppsRes.data?.length > 0 ? oppsRes.data : demoOpportunities);
+                } catch (err) {
+                    console.log('Using demo data');
+                    setAmendments(demoAmendments);
+                    setOpportunities(demoOpportunities);
+                }
+                setLoading(false);
+            }
+
+            const filteredAmendments = amendments.filter(a => {
+                if (filterOpp !== 'all' && a.opportunity_id !== filterOpp) return false;
+                if (filterImpact !== 'all' && a.impact_level !== filterImpact) return false;
+                return true;
+            });
+
+            const pendingResponse = amendments.filter(a => a.requires_response && !a.response_submitted);
+            const criticalImpact = amendments.filter(a => a.impact_level === 'critical' || a.impact_level === 'high');
+
+            function formatDate(dateStr) {
+                if (!dateStr) return 'N/A';
+                return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            }
+
+            function getDaysUntilDue(dueDate) {
+                if (!dueDate) return null;
+                const due = new Date(dueDate);
+                const today = new Date();
+                const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+                return diff;
+            }
+
+            function AmendmentCard({ amendment }) {
+                const typeCfg = typeConfig[amendment.amendment_type] || typeConfig.administrative;
+                const statusCfg = statusConfig[amendment.status] || statusConfig.pending;
+                const daysUntilDue = getDaysUntilDue(amendment.response_due);
+                const isUrgent = daysUntilDue !== null && daysUntilDue <= 3 && !amendment.response_submitted;
+
+                return (
+                    <div 
+                        className={`glass-card rounded-xl p-5 cursor-pointer hover:scale-[1.01] transition-all ${isUrgent ? 'urgent-pulse border-red-500/50' : ''}`}
+                        onClick={() => { setSelectedAmendment(amendment); setShowModal(true); }}
+                    >
+                        <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 w-12 h-12 rounded-xl flex items-center justify-center border border-cyan-500/30">
+                                    <span className="text-cyan-400 font-bold">#{amendment.amendment_number}</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-white font-semibold">{amendment.title}</h3>
+                                    <p className="text-cyan-400 text-sm">{amendment.opportunity_title}</p>
+                                </div>
+                            </div>
+                            <span className={`impact-${amendment.impact_level} type-badge`}>
+                                {amendment.impact_level?.toUpperCase()}
+                            </span>
+                        </div>
+
+                        <p className="text-gray-400 text-sm mb-4 line-clamp-2">{amendment.description}</p>
+
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            <span className={`${typeCfg.color} type-badge flex items-center gap-1`}>
+                                <i className={`fas ${typeCfg.icon}`}></i>
+                                {typeCfg.label}
+                            </span>
+                            <span className={`${statusCfg.color} type-badge flex items-center gap-1 bg-white/5`}>
+                                <i className={`fas ${statusCfg.icon}`}></i>
+                                {statusCfg.label}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span className="text-gray-500">Received</span>
+                                <p className="text-white">{formatDate(amendment.received_date)}</p>
+                            </div>
+                            {amendment.requires_response && (
+                                <div>
+                                    <span className="text-gray-500">Response Due</span>
+                                    <p className={`font-medium ${isUrgent ? 'text-red-400' : 'text-white'}`}>
+                                        {formatDate(amendment.response_due)}
+                                        {daysUntilDue !== null && !amendment.response_submitted && (
+                                            <span className={`ml-2 text-xs ${daysUntilDue <= 3 ? 'text-red-400' : daysUntilDue <= 7 ? 'text-amber-400' : 'text-gray-400'}`}>
+                                                ({daysUntilDue > 0 ? `${daysUntilDue}d left` : daysUntilDue === 0 ? 'TODAY' : 'OVERDUE'})
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {amendment.affected_sections?.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-700/50">
+                                <span className="text-gray-500 text-xs">Affected Sections:</span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                    {amendment.affected_sections.map((s, i) => (
+                                        <span key={i} className="bg-gray-700/50 px-2 py-0.5 rounded text-xs text-gray-300">{s}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {amendment.requires_response && (
+                            <div className="mt-4 pt-4 border-t border-gray-700/50 flex items-center justify-between">
+                                <span className="text-gray-400 text-sm flex items-center gap-2">
+                                    <i className={`fas ${amendment.response_submitted ? 'fa-check-circle text-emerald-400' : 'fa-exclamation-circle text-amber-400'}`}></i>
+                                    {amendment.response_submitted ? 'Response Submitted' : 'Response Required'}
+                                </span>
+                                {!amendment.response_submitted && (
+                                    <button className="text-cyan-400 text-sm hover:text-cyan-300">
+                                        Submit Response <i className="fas fa-arrow-right ml-1"></i>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            function AmendmentModal() {
+                if (!selectedAmendment) return null;
+                const typeCfg = typeConfig[selectedAmendment.amendment_type] || typeConfig.administrative;
+                const statusCfg = statusConfig[selectedAmendment.status] || statusConfig.pending;
+
+                return (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
+                        <div className="glass-card rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-start justify-between mb-6">
+                                <div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className="bg-cyan-500/20 text-cyan-400 px-3 py-1 rounded-lg font-bold">
+                                            Amendment #{selectedAmendment.amendment_number}
+                                        </span>
+                                        <span className={`impact-${selectedAmendment.impact_level} type-badge`}>
+                                            {selectedAmendment.impact_level?.toUpperCase()} IMPACT
+                                        </span>
+                                    </div>
+                                    <h2 className="text-xl font-bold text-white">{selectedAmendment.title}</h2>
+                                    <p className="text-cyan-400">{selectedAmendment.opportunity_title}</p>
+                                </div>
+                                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-white">
+                                    <i className="fas fa-times text-xl"></i>
+                                </button>
+                            </div>
+
+                            <div className="glass-card rounded-lg p-4 mb-6">
+                                <h3 className="text-gray-400 text-sm mb-2">Description</h3>
+                                <p className="text-white">{selectedAmendment.description}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="glass-card rounded-lg p-4">
+                                    <div className="text-gray-400 text-sm mb-1">Type</div>
+                                    <div className={`${typeCfg.color} type-badge inline-flex items-center gap-1`}>
+                                        <i className={`fas ${typeCfg.icon}`}></i>
+                                        {typeCfg.label}
+                                    </div>
+                                </div>
+                                <div className="glass-card rounded-lg p-4">
+                                    <div className="text-gray-400 text-sm mb-1">Status</div>
+                                    <div className={`${statusCfg.color} flex items-center gap-2`}>
+                                        <i className={`fas ${statusCfg.icon}`}></i>
+                                        {statusCfg.label}
+                                    </div>
+                                </div>
+                                <div className="glass-card rounded-lg p-4">
+                                    <div className="text-gray-400 text-sm mb-1">Received</div>
+                                    <div className="text-white font-medium">{formatDate(selectedAmendment.received_date)}</div>
+                                </div>
+                                <div className="glass-card rounded-lg p-4">
+                                    <div className="text-gray-400 text-sm mb-1">Assigned To</div>
+                                    <div className="text-white font-medium">{selectedAmendment.assigned_to || 'Unassigned'}</div>
+                                </div>
+                            </div>
+
+                            {selectedAmendment.requires_response && (
+                                <div className={`glass-card rounded-lg p-4 mb-6 border-l-4 ${selectedAmendment.response_submitted ? 'border-emerald-500' : 'border-amber-500'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-white font-semibold">Response Required</h3>
+                                            <p className="text-gray-400 text-sm">Due: {formatDate(selectedAmendment.response_due)}</p>
+                                        </div>
+                                        {selectedAmendment.response_submitted ? (
+                                            <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg text-sm">
+                                                <i className="fas fa-check mr-1"></i> Submitted {formatDate(selectedAmendment.response_date)}
+                                            </span>
+                                        ) : (
+                                            <button className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+                                                <i className="fas fa-paper-plane mr-1"></i> Submit Response
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedAmendment.changes_summary && (
+                                <div className="mb-6">
+                                    <h3 className="text-white font-semibold mb-2">Summary of Changes</h3>
+                                    <div className="glass-card rounded-lg p-4">
+                                        <p className="text-gray-300">{selectedAmendment.changes_summary}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedAmendment.affected_sections?.length > 0 && (
+                                <div className="mb-6">
+                                    <h3 className="text-white font-semibold mb-2">Affected Sections</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedAmendment.affected_sections.map((s, i) => (
+                                            <span key={i} className="bg-gray-700/50 px-3 py-1 rounded-lg text-gray-300">
+                                                <i className="fas fa-file-alt mr-2 text-cyan-400"></i>{s}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex gap-3">
+                                <button className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white py-3 rounded-lg font-medium transition-colors">
+                                    <i className="fas fa-edit mr-2"></i>Edit Amendment
+                                </button>
+                                <button className="flex-1 glass-card hover:bg-white/10 text-white py-3 rounded-lg font-medium transition-colors">
+                                    <i className="fas fa-download mr-2"></i>Download
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-center">
+                            <i className="fas fa-spinner fa-spin text-4xl text-cyan-400 mb-4"></i>
+                            <p className="text-gray-400">Loading Amendments...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen p-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                            <a href="index.html" className="text-gray-400 hover:text-cyan-400 transition-colors">
+                                <i className="fas fa-arrow-left text-xl"></i>
+                            </a>
+                            <div>
+                                <h1 className="text-3xl font-bold text-white cyan-glow">Amendment Tracker</h1>
+                                <p className="text-gray-400">Monitor RFP amendments and response deadlines</p>
+                            </div>
+                        </div>
+                        <button className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2">
+                            <i className="fas fa-plus"></i>
+                            Add Amendment
+                        </button>
+                    </div>
+
+                    {/* Alert Banner */}
+                    {pendingResponse.length > 0 && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <i className="fas fa-exclamation-triangle text-amber-400 text-xl"></i>
+                                <div>
+                                    <p className="text-amber-400 font-medium">{pendingResponse.length} Amendment{pendingResponse.length > 1 ? 's' : ''} Awaiting Response</p>
+                                    <p className="text-gray-400 text-sm">Review and submit responses before deadlines</p>
+                                </div>
+                            </div>
+                            <button className="text-amber-400 hover:text-amber-300 text-sm">
+                                View All <i className="fas fa-arrow-right ml-1"></i>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-4 gap-4 mb-8">
+                        <div className="glass-card rounded-xl p-5">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-gray-400 text-sm">Total Amendments</span>
+                                <i className="fas fa-file-signature text-cyan-400"></i>
+                            </div>
+                            <div className="text-3xl font-bold text-white">{amendments.length}</div>
+                        </div>
+                        <div className="glass-card rounded-xl p-5">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-gray-400 text-sm">Pending Response</span>
+                                <i className="fas fa-reply text-amber-400"></i>
+                            </div>
+                            <div className="text-3xl font-bold text-white">{pendingResponse.length}</div>
+                        </div>
+                        <div className="glass-card rounded-xl p-5">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-gray-400 text-sm">High/Critical Impact</span>
+                                <i className="fas fa-bolt text-red-400"></i>
+                            </div>
+                            <div className="text-3xl font-bold text-white">{criticalImpact.length}</div>
+                        </div>
+                        <div className="glass-card rounded-xl p-5">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-gray-400 text-sm">Incorporated</span>
+                                <i className="fas fa-check-circle text-emerald-400"></i>
+                            </div>
+                            <div className="text-3xl font-bold text-white">{amendments.filter(a => a.status === 'incorporated').length}</div>
+                        </div>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="flex gap-4 mb-6">
+                        <select 
+                            value={filterOpp} 
+                            onChange={e => setFilterOpp(e.target.value)}
+                            className="bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none"
+                        >
+                            <option value="all">All Opportunities</option>
+                            {opportunities.map(o => (
+                                <option key={o.id} value={o.id}>{o.nickname || o.title}</option>
+                            ))}
+                        </select>
+                        <select 
+                            value={filterImpact} 
+                            onChange={e => setFilterImpact(e.target.value)}
+                            className="bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-cyan-400 focus:outline-none"
+                        >
+                            <option value="all">All Impact Levels</option>
+                            <option value="critical">Critical</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div>
+
+                    {/* Amendments Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {filteredAmendments.map(amendment => (
+                            <AmendmentCard key={amendment.id} amendment={amendment} />
+                        ))}
+                    </div>
+
+                    {filteredAmendments.length === 0 && (
+                        <div className="text-center py-16 glass-card rounded-xl">
+                            <i className="fas fa-file-alt text-4xl text-gray-600 mb-4"></i>
+                            <p className="text-gray-400">No amendments found</p>
+                        </div>
+                    )}
+
+                    {/* Modal */}
+                    {showModal && <AmendmentModal />}
+
+                    {/* Footer */}
+                    <footer className="mt-12 pt-6 border-t border-gray-800 text-center text-gray-500 text-sm">
+                        © 2026 Mission Meets Tech • MissionPulse v2.0 • Sprint 67
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
