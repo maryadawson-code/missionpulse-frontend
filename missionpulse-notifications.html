@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Center | MissionPulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #00050F 0%, #001a2c 50%, #00050F 100%); }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0,229,250,0.15); }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const supabaseUrl = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0OTc5MzMsImV4cCI6MjA1MzA3MzkzM30.pBPpVaJmVkzhCcUvJPN2KnMGnstuc55sNv8CVsERRPg';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const DEMO_NOTIFICATIONS = [
+            { id: '1', notification_type: 'deadline', title: 'Proposal Due in 3 Days', message: 'DHA MHS Genesis AI Support - Proposal submission deadline approaching', priority: 'critical', is_read: false, source_url: '/missionpulse-calendar.html', created_at: '2026-02-02T08:00:00Z' },
+            { id: '2', notification_type: 'task', title: 'Task Assigned to You', message: 'Sarah M. assigned "Draft Technical Approach Section 3.1" to you', priority: 'high', is_read: false, source_url: '/missionpulse-tasks.html', created_at: '2026-02-02T07:30:00Z' },
+            { id: '3', notification_type: 'review', title: 'Document Ready for Review', message: 'Past Performance Volume v2 is ready for your review', priority: 'normal', is_read: false, source_url: '/missionpulse-documents.html', created_at: '2026-02-01T16:45:00Z' },
+            { id: '4', notification_type: 'approval', title: 'Approval Required', message: 'Cost Volume requires executive approval before submission', priority: 'high', is_read: false, source_url: '/missionpulse-hitl.html', created_at: '2026-02-01T14:20:00Z' },
+            { id: '5', notification_type: 'mention', title: 'You were mentioned', message: 'John D. mentioned you in a comment on "Staffing Matrix"', priority: 'normal', is_read: true, source_url: '/missionpulse-tasks.html', created_at: '2026-02-01T11:30:00Z' },
+            { id: '6', notification_type: 'milestone', title: 'Milestone Completed', message: 'Pink Team Review has been marked as completed', priority: 'normal', is_read: true, source_url: '/missionpulse-calendar.html', created_at: '2026-01-31T17:00:00Z' },
+            { id: '7', notification_type: 'compliance', title: 'Compliance Alert', message: '2 compliance items flagged in Section L response matrix', priority: 'high', is_read: true, source_url: '/missionpulse-compliance.html', created_at: '2026-01-31T15:30:00Z' },
+            { id: '8', notification_type: 'team', title: 'Team Update', message: 'New team member Lisa T. has joined the proposal team', priority: 'low', is_read: true, source_url: '/missionpulse-team.html', created_at: '2026-01-30T10:00:00Z' },
+            { id: '9', notification_type: 'system', title: 'AI Analysis Complete', message: 'Black Hat analysis for Leidos competitor profile is ready', priority: 'normal', is_read: true, source_url: '/missionpulse-blackhat.html', created_at: '2026-01-29T14:15:00Z' },
+            { id: '10', notification_type: 'deadline', title: 'Questions Due Tomorrow', message: 'Government Q&A questions must be submitted by 5pm EST', priority: 'critical', is_read: true, source_url: '/missionpulse-calendar.html', created_at: '2026-01-28T09:00:00Z' }
+        ];
+
+        const NOTIFICATION_TYPES = [
+            { id: 'all', label: 'All', icon: '📬' },
+            { id: 'deadline', label: 'Deadlines', icon: '⏰' },
+            { id: 'task', label: 'Tasks', icon: '✅' },
+            { id: 'review', label: 'Reviews', icon: '👁️' },
+            { id: 'approval', label: 'Approvals', icon: '✓' },
+            { id: 'mention', label: 'Mentions', icon: '@' },
+            { id: 'compliance', label: 'Compliance', icon: '⚠️' },
+            { id: 'system', label: 'System', icon: '🤖' }
+        ];
+
+        function NotificationCenter() {
+            const [notifications, setNotifications] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [filterType, setFilterType] = useState('all');
+            const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+
+            useEffect(() => { fetchNotifications(); }, []);
+
+            async function fetchNotifications() {
+                try {
+                    const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+                    if (error) throw error;
+                    setNotifications(data?.length > 0 ? data : DEMO_NOTIFICATIONS);
+                } catch (err) {
+                    console.log('Using demo data:', err.message);
+                    setNotifications(DEMO_NOTIFICATIONS);
+                }
+                setLoading(false);
+            }
+
+            function handleMarkRead(id) {
+                setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
+            }
+
+            function handleMarkAllRead() {
+                setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+            }
+
+            function handleDismiss(id) {
+                setNotifications(notifications.filter(n => n.id !== id));
+            }
+
+            function handleClearAll() {
+                setNotifications(notifications.filter(n => !n.is_read));
+            }
+
+            function formatTimeAgo(dateStr) {
+                const now = new Date();
+                const date = new Date(dateStr);
+                const diff = Math.floor((now - date) / 1000);
+                
+                if (diff < 60) return 'Just now';
+                if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+
+            const typeIcon = (type) => {
+                const found = NOTIFICATION_TYPES.find(t => t.id === type);
+                return found ? found.icon : '📌';
+            };
+
+            const priorityColor = (priority) => ({
+                'critical': 'border-l-red-500 bg-red-500/5',
+                'high': 'border-l-amber-500 bg-amber-500/5',
+                'normal': 'border-l-cyan-500 bg-cyan-500/5',
+                'low': 'border-l-gray-500 bg-gray-500/5'
+            }[priority] || 'border-l-gray-500');
+
+            const priorityBadge = (priority) => ({
+                'critical': 'bg-red-500/20 text-red-400',
+                'high': 'bg-amber-500/20 text-amber-400',
+                'normal': 'bg-cyan-500/20 text-cyan-400',
+                'low': 'bg-gray-500/20 text-gray-400'
+            }[priority] || 'bg-gray-500/20 text-gray-400');
+
+            // Filter notifications
+            const filteredNotifications = notifications.filter(n => {
+                if (filterType !== 'all' && n.notification_type !== filterType) return false;
+                if (showUnreadOnly && n.is_read) return false;
+                return true;
+            });
+
+            const unreadCount = notifications.filter(n => !n.is_read).length;
+            const criticalCount = notifications.filter(n => !n.is_read && n.priority === 'critical').length;
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header */}
+                    <header className="border-b border-cyan-500/20 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
+                        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <a href="index.html" className="text-cyan-400 hover:text-cyan-300">← Back</a>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-400 to-red-600 flex items-center justify-center text-xl relative">
+                                        🔔
+                                        {unreadCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center font-bold">
+                                                {unreadCount}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold">Notifications</h1>
+                                        <p className="text-xs text-gray-400">
+                                            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'} 
+                                            {criticalCount > 0 && <span className="text-red-400 ml-2">• {criticalCount} critical</span>}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {unreadCount > 0 && (
+                                    <button onClick={handleMarkAllRead} className="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20">
+                                        ✓ Mark All Read
+                                    </button>
+                                )}
+                                <button onClick={handleClearAll} className="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20">
+                                    🗑️ Clear Read
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="max-w-4xl mx-auto px-6 py-8">
+                        {/* Filters */}
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="flex flex-wrap gap-2">
+                                {NOTIFICATION_TYPES.map(type => (
+                                    <button key={type.id}
+                                        onClick={() => setFilterType(type.id)}
+                                        className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition-all ${filterType === type.id ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
+                                        <span>{type.icon}</span>
+                                        <span>{type.label}</span>
+                                        {type.id !== 'all' && (
+                                            <span className="text-xs opacity-60">
+                                                ({notifications.filter(n => n.notification_type === type.id).length})
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                            <label className="flex items-center gap-2 text-sm text-gray-400 ml-auto cursor-pointer">
+                                <input type="checkbox" checked={showUnreadOnly} onChange={(e) => setShowUnreadOnly(e.target.checked)}
+                                    className="rounded bg-white/10 border-white/20" />
+                                Unread only
+                            </label>
+                        </div>
+
+                        {/* Notifications List */}
+                        <div className="space-y-3">
+                            {filteredNotifications.map(notification => (
+                                <div key={notification.id}
+                                    className={`glass-card rounded-xl p-4 border-l-4 ${priorityColor(notification.priority)} ${!notification.is_read ? 'bg-white/5' : ''} transition-all hover:border-cyan-500/40`}>
+                                    <div className="flex items-start gap-4">
+                                        <div className="text-2xl">{typeIcon(notification.notification_type)}</div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-start justify-between gap-2 mb-1">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className={`font-medium ${!notification.is_read ? 'text-white' : 'text-gray-300'}`}>
+                                                        {notification.title}
+                                                    </h3>
+                                                    {!notification.is_read && (
+                                                        <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>
+                                                    )}
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded text-xs ${priorityBadge(notification.priority)}`}>
+                                                    {notification.priority}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-gray-400 mb-2">{notification.message}</p>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-500">{formatTimeAgo(notification.created_at)}</span>
+                                                <div className="flex items-center gap-2">
+                                                    {notification.source_url && (
+                                                        <a href={notification.source_url} className="text-xs text-cyan-400 hover:underline">
+                                                            View Details →
+                                                        </a>
+                                                    )}
+                                                    {!notification.is_read && (
+                                                        <button onClick={() => handleMarkRead(notification.id)} className="text-xs text-gray-500 hover:text-white">
+                                                            Mark read
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => handleDismiss(notification.id)} className="text-xs text-gray-500 hover:text-red-400">
+                                                        Dismiss
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {filteredNotifications.length === 0 && (
+                                <div className="text-center py-16">
+                                    <div className="text-6xl mb-4">🎉</div>
+                                    <h3 className="text-xl font-semibold mb-2">You're all caught up!</h3>
+                                    <p className="text-gray-400">No notifications match your filters</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Notification Settings */}
+                        <div className="mt-8 glass-card rounded-xl p-6">
+                            <h3 className="font-semibold mb-4">Notification Preferences</h3>
+                            <div className="space-y-3">
+                                {[
+                                    { label: 'Deadline reminders', desc: 'Get notified before proposal deadlines', checked: true },
+                                    { label: 'Task assignments', desc: 'When tasks are assigned to you', checked: true },
+                                    { label: 'Review requests', desc: 'Documents waiting for your review', checked: true },
+                                    { label: 'Approval requests', desc: 'Items requiring your approval', checked: true },
+                                    { label: 'Team mentions', desc: 'When someone mentions you', checked: true },
+                                    { label: 'Compliance alerts', desc: 'Compliance issues detected', checked: true },
+                                    { label: 'System updates', desc: 'AI analysis and system notifications', checked: false }
+                                ].map((pref, idx) => (
+                                    <div key={idx} className="flex items-center justify-between py-2 border-b border-white/10 last:border-0">
+                                        <div>
+                                            <div className="font-medium text-sm">{pref.label}</div>
+                                            <div className="text-xs text-gray-500">{pref.desc}</div>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" defaultChecked={pref.checked} className="sr-only peer" />
+                                            <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                                        </label>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<NotificationCenter />, document.getElementById('root'));
+    </script>
+</body>
+</html>
