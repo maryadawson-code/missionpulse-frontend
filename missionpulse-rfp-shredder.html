@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFP Shredder | MissionPulse</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; min-height: 100vh; }
+    .glass { background: rgba(0, 229, 250, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(0, 229, 250, 0.1); }
+    .glass-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+    .glow-cyan { box-shadow: 0 0 30px rgba(0, 229, 250, 0.15); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+    .animate-scan { animation: scan 2s ease-in-out infinite; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0, 229, 250, 0.3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Demo extracted requirements
+    const DEMO_REQUIREMENTS = [
+      { id: 1, section: 'L.3.1', type: 'Mandatory', text: 'Contractor shall provide 24/7 system monitoring and support.', status: 'mapped', compliance: 'PWS 3.1.1', priority: 'critical' },
+      { id: 2, section: 'L.3.2', type: 'Mandatory', text: 'All personnel must have minimum Secret clearance.', status: 'mapped', compliance: 'PWS 3.2.1', priority: 'critical' },
+      { id: 3, section: 'L.4.1', type: 'Mandatory', text: 'System must achieve FedRAMP Moderate authorization within 12 months.', status: 'flagged', compliance: null, priority: 'high' },
+      { id: 4, section: 'L.5.1', type: 'Optional', text: 'Cloud hosting preferred on AWS GovCloud or Azure Government.', status: 'mapped', compliance: 'PWS 5.1.2', priority: 'medium' },
+      { id: 5, section: 'M.2.1', type: 'Evaluation', text: 'Technical approach will be evaluated on innovation and risk mitigation.', status: 'noted', compliance: null, priority: 'high' },
+      { id: 6, section: 'M.3.1', type: 'Evaluation', text: 'Past performance must demonstrate 3 similar contracts within 5 years.', status: 'mapped', compliance: 'Vol II Sec B', priority: 'critical' },
+      { id: 7, section: 'L.6.2', type: 'Mandatory', text: 'Contractor shall comply with NIST 800-171 for CUI handling.', status: 'mapped', compliance: 'PWS 6.3.1', priority: 'critical' },
+      { id: 8, section: 'L.7.1', type: 'Mandatory', text: 'Weekly status reports required within 48 hours of period end.', status: 'unmapped', compliance: null, priority: 'low' },
+    ];
+
+    const DEMO_SECTIONS = [
+      { id: 'l', name: 'Section L - Instructions', count: 24, extracted: 18 },
+      { id: 'm', name: 'Section M - Evaluation', count: 12, extracted: 12 },
+      { id: 'c', name: 'Section C - SOW/PWS', count: 45, extracted: 38 },
+      { id: 'h', name: 'Section H - Clauses', count: 67, extracted: 52 },
+      { id: 'j', name: 'Section J - Attachments', count: 8, extracted: 8 },
+    ];
+
+    // Status Badge Component
+    const StatusBadge = ({ status }) => {
+      const styles = {
+        mapped: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        flagged: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        unmapped: 'bg-red-500/20 text-red-400 border-red-500/30',
+        noted: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      };
+      return (
+        <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${styles[status]}`}>
+          {status.toUpperCase()}
+        </span>
+      );
+    };
+
+    // Priority Badge
+    const PriorityBadge = ({ priority }) => {
+      const styles = {
+        critical: 'bg-red-500/20 text-red-400',
+        high: 'bg-orange-500/20 text-orange-400',
+        medium: 'bg-yellow-500/20 text-yellow-400',
+        low: 'bg-slate-500/20 text-slate-400',
+      };
+      return (
+        <span className={`px-2 py-0.5 text-xs font-medium rounded ${styles[priority]}`}>
+          {priority}
+        </span>
+      );
+    };
+
+    function RFPShredder() {
+      const [uploadedFile, setUploadedFile] = useState(null);
+      const [analyzing, setAnalyzing] = useState(false);
+      const [progress, setProgress] = useState(0);
+      const [requirements, setRequirements] = useState([]);
+      const [sections, setSections] = useState([]);
+      const [selectedSection, setSelectedSection] = useState('all');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [showAnalysis, setShowAnalysis] = useState(false);
+      const fileInputRef = useRef(null);
+
+      // Simulate file analysis
+      const analyzeFile = async (file) => {
+        setAnalyzing(true);
+        setProgress(0);
+        
+        // Simulate progress
+        const interval = setInterval(() => {
+          setProgress(prev => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + Math.random() * 15;
+          });
+        }, 300);
+
+        // Simulate analysis time
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        clearInterval(interval);
+        setProgress(100);
+        setRequirements(DEMO_REQUIREMENTS);
+        setSections(DEMO_SECTIONS);
+        setShowAnalysis(true);
+        setAnalyzing(false);
+      };
+
+      const handleFileUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          setUploadedFile(file);
+          analyzeFile(file);
+        }
+      };
+
+      const handleDrop = (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+          setUploadedFile(file);
+          analyzeFile(file);
+        }
+      };
+
+      const filteredRequirements = requirements.filter(req => {
+        if (selectedSection !== 'all') {
+          if (!req.section.toLowerCase().startsWith(selectedSection)) return false;
+        }
+        if (searchQuery) {
+          return req.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                 req.section.toLowerCase().includes(searchQuery.toLowerCase());
+        }
+        return true;
+      });
+
+      const stats = {
+        total: requirements.length,
+        mapped: requirements.filter(r => r.status === 'mapped').length,
+        flagged: requirements.filter(r => r.status === 'flagged').length,
+        unmapped: requirements.filter(r => r.status === 'unmapped').length,
+        critical: requirements.filter(r => r.priority === 'critical').length,
+      };
+
+      return (
+        <div className="min-h-screen bg-[#00050F]">
+          {/* Header */}
+          <header className="glass border-b border-slate-700/50 sticky top-0 z-50">
+            <div className="max-w-[1800px] mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <a href="missionpulse-nav-hub.html" className="text-slate-400 hover:text-white transition-colors">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </a>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-white">RFP Shredder</h1>
+                    <p className="text-xs text-purple-400">AI-Powered Document Analysis</p>
+                  </div>
+                </div>
+                {showAnalysis && (
+                  <button
+                    onClick={() => { setShowAnalysis(false); setUploadedFile(null); }}
+                    className="px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-slate-300 hover:border-cyan-500/50 transition-all"
+                  >
+                    Upload New Document
+                  </button>
+                )}
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-[1800px] mx-auto px-6 py-8">
+            {!showAnalysis ? (
+              /* Upload Section */
+              <div className="max-w-2xl mx-auto">
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={(e) => e.preventDefault()}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="glass-card rounded-2xl p-12 text-center cursor-pointer hover:border-purple-500/50 transition-all group"
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.doc"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  
+                  {analyzing ? (
+                    <div className="space-y-6">
+                      <div className="w-20 h-20 mx-auto rounded-2xl bg-purple-500/20 flex items-center justify-center relative overflow-hidden">
+                        <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <div className="absolute left-0 right-0 h-1 bg-purple-400/50 animate-scan"></div>
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold mb-2">Analyzing: {uploadedFile?.name}</p>
+                        <div className="w-full bg-slate-800 rounded-full h-2 mb-2">
+                          <div 
+                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(progress, 100)}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-sm text-slate-400">
+                          {progress < 30 && 'Extracting text content...'}
+                          {progress >= 30 && progress < 60 && 'Identifying requirements...'}
+                          {progress >= 60 && progress < 90 && 'Mapping compliance items...'}
+                          {progress >= 90 && 'Finalizing analysis...'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-20 h-20 mx-auto rounded-2xl bg-purple-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">Upload RFP Document</h2>
+                      <p className="text-slate-400 mb-6">Drag & drop or click to upload PDF, DOCX, or DOC files</p>
+                      <div className="flex items-center justify-center gap-4 text-sm text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Section L/M Extraction
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Auto Requirements Matrix
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          FAR/DFARS Flagging
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Demo Button */}
+                {!analyzing && (
+                  <div className="text-center mt-6">
+                    <button
+                      onClick={() => {
+                        setUploadedFile({ name: 'DHA-HCIT-RFP-2025.pdf' });
+                        analyzeFile({ name: 'demo' });
+                      }}
+                      className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                    >
+                      Or try with demo RFP →
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Analysis Results */
+              <div className="space-y-6">
+                {/* Stats Row */}
+                <div className="grid grid-cols-5 gap-4">
+                  <div className="glass-card rounded-xl p-4">
+                    <p className="text-sm text-slate-400 mb-1">Total Requirements</p>
+                    <p className="text-2xl font-bold text-white">{stats.total}</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4">
+                    <p className="text-sm text-slate-400 mb-1">Mapped</p>
+                    <p className="text-2xl font-bold text-emerald-400">{stats.mapped}</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4">
+                    <p className="text-sm text-slate-400 mb-1">Flagged</p>
+                    <p className="text-2xl font-bold text-amber-400">{stats.flagged}</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4">
+                    <p className="text-sm text-slate-400 mb-1">Unmapped</p>
+                    <p className="text-2xl font-bold text-red-400">{stats.unmapped}</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4">
+                    <p className="text-sm text-slate-400 mb-1">Critical Items</p>
+                    <p className="text-2xl font-bold text-purple-400">{stats.critical}</p>
+                  </div>
+                </div>
+
+                {/* Sections Progress */}
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Document Sections</h3>
+                  <div className="grid grid-cols-5 gap-4">
+                    {sections.map(section => (
+                      <div key={section.id} className="text-center">
+                        <div className="relative w-16 h-16 mx-auto mb-2">
+                          <svg className="w-16 h-16 transform -rotate-90">
+                            <circle cx="32" cy="32" r="28" fill="none" stroke="#1e293b" strokeWidth="4" />
+                            <circle 
+                              cx="32" cy="32" r="28" fill="none" stroke="#8B5CF6" strokeWidth="4"
+                              strokeDasharray={`${(section.extracted / section.count) * 176} 176`}
+                            />
+                          </svg>
+                          <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">
+                            {Math.round((section.extracted / section.count) * 100)}%
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400">{section.name}</p>
+                        <p className="text-xs text-slate-500">{section.extracted}/{section.count}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex items-center gap-4">
+                  <div className="relative flex-1 max-w-md">
+                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search requirements..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-12 pr-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500/50"
+                    />
+                  </div>
+                  <select
+                    value={selectedSection}
+                    onChange={(e) => setSelectedSection(e.target.value)}
+                    className="px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-purple-500/50"
+                  >
+                    <option value="all">All Sections</option>
+                    <option value="l">Section L</option>
+                    <option value="m">Section M</option>
+                    <option value="c">Section C</option>
+                    <option value="h">Section H</option>
+                  </select>
+                  <button className="px-4 py-2.5 bg-purple-500/20 border border-purple-500/30 rounded-xl text-purple-400 hover:bg-purple-500/30 transition-all">
+                    Export Matrix
+                  </button>
+                </div>
+
+                {/* Requirements Table */}
+                <div className="glass-card rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-800/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Section</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Type</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Requirement</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Mapped To</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Priority</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/50">
+                        {filteredRequirements.map(req => (
+                          <tr key={req.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="px-4 py-3 text-sm font-mono text-cyan-400">{req.section}</td>
+                            <td className="px-4 py-3 text-sm text-slate-300">{req.type}</td>
+                            <td className="px-4 py-3 text-sm text-white max-w-md">{req.text}</td>
+                            <td className="px-4 py-3"><StatusBadge status={req.status} /></td>
+                            <td className="px-4 py-3 text-sm text-slate-400">{req.compliance || '—'}</td>
+                            <td className="px-4 py-3"><PriorityBadge priority={req.priority} /></td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <button className="p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                                <button className="p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<RFPShredder />);
+  </script>
+</body>
+</html>
