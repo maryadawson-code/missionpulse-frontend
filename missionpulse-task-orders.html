@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse S115 - Task Order Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Space Grotesk', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes barFill { from { width: 0%; } }
+    .animate-slide-in { animation: slideIn 0.4s ease-out forwards; }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-bar { animation: barFill 0.8s ease-out forwards; }
+    .glass-card { background: linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.7) 100%); backdrop-filter: blur(10px); border: 1px solid rgba(0,229,250,0.15); }
+    .glass-card:hover { border-color: rgba(0,229,250,0.3); }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #0a1628; } ::-webkit-scrollbar-thumb { background: rgba(0,229,250,0.3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMTgsImV4cCI6MjA1MzM5OTAxOH0.gFHBoGjPMWjCGuJNdxMGPOBmGMHBp0jSTbxxcFKqkPQ';
+    var sbClient;
+    try { sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) { sbClient = null; }
+
+    const Icons = {
+      folder: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
+      dollar: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      clock: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      alert: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      trending: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+    };
+    const Icon = ({ name, className = "w-4 h-4" }) => { const C = Icons[name]; return C ? <span className={`inline-block ${className}`}><C /></span> : null; };
+
+    const CONTRACTS = [
+      {
+        id: 1, name: 'DHA Health IT Services IDIQ', vehicle: 'IDIQ', contract_num: 'W81K04-25-D-0042', agency: 'DHA',
+        ceiling: 250000000, obligated: 62000000, invoiced: 48000000,
+        pop_start: '2025-03-01', pop_end: '2030-02-28', options: 4, options_exercised: 1,
+        task_orders: [
+          { id: 'TO-001', name: 'EHR Migration Phase 1', value: 32000000, obligated: 28000000, status: 'active', pop: '2025-03-01 to 2026-08-31', clins: [
+            { num: '0001', desc: 'Program Management', type: 'FFP', funded: 4200000, expended: 3100000, status: 'green' },
+            { num: '0002', desc: 'Systems Engineering', type: 'T&M', funded: 12000000, expended: 9800000, status: 'green' },
+            { num: '0003', desc: 'Data Migration', type: 'FFP', funded: 8500000, expended: 6200000, status: 'amber' },
+            { num: '0004', desc: 'Testing & Validation', type: 'FFP', funded: 3300000, expended: 1200000, status: 'green' },
+          ]},
+          { id: 'TO-002', name: 'Cybersecurity Assessment', value: 8500000, obligated: 8500000, status: 'active', pop: '2025-06-01 to 2026-05-31', clins: [
+            { num: '0001', desc: 'Security Assessment', type: 'FFP', funded: 5000000, expended: 3800000, status: 'green' },
+            { num: '0002', desc: 'Remediation Support', type: 'T&M', funded: 3500000, expended: 2100000, status: 'green' },
+          ]},
+          { id: 'TO-003', name: 'AI Analytics Pilot', value: 15000000, obligated: 5000000, status: 'pending', pop: '2026-04-01 to 2027-03-31', clins: [
+            { num: '0001', desc: 'AI Development', type: 'T&M', funded: 3000000, expended: 0, status: 'not_started' },
+            { num: '0002', desc: 'Infrastructure', type: 'FFP', funded: 2000000, expended: 0, status: 'not_started' },
+          ]},
+        ]
+      },
+      {
+        id: 2, name: 'VA Digital Services BPA', vehicle: 'BPA', contract_num: '36C10X25-A-0108', agency: 'VA',
+        ceiling: 75000000, obligated: 18000000, invoiced: 12500000,
+        pop_start: '2025-07-01', pop_end: '2030-06-30', options: 4, options_exercised: 0,
+        task_orders: [
+          { id: 'TO-001', name: 'Claims Portal Modernization', value: 12000000, obligated: 12000000, status: 'active', pop: '2025-07-01 to 2026-12-31', clins: [
+            { num: '0001', desc: 'UX Redesign', type: 'FFP', funded: 3500000, expended: 2800000, status: 'green' },
+            { num: '0002', desc: 'Backend Development', type: 'T&M', funded: 6000000, expended: 4200000, status: 'amber' },
+            { num: '0003', desc: 'QA & Deployment', type: 'FFP', funded: 2500000, expended: 800000, status: 'green' },
+          ]},
+          { id: 'TO-002', name: 'Data Analytics Dashboard', value: 6000000, obligated: 6000000, status: 'active', pop: '2025-09-01 to 2026-08-31', clins: [
+            { num: '0001', desc: 'Dashboard Dev', type: 'T&M', funded: 4000000, expended: 2100000, status: 'green' },
+            { num: '0002', desc: 'Data Integration', type: 'FFP', funded: 2000000, expended: 1400000, status: 'green' },
+          ]},
+        ]
+      },
+    ];
+
+    const ConnectionIndicator = ({ connected }) => (
+      <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono" style={{ background: connected ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)', border: `1px solid ${connected ? 'rgba(0,255,136,0.3)' : 'rgba(255,184,0,0.3)'}` }}>
+        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-amber-400 animate-pulse'}`} />
+        <span style={{ color: connected ? '#00ff88' : '#ffb800' }}>{connected ? 'LIVE' : 'DEMO'}</span>
+      </div>
+    );
+
+    const TaskOrderTracker = () => {
+      const [connected, setConnected] = useState(false);
+      const [userRole, setUserRole] = useState('CEO');
+      const [expandedContract, setExpandedContract] = useState(CONTRACTS[0].id);
+      const [expandedTO, setExpandedTO] = useState(null);
+
+      useEffect(() => {
+        const allowed = ['CEO','COO','CAP','PM','FIN','CON','Admin'];
+        if (!allowed.includes(userRole)) setUserRole(null);
+      }, [userRole]);
+
+      useEffect(() => {
+        const tryConnect = async () => {
+          if (!sbClient) return;
+          try { const { data } = await sbClient.from('opportunities').select('id').limit(1); if (data) setConnected(true); } catch(e) {}
+        };
+        tryConnect();
+      }, []);
+
+      const fmt = (n) => n >= 1000000 ? `$${(n/1000000).toFixed(1)}M` : `$${(n/1000).toFixed(0)}K`;
+      const pct = (a,b) => b > 0 ? Math.round((a/b)*100) : 0;
+
+      const totalCeiling = CONTRACTS.reduce((s,c) => s + c.ceiling, 0);
+      const totalObligated = CONTRACTS.reduce((s,c) => s + c.obligated, 0);
+      const totalInvoiced = CONTRACTS.reduce((s,c) => s + c.invoiced, 0);
+      const totalTOs = CONTRACTS.reduce((s,c) => s + c.task_orders.length, 0);
+
+      const ClinStatus = ({ status }) => {
+        const m = { green: { c: '#00ff88', l: 'On Track' }, amber: { c: '#ffb800', l: 'At Risk' }, red: { c: '#ff4444', l: 'Over' }, not_started: { c: '#64748b', l: 'Not Started' } };
+        const s = m[status] || m.green;
+        return <span className="flex items-center gap-1.5 text-xs font-mono"><div className="w-2 h-2 rounded-full" style={{ background: s.c }} /><span style={{ color: s.c }}>{s.l}</span></span>;
+      };
+
+      const TOStatusBadge = ({ status }) => {
+        const m = { active: { c: '#00ff88', l: 'ACTIVE' }, pending: { c: '#ffb800', l: 'PENDING' }, complete: { c: '#00E5FA', l: 'COMPLETE' }, closed: { c: '#64748b', l: 'CLOSED' } };
+        const s = m[status] || m.active;
+        return <span className="px-2 py-0.5 rounded text-xs font-mono font-bold" style={{ background: `${s.c}15`, color: s.c, border: `1px solid ${s.c}30` }}>{s.l}</span>;
+      };
+
+      return (
+        <div className="min-h-screen" style={{ background: '#00050F' }}>
+          <div className="max-w-7xl mx-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-2xl font-bold text-white">Task Order Tracker</h1>
+                  <ConnectionIndicator connected={connected} />
+                </div>
+                <p className="text-sm text-slate-400">IDIQ/BPA management, ceiling vs obligated, PoP tracking & CLIN status</p>
+              </div>
+            </div>
+
+            {/* KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {[
+                { label: 'Total Ceiling', value: fmt(totalCeiling), color: '#00E5FA', icon: 'dollar' },
+                { label: 'Obligated', value: fmt(totalObligated), color: '#a78bfa', sub: `${pct(totalObligated,totalCeiling)}% of ceiling` },
+                { label: 'Invoiced', value: fmt(totalInvoiced), color: '#00ff88', sub: `${pct(totalInvoiced,totalObligated)}% of obligated` },
+                { label: 'Task Orders', value: totalTOs, color: '#ffb800', icon: 'folder' },
+              ].map((k,i) => (
+                <div key={i} className="glass-card rounded-xl p-4 animate-slide-in" style={{ animationDelay: `${i*0.05}s` }}>
+                  <span className="text-xs text-slate-500 font-mono uppercase">{k.label}</span>
+                  <div className="text-2xl font-mono font-bold mt-1" style={{ color: k.color }}>{k.value}</div>
+                  {k.sub && <span className="text-xs text-slate-500">{k.sub}</span>}
+                </div>
+              ))}
+            </div>
+
+            {/* Contract Accordion */}
+            <div className="space-y-4">
+              {CONTRACTS.map((contract, ci) => (
+                <div key={contract.id} className="glass-card rounded-xl overflow-hidden animate-slide-in" style={{ animationDelay: `${ci*0.1}s` }}>
+                  {/* Contract Header */}
+                  <div onClick={() => setExpandedContract(expandedContract === contract.id ? null : contract.id)} className="p-5 cursor-pointer hover:bg-slate-800/20 transition">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="text-white font-semibold">{contract.name}</h3>
+                          <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{contract.vehicle}</span>
+                          <span className="text-xs font-mono text-slate-500">{contract.agency}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-mono">{contract.contract_num} · PoP: {contract.pop_start} → {contract.pop_end} · Options: {contract.options_exercised}/{contract.options}</p>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right"><div className="text-sm font-mono font-bold text-cyan-400">{fmt(contract.ceiling)}</div><div className="text-xs text-slate-500">ceiling</div></div>
+                        <div className="text-right"><div className="text-sm font-mono font-bold text-purple-400">{fmt(contract.obligated)}</div><div className="text-xs text-slate-500">obligated</div></div>
+                        <span className="text-slate-500">{expandedContract === contract.id ? '▾' : '▸'}</span>
+                      </div>
+                    </div>
+                    {/* Ceiling utilization bar */}
+                    <div className="mt-3 h-2 rounded-full bg-slate-700/30 overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-cyan-500/60 to-purple-500/60 animate-bar" style={{ width: `${pct(contract.obligated, contract.ceiling)}%` }} />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-xs text-slate-600 font-mono">{pct(contract.obligated, contract.ceiling)}% obligated</span>
+                      <span className="text-xs text-slate-600 font-mono">{fmt(contract.ceiling - contract.obligated)} remaining</span>
+                    </div>
+                  </div>
+
+                  {/* Task Orders */}
+                  {expandedContract === contract.id && (
+                    <div className="border-t border-slate-700/20">
+                      {contract.task_orders.map((to, ti) => (
+                        <div key={to.id} className="border-b border-slate-700/10 last:border-0">
+                          <div onClick={() => setExpandedTO(expandedTO === `${contract.id}-${to.id}` ? null : `${contract.id}-${to.id}`)} className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-800/10 transition ml-4">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-mono text-cyan-400 font-bold">{to.id}</span>
+                              <span className="text-sm text-white">{to.name}</span>
+                              <TOStatusBadge status={to.status} />
+                            </div>
+                            <div className="flex items-center gap-6">
+                              <div className="text-right"><span className="text-sm font-mono text-slate-300">{fmt(to.value)}</span></div>
+                              <div className="text-right"><span className="text-sm font-mono text-purple-400">{fmt(to.obligated)}</span><span className="text-xs text-slate-500 ml-1">obl</span></div>
+                              <span className="text-xs text-slate-500 font-mono">{to.clins.length} CLINs</span>
+                              <span className="text-slate-600 text-sm">{expandedTO === `${contract.id}-${to.id}` ? '▾' : '▸'}</span>
+                            </div>
+                          </div>
+
+                          {/* CLINs */}
+                          {expandedTO === `${contract.id}-${to.id}` && (
+                            <div className="bg-slate-900/30 px-5 py-3 ml-8 mr-4 mb-3 rounded-lg">
+                              <div className="text-xs text-slate-500 font-mono mb-1">PoP: {to.pop}</div>
+                              <div className="grid grid-cols-6 gap-2 text-xs font-mono text-slate-500 mb-2 px-2 pt-2 border-t border-slate-700/20">
+                                <span>CLIN</span><span className="col-span-2">Description</span><span>Type</span><span>Funded</span><span>Status</span>
+                              </div>
+                              {to.clins.map((clin, k) => (
+                                <div key={k} className="grid grid-cols-6 gap-2 items-center px-2 py-2 text-sm hover:bg-slate-800/20 rounded">
+                                  <span className="font-mono text-cyan-400 text-xs font-bold">{clin.num}</span>
+                                  <span className="text-slate-300 col-span-2 text-xs">{clin.desc}</span>
+                                  <span className="text-xs font-mono text-slate-500">{clin.type}</span>
+                                  <div>
+                                    <div className="text-xs font-mono text-slate-300">{fmt(clin.funded)}</div>
+                                    <div className="h-1.5 rounded-full bg-slate-700/30 overflow-hidden mt-1">
+                                      <div className="h-full rounded-full" style={{ width: `${pct(clin.expended, clin.funded)}%`, background: clin.status === 'green' ? '#00ff88' : clin.status === 'amber' ? '#ffb800' : '#64748b' }} />
+                                    </div>
+                                    <div className="text-xs text-slate-600 font-mono">{pct(clin.expended, clin.funded)}% spent</div>
+                                  </div>
+                                  <ClinStatus status={clin.status} />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 text-center">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <Icon name="shield" className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-xs text-amber-500/80 font-mono">AI GENERATED — REQUIRES HUMAN REVIEW</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<TaskOrderTracker />, document.getElementById('root'));
+  </script>
+</body>
+</html>
