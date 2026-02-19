@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse — Milestones Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#00050F;min-height:100vh;color:#e2e8f0}
+    ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,229,250,0.2);border-radius:3px}
+  </style>
+</head>
+<body>
+  <div id="missionpulse-sidebar"></div>
+  <div class="main-content"><div id="root"></div></div>
+  <script src="missionpulse-nav.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    const SB_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5MjMxNDMsImV4cCI6MjA1MzQ5OTE0M30.GFbjgRMgVhMMcnNaJMrLVnJI_u6yBGJOhO-LHKE8sZQ';
+    var sbClient;
+    try { sbClient = supabase.createClient(SB_URL, SB_KEY); } catch(e) { sbClient = null; }
+
+    const ROLES_ALLOWED = ['*'];
+    const TODAY = '2026-02-18';
+
+    // ── SHIPLEY GATES ──
+    const SHIPLEY_GATES = [
+      { id:'G0', name:'Opportunity Identified', shortName:'OPP ID', phase:'Capture' },
+      { id:'G1', name:'Bid / No-Bid Decision', shortName:'BID/NO-BID', phase:'Capture' },
+      { id:'G2', name:'Capture Plan Approved', shortName:'CAP PLAN', phase:'Capture' },
+      { id:'G3', name:'Go / No-Go Decision', shortName:'GO/NO-GO', phase:'Proposal' },
+      { id:'G4', name:'Blue Team Review', shortName:'BLUE', phase:'Proposal' },
+      { id:'G5', name:'Pink Team Review', shortName:'PINK', phase:'Proposal' },
+      { id:'G6', name:'Red Team Review', shortName:'RED', phase:'Proposal' },
+      { id:'G7', name:'Gold Team / Final Review', shortName:'GOLD', phase:'Proposal' },
+      { id:'G8', name:'Submission', shortName:'SUBMIT', phase:'Submission' },
+      { id:'G9', name:'Orals / Discussions', shortName:'ORALS', phase:'Post-Submit' },
+      { id:'G10', name:'Award Decision', shortName:'AWARD', phase:'Post-Submit' },
+    ];
+
+    const DEMO_MILESTONES = [
+      // DHA EHR Modernization
+      { id:1, oppId:1, opp:'DHA EHR Modernization', gate:'G0', date:'2025-09-15', status:'COMPLETE', owner:'Mary W.', notes:'Sam.gov notice identified' },
+      { id:2, oppId:1, opp:'DHA EHR Modernization', gate:'G1', date:'2025-10-01', status:'COMPLETE', owner:'Mary W.', notes:'Board approved — pursue' },
+      { id:3, oppId:1, opp:'DHA EHR Modernization', gate:'G2', date:'2025-10-20', status:'COMPLETE', owner:'Tom P.', notes:'Capture plan locked' },
+      { id:4, oppId:1, opp:'DHA EHR Modernization', gate:'G3', date:'2025-11-15', status:'COMPLETE', owner:'Mary W.', notes:'Go decision — full team assigned' },
+      { id:5, oppId:1, opp:'DHA EHR Modernization', gate:'G4', date:'2025-12-10', status:'COMPLETE', owner:'Sarah K.', notes:'Blue team passed, 12 comments' },
+      { id:6, oppId:1, opp:'DHA EHR Modernization', gate:'G5', date:'2026-01-15', status:'COMPLETE', owner:'Sarah K.', notes:'Pink team — 28 findings resolved' },
+      { id:7, oppId:1, opp:'DHA EHR Modernization', gate:'G6', date:'2026-02-20', status:'DUE SOON', owner:'Review Board', notes:'Red team scheduled — 2 days out' },
+      { id:8, oppId:1, opp:'DHA EHR Modernization', gate:'G7', date:'2026-03-01', status:'UPCOMING', owner:'Mary W.', notes:'Gold team review' },
+      { id:9, oppId:1, opp:'DHA EHR Modernization', gate:'G8', date:'2026-03-10', status:'UPCOMING', owner:'Mary W.', notes:'Submission deadline' },
+
+      // VA Claims Processing AI
+      { id:10, oppId:2, opp:'VA Claims Processing AI', gate:'G0', date:'2025-11-01', status:'COMPLETE', owner:'Mary W.', notes:'RFI identified on eBuy' },
+      { id:11, oppId:2, opp:'VA Claims Processing AI', gate:'G1', date:'2025-11-15', status:'COMPLETE', owner:'Mary W.', notes:'Bid decision — approved' },
+      { id:12, oppId:2, opp:'VA Claims Processing AI', gate:'G2', date:'2025-12-05', status:'COMPLETE', owner:'Tom P.', notes:'Capture plan — teaming strategy set' },
+      { id:13, oppId:2, opp:'VA Claims Processing AI', gate:'G3', date:'2026-01-10', status:'COMPLETE', owner:'Mary W.', notes:'Go — SDVOSB set-aside confirmed' },
+      { id:14, oppId:2, opp:'VA Claims Processing AI', gate:'G4', date:'2026-02-15', status:'COMPLETE', owner:'Sarah K.', notes:'Blue team done, 8 minor findings' },
+      { id:15, oppId:2, opp:'VA Claims Processing AI', gate:'G5', date:'2026-03-05', status:'UPCOMING', owner:'Review Board', notes:'Pink team scheduled' },
+      { id:16, oppId:2, opp:'VA Claims Processing AI', gate:'G6', date:'2026-03-20', status:'UPCOMING', owner:'Review Board', notes:'Red team' },
+      { id:17, oppId:2, opp:'VA Claims Processing AI', gate:'G8', date:'2026-04-01', status:'UPCOMING', owner:'Mary W.', notes:'Submission due' },
+
+      // CMS Data Analytics
+      { id:18, oppId:3, opp:'CMS Data Analytics Platform', gate:'G0', date:'2025-08-01', status:'COMPLETE', owner:'Mary W.', notes:'' },
+      { id:19, oppId:3, opp:'CMS Data Analytics Platform', gate:'G1', date:'2025-08-20', status:'COMPLETE', owner:'Mary W.', notes:'' },
+      { id:20, oppId:3, opp:'CMS Data Analytics Platform', gate:'G2', date:'2025-09-10', status:'COMPLETE', owner:'Tom P.', notes:'' },
+      { id:21, oppId:3, opp:'CMS Data Analytics Platform', gate:'G3', date:'2025-10-01', status:'COMPLETE', owner:'Mary W.', notes:'' },
+      { id:22, oppId:3, opp:'CMS Data Analytics Platform', gate:'G4', date:'2025-11-01', status:'COMPLETE', owner:'Sarah K.', notes:'' },
+      { id:23, oppId:3, opp:'CMS Data Analytics Platform', gate:'G5', date:'2025-12-01', status:'COMPLETE', owner:'Sarah K.', notes:'Pink team — clean' },
+      { id:24, oppId:3, opp:'CMS Data Analytics Platform', gate:'G6', date:'2026-01-20', status:'COMPLETE', owner:'Review Board', notes:'Red team passed' },
+      { id:25, oppId:3, opp:'CMS Data Analytics Platform', gate:'G7', date:'2026-02-05', status:'COMPLETE', owner:'Mary W.', notes:'Gold team — final edits' },
+      { id:26, oppId:3, opp:'CMS Data Analytics Platform', gate:'G8', date:'2026-02-14', status:'COMPLETE', owner:'Mary W.', notes:'Submitted on time' },
+      { id:27, oppId:3, opp:'CMS Data Analytics Platform', gate:'G10', date:'2026-04-15', status:'UPCOMING', owner:'CO', notes:'Award expected' },
+    ];
+
+    const ConnectionDot = ({ c }) => (
+      <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', color:c?'#00ff88':'#f59e0b' }}>
+        <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:c?'#00ff88':'#f59e0b', boxShadow:`0 0 6px ${c?'#00ff88':'#f59e0b'}` }} />{c?'LIVE':'DEMO'}
+      </div>
+    );
+
+    // ── GANTT-LITE BAR ──
+    const GanttBar = ({ milestones, gates }) => {
+      if (!milestones.length) return null;
+      const dates = milestones.map(m => new Date(m.date).getTime());
+      const minD = Math.min(...dates);
+      const maxD = Math.max(...dates);
+      const range = maxD - minD || 1;
+      const todayPct = Math.min(100, Math.max(0, ((new Date(TODAY).getTime() - minD) / range) * 100));
+
+      return (
+        <div style={{ position:'relative', height:'40px', background:'rgba(0,0,0,0.2)', borderRadius:'6px', margin:'8px 0', overflow:'hidden' }}>
+          {/* Today marker */}
+          <div style={{ position:'absolute', top:0, bottom:0, left:`${todayPct}%`, width:'2px', background:'#f59e0b', zIndex:2 }}>
+            <div style={{ position:'absolute', top:'-14px', left:'-12px', fontSize:'8px', fontWeight:700, color:'#f59e0b', whiteSpace:'nowrap' }}>TODAY</div>
+          </div>
+          {/* Milestones */}
+          {milestones.map(m => {
+            const pct = ((new Date(m.date).getTime() - minD) / range) * 100;
+            const gate = gates.find(g => g.id === m.gate);
+            const colors = { COMPLETE:'#00ff88', 'DUE SOON':'#f59e0b', UPCOMING:'#5a7a9a', OVERDUE:'#ef4444' };
+            const c = colors[m.status] || '#5a7a9a';
+            return (
+              <div key={m.id} style={{ position:'absolute', left:`${pct}%`, top:'50%', transform:'translate(-50%,-50%)', zIndex:1, textAlign:'center' }}
+                title={`${gate?.shortName}: ${m.date} (${m.status})`}>
+                <div style={{ width:'12px', height:'12px', borderRadius:'50%', background:c, border:'2px solid #00050F', boxShadow:`0 0 4px ${c}`, margin:'0 auto' }} />
+                <div style={{ fontSize:'7px', fontWeight:700, color:c, marginTop:'2px', whiteSpace:'nowrap' }}>{gate?.shortName}</div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    const App = () => {
+      const [connected, setConnected] = useState(false);
+      const [milestones, setMilestones] = useState(DEMO_MILESTONES);
+      const [tab, setTab] = useState('timeline');
+      const [oppFilter, setOppFilter] = useState('All');
+
+      useEffect(() => {
+        if (!sbClient) return;
+        (async () => {
+          try {
+            const { data, error } = await sbClient.from('opportunities').select('id');
+            if (!error && data && data.length > 0) setConnected(true);
+          } catch {}
+        })();
+      }, []);
+
+      const opps = useMemo(() => [...new Set(milestones.map(m => m.opp))], [milestones]);
+      const filtered = useMemo(() => oppFilter === 'All' ? milestones : milestones.filter(m => m.opp === oppFilter), [milestones, oppFilter]);
+
+      const alerts = useMemo(() => {
+        return milestones.filter(m => {
+          if (m.status === 'COMPLETE') return false;
+          const d = new Date(m.date);
+          const t = new Date(TODAY);
+          const diff = (d - t) / (1000*60*60*24);
+          return diff <= 7 && diff >= -3;
+        }).sort((a,b) => new Date(a.date) - new Date(b.date));
+      }, [milestones]);
+
+      const statusCounts = useMemo(() => ({
+        complete: milestones.filter(m => m.status === 'COMPLETE').length,
+        dueSoon: milestones.filter(m => m.status === 'DUE SOON').length,
+        upcoming: milestones.filter(m => m.status === 'UPCOMING').length,
+        overdue: milestones.filter(m => m.status === 'OVERDUE').length,
+      }), [milestones]);
+
+      const statusColor = { COMPLETE:'#00ff88', 'DUE SOON':'#f59e0b', UPCOMING:'#5a7a9a', OVERDUE:'#ef4444' };
+
+      return (
+        <div style={{ padding:'24px 32px', maxWidth:'1400px' }}>
+          {/* Header */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px' }}>
+            <div>
+              <div style={{ fontSize:'10px', fontWeight:700, color:'rgba(0,229,250,0.5)', letterSpacing:'2px', textTransform:'uppercase', marginBottom:'4px' }}>PROPOSAL LIFECYCLE</div>
+              <h1 style={{ fontSize:'26px', fontWeight:800, color:'white', letterSpacing:'-0.5px', margin:0 }}>Milestones Tracker</h1>
+              <div style={{ fontSize:'12px', color:'#5a7a9a', marginTop:'4px' }}>Shipley gates • Deadline alerts • Gantt timeline</div>
+            </div>
+            <ConnectionDot c={connected} />
+          </div>
+
+          {/* Alerts Banner */}
+          {alerts.length > 0 && (
+            <div style={{ background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', borderRadius:'10px', padding:'12px 18px', marginBottom:'20px' }}>
+              <div style={{ fontSize:'11px', fontWeight:700, color:'#f59e0b', marginBottom:'6px' }}>⚡ DEADLINE ALERTS ({alerts.length})</div>
+              <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                {alerts.map(a => {
+                  const gate = SHIPLEY_GATES.find(g => g.id === a.gate);
+                  return (
+                    <div key={a.id} style={{ fontSize:'11px', background:'rgba(0,0,0,0.2)', padding:'4px 10px', borderRadius:'6px' }}>
+                      <span style={{ color:'white', fontWeight:600 }}>{a.opp}</span>
+                      <span style={{ color:'#5a7a9a' }}> — </span>
+                      <span style={{ color:'#f59e0b', fontWeight:600 }}>{gate?.shortName}</span>
+                      <span style={{ color:'#5a7a9a' }}> {a.date}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Stats */}
+          <div style={{ display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'20px' }}>
+            {[
+              { label:'Total Milestones', value:milestones.length, color:'#00E5FA' },
+              { label:'Complete', value:statusCounts.complete, color:'#00ff88' },
+              { label:'Due Soon', value:statusCounts.dueSoon, color:'#f59e0b' },
+              { label:'Upcoming', value:statusCounts.upcoming, color:'#94a3b8' },
+              { label:'Active Proposals', value:opps.length, color:'#a78bfa' },
+            ].map(s => (
+              <div key={s.label} style={{ background:'rgba(10,22,40,0.7)', border:'1px solid rgba(0,229,250,0.08)', borderRadius:'10px', padding:'10px 16px', minWidth:'130px' }}>
+                <div style={{ fontSize:'9px', fontWeight:700, color:'#5a7a9a', letterSpacing:'0.5px', textTransform:'uppercase' }}>{s.label}</div>
+                <div style={{ fontSize:'22px', fontWeight:800, color:s.color, letterSpacing:'-0.5px' }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabs + Filter */}
+          <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'20px', alignItems:'center' }}>
+            {[{k:'timeline',l:'Timeline View'},{k:'gantt',l:'Gantt View'},{k:'gates',l:'Gate Matrix'}].map(t => (
+              <button key={t.k} onClick={() => setTab(t.k)} style={{ padding:'7px 16px', fontSize:'12px', fontWeight:600, borderRadius:'8px', border:'none', cursor:'pointer', background:tab===t.k?'rgba(0,229,250,0.15)':'rgba(10,22,40,0.5)', color:tab===t.k?'#00E5FA':'#5a7a9a' }}>{t.l}</button>
+            ))}
+            <div style={{ marginLeft:'auto', display:'flex', gap:'4px' }}>
+              <button onClick={() => setOppFilter('All')} style={{ padding:'5px 10px', fontSize:'10px', fontWeight:600, borderRadius:'6px', border:'none', cursor:'pointer', background:oppFilter==='All'?'rgba(0,229,250,0.15)':'rgba(10,22,40,0.5)', color:oppFilter==='All'?'#00E5FA':'#5a7a9a' }}>All</button>
+              {opps.map(o => (
+                <button key={o} onClick={() => setOppFilter(o)} style={{ padding:'5px 10px', fontSize:'10px', fontWeight:600, borderRadius:'6px', border:'none', cursor:'pointer', whiteSpace:'nowrap', background:oppFilter===o?'rgba(0,229,250,0.15)':'rgba(10,22,40,0.5)', color:oppFilter===o?'#00E5FA':'#5a7a9a' }}>{o.split(' ').slice(0,2).join(' ')}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* TIMELINE VIEW */}
+          {tab === 'timeline' && (
+            <div style={{ background:'rgba(10,22,40,0.5)', border:'1px solid rgba(0,229,250,0.08)', borderRadius:'12px', overflow:'hidden' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'12px' }}>
+                <thead>
+                  <tr style={{ borderBottom:'1px solid rgba(0,229,250,0.1)' }}>
+                    {['Date','Opportunity','Shipley Gate','Status','Owner','Notes'].map(h => (
+                      <th key={h} style={{ padding:'10px 12px', textAlign:'left', color:'#5a7a9a', fontWeight:700, fontSize:'10px', letterSpacing:'0.5px', textTransform:'uppercase' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.sort((a,b) => new Date(a.date) - new Date(b.date)).map(m => {
+                    const gate = SHIPLEY_GATES.find(g => g.id === m.gate);
+                    return (
+                      <tr key={m.id} style={{ borderBottom:'1px solid rgba(0,229,250,0.04)' }}
+                        onMouseOver={e => e.currentTarget.style.background='rgba(0,229,250,0.03)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
+                        <td style={{ padding:'9px 12px', fontFamily:'monospace', fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap' }}>{m.date}</td>
+                        <td style={{ padding:'9px 12px', color:'white', fontWeight:500 }}>{m.opp}</td>
+                        <td style={{ padding:'9px 12px' }}>
+                          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 8px', borderRadius:'4px', background:'rgba(0,229,250,0.08)', color:'#00E5FA' }}>{m.gate}</span>
+                          <span style={{ marginLeft:'6px', fontSize:'11px', color:'#94a3b8' }}>{gate?.name}</span>
+                        </td>
+                        <td style={{ padding:'9px 12px' }}>
+                          <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 8px', borderRadius:'4px', background:`${statusColor[m.status]}12`, color:statusColor[m.status] }}>
+                            {m.status === 'COMPLETE' && '✓ '}{m.status}
+                          </span>
+                        </td>
+                        <td style={{ padding:'9px 12px', color:'#94a3b8', fontSize:'11px' }}>{m.owner}</td>
+                        <td style={{ padding:'9px 12px', color:'#64748b', fontSize:'11px', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.notes}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* GANTT VIEW */}
+          {tab === 'gantt' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+              {opps.filter(o => oppFilter === 'All' || o === oppFilter).map(opp => {
+                const oppMs = milestones.filter(m => m.opp === opp);
+                const complete = oppMs.filter(m => m.status === 'COMPLETE').length;
+                const pct = Math.round((complete / oppMs.length) * 100);
+                return (
+                  <div key={opp} style={{ background:'rgba(10,22,40,0.5)', border:'1px solid rgba(0,229,250,0.08)', borderRadius:'10px', padding:'16px 18px' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2px' }}>
+                      <div style={{ fontSize:'14px', fontWeight:700, color:'white' }}>{opp}</div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                        <div style={{ width:'80px', height:'6px', background:'rgba(255,255,255,0.06)', borderRadius:'3px', overflow:'hidden' }}>
+                          <div style={{ width:`${pct}%`, height:'100%', background:pct===100?'#00ff88':'#00E5FA', borderRadius:'3px', transition:'width 0.3s' }} />
+                        </div>
+                        <span style={{ fontSize:'11px', fontWeight:600, color:pct===100?'#00ff88':'#00E5FA' }}>{pct}%</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize:'11px', color:'#5a7a9a', marginBottom:'4px' }}>{complete}/{oppMs.length} gates complete</div>
+                    <GanttBar milestones={oppMs} gates={SHIPLEY_GATES} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* GATE MATRIX VIEW */}
+          {tab === 'gates' && (
+            <div style={{ background:'rgba(10,22,40,0.5)', border:'1px solid rgba(0,229,250,0.08)', borderRadius:'12px', overflow:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'11px', minWidth:'800px' }}>
+                <thead>
+                  <tr style={{ borderBottom:'1px solid rgba(0,229,250,0.1)' }}>
+                    <th style={{ padding:'10px 14px', textAlign:'left', color:'#5a7a9a', fontWeight:700, fontSize:'10px', position:'sticky', left:0, background:'#0a1628', zIndex:1 }}>OPPORTUNITY</th>
+                    {SHIPLEY_GATES.map(g => (
+                      <th key={g.id} style={{ padding:'8px 4px', textAlign:'center', color:'#5a7a9a', fontWeight:600, fontSize:'8px', letterSpacing:'0.3px', whiteSpace:'nowrap' }}>{g.shortName}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {opps.filter(o => oppFilter === 'All' || o === oppFilter).map(opp => {
+                    const oppMs = milestones.filter(m => m.opp === opp);
+                    return (
+                      <tr key={opp} style={{ borderBottom:'1px solid rgba(0,229,250,0.04)' }}>
+                        <td style={{ padding:'10px 14px', color:'white', fontWeight:500, whiteSpace:'nowrap', position:'sticky', left:0, background:'#0a1020', zIndex:1, fontSize:'12px' }}>{opp}</td>
+                        {SHIPLEY_GATES.map(gate => {
+                          const ms = oppMs.find(m => m.gate === gate.id);
+                          if (!ms) return <td key={gate.id} style={{ padding:'6px', textAlign:'center' }}><div style={{ width:'16px', height:'16px', margin:'0 auto', borderRadius:'4px', background:'rgba(255,255,255,0.03)', border:'1px dashed rgba(255,255,255,0.06)' }} /></td>;
+                          const c = statusColor[ms.status];
+                          return (
+                            <td key={gate.id} style={{ padding:'6px', textAlign:'center' }} title={`${ms.date}: ${ms.status}`}>
+                              <div style={{ width:'16px', height:'16px', margin:'0 auto', borderRadius:'4px', background:`${c}20`, border:`1px solid ${c}40`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                {ms.status === 'COMPLETE' && <span style={{ fontSize:'10px', color:c }}>✓</span>}
+                                {ms.status === 'DUE SOON' && <span style={{ fontSize:'10px', color:c }}>!</span>}
+                                {ms.status === 'UPCOMING' && <span style={{ fontSize:'8px', color:c }}>○</span>}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ textAlign:'center', padding:'20px 0', marginTop:'28px', borderTop:'1px solid rgba(0,229,250,0.06)', fontSize:'10px', color:'rgba(148,163,184,0.4)', lineHeight:'1.8' }}>
+            ⚠️ AI GENERATED — REQUIRES HUMAN REVIEW<br/>MissionPulse v12.0 — Mission Meets Tech | CMMC 2.0 L2 Compliant
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
