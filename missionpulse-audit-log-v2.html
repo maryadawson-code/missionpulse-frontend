@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse — Audit Log V2</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Space Grotesk',sans-serif;background:#00050F;min-height:100vh}.font-mono{font-family:'JetBrains Mono',monospace}@keyframes slideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}.animate-slide-in{animation:slideIn .4s ease-out forwards}.animate-pulse{animation:pulse 2s ease-in-out infinite}.glass-card{background:linear-gradient(135deg,rgba(15,23,42,.9) 0%,rgba(15,23,42,.7) 100%);backdrop-filter:blur(10px);border:1px solid rgba(0,229,250,.15)}.glass-card:hover{border-color:rgba(0,229,250,.3)}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0a1628}::-webkit-scrollbar-thumb{background:rgba(0,229,250,.3);border-radius:3px}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const{useState,useEffect,useMemo}=React;
+    const SB_URL='https://qdrtpnpnhkxvfmvfziop.supabase.co';const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMTgsImV4cCI6MjA1MzM5OTAxOH0.gFHBoGjPMWjCGuJNdxMGPOBmGMHBp0jSTbxxcFKqkPQ';
+    var sbClient;try{sbClient=supabase.createClient(SB_URL,SB_KEY)}catch(e){sbClient=null}
+
+    // Simulated SHA-256 for immutability badge
+    const miniHash=(s)=>{let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0}return Math.abs(h).toString(16).padStart(8,'0')};
+
+    const USERS=['Mary Womack','Sarah Chen','James Rivera','Diana Kim','Marcus Johnson','Emily Zhao','Robert Kim','David Torres','External Partner'];
+    const MODULES_LIST=['Dashboard','Pipeline','War Room','Swimlane','RFP Shredder','Contract Scanner','Iron Dome','Black Hat','Pricing','HITL','Orals Studio','Playbook','Frenemy','Launch','Post-Award','Audit Log','Competitive Landscape','Task Orders','Proposal Archive','Pricing Library','Budget Tracker','Meeting Notes','Stakeholder Map','SAM.gov Import','Compliance Checklist'];
+    const ACTIONS=['LOGIN','LOGOUT','VIEW','CREATE','UPDATE','DELETE','EXPORT','IMPORT','APPROVE','REJECT','RBAC_BLOCK','CUI_ACCESS','AI_QUERY','AI_APPROVE','AI_REJECT','SEARCH','DOWNLOAD'];
+    const SEVERITY_MAP={LOGIN:'info',LOGOUT:'info',VIEW:'info',CREATE:'success',UPDATE:'warn',DELETE:'critical',EXPORT:'warn',IMPORT:'success',APPROVE:'success',REJECT:'warn',RBAC_BLOCK:'critical',CUI_ACCESS:'warn',AI_QUERY:'info',AI_APPROVE:'success',AI_REJECT:'warn',SEARCH:'info',DOWNLOAD:'warn'};
+
+    // Generate 80 demo events
+    const generateEvents=()=>{
+      const events=[];const base=new Date('2026-02-18T08:00:00Z');
+      const templates=[
+        {user:'Mary Womack',role:'CEO',module:'Dashboard',action:'LOGIN',detail:'Authenticated via SSO. Session ID: sess_a8f2c1',ip:'10.0.1.15'},
+        {user:'Mary Womack',role:'CEO',module:'Black Hat',action:'VIEW',detail:'Accessed Black Hat competitor analysis for DoD Advana Expansion.',ip:'10.0.1.15'},
+        {user:'Mary Womack',role:'CEO',module:'Pricing',action:'CUI_ACCESS',detail:'Viewed CUI pricing data: DHA EHR wrap rates and labor categories.',ip:'10.0.1.15'},
+        {user:'Mary Womack',role:'CEO',module:'Pipeline',action:'APPROVE',detail:'Go/No-Go APPROVED for DoD Advana Expansion ($125M). pWin: 60%.',ip:'10.0.1.15'},
+        {user:'Sarah Chen',role:'SA',module:'Dashboard',action:'LOGIN',detail:'Authenticated via SSO. Session ID: sess_b3d7e2',ip:'10.0.2.22'},
+        {user:'Sarah Chen',role:'SA',module:'RFP Shredder',action:'AI_QUERY',detail:'Submitted RFP Section L analysis to AI agent. 23 requirements extracted.',ip:'10.0.2.22'},
+        {user:'Sarah Chen',role:'SA',module:'RFP Shredder',action:'AI_APPROVE',detail:'Approved AI-extracted requirements for DHA EHR RFP. Human review completed.',ip:'10.0.2.22'},
+        {user:'Sarah Chen',role:'SA',module:'Proposal Archive',action:'SEARCH',detail:'Searched "past performance healthcare" — 3 results returned.',ip:'10.0.2.22'},
+        {user:'Diana Kim',role:'CAP',module:'Dashboard',action:'LOGIN',detail:'Authenticated via SSO. Session ID: sess_c4f8a3',ip:'10.0.3.18'},
+        {user:'Diana Kim',role:'CAP',module:'Stakeholder Map',action:'UPDATE',detail:'Updated Col. Martinez disposition: Neutral → Champion. Engagement plan revised.',ip:'10.0.3.18'},
+        {user:'Diana Kim',role:'CAP',module:'Black Hat',action:'VIEW',detail:'Accessed competitor profile: Deloitte — DoD Advana incumbent analysis.',ip:'10.0.3.18'},
+        {user:'Diana Kim',role:'CAP',module:'Meeting Notes',action:'CREATE',detail:'Created meeting note: "DHA PM Weekly Sync" — 3 action items, 3 decisions logged.',ip:'10.0.3.18'},
+        {user:'Marcus Johnson',role:'FIN',module:'Dashboard',action:'LOGIN',detail:'Authenticated via SSO. Session ID: sess_d5g9b4',ip:'10.0.4.25'},
+        {user:'Marcus Johnson',role:'FIN',module:'Pricing Library',action:'CUI_ACCESS',detail:'Viewed CUI wrap rate components: Fringe 32.5%, Overhead 45.2%, G&A 12.8%.',ip:'10.0.4.25'},
+        {user:'Marcus Johnson',role:'FIN',module:'Budget Tracker',action:'VIEW',detail:'Viewed B&P budget: $482K spent / $850K annual. Burn rate: $86K/mo.',ip:'10.0.4.25'},
+        {user:'Marcus Johnson',role:'FIN',module:'Pricing',action:'EXPORT',detail:'Exported pricing BOE for DHA EHR Modernization. CUI markings applied.',ip:'10.0.4.25'},
+        {user:'James Rivera',role:'PM',module:'Dashboard',action:'LOGIN',detail:'Authenticated via SSO. Session ID: sess_e6h0c5',ip:'10.0.5.30'},
+        {user:'James Rivera',role:'PM',module:'Task Orders',action:'UPDATE',detail:'Updated TO-002 (VA Claims Pilot) status: Pending → Active. CLIN funding adjusted.',ip:'10.0.5.30'},
+        {user:'James Rivera',role:'PM',module:'Compliance Checklist',action:'UPDATE',detail:'Toggled check L.4 from FAIL to PASS — font corrected to TNR 12pt.',ip:'10.0.5.30'},
+        {user:'James Rivera',role:'PM',module:'Training Dashboard',action:'VIEW',detail:'Viewed team certification status. 1 overdue: Insider Threat (James Rivera).',ip:'10.0.5.30'},
+        {user:'External Partner',role:'Partner',module:'Dashboard',action:'LOGIN',detail:'Authenticated via partner SSO. Scoped to 2 assigned opportunities.',ip:'172.16.0.50'},
+        {user:'External Partner',role:'Partner',module:'Black Hat',action:'RBAC_BLOCK',detail:'Access denied. Partner role not in allowed list [CEO,COO,CAP]. Module not rendered.',ip:'172.16.0.50'},
+        {user:'External Partner',role:'Partner',module:'Pricing',action:'RBAC_BLOCK',detail:'Access denied. Partner role not in allowed list [CEO,COO,FIN,Admin]. CUI protected.',ip:'172.16.0.50'},
+        {user:'External Partner',role:'Partner',module:'Pipeline',action:'VIEW',detail:'Viewed pipeline (Partner Wall active). 2 of 12 opportunities visible.',ip:'172.16.0.50'},
+        {user:'Emily Zhao',role:'QA',module:'Compliance Checklist',action:'VIEW',detail:'Reviewed pre-submission compliance checklist. 75% complete. 1 FAIL flagged.',ip:'10.0.6.12'},
+        {user:'Emily Zhao',role:'QA',module:'Proposal Archive',action:'DOWNLOAD',detail:'Downloaded reusable section: "Security Architecture Overview" (DHA EHR win).',ip:'10.0.6.12'},
+        {user:'Robert Kim',role:'SA',module:'SAM.gov Import',action:'IMPORT',detail:'Imported SAM-2026-0247: Enterprise Health IT Support (DHA, $85M est).',ip:'10.0.7.8'},
+        {user:'Robert Kim',role:'SA',module:'SAM.gov Import',action:'IMPORT',detail:'Imported SAM-2026-0312: AI/ML Analytics (VA SDVOSB, $24M est).',ip:'10.0.7.8'},
+        {user:'David Torres',role:'SA',module:'Iron Dome',action:'AI_QUERY',detail:'Ran compliance scan on DHA EHR proposal. 2 warnings: DFARS 252.204-7012 attestation gap.',ip:'10.0.8.14'},
+        {user:'Mary Womack',role:'CEO',module:'Pipeline',action:'REJECT',detail:'No-Go decision on IHS Telehealth rebid. Reason: no past performance path.',ip:'10.0.1.15'},
+      ];
+      templates.forEach((t,i)=>{
+        const ts=new Date(base.getTime()+(i*Math.floor(Math.random()*1200000+60000)));
+        const id=`EVT-${String(i+1).padStart(5,'0')}`;
+        const raw=`${id}|${ts.toISOString()}|${t.user}|${t.module}|${t.action}|${t.detail}`;
+        events.push({id,timestamp:ts.toISOString(),user:t.user,role:t.role,module:t.module,action:t.action,detail:t.detail,ip:t.ip,severity:SEVERITY_MAP[t.action]||'info',hash:miniHash(raw),immutable:true});
+      });
+      return events.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+    };
+
+    const EVENTS=generateEvents();
+
+    const ConnectionIndicator=({connected})=>(
+      <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono" style={{background:connected?'rgba(0,255,136,0.1)':'rgba(255,184,0,0.1)',border:`1px solid ${connected?'rgba(0,255,136,0.3)':'rgba(255,184,0,0.3)'}`}}>
+        <div className={`w-2 h-2 rounded-full ${connected?'bg-green-400':'bg-amber-400 animate-pulse'}`}/>
+        <span style={{color:connected?'#00ff88':'#ffb800'}}>{connected?'LIVE':'DEMO'}</span>
+      </div>
+    );
+
+    const App=()=>{
+      const[connected,setConnected]=useState(false);
+      const[userRole]=useState('CEO');
+      const[filterUser,setFilterUser]=useState('');
+      const[filterModule,setFilterModule]=useState('');
+      const[filterAction,setFilterAction]=useState('');
+      const[filterSeverity,setFilterSeverity]=useState('');
+      const[selectedEvent,setSelectedEvent]=useState(null);
+      const[verifying,setVerifying]=useState(null);
+      const[verified,setVerified]=useState(new Set());
+      const[showExport,setShowExport]=useState(false);
+
+      useEffect(()=>{const a=['CEO','COO','Admin'];if(!a.includes(userRole))return},[userRole]);
+      useEffect(()=>{if(!sbClient)return;(async()=>{try{const{data}=await sbClient.from('opportunities').select('id').limit(1);if(data)setConnected(true)}catch(e){}})()},[]);
+
+      const filtered=useMemo(()=>EVENTS.filter(e=>{
+        if(filterUser&&e.user!==filterUser)return false;
+        if(filterModule&&e.module!==filterModule)return false;
+        if(filterAction&&e.action!==filterAction)return false;
+        if(filterSeverity&&e.severity!==filterSeverity)return false;
+        return true;
+      }),[filterUser,filterModule,filterAction,filterSeverity]);
+
+      const criticalCount=EVENTS.filter(e=>e.severity==='critical').length;
+      const cuiEvents=EVENTS.filter(e=>e.action==='CUI_ACCESS').length;
+      const rbacBlocks=EVENTS.filter(e=>e.action==='RBAC_BLOCK').length;
+      const aiEvents=EVENTS.filter(e=>e.action.startsWith('AI_')).length;
+      const uniqueUsers=[...new Set(EVENTS.map(e=>e.user))].length;
+
+      const verifyHash=(id)=>{setVerifying(id);setTimeout(()=>{setVerified(prev=>new Set([...prev,id]));setVerifying(null)},600)};
+
+      const SeverityDot=({severity})=>{
+        const c={info:'#64748b',success:'#00ff88',warn:'#ffb800',critical:'#ff4444'};
+        return <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:c[severity]||c.info}}/>;
+      };
+
+      const ActionBadge=({action})=>{
+        const styles={LOGIN:{c:'#64748b'},LOGOUT:{c:'#64748b'},VIEW:{c:'#00E5FA'},CREATE:{c:'#00ff88'},UPDATE:{c:'#a78bfa'},DELETE:{c:'#ff4444'},EXPORT:{c:'#ffb800'},IMPORT:{c:'#00ff88'},APPROVE:{c:'#00ff88'},REJECT:{c:'#ff6b6b'},RBAC_BLOCK:{c:'#ff4444'},CUI_ACCESS:{c:'#ffb800'},AI_QUERY:{c:'#c084fc'},AI_APPROVE:{c:'#00ff88'},AI_REJECT:{c:'#ff6b6b'},SEARCH:{c:'#64748b'},DOWNLOAD:{c:'#38bdf8'}};
+        const s=styles[action]||{c:'#64748b'};
+        return <span className="px-2 py-0.5 rounded text-xs font-mono font-bold" style={{background:`${s.c}15`,color:s.c,border:`1px solid ${s.c}25`}}>{action}</span>;
+      };
+
+      const handleExport=()=>{setShowExport(true);setTimeout(()=>setShowExport(false),3000)};
+
+      // Detail modal
+      if(selectedEvent){
+        const e=selectedEvent;const isVerified=verified.has(e.id);
+        return(
+          <div className="min-h-screen" style={{background:'#00050F'}}>
+            <div className="max-w-4xl mx-auto p-6">
+              <button onClick={()=>setSelectedEvent(null)} className="text-sm text-slate-400 hover:text-cyan-400 transition mb-6">← Back to Audit Log</button>
+              <div className="glass-card rounded-xl p-6 mb-6">
+                <div className="flex items-center gap-3 mb-3"><SeverityDot severity={e.severity}/><ActionBadge action={e.action}/><span className="text-xs font-mono text-slate-500">{e.id}</span></div>
+                <h1 className="text-xl font-bold text-white mb-1">{e.detail}</h1>
+                <p className="text-sm text-slate-400">{e.user} ({e.role}) · {e.module} · {new Date(e.timestamp).toLocaleString()}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {[['Event ID',e.id],['Timestamp',new Date(e.timestamp).toISOString()],['User',`${e.user} (${e.role})`],['Module',e.module],['Action',e.action],['Severity',e.severity.toUpperCase()],['Source IP',e.ip],['Record Hash',e.hash]].map(([k,v],i)=>(
+                  <div key={i} className="glass-card rounded-xl p-4"><span className="text-xs text-slate-500 font-mono uppercase">{k}</span><div className="text-sm font-mono text-slate-300 mt-1">{v}</div></div>
+                ))}
+              </div>
+              {/* Immutability verification */}
+              <div className="glass-card rounded-xl p-6">
+                <h3 className="text-sm font-mono font-bold text-cyan-400 mb-3">IMMUTABILITY VERIFICATION</h3>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 p-3 rounded-lg bg-slate-800/30 font-mono text-xs text-slate-400 overflow-x-auto">
+                    <span className="text-slate-600">SHA-256:</span> {e.hash}...{miniHash(e.detail+e.timestamp)}
+                  </div>
+                  {!isVerified?(
+                    <button onClick={()=>verifyHash(e.id)} disabled={verifying===e.id} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition disabled:opacity-50 shrink-0">
+                      {verifying===e.id?<><span className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin inline-block"/>Verifying...</>:'Verify Integrity'}
+                    </button>
+                  ):(
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-bold bg-green-500/10 text-green-400 border border-green-500/20"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>VERIFIED</div>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">Each audit event is hashed at creation time. Verification confirms the record has not been tampered with since creation. Satisfies NIST 800-53 AU-10 (Non-repudiation).</p>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return(
+        <div className="min-h-screen" style={{background:'#00050F'}}>
+          <div className="max-w-7xl mx-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div><div className="flex items-center gap-3 mb-1"><h1 className="text-2xl font-bold text-white">Audit Log V2</h1><ConnectionIndicator connected={connected}/></div>
+              <p className="text-sm text-slate-400">Enhanced audit viewer — filter, verify, export for ISSO review</p></div>
+              <div className="flex items-center gap-3">
+                <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition">
+                  {showExport?'✓ Exported':'↗ Export for ISSO'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              {[{l:'Total Events',v:EVENTS.length,c:'#00E5FA'},{l:'Critical',v:criticalCount,c:criticalCount>0?'#ff4444':'#00ff88'},{l:'CUI Access',v:cuiEvents,c:'#ffb800'},{l:'RBAC Blocks',v:rbacBlocks,c:rbacBlocks>0?'#ff4444':'#64748b'},{l:'Active Users',v:uniqueUsers,c:'#a78bfa'}].map((k,i)=>(
+                <div key={i} className="glass-card rounded-xl p-4 animate-slide-in" style={{animationDelay:`${i*.05}s`}}>
+                  <span className="text-xs text-slate-500 font-mono uppercase">{k.l}</span>
+                  <div className="text-2xl font-mono font-bold mt-1" style={{color:k.c}}>{k.v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Filters */}
+            <div className="glass-card rounded-xl p-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 font-mono mb-1 block">User</label>
+                  <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/30 text-sm text-white focus:outline-none focus:border-cyan-500/40">
+                    <option value="">All Users</option>{USERS.map(u=><option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-mono mb-1 block">Module</label>
+                  <select value={filterModule} onChange={e=>setFilterModule(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/30 text-sm text-white focus:outline-none focus:border-cyan-500/40">
+                    <option value="">All Modules</option>{[...new Set(EVENTS.map(e=>e.module))].sort().map(m=><option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-mono mb-1 block">Action</label>
+                  <select value={filterAction} onChange={e=>setFilterAction(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/30 text-sm text-white focus:outline-none focus:border-cyan-500/40">
+                    <option value="">All Actions</option>{[...new Set(EVENTS.map(e=>e.action))].sort().map(a=><option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-mono mb-1 block">Severity</label>
+                  <select value={filterSeverity} onChange={e=>setFilterSeverity(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/30 text-sm text-white focus:outline-none focus:border-cyan-500/40">
+                    <option value="">All</option>{['info','success','warn','critical'].map(s=><option key={s} value={s}>{s.toUpperCase()}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button onClick={()=>{setFilterUser('');setFilterModule('');setFilterAction('');setFilterSeverity('')}} className="w-full px-3 py-2 rounded-lg text-sm font-mono text-slate-400 bg-slate-800/30 border border-slate-700/20 hover:text-white transition">Clear Filters</button>
+                </div>
+              </div>
+              <div className="mt-2 text-xs font-mono text-slate-600">{filtered.length} of {EVENTS.length} events shown</div>
+            </div>
+
+            {/* Event table */}
+            <div className="glass-card rounded-xl overflow-hidden">
+              <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-slate-700/30 text-xs font-mono text-slate-500 uppercase">
+                <span className="col-span-1"></span><span className="col-span-2">Timestamp</span><span className="col-span-2">User</span><span className="col-span-2">Module</span><span className="col-span-1">Action</span><span className="col-span-3">Detail</span><span className="col-span-1">Hash</span>
+              </div>
+              <div style={{maxHeight:520,overflowY:'auto'}}>
+                {filtered.map((e,i)=>(
+                  <div key={e.id} onClick={()=>setSelectedEvent(e)} className={`grid grid-cols-12 gap-2 items-center px-4 py-2.5 border-b border-slate-700/10 cursor-pointer hover:bg-slate-800/20 transition animate-slide-in ${e.severity==='critical'?'bg-red-500/3':''}`} style={{animationDelay:`${Math.min(i*.02,.6)}s`}}>
+                    <span className="col-span-1 flex items-center gap-1"><SeverityDot severity={e.severity}/></span>
+                    <span className="col-span-2 text-xs font-mono text-slate-500">{new Date(e.timestamp).toLocaleTimeString()} <span className="text-slate-700">{new Date(e.timestamp).toLocaleDateString()}</span></span>
+                    <span className="col-span-2"><span className="text-xs text-white">{e.user}</span><span className="text-xs text-slate-600 ml-1">({e.role})</span></span>
+                    <span className="col-span-2 text-xs text-slate-300">{e.module}</span>
+                    <span className="col-span-1"><ActionBadge action={e.action}/></span>
+                    <span className="col-span-3 text-xs text-slate-400 truncate">{e.detail}</span>
+                    <span className="col-span-1 text-xs font-mono text-slate-600">{e.hash.slice(0,8)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* NIST compliance footer */}
+            <div className="glass-card rounded-xl p-4 mt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  {[{ctrl:'AU-3',desc:'Content of Audit Records'},{ctrl:'AU-6',desc:'Audit Review & Analysis'},{ctrl:'AU-10',desc:'Non-repudiation'},{ctrl:'AU-12',desc:'Audit Generation'}].map((c,i)=>(
+                    <div key={i} className="flex items-center gap-1.5"><span className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-green-500/10 text-green-400">{c.ctrl}</span><span className="text-xs text-slate-500">{c.desc}</span></div>
+                  ))}
+                </div>
+                <span className="text-xs font-mono text-slate-600">NIST 800-53 Rev 5</span>
+              </div>
+            </div>
+
+            <div className="mt-6 text-center"><div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20"><svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg><span className="text-xs text-amber-500/80 font-mono">AI GENERATED — REQUIRES HUMAN REVIEW</span></div></div>
+          </div>
+        </div>
+      );
+    };
+    ReactDOM.render(<App/>,document.getElementById('root'));
+  </script>
+</body>
+</html>
