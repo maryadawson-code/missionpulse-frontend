@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse — Teaming Calculator</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#00050F;min-height:100vh;color:#e2e8f0}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,229,250,0.2);border-radius:3px}input[type=range]{-webkit-appearance:none;background:rgba(0,229,250,0.15);height:6px;border-radius:3px;outline:none}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#00E5FA;cursor:pointer}</style>
+</head>
+<body>
+  <div id="missionpulse-sidebar"></div>
+  <div class="main-content"><div id="root"></div></div>
+  <script src="missionpulse-nav.js"></script>
+  <script type="text/babel">
+    const{useState,useEffect,useMemo}=React;
+    const SB_URL='https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5MjMxNDMsImV4cCI6MjA1MzQ5OTE0M30.GFbjgRMgVhMMcnNaJMrLVnJI_u6yBGJOhO-LHKE8sZQ';
+    var sbClient;try{sbClient=supabase.createClient(SB_URL,SB_KEY)}catch(e){sbClient=null}
+    const ROLES_ALLOWED=['CEO','COO','CAP','FIN','PM'];
+
+    const DEMO_LCATS=[
+      {id:1,title:'Program Manager',rate:185,hours:2080,category:'Management'},
+      {id:2,title:'Deputy Program Manager',rate:155,hours:2080,category:'Management'},
+      {id:3,title:'Solutions Architect',rate:195,hours:1800,category:'Technical'},
+      {id:4,title:'Senior Developer',rate:165,hours:2080,category:'Technical'},
+      {id:5,title:'DevSecOps Engineer',rate:170,hours:2080,category:'Technical'},
+      {id:6,title:'Data Engineer',rate:160,hours:1800,category:'Technical'},
+      {id:7,title:'AI/ML Engineer',rate:180,hours:1800,category:'Technical'},
+      {id:8,title:'Cybersecurity Analyst',rate:150,hours:2080,category:'Security'},
+      {id:9,title:'ISSO',rate:145,hours:1040,category:'Security'},
+      {id:10,title:'Help Desk Lead',rate:95,hours:2080,category:'Support'},
+      {id:11,title:'Help Desk Tier 1',rate:65,hours:4160,category:'Support'},
+      {id:12,title:'QA Analyst',rate:120,hours:1800,category:'Quality'},
+      {id:13,title:'Technical Writer',rate:100,hours:1200,category:'Quality'},
+      {id:14,title:'Training Specialist',rate:110,hours:800,category:'Quality'},
+      {id:15,title:'508 Compliance Specialist',rate:115,hours:600,category:'Quality'},
+    ];
+
+    const DEMO_PARTNERS=[
+      {id:1,name:'Mission Meets Tech',role:'Prime',color:'#00E5FA',shortName:'MMT'},
+      {id:2,name:'TechPartner Alpha',role:'Sub — Technical',color:'#a78bfa',shortName:'TPA'},
+      {id:3,name:'SecureForce Inc.',role:'Sub — Cyber',color:'#f59e0b',shortName:'SFI'},
+      {id:4,name:'DataBridge LLC',role:'Sub — Analytics',color:'#00ff88',shortName:'DBL'},
+    ];
+
+    const ConnectionDot=({c})=>(<div style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'11px',color:c?'#00ff88':'#f59e0b'}}><div style={{width:'8px',height:'8px',borderRadius:'50%',background:c?'#00ff88':'#f59e0b',boxShadow:`0 0 6px ${c?'#00ff88':'#f59e0b'}`}}/>{c?'LIVE':'DEMO'}</div>);
+
+    const BarSegment=({segments,height=24})=>{
+      const total=segments.reduce((s,seg)=>s+seg.value,0)||1;
+      return(
+        <div style={{display:'flex',height:`${height}px`,borderRadius:'6px',overflow:'hidden',background:'rgba(255,255,255,0.03)'}}>
+          {segments.map((seg,i)=>(
+            <div key={i} style={{width:`${(seg.value/total)*100}%`,background:seg.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',fontWeight:700,color:'#000510',minWidth:seg.value>0?'20px':'0',transition:'width 0.3s'}} title={`${seg.label}: ${((seg.value/total)*100).toFixed(1)}%`}>
+              {(seg.value/total)>0.08&&`${((seg.value/total)*100).toFixed(0)}%`}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    const App=()=>{
+      const[connected,setConnected]=useState(false);
+      const[partners]=useState(DEMO_PARTNERS);
+      const[lcats,setLcats]=useState(()=>DEMO_LCATS.map(l=>({...l,allocation:{1:100,2:0,3:0,4:0}})));
+      const[contractValue,setContractValue]=useState(45000000);
+      const[tab,setTab]=useState('allocation');
+
+      useEffect(()=>{if(!sbClient)return;(async()=>{try{const{data,error}=await sbClient.from('teaming_partners').select('id');if(!error&&data&&data.length>0)setConnected(true)}catch{}})()},[]);
+
+      const updateAllocation=(lcatId,partnerId,value)=>{
+        setLcats(prev=>prev.map(l=>{
+          if(l.id!==lcatId)return l;
+          const newAlloc={...l.allocation,[partnerId]:Math.max(0,Math.min(100,parseInt(value)||0))};
+          const total=Object.values(newAlloc).reduce((s,v)=>s+v,0);
+          if(total>100){const diff=total-100;newAlloc[partnerId]=Math.max(0,newAlloc[partnerId]-diff)}
+          return{...l,allocation:newAlloc};
+        }));
+      };
+
+      const partnerSummary=useMemo(()=>{
+        return partners.map(p=>{
+          let totalValue=0;let totalHours=0;let lcatCount=0;
+          lcats.forEach(l=>{
+            const pct=(l.allocation[p.id]||0)/100;
+            if(pct>0){totalValue+=l.rate*l.hours*pct;totalHours+=l.hours*pct;lcatCount++}
+          });
+          return{...p,totalValue,totalHours:Math.round(totalHours),lcatCount,worksharePct:contractValue>0?(totalValue/lcats.reduce((s,l)=>s+l.rate*l.hours,0))*100:0};
+        });
+      },[lcats,partners,contractValue]);
+
+      const totalEstimate=lcats.reduce((s,l)=>s+l.rate*l.hours,0);
+      const primeShare=partnerSummary.find(p=>p.role==='Prime')?.worksharePct||0;
+
+      const fmt=v=>v>=1000000?`$${(v/1000000).toFixed(1)}M`:v>=1000?`$${(v/1000).toFixed(0)}K`:`$${v.toFixed(0)}`;
+
+      return(
+        <div style={{padding:'24px 32px',maxWidth:'1400px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'24px'}}>
+            <div>
+              <div style={{fontSize:'10px',fontWeight:700,color:'rgba(0,229,250,0.5)',letterSpacing:'2px',textTransform:'uppercase',marginBottom:'4px'}}>WORKSHARE PLANNING</div>
+              <h1 style={{fontSize:'26px',fontWeight:800,color:'white',letterSpacing:'-0.5px',margin:0}}>Teaming Calculator</h1>
+              <div style={{fontSize:'12px',color:'#5a7a9a',marginTop:'4px'}}>LCAT allocation • Workshare splits • Subcontract values</div>
+            </div>
+            <ConnectionDot c={connected}/>
+          </div>
+
+          {/* Partner Summary Cards */}
+          <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'20px'}}>
+            {partnerSummary.map(p=>(
+              <div key={p.id} style={{background:'rgba(10,22,40,0.7)',border:`1px solid ${p.color}20`,borderRadius:'10px',padding:'12px 16px',flex:'1',minWidth:'200px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+                  <div style={{width:'10px',height:'10px',borderRadius:'3px',background:p.color}}/>
+                  <span style={{fontSize:'13px',fontWeight:700,color:'white'}}>{p.shortName}</span>
+                  <span style={{fontSize:'9px',fontWeight:600,padding:'1px 6px',borderRadius:'3px',background:`${p.color}15`,color:p.color}}>{p.role}</span>
+                </div>
+                <div style={{display:'flex',gap:'14px',fontSize:'11px'}}>
+                  <div><div style={{color:'#5a7a9a',fontSize:'9px',fontWeight:600}}>VALUE</div><div style={{fontWeight:700,color:p.color}}>{fmt(p.totalValue)}</div></div>
+                  <div><div style={{color:'#5a7a9a',fontSize:'9px',fontWeight:600}}>HOURS</div><div style={{fontWeight:700,color:'#e2e8f0'}}>{p.totalHours.toLocaleString()}</div></div>
+                  <div><div style={{color:'#5a7a9a',fontSize:'9px',fontWeight:600}}>SHARE</div><div style={{fontWeight:700,color:p.worksharePct>=51?'#00ff88':p.worksharePct>=20?'#00E5FA':'#5a7a9a'}}>{p.worksharePct.toFixed(1)}%</div></div>
+                  <div><div style={{color:'#5a7a9a',fontSize:'9px',fontWeight:600}}>LCATS</div><div style={{fontWeight:700,color:'#e2e8f0'}}>{p.lcatCount}</div></div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Workshare Bar */}
+          <div style={{marginBottom:'20px'}}>
+            <div style={{fontSize:'10px',fontWeight:700,color:'#5a7a9a',letterSpacing:'0.5px',textTransform:'uppercase',marginBottom:'6px'}}>WORKSHARE DISTRIBUTION</div>
+            <BarSegment segments={partnerSummary.map(p=>({value:p.totalValue,color:p.color,label:p.shortName}))} height={32}/>
+            <div style={{display:'flex',gap:'12px',marginTop:'6px'}}>
+              {partnerSummary.map(p=>(
+                <div key={p.id} style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'10px',color:'#5a7a9a'}}>
+                  <div style={{width:'8px',height:'8px',borderRadius:'2px',background:p.color}}/>{p.shortName}: {p.worksharePct.toFixed(1)}%
+                </div>
+              ))}
+            </div>
+            {primeShare<51&&<div style={{marginTop:'6px',fontSize:'11px',color:'#ef4444',fontWeight:600}}>⚠️ Prime workshare below 51% — SBA subcontracting limitation may apply</div>}
+          </div>
+
+          {/* Contract Value Input */}
+          <div style={{display:'flex',gap:'16px',alignItems:'center',marginBottom:'16px',background:'rgba(10,22,40,0.5)',border:'1px solid rgba(0,229,250,0.08)',borderRadius:'10px',padding:'12px 18px'}}>
+            <div style={{fontSize:'12px',fontWeight:600,color:'#5a7a9a',whiteSpace:'nowrap'}}>Contract Value:</div>
+            <input type="range" min={5000000} max={200000000} step={1000000} value={contractValue} onChange={e=>setContractValue(parseInt(e.target.value))} style={{flex:1}}/>
+            <div style={{fontSize:'16px',fontWeight:800,color:'#00E5FA',whiteSpace:'nowrap'}}>{fmt(contractValue)}</div>
+            <div style={{fontSize:'11px',color:'#5a7a9a'}}>Est: {fmt(totalEstimate)}</div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{display:'flex',gap:'4px',marginBottom:'16px'}}>
+            {[{k:'allocation',l:'LCAT Allocation'},{k:'summary',l:'Value Summary'}].map(t=>(
+              <button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'7px 16px',fontSize:'12px',fontWeight:600,borderRadius:'8px',border:'none',cursor:'pointer',background:tab===t.k?'rgba(0,229,250,0.15)':'rgba(10,22,40,0.5)',color:tab===t.k?'#00E5FA':'#5a7a9a'}}>{t.l}</button>
+            ))}
+          </div>
+
+          {/* ALLOCATION TABLE */}
+          {tab==='allocation'&&(
+            <div style={{background:'rgba(10,22,40,0.5)',border:'1px solid rgba(0,229,250,0.08)',borderRadius:'12px',overflow:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'800px'}}>
+                <thead><tr style={{borderBottom:'1px solid rgba(0,229,250,0.1)'}}>
+                  <th style={{padding:'10px 14px',textAlign:'left',color:'#5a7a9a',fontWeight:700,fontSize:'10px',position:'sticky',left:0,background:'#0a1628',zIndex:1}}>LCAT</th>
+                  <th style={{padding:'10px 8px',textAlign:'center',color:'#5a7a9a',fontWeight:600,fontSize:'10px'}}>Rate</th>
+                  <th style={{padding:'10px 8px',textAlign:'center',color:'#5a7a9a',fontWeight:600,fontSize:'10px'}}>Hours</th>
+                  <th style={{padding:'10px 8px',textAlign:'center',color:'#5a7a9a',fontWeight:600,fontSize:'10px'}}>Value</th>
+                  {partners.map(p=>(<th key={p.id} style={{padding:'10px 8px',textAlign:'center',fontWeight:700,fontSize:'10px',color:p.color}}>{p.shortName} %</th>))}
+                  <th style={{padding:'10px 8px',textAlign:'center',color:'#5a7a9a',fontWeight:600,fontSize:'10px'}}>Split</th>
+                </tr></thead>
+                <tbody>
+                  {lcats.map(l=>{
+                    const totalVal=l.rate*l.hours;
+                    const totalAlloc=Object.values(l.allocation).reduce((s,v)=>s+v,0);
+                    return(
+                      <tr key={l.id} style={{borderBottom:'1px solid rgba(0,229,250,0.04)'}}>
+                        <td style={{padding:'8px 14px',color:'white',fontWeight:500,whiteSpace:'nowrap',position:'sticky',left:0,background:'#0a1020',zIndex:1}}>
+                          {l.title}
+                          <span style={{marginLeft:'6px',fontSize:'9px',padding:'1px 5px',borderRadius:'3px',background:'rgba(0,229,250,0.06)',color:'#5a7a9a'}}>{l.category}</span>
+                        </td>
+                        <td style={{padding:'8px',textAlign:'center',fontFamily:'monospace',fontSize:'11px',color:'#94a3b8'}}>${l.rate}</td>
+                        <td style={{padding:'8px',textAlign:'center',fontFamily:'monospace',fontSize:'11px',color:'#94a3b8'}}>{l.hours.toLocaleString()}</td>
+                        <td style={{padding:'8px',textAlign:'center',fontWeight:600,color:'#00E5FA',fontSize:'11px'}}>{fmt(totalVal)}</td>
+                        {partners.map(p=>(
+                          <td key={p.id} style={{padding:'4px 6px',textAlign:'center'}}>
+                            <input type="number" min={0} max={100} value={l.allocation[p.id]||0}
+                              onChange={e=>updateAllocation(l.id,p.id,e.target.value)}
+                              style={{width:'52px',background:'rgba(0,0,0,0.3)',border:`1px solid ${(l.allocation[p.id]||0)>0?p.color+'40':'rgba(255,255,255,0.06)'}`,borderRadius:'6px',padding:'4px 6px',fontSize:'11px',color:'white',textAlign:'center',outline:'none'}}/>
+                          </td>
+                        ))}
+                        <td style={{padding:'4px 8px',width:'120px'}}>
+                          <BarSegment segments={partners.map(p=>({value:(l.allocation[p.id]||0),color:p.color,label:p.shortName}))} height={16}/>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* VALUE SUMMARY */}
+          {tab==='summary'&&(
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))',gap:'12px'}}>
+              {partnerSummary.map(p=>(
+                <div key={p.id} style={{background:'rgba(10,22,40,0.5)',border:`1px solid ${p.color}15`,borderRadius:'12px',padding:'18px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}}>
+                    <div style={{width:'12px',height:'12px',borderRadius:'4px',background:p.color}}/>
+                    <span style={{fontSize:'16px',fontWeight:800,color:'white'}}>{p.name}</span>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'14px'}}>
+                    <div><div style={{fontSize:'9px',fontWeight:700,color:'#5a7a9a',letterSpacing:'0.5px'}}>TOTAL VALUE</div><div style={{fontSize:'20px',fontWeight:800,color:p.color}}>{fmt(p.totalValue)}</div></div>
+                    <div><div style={{fontSize:'9px',fontWeight:700,color:'#5a7a9a',letterSpacing:'0.5px'}}>WORKSHARE</div><div style={{fontSize:'20px',fontWeight:800,color:p.worksharePct>=51?'#00ff88':'#e2e8f0'}}>{p.worksharePct.toFixed(1)}%</div></div>
+                    <div><div style={{fontSize:'9px',fontWeight:700,color:'#5a7a9a',letterSpacing:'0.5px'}}>TOTAL HOURS</div><div style={{fontSize:'16px',fontWeight:700,color:'#e2e8f0'}}>{p.totalHours.toLocaleString()}</div></div>
+                    <div><div style={{fontSize:'9px',fontWeight:700,color:'#5a7a9a',letterSpacing:'0.5px'}}>LCAT COUNT</div><div style={{fontSize:'16px',fontWeight:700,color:'#e2e8f0'}}>{p.lcatCount}</div></div>
+                  </div>
+                  <div style={{fontSize:'10px',fontWeight:700,color:'#5a7a9a',marginBottom:'6px'}}>ASSIGNED LCATS</div>
+                  <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
+                    {lcats.filter(l=>(l.allocation[p.id]||0)>0).map(l=>(
+                      <span key={l.id} style={{fontSize:'10px',padding:'2px 6px',borderRadius:'4px',background:`${p.color}10`,color:p.color}}>{l.title} ({l.allocation[p.id]}%)</span>
+                    ))}
+                    {lcats.filter(l=>(l.allocation[p.id]||0)>0).length===0&&<span style={{fontSize:'10px',color:'#3e4f63'}}>No LCATs assigned</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{textAlign:'center',padding:'20px 0',marginTop:'28px',borderTop:'1px solid rgba(0,229,250,0.06)',fontSize:'10px',color:'rgba(148,163,184,0.4)',lineHeight:'1.8'}}>⚠️ AI GENERATED — REQUIRES HUMAN REVIEW<br/>MissionPulse v12.0 — Mission Meets Tech | CMMC 2.0 L2 Compliant</div>
+        </div>
+      );
+    };
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
