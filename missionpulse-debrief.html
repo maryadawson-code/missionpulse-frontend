@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse S110 - Debrief Center</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Space Grotesk', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes barFill { from { width: 0%; } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-slide-in { animation: slideIn 0.4s ease-out forwards; }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    .animate-bar { animation: barFill 1s ease-out forwards; }
+    .glass-card { background: linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.7) 100%); backdrop-filter: blur(10px); border: 1px solid rgba(0,229,250,0.15); }
+    .glass-card:hover { border-color: rgba(0,229,250,0.3); }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #0a1628; } ::-webkit-scrollbar-thumb { background: rgba(0,229,250,0.3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ===== SUPABASE =====
+    const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MjMwMTgsImV4cCI6MjA1MzM5OTAxOH0.gFHBoGjPMWjCGuJNdxMGPOBmGMHBp0jSTbxxcFKqkPQ';
+    var sbClient;
+    try { sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) { sbClient = null; }
+
+    // ===== ICONS =====
+    const Icons = {
+      trophy: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3h14l-1.5 6.5a5.5 5.5 0 01-11 0L5 3zm7 13v4m-4 0h8m-6-4a2 2 0 104 0" /></svg>,
+      xCircle: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      clipboard: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>,
+      lightbulb: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
+      check: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      star: () => <svg className="w-full h-full" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
+      users: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+      trending: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
+      chat: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+      shield: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      filter: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+      plus: () => <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+    };
+    const Icon = ({ name, className = "w-4 h-4" }) => { const C = Icons[name]; return C ? <span className={`inline-block ${className}`}><C /></span> : null; };
+
+    // ===== DEMO DATA =====
+    const DEMO_DEBRIEFS = [
+      { id: 1, opportunity: 'DHA EHR Modernization', contract_value: 47000000, outcome: 'win', date: '2026-01-15', pwin_predicted: 72, evaluator_scores: { technical: 92, management: 88, past_performance: 95, price: 85 }, evaluator_feedback: [ { area: 'Technical', rating: 'Outstanding', comment: 'Proposed MHS Genesis integration architecture demonstrated deep domain expertise. Zero-downtime migration plan was strongest among offerors.' }, { area: 'Management', rating: 'Good', comment: 'Project management approach was solid. Staffing plan could have been more detailed for surge capacity.' }, { area: 'Past Performance', rating: 'Outstanding', comment: 'Strong CPARS ratings. DHA Leidos subcontract references were highly relevant.' }, { area: 'Price', rating: 'Acceptable', comment: 'Price was competitive but not lowest. Technical superiority justified the premium.' } ], lessons: [ { type: 'strength', text: 'Early teaming agreement with Leidos gave credibility on past performance' }, { type: 'strength', text: 'AskSage-powered compliance matrix caught 3 hidden requirements competitors missed' }, { type: 'improvement', text: 'Price volume needed earlier engagement with DCAA-compliant rate development' }, { type: 'improvement', text: 'Oral presentation rehearsals should start 2 weeks earlier' } ], actions: [ { task: 'Create reusable EHR migration template from winning approach', owner: 'SA Lead', due: '2026-02-15', status: 'in_progress' }, { task: 'Update pricing model with approved DHA labor categories', owner: 'FIN Lead', due: '2026-02-01', status: 'complete' }, { task: 'Document Leidos teaming lessons for partner playbook', owner: 'COO', due: '2026-02-28', status: 'pending' } ] },
+      { id: 2, opportunity: 'VA Claims Processing AI', contract_value: 23000000, outcome: 'loss', date: '2025-12-20', pwin_predicted: 55, evaluator_scores: { technical: 78, management: 82, past_performance: 70, price: 90 }, evaluator_feedback: [ { area: 'Technical', rating: 'Acceptable', comment: 'AI approach was innovative but lacked sufficient detail on VA-specific data governance requirements.' }, { area: 'Management', rating: 'Good', comment: 'Solid PM approach. Agile methodology was well-articulated.' }, { area: 'Past Performance', rating: 'Marginal', comment: 'Limited direct VA experience. Commercial AI references were not considered sufficiently relevant.' }, { area: 'Price', rating: 'Outstanding', comment: 'Most competitive price among offerors.' } ], lessons: [ { type: 'strength', text: 'Pricing strategy was on target — lowest evaluated cost' }, { type: 'improvement', text: 'Need VA-specific past performance — pursue subcontract opportunities' }, { type: 'improvement', text: 'Technical volume must address agency-specific data governance explicitly' }, { type: 'critical', text: 'Past performance gap was the discriminator — must build VA portfolio' } ], actions: [ { task: 'Identify 3 VA subcontract opportunities for past performance building', owner: 'BD Lead', due: '2026-03-01', status: 'in_progress' }, { task: 'Create VA data governance compliance template', owner: 'SA Lead', due: '2026-02-15', status: 'pending' }, { task: 'Schedule post-debrief meeting with VA OSDBU', owner: 'CEO', due: '2026-02-10', status: 'complete' } ] },
+      { id: 3, opportunity: 'CMS Data Analytics Platform', contract_value: 15500000, outcome: 'win', date: '2025-11-05', pwin_predicted: 65, evaluator_scores: { technical: 90, management: 91, past_performance: 88, price: 82 }, evaluator_feedback: [ { area: 'Technical', rating: 'Outstanding', comment: 'Advana integration approach and FedRAMP compliance architecture were best in class.' }, { area: 'Management', rating: 'Outstanding', comment: 'Transition plan was exceptionally detailed. Risk mitigation strategies were credible.' }, { area: 'Past Performance', rating: 'Good', comment: 'Relevant CMS experience demonstrated. CPARS ratings were consistently exceptional.' }, { area: 'Price', rating: 'Acceptable', comment: 'Not lowest price but represented best value given technical superiority.' } ], lessons: [ { type: 'strength', text: 'FedRAMP narrative using MissionPulse compliance artifacts saved 40 hours' }, { type: 'strength', text: 'Transition plan template is now reusable across all data analytics bids' }, { type: 'improvement', text: 'Should have proposed more aggressive SLA commitments to differentiate further' } ], actions: [ { task: 'Productize FedRAMP compliance narrative as MissionPulse template', owner: 'SA Lead', due: '2026-01-15', status: 'complete' }, { task: 'Update SLA benchmark database with CMS standards', owner: 'PM Lead', due: '2026-01-30', status: 'complete' } ] },
+      { id: 4, opportunity: 'IHS Telehealth Expansion', contract_value: 8200000, outcome: 'loss', date: '2025-10-18', pwin_predicted: 40, evaluator_scores: { technical: 72, management: 75, past_performance: 65, price: 88 }, evaluator_feedback: [ { area: 'Technical', rating: 'Acceptable', comment: 'Telehealth solution was adequate but did not address tribal sovereignty data requirements.' }, { area: 'Management', rating: 'Acceptable', comment: 'Standard approach. No differentiated understanding of IHS operational environment.' }, { area: 'Past Performance', rating: 'Marginal', comment: 'No direct IHS experience. Referenced commercial telehealth was not considered relevant.' }, { area: 'Price', rating: 'Good', comment: 'Competitive pricing aligned with IGCE estimates.' } ], lessons: [ { type: 'critical', text: 'Tribal data sovereignty is non-negotiable — must build this expertise' }, { type: 'improvement', text: 'Should have pursued IHS-specific teaming partner with tribal health experience' }, { type: 'improvement', text: 'Gate review should have flagged this as No-Go at Phase 2 given past performance gap' } ], actions: [ { task: 'Research tribal data sovereignty compliance frameworks', owner: 'Compliance Lead', due: '2026-03-15', status: 'pending' }, { task: 'Update Go/No-Go criteria to weight agency-specific past performance higher', owner: 'COO', due: '2026-02-01', status: 'in_progress' } ] },
+    ];
+
+    // ===== CONNECTION INDICATOR =====
+    const ConnectionIndicator = ({ connected }) => (
+      <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono" style={{ background: connected ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)', border: `1px solid ${connected ? 'rgba(0,255,136,0.3)' : 'rgba(255,184,0,0.3)'}` }}>
+        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-amber-400 animate-pulse'}`} />
+        <span style={{ color: connected ? '#00ff88' : '#ffb800' }}>{connected ? 'LIVE' : 'DEMO'}</span>
+      </div>
+    );
+
+    // ===== MAIN APP =====
+    const DebriefCenter = () => {
+      const [debriefs, setDebriefs] = useState(DEMO_DEBRIEFS);
+      const [connected, setConnected] = useState(false);
+      const [userRole, setUserRole] = useState('CEO');
+      const [selectedDebrief, setSelectedDebrief] = useState(null);
+      const [filterOutcome, setFilterOutcome] = useState('all');
+      const [showNewAction, setShowNewAction] = useState(false);
+
+      // RBAC Check
+      useEffect(() => {
+        const allowedRoles = ['CEO','COO','CAP','PM','SA','QA','Admin'];
+        if (!allowedRoles.includes(userRole)) { setUserRole(null); }
+      }, [userRole]);
+
+      // Supabase connection attempt
+      useEffect(() => {
+        const tryConnect = async () => {
+          if (!sbClient) return;
+          try {
+            const { data } = await sbClient.from('opportunities').select('id').limit(1);
+            if (data) setConnected(true);
+          } catch(e) { console.log('Using demo data'); }
+        };
+        tryConnect();
+      }, []);
+
+      const filtered = debriefs.filter(d => filterOutcome === 'all' || d.outcome === filterOutcome);
+      const wins = debriefs.filter(d => d.outcome === 'win');
+      const losses = debriefs.filter(d => d.outcome === 'loss');
+      const winRate = debriefs.length ? Math.round((wins.length / debriefs.length) * 100) : 0;
+      const avgWinScore = wins.length ? Math.round(wins.reduce((s,d) => s + Object.values(d.evaluator_scores).reduce((a,b)=>a+b,0)/4, 0) / wins.length) : 0;
+      const totalActions = debriefs.reduce((s,d) => s + d.actions.length, 0);
+      const completedActions = debriefs.reduce((s,d) => s + d.actions.filter(a => a.status === 'complete').length, 0);
+
+      const ScoreBar = ({ label, score, maxScore = 100 }) => (
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-xs text-slate-400 w-28 shrink-0">{label}</span>
+          <div className="flex-1 h-2 rounded-full bg-slate-700/50 overflow-hidden">
+            <div className="h-full rounded-full animate-bar" style={{ width: `${score}%`, background: score >= 90 ? '#00ff88' : score >= 80 ? '#00E5FA' : score >= 70 ? '#ffb800' : '#ff4444' }} />
+          </div>
+          <span className="text-xs font-mono w-8 text-right" style={{ color: score >= 90 ? '#00ff88' : score >= 80 ? '#00E5FA' : score >= 70 ? '#ffb800' : '#ff4444' }}>{score}</span>
+        </div>
+      );
+
+      const RatingBadge = ({ rating }) => {
+        const colors = { Outstanding: '#00ff88', Good: '#00E5FA', Acceptable: '#ffb800', Marginal: '#ff4444' };
+        return <span className="px-2 py-0.5 rounded text-xs font-mono font-bold" style={{ background: `${colors[rating]}15`, color: colors[rating], border: `1px solid ${colors[rating]}30` }}>{rating}</span>;
+      };
+
+      const StatusBadge = ({ status }) => {
+        const map = { complete: { color: '#00ff88', label: 'Complete' }, in_progress: { color: '#00E5FA', label: 'In Progress' }, pending: { color: '#ffb800', label: 'Pending' } };
+        const s = map[status] || map.pending;
+        return <span className="px-2 py-0.5 rounded text-xs font-mono" style={{ background: `${s.color}15`, color: s.color }}>{s.label}</span>;
+      };
+
+      const LessonTag = ({ type }) => {
+        const map = { strength: { color: '#00ff88', label: '✦ Strength' }, improvement: { color: '#ffb800', label: '⚡ Improve' }, critical: { color: '#ff4444', label: '🔴 Critical' } };
+        const t = map[type] || map.improvement;
+        return <span className="px-2 py-0.5 rounded text-xs font-mono font-bold" style={{ background: `${t.color}15`, color: t.color }}>{t.label}</span>;
+      };
+
+      // Detail View
+      if (selectedDebrief) {
+        const d = selectedDebrief;
+        return (
+          <div className="min-h-screen" style={{ background: '#00050F' }}>
+            <div className="max-w-6xl mx-auto p-6">
+              {/* Back nav */}
+              <button onClick={() => setSelectedDebrief(null)} className="flex items-center gap-2 text-sm text-slate-400 hover:text-cyan-400 transition mb-6">
+                ← Back to Debrief Center
+              </button>
+
+              {/* Header */}
+              <div className="glass-card rounded-xl p-6 mb-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className={`px-3 py-1 rounded-lg text-xs font-mono font-bold ${d.outcome === 'win' ? 'bg-green-500/15 text-green-400 border border-green-500/30' : 'bg-red-500/15 text-red-400 border border-red-500/30'}`}>
+                        {d.outcome === 'win' ? '🏆 WIN' : '✗ LOSS'}
+                      </span>
+                      <span className="text-xs text-slate-500 font-mono">{d.date}</span>
+                    </div>
+                    <h1 className="text-2xl font-bold text-white mb-1">{d.opportunity}</h1>
+                    <p className="text-slate-400 text-sm">${(d.contract_value/1000000).toFixed(1)}M contract value · Predicted pWin: {d.pwin_predicted}%</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-mono font-bold" style={{ color: avgScore(d) >= 85 ? '#00ff88' : avgScore(d) >= 75 ? '#00E5FA' : '#ffb800' }}>
+                      {avgScore(d)}
+                    </div>
+                    <div className="text-xs text-slate-500">AVG SCORE</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Evaluator Scores */}
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-sm font-mono font-bold text-cyan-400 mb-4">EVALUATOR SCORES</h3>
+                  <ScoreBar label="Technical" score={d.evaluator_scores.technical} />
+                  <ScoreBar label="Management" score={d.evaluator_scores.management} />
+                  <ScoreBar label="Past Performance" score={d.evaluator_scores.past_performance} />
+                  <ScoreBar label="Price" score={d.evaluator_scores.price} />
+                </div>
+
+                {/* Score Comparison Radar-style */}
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-sm font-mono font-bold text-cyan-400 mb-4">SCORE vs AVERAGE</h3>
+                  {Object.entries(d.evaluator_scores).map(([key, val]) => {
+                    const avgAll = Math.round(debriefs.reduce((s,db) => s + db.evaluator_scores[key], 0) / debriefs.length);
+                    const delta = val - avgAll;
+                    return (
+                      <div key={key} className="flex items-center justify-between py-2 border-b border-slate-700/30 last:border-0">
+                        <span className="text-sm text-slate-300 capitalize">{key.replace('_',' ')}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-slate-500 font-mono">avg {avgAll}</span>
+                          <span className={`text-sm font-mono font-bold ${delta >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {delta >= 0 ? '+' : ''}{delta}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Evaluator Feedback */}
+                <div className="glass-card rounded-xl p-6 lg:col-span-2">
+                  <h3 className="text-sm font-mono font-bold text-cyan-400 mb-4">EVALUATOR FEEDBACK</h3>
+                  <div className="space-y-4">
+                    {d.evaluator_feedback.map((fb, i) => (
+                      <div key={i} className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/30 animate-slide-in" style={{ animationDelay: `${i * 0.1}s` }}>
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-sm font-bold text-white">{fb.area}</span>
+                          <RatingBadge rating={fb.rating} />
+                        </div>
+                        <p className="text-sm text-slate-300 leading-relaxed">"{fb.comment}"</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Lessons Learned */}
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-sm font-mono font-bold text-cyan-400 mb-4">
+                    <span className="flex items-center gap-2"><Icon name="lightbulb" className="w-4 h-4 text-amber-400" /> LESSONS LEARNED</span>
+                  </h3>
+                  <div className="space-y-3">
+                    {d.lessons.map((l, i) => (
+                      <div key={i} className="flex gap-3 p-3 rounded-lg bg-slate-800/20">
+                        <LessonTag type={l.type} />
+                        <span className="text-sm text-slate-300 flex-1">{l.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Improvement Actions */}
+                <div className="glass-card rounded-xl p-6">
+                  <h3 className="text-sm font-mono font-bold text-cyan-400 mb-4">IMPROVEMENT ACTIONS</h3>
+                  <div className="space-y-3">
+                    {d.actions.map((a, i) => (
+                      <div key={i} className="p-3 rounded-lg bg-slate-800/20 border border-slate-700/20">
+                        <div className="flex items-start justify-between mb-1">
+                          <span className="text-sm text-white font-medium">{a.task}</span>
+                          <StatusBadge status={a.status} />
+                        </div>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="text-xs text-slate-500">Owner: <span className="text-slate-300">{a.owner}</span></span>
+                          <span className="text-xs text-slate-500">Due: <span className="text-slate-300">{a.due}</span></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function avgScore(d) {
+        const vals = Object.values(d.evaluator_scores);
+        return Math.round(vals.reduce((a,b) => a+b, 0) / vals.length);
+      }
+
+      // ===== LIST VIEW =====
+      return (
+        <div className="min-h-screen" style={{ background: '#00050F' }}>
+          <div className="max-w-7xl mx-auto p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-2xl font-bold text-white">Debrief Center</h1>
+                  <ConnectionIndicator connected={connected} />
+                </div>
+                <p className="text-sm text-slate-400">Win/loss analysis, evaluator feedback & improvement tracking</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
+                  {['all','win','loss'].map(f => (
+                    <button key={f} onClick={() => setFilterOutcome(f)} className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold transition ${filterOutcome === f ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}>
+                      {f === 'all' ? 'ALL' : f.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: 'Win Rate', value: `${winRate}%`, icon: 'trophy', color: '#00ff88' },
+                { label: 'Avg Win Score', value: avgWinScore, icon: 'star', color: '#00E5FA' },
+                { label: 'Debriefs', value: debriefs.length, icon: 'clipboard', color: '#a78bfa' },
+                { label: 'Actions Done', value: `${completedActions}/${totalActions}`, icon: 'check', color: '#ffb800' },
+              ].map((kpi, i) => (
+                <div key={i} className="glass-card rounded-xl p-5 animate-slide-in" style={{ animationDelay: `${i * 0.05}s` }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Icon name={kpi.icon} className="w-4 h-4" style={{ color: kpi.color }} />
+                    <span className="text-xs text-slate-500 font-mono uppercase">{kpi.label}</span>
+                  </div>
+                  <div className="text-2xl font-mono font-bold" style={{ color: kpi.color }}>{kpi.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Debrief List */}
+            <div className="space-y-4">
+              {filtered.map((d, i) => (
+                <div key={d.id} onClick={() => setSelectedDebrief(d)} className="glass-card rounded-xl p-5 cursor-pointer hover:border-cyan-500/40 transition-all animate-slide-in" style={{ animationDelay: `${i * 0.08}s` }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${d.outcome === 'win' ? 'bg-green-500/15' : 'bg-red-500/15'}`}>
+                        <Icon name={d.outcome === 'win' ? 'trophy' : 'xCircle'} className={`w-6 h-6 ${d.outcome === 'win' ? 'text-green-400' : 'text-red-400'}`} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-white font-semibold">{d.opportunity}</h3>
+                          <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${d.outcome === 'win' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                            {d.outcome.toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">${(d.contract_value/1000000).toFixed(1)}M · {d.date} · pWin: {d.pwin_predicted}%</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <div className="text-lg font-mono font-bold" style={{ color: avgScore(d) >= 85 ? '#00ff88' : avgScore(d) >= 75 ? '#00E5FA' : '#ffb800' }}>{avgScore(d)}</div>
+                        <div className="text-xs text-slate-500">avg score</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-mono text-slate-300">{d.lessons.length}</div>
+                        <div className="text-xs text-slate-500">lessons</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-mono text-slate-300">{d.actions.filter(a=>a.status==='complete').length}/{d.actions.length}</div>
+                        <div className="text-xs text-slate-500">actions</div>
+                      </div>
+                      <span className="text-slate-600 text-lg">→</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* AI Disclaimer */}
+            <div className="mt-8 text-center">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <Icon name="shield" className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-xs text-amber-500/80 font-mono">AI GENERATED — REQUIRES HUMAN REVIEW</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<DebriefCenter />, document.getElementById('root'));
+  </script>
+</body>
+</html>
