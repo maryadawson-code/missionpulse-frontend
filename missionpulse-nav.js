@@ -193,7 +193,7 @@
 
         try {
             if (typeof supabase !== 'undefined' || (window.supabase && typeof window.supabase.createClient === 'function')) {
-                var client = window.sbClient || (window.supabase ? window.supabase.createClient('https://qdrtpnpnhkxvfmvfziop.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8') : null);
+                var client = window.sbClient || (window.supabase ? window.supabase.createClient('https://djuviwarqdvlbgcfuupa.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8') : null);
                 if (client) {
                     client.from('opportunities').select('id').limit(1).then(function(res) {
                         if (!res.error) {
