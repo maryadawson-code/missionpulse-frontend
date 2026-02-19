@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Clearance Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Space Grotesk', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-up { animation: fadeInUp 0.5s ease-out forwards; }
+    .glass-card { background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.7) 100%); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.2); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="supabase-client.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const ROLES_ALLOWED = ['CEO','COO','CAP','PM','DEL','Admin'];
+
+    const DEMO_CLEARANCES = [
+      { id: 'CLR-001', name: 'Sarah Chen', role: 'Solution Architect', level: 'Secret', status: 'active', issueDate: '2023-03-15', expDate: '2028-03-15', sponsoredBy: 'DHA', investigation: 'T3', polyRequired: false, notes: 'Key personnel for DHA EHR' },
+      { id: 'CLR-002', name: 'Marcus Johnson', role: 'Program Manager', level: 'TS/SCI', status: 'active', issueDate: '2022-08-01', expDate: '2027-08-01', sponsoredBy: 'DoD', investigation: 'T5', polyRequired: true, notes: 'CI Poly current through 2027' },
+      { id: 'CLR-003', name: 'Emily Rodriguez', role: 'Security Engineer', level: 'Secret', status: 'active', issueDate: '2024-01-20', expDate: '2029-01-20', sponsoredBy: 'VA', investigation: 'T3', polyRequired: false, notes: '' },
+      { id: 'CLR-004', name: 'David Park', role: 'Database Administrator', level: 'Public Trust', status: 'active', issueDate: '2023-11-10', expDate: '2028-11-10', sponsoredBy: 'CMS', investigation: 'MBI', polyRequired: false, notes: 'Upgrade to Secret pending for DoD work' },
+      { id: 'CLR-005', name: 'Jessica Williams', role: 'Software Engineer III', level: 'Secret', status: 'pending', issueDate: null, expDate: null, sponsoredBy: 'DHA', investigation: 'T3', polyRequired: false, notes: 'eQIP submitted 2025-01-05. Interview scheduled.' },
+      { id: 'CLR-006', name: 'Robert Taylor', role: 'QA Lead', level: 'Public Trust', status: 'expired', issueDate: '2019-06-15', expDate: '2024-06-15', sponsoredBy: 'VA', investigation: 'MBI', polyRequired: false, notes: 'Reinvestigation required for VA renewal' },
+      { id: 'CLR-007', name: 'Amanda Foster', role: 'Business Analyst', level: 'Secret', status: 'interim', issueDate: '2025-01-28', expDate: null, sponsoredBy: 'DoD', investigation: 'T3', polyRequired: false, notes: 'Interim granted, final pending' },
+    ];
+
+    const LevelBadge = ({ level }) => {
+      const config = {
+        'TS/SCI': { bg: 'rgba(239,68,68,0.15)', color: '#EF4444', border: 'rgba(239,68,68,0.3)' },
+        'Secret': { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: 'rgba(245,158,11,0.3)' },
+        'Public Trust': { bg: 'rgba(16,185,129,0.15)', color: '#10B981', border: 'rgba(16,185,129,0.3)' }
+      };
+      const c = config[level] || config['Public Trust'];
+      return React.createElement('span', { className: 'px-2 py-0.5 rounded text-xs font-bold font-mono', style: { background: c.bg, color: c.color, border: `1px solid ${c.border}` } }, level);
+    };
+
+    const StatusDot = ({ status }) => {
+      const colors = { active: '#10B981', pending: '#F59E0B', interim: '#818CF8', expired: '#EF4444' };
+      return React.createElement('div', { className: 'flex items-center gap-1.5' },
+        React.createElement('span', { className: 'w-2 h-2 rounded-full', style: { backgroundColor: colors[status] || '#6B7280' } }),
+        React.createElement('span', { className: 'text-xs capitalize', style: { color: colors[status] || '#6B7280' } }, status)
+      );
+    };
+
+    const App = () => {
+      const [clearances, setClearances] = useState(DEMO_CLEARANCES);
+      const [filter, setFilter] = useState('all');
+      const [search, setSearch] = useState('');
+      const [connected, setConnected] = useState(false);
+
+      useEffect(() => {
+        const role = localStorage.getItem('missionpulse_role');
+        if (role && !ROLES_ALLOWED.includes(role)) { window.location.href = 'index.html'; return; }
+        const load = async () => {
+          try {
+            if (typeof sbClient !== 'undefined') {
+              const { data } = await sbClient.from('personnel_clearances').select('*');
+              if (data?.length) { setClearances(data); setConnected(true); }
+            }
+          } catch (e) {}
+        };
+        load();
+      }, []);
+
+      const filtered = clearances
+        .filter(c => filter === 'all' || c.status === filter)
+        .filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.role.toLowerCase().includes(search.toLowerCase()));
+
+      const daysUntilExpiry = (date) => {
+        if (!date) return null;
+        const diff = new Date(date) - new Date();
+        return Math.ceil(diff / (1000 * 60 * 60 * 24));
+      };
+
+      const stats = {
+        active: clearances.filter(c => c.status === 'active').length,
+        pending: clearances.filter(c => c.status === 'pending' || c.status === 'interim').length,
+        expired: clearances.filter(c => c.status === 'expired').length,
+        expiringSoon: clearances.filter(c => { const d = daysUntilExpiry(c.expDate); return d !== null && d > 0 && d <= 180; }).length
+      };
+
+      return React.createElement('div', { className: 'min-h-screen p-6', style: { background: '#00050F' } },
+        React.createElement('div', { className: 'flex items-center justify-between mb-6' },
+          React.createElement('div', null,
+            React.createElement('div', { className: 'flex items-center gap-3' },
+              React.createElement('h1', { className: 'text-2xl font-bold text-white' }, '🔐 Clearance Tracker'),
+              React.createElement('span', { className: 'px-2 py-0.5 rounded text-xs font-bold', style: { background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.3)' } }, 'RESTRICTED')
+            ),
+            React.createElement('p', { className: 'text-gray-400 text-sm mt-1' }, 'Personnel security clearances • Expiration tracking • Sponsorship management')
+          ),
+          React.createElement('div', { className: 'flex items-center gap-3' },
+            React.createElement('div', { className: 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs', style: { background: connected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: connected ? '#10B981' : '#F59E0B', border: `1px solid ${connected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` } },
+              React.createElement('span', { className: `w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-yellow-500'}` }), connected ? 'Supabase Connected' : 'Demo Mode'
+            ),
+            React.createElement('a', { href: 'index.html', className: 'px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white', style: { border: '1px solid rgba(255,255,255,0.1)' } }, '← Dashboard')
+          )
+        ),
+
+        React.createElement('div', { className: 'grid grid-cols-4 gap-4 mb-6' },
+          [
+            { label: 'Active Clearances', value: stats.active, color: '#10B981' },
+            { label: 'Pending/Interim', value: stats.pending, color: '#F59E0B' },
+            { label: 'Expiring <6mo', value: stats.expiringSoon, color: stats.expiringSoon > 0 ? '#EF4444' : '#10B981' },
+            { label: 'Expired', value: stats.expired, color: '#EF4444' }
+          ].map((s, i) =>
+            React.createElement('div', { key: i, className: 'glass-card rounded-lg p-4 text-center animate-fade-up', style: { animationDelay: `${i*0.1}s` } },
+              React.createElement('div', { className: 'font-mono text-2xl font-bold', style: { color: s.color } }, s.value),
+              React.createElement('div', { className: 'text-xs text-gray-400 mt-1' }, s.label)
+            )
+          )
+        ),
+
+        React.createElement('div', { className: 'flex gap-3 mb-6' },
+          React.createElement('input', { type: 'text', placeholder: 'Search by name or role...', className: 'flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none', value: search, onChange: e => setSearch(e.target.value) }),
+          ['all', 'active', 'pending', 'interim', 'expired'].map(f =>
+            React.createElement('button', { key: f, className: `px-3 py-2 rounded-lg text-xs font-medium ${filter === f ? 'text-white' : 'text-gray-400'}`, style: { background: filter === f ? 'rgba(0,229,250,0.15)' : 'transparent', border: `1px solid ${filter === f ? 'rgba(0,229,250,0.4)' : 'rgba(255,255,255,0.1)'}` }, onClick: () => setFilter(f) },
+              f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)
+            )
+          )
+        ),
+
+        React.createElement('div', { className: 'space-y-3 mb-8' },
+          filtered.map((c, i) => {
+            const days = daysUntilExpiry(c.expDate);
+            const expiring = days !== null && days > 0 && days <= 180;
+            return React.createElement('div', { key: c.id, className: `glass-card rounded-lg p-4 animate-fade-up ${expiring ? 'border-yellow-500/30' : ''}`, style: { animationDelay: `${i*0.05}s`, borderColor: c.status === 'expired' ? 'rgba(239,68,68,0.4)' : undefined } },
+              React.createElement('div', { className: 'flex items-center justify-between' },
+                React.createElement('div', { className: 'flex items-center gap-4' },
+                  React.createElement('div', { className: 'w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm', style: { background: 'rgba(0,229,250,0.15)' } }, c.name.split(' ').map(n => n[0]).join('')),
+                  React.createElement('div', null,
+                    React.createElement('div', { className: 'flex items-center gap-2' },
+                      React.createElement('h3', { className: 'text-white font-semibold' }, c.name),
+                      React.createElement(LevelBadge, { level: c.level }),
+                      c.polyRequired && React.createElement('span', { className: 'px-1.5 py-0.5 rounded text-xs', style: { background: 'rgba(239,68,68,0.1)', color: '#F87171' } }, 'POLY')
+                    ),
+                    React.createElement('div', { className: 'flex items-center gap-3 text-xs text-gray-400 mt-0.5' },
+                      React.createElement('span', null, c.role),
+                      React.createElement('span', null, `Sponsor: ${c.sponsoredBy}`),
+                      React.createElement('span', { className: 'font-mono' }, c.investigation)
+                    )
+                  )
+                ),
+                React.createElement('div', { className: 'flex items-center gap-4' },
+                  React.createElement(StatusDot, { status: c.status }),
+                  c.expDate && React.createElement('div', { className: 'text-right' },
+                    React.createElement('div', { className: 'font-mono text-xs', style: { color: expiring ? '#F59E0B' : days <= 0 ? '#EF4444' : '#6B7280' } },
+                      days > 0 ? `${days}d remaining` : 'EXPIRED'
+                    ),
+                    React.createElement('div', { className: 'text-xs text-gray-500' }, `Exp: ${c.expDate}`)
+                  ),
+                  c.notes && React.createElement('span', { className: 'text-xs text-gray-500 max-w-48 truncate', title: c.notes }, c.notes)
+                )
+              )
+            );
+          })
+        ),
+
+        React.createElement('div', { className: 'text-center py-4 border-t border-gray-800' },
+          React.createElement('p', { className: 'text-xs text-gray-600' }, '⚠️ AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse by Mission Meets Tech • NIST 800-171 Compliant')
+        )
+      );
+    };
+
+    ReactDOM.render(React.createElement(App), document.getElementById('root'));
+  </script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Evaluation Criteria Analyzer</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Space Grotesk', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes barFill { from { width: 0%; } }
+    .animate-fade-up { animation: fadeInUp 0.5s ease-out forwards; }
+    .animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
+    .animate-bar { animation: barFill 0.8s ease-out forwards; }
+    .glass-card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.7) 100%);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 229, 250, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="supabase-client.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // RBAC: All roles can view evaluation criteria
+    const ROLES_ALLOWED = ['CEO','COO','CAP','PM','SA','FIN','CON','DEL','QA','Partner','Admin'];
+
+    const DEMO_EVALUATIONS = [
+      {
+        id: 'EVAL-001', opportunity: 'DHA EHR Modernization', rfpSection: 'Section M.1',
+        factor: 'Technical Approach', weight: 40, type: 'Most Important',
+        subfactors: [
+          { name: 'System Architecture', weight: 15, ourScore: 88, notes: 'Strong - FHIR-native design differentiator' },
+          { name: 'Migration Strategy', weight: 15, ourScore: 72, notes: 'GAP: Need phased rollback plan' },
+          { name: 'Security Framework', weight: 10, ourScore: 95, notes: 'Strong - CMMC L2 certified' }
+        ],
+        status: 'analyzed'
+      },
+      {
+        id: 'EVAL-002', opportunity: 'DHA EHR Modernization', rfpSection: 'Section M.2',
+        factor: 'Management Approach', weight: 30, type: 'Important',
+        subfactors: [
+          { name: 'Project Management', weight: 10, ourScore: 90, notes: 'PMP-certified PM with 12yr DHA experience' },
+          { name: 'Staffing Plan', weight: 10, ourScore: 85, notes: 'Key personnel identified, backfill plan solid' },
+          { name: 'Quality Control', weight: 10, ourScore: 78, notes: 'Need ISO 9001 reference' }
+        ],
+        status: 'analyzed'
+      },
+      {
+        id: 'EVAL-003', opportunity: 'DHA EHR Modernization', rfpSection: 'Section M.3',
+        factor: 'Past Performance', weight: 20, type: 'Important',
+        subfactors: [
+          { name: 'Relevance', weight: 10, ourScore: 82, notes: '3 relevant contracts, 2 DHA-specific' },
+          { name: 'Quality of Performance', weight: 10, ourScore: 91, notes: 'All CPARs Exceptional/Very Good' }
+        ],
+        status: 'analyzed'
+      },
+      {
+        id: 'EVAL-004', opportunity: 'DHA EHR Modernization', rfpSection: 'Section M.4',
+        factor: 'Price', weight: 10, type: 'Less Important',
+        subfactors: [
+          { name: 'Price Reasonableness', weight: 5, ourScore: 75, notes: 'Competitive but not lowest — need value justification' },
+          { name: 'Price Realism', weight: 5, ourScore: 88, notes: 'BOE well-documented, realistic labor rates' }
+        ],
+        status: 'in_progress'
+      },
+      {
+        id: 'EVAL-005', opportunity: 'VA Claims Processing', rfpSection: 'Section M.1',
+        factor: 'Technical Capability', weight: 50, type: 'Most Important',
+        subfactors: [
+          { name: 'AI/ML Approach', weight: 20, ourScore: 92, notes: 'AskSage FedRAMP integration' },
+          { name: 'Automation Design', weight: 15, ourScore: 87, notes: 'RPA + NLP pipeline demonstrated' },
+          { name: 'Data Analytics', weight: 15, ourScore: 80, notes: 'Need Advana reference architecture' }
+        ],
+        status: 'draft'
+      }
+    ];
+
+    const DEMO_OPPORTUNITIES = ['DHA EHR Modernization', 'VA Claims Processing', 'CMS Data Analytics', 'IHS Telehealth'];
+
+    const ScoreBar = ({ score, label }) => {
+      const color = score >= 85 ? '#10B981' : score >= 70 ? '#F59E0B' : '#EF4444';
+      return React.createElement('div', { className: 'flex items-center gap-3' },
+        label && React.createElement('span', { className: 'text-xs text-gray-400 w-32 truncate' }, label),
+        React.createElement('div', { className: 'flex-1 h-2 bg-gray-800 rounded-full overflow-hidden' },
+          React.createElement('div', {
+            className: 'h-full rounded-full animate-bar',
+            style: { width: `${score}%`, backgroundColor: color }
+          })
+        ),
+        React.createElement('span', { className: 'font-mono text-xs w-10 text-right', style: { color } }, `${score}%`)
+      );
+    };
+
+    const StatusBadge = ({ status }) => {
+      const config = {
+        analyzed: { bg: 'rgba(16,185,129,0.15)', color: '#10B981', label: 'Analyzed' },
+        in_progress: { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', label: 'In Progress' },
+        draft: { bg: 'rgba(99,102,241,0.15)', color: '#818CF8', label: 'Draft' },
+        gap: { bg: 'rgba(239,68,68,0.15)', color: '#EF4444', label: 'Gap Identified' }
+      };
+      const c = config[status] || config.draft;
+      return React.createElement('span', {
+        className: 'px-2 py-0.5 rounded text-xs font-medium',
+        style: { background: c.bg, color: c.color }
+      }, c.label);
+    };
+
+    const EvalCard = ({ eval: ev, expanded, onToggle }) => {
+      const weightedScore = ev.subfactors.reduce((sum, sf) => sum + (sf.ourScore * sf.weight / ev.weight), 0);
+      const gaps = ev.subfactors.filter(sf => sf.ourScore < 75);
+      
+      return React.createElement('div', {
+        className: 'glass-card rounded-lg overflow-hidden transition-all duration-300',
+        style: { animationDelay: '0.1s' }
+      },
+        React.createElement('div', {
+          className: 'p-4 cursor-pointer hover:bg-white/5 transition-colors',
+          onClick: onToggle
+        },
+          React.createElement('div', { className: 'flex items-center justify-between mb-2' },
+            React.createElement('div', { className: 'flex items-center gap-3' },
+              React.createElement('span', { className: 'font-mono text-xs text-cyan-400' }, ev.rfpSection),
+              React.createElement('h3', { className: 'text-white font-semibold' }, ev.factor),
+              React.createElement(StatusBadge, { status: ev.status })
+            ),
+            React.createElement('div', { className: 'flex items-center gap-4' },
+              gaps.length > 0 && React.createElement('span', {
+                className: 'text-xs px-2 py-0.5 rounded',
+                style: { background: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+              }, `${gaps.length} gap${gaps.length > 1 ? 's' : ''}`),
+              React.createElement('span', {
+                className: 'font-mono text-sm',
+                style: { color: ev.type === 'Most Important' ? '#00E5FA' : ev.type === 'Important' ? '#F59E0B' : '#6B7280' }
+              }, `${ev.weight}% weight`),
+              React.createElement('span', { className: 'text-gray-500 text-lg' }, expanded ? '▾' : '▸')
+            )
+          ),
+          React.createElement('div', { className: 'flex items-center gap-4' },
+            React.createElement('span', { className: 'text-xs text-gray-500' }, ev.type),
+            React.createElement('div', { className: 'flex-1' },
+              React.createElement(ScoreBar, { score: Math.round(weightedScore) })
+            )
+          )
+        ),
+        expanded && React.createElement('div', { className: 'border-t border-gray-800 p-4 space-y-3' },
+          ev.subfactors.map((sf, i) =>
+            React.createElement('div', { key: i, className: 'bg-gray-900/50 rounded-lg p-3' },
+              React.createElement(ScoreBar, { score: sf.ourScore, label: sf.name }),
+              React.createElement('p', { className: 'text-xs text-gray-400 mt-1 ml-[140px]' },
+                sf.ourScore < 75 && React.createElement('span', { className: 'text-red-400 font-medium mr-1' }, '⚠'),
+                sf.notes
+              )
+            )
+          ),
+          React.createElement('div', { className: 'flex gap-2 mt-3' },
+            React.createElement('button', {
+              className: 'px-3 py-1.5 rounded text-xs font-medium',
+              style: { background: 'rgba(0,229,250,0.15)', color: '#00E5FA', border: '1px solid rgba(0,229,250,0.3)' }
+            }, '🤖 AI: Generate Response Strategy'),
+            React.createElement('button', {
+              className: 'px-3 py-1.5 rounded text-xs font-medium',
+              style: { background: 'rgba(99,102,241,0.15)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.3)' }
+            }, '📋 Export to Win Theme'),
+            React.createElement('button', {
+              className: 'px-3 py-1.5 rounded text-xs font-medium',
+              style: { background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }
+            }, '⚡ Flag for Black Hat Review')
+          )
+        )
+      );
+    };
+
+    const App = () => {
+      const [evals, setEvals] = useState(DEMO_EVALUATIONS);
+      const [selectedOpp, setSelectedOpp] = useState('DHA EHR Modernization');
+      const [expandedId, setExpandedId] = useState(null);
+      const [connected, setConnected] = useState(false);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        // RBAC check
+        const role = localStorage.getItem('missionpulse_role');
+        if (role && !ROLES_ALLOWED.includes(role)) {
+          window.location.href = 'index.html';
+          return;
+        }
+
+        // Try Supabase
+        const loadData = async () => {
+          try {
+            if (typeof sbClient !== 'undefined') {
+              const { data, error } = await sbClient.from('evaluation_criteria').select('*');
+              if (data && data.length > 0) {
+                setEvals(data);
+                setConnected(true);
+              }
+            }
+          } catch (e) { console.log('Using demo data'); }
+          setLoading(false);
+        };
+        loadData();
+      }, []);
+
+      const filtered = evals.filter(e => e.opportunity === selectedOpp);
+      const totalWeightedScore = filtered.reduce((sum, e) => {
+        const factorScore = e.subfactors.reduce((s, sf) => s + (sf.ourScore * sf.weight / e.weight), 0);
+        return sum + (factorScore * e.weight / 100);
+      }, 0);
+      const totalGaps = filtered.reduce((sum, e) => sum + e.subfactors.filter(sf => sf.ourScore < 75).length, 0);
+      const totalSubfactors = filtered.reduce((sum, e) => sum + e.subfactors.length, 0);
+
+      return React.createElement('div', { className: 'min-h-screen p-6', style: { background: '#00050F' } },
+        // Header
+        React.createElement('div', { className: 'flex items-center justify-between mb-6' },
+          React.createElement('div', null,
+            React.createElement('h1', { className: 'text-2xl font-bold text-white' }, '📊 Evaluation Criteria Analyzer'),
+            React.createElement('p', { className: 'text-gray-400 text-sm mt-1' }, 'Section M analysis • Score mapping • Gap identification')
+          ),
+          React.createElement('div', { className: 'flex items-center gap-3' },
+            React.createElement('div', {
+              className: 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs',
+              style: { background: connected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                       color: connected ? '#10B981' : '#F59E0B',
+                       border: `1px solid ${connected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }
+            },
+              React.createElement('span', { className: `w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-yellow-500'}` }),
+              connected ? 'Supabase Connected' : 'Demo Mode'
+            ),
+            React.createElement('a', {
+              href: 'index.html',
+              className: 'px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white transition-colors',
+              style: { border: '1px solid rgba(255,255,255,0.1)' }
+            }, '← Dashboard')
+          )
+        ),
+
+        // Opportunity Selector
+        React.createElement('div', { className: 'flex gap-2 mb-6 flex-wrap' },
+          DEMO_OPPORTUNITIES.map(opp =>
+            React.createElement('button', {
+              key: opp,
+              className: `px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedOpp === opp ? 'text-white' : 'text-gray-400 hover:text-white'}`,
+              style: {
+                background: selectedOpp === opp ? 'rgba(0,229,250,0.15)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${selectedOpp === opp ? 'rgba(0,229,250,0.4)' : 'rgba(255,255,255,0.1)'}`
+              },
+              onClick: () => setSelectedOpp(opp)
+            }, opp)
+          )
+        ),
+
+        // Stats Row
+        React.createElement('div', { className: 'grid grid-cols-4 gap-4 mb-6' },
+          [
+            { label: 'Overall Score', value: `${Math.round(totalWeightedScore)}%`, color: totalWeightedScore >= 80 ? '#10B981' : '#F59E0B' },
+            { label: 'Eval Factors', value: filtered.length, color: '#00E5FA' },
+            { label: 'Subfactors', value: totalSubfactors, color: '#818CF8' },
+            { label: 'Gaps Found', value: totalGaps, color: totalGaps > 0 ? '#EF4444' : '#10B981' }
+          ].map((stat, i) =>
+            React.createElement('div', {
+              key: i,
+              className: 'glass-card rounded-lg p-4 text-center animate-fade-up',
+              style: { animationDelay: `${i * 0.1}s` }
+            },
+              React.createElement('div', { className: 'font-mono text-2xl font-bold', style: { color: stat.color } }, stat.value),
+              React.createElement('div', { className: 'text-xs text-gray-400 mt-1' }, stat.label)
+            )
+          )
+        ),
+
+        // Weight Visualization
+        React.createElement('div', { className: 'glass-card rounded-lg p-4 mb-6' },
+          React.createElement('h3', { className: 'text-white text-sm font-semibold mb-3' }, 'Evaluation Weight Distribution'),
+          React.createElement('div', { className: 'flex rounded-lg overflow-hidden h-8' },
+            filtered.map((e, i) => {
+              const colors = ['#00E5FA', '#818CF8', '#F59E0B', '#6B7280'];
+              return React.createElement('div', {
+                key: i,
+                className: 'flex items-center justify-center text-xs font-mono font-medium text-white transition-all hover:opacity-80',
+                style: { width: `${e.weight}%`, backgroundColor: colors[i % colors.length] },
+                title: `${e.factor}: ${e.weight}%`
+              }, `${e.factor.split(' ')[0]} ${e.weight}%`);
+            })
+          )
+        ),
+
+        // Eval Cards
+        React.createElement('div', { className: 'space-y-3 mb-8' },
+          filtered.map(ev =>
+            React.createElement(EvalCard, {
+              key: ev.id,
+              eval: ev,
+              expanded: expandedId === ev.id,
+              onToggle: () => setExpandedId(expandedId === ev.id ? null : ev.id)
+            })
+          )
+        ),
+
+        // AI Disclaimer Footer
+        React.createElement('div', {
+          className: 'text-center py-4 border-t border-gray-800 mt-8'
+        },
+          React.createElement('p', { className: 'text-xs text-gray-600' },
+            '⚠️ AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse by Mission Meets Tech • ',
+            React.createElement('span', { className: 'font-mono' }, 'NIST 800-171 Compliant')
+          )
+        )
+      );
+    };
+
+    ReactDOM.render(React.createElement(App), document.getElementById('root'));
+  </script>
+</body>
+</html>

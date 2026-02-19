@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse - Proposal Archive</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Space Grotesk', sans-serif; background: #00050F; min-height: 100vh; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-up { animation: fadeInUp 0.5s ease-out forwards; }
+    .glass-card { background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.7) 100%); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 250, 0.2); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="supabase-client.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const ROLES_ALLOWED = ['CEO','COO','CAP','PM','SA','FIN','CON','DEL','QA','Partner','Admin'];
+
+    const DEMO_ARCHIVES = [
+      { id: 'ARC-001', title: 'DHA Genesis EHR Phase II', solicitation: 'W81K00-23-R-0042', outcome: 'win', score: 92, submitDate: '2024-08-15', value: '$24.5M', agency: 'DHA', team: 'rockITdata (Prime)', sections: 12, attachments: 47 },
+      { id: 'ARC-002', title: 'VA Claims Modernization', solicitation: '36C10X-23-R-0089', outcome: 'loss', score: 78, submitDate: '2024-06-22', value: '$18.2M', agency: 'VA', team: 'Leidos (Sub)', sections: 10, attachments: 35 },
+      { id: 'ARC-003', title: 'CMS Data Analytics Platform', solicitation: '75FCMC-24-R-0015', outcome: 'win', score: 88, submitDate: '2024-11-01', value: '$31.8M', agency: 'CMS', team: 'MMT (Prime)', sections: 14, attachments: 62 },
+      { id: 'ARC-004', title: 'IHS Telehealth Expansion', solicitation: '75H70-24-R-0033', outcome: 'pending', score: null, submitDate: '2025-01-10', value: '$12.1M', agency: 'IHS', team: 'MMT (Prime)', sections: 8, attachments: 28 },
+      { id: 'ARC-005', title: 'USCG IT Infrastructure', solicitation: 'HSCG23-23-R-0112', outcome: 'no_bid', score: null, submitDate: '2024-03-05', value: '$45.0M', agency: 'DHS/USCG', team: 'N/A', sections: 0, attachments: 3 },
+      { id: 'ARC-006', title: 'DoD JADC2 Data Mesh', solicitation: 'W91CRB-24-R-0067', outcome: 'loss', score: 71, submitDate: '2024-09-18', value: '$52.3M', agency: 'DoD', team: 'SAIC (Sub)', sections: 16, attachments: 78 },
+    ];
+
+    const OutcomeBadge = ({ outcome }) => {
+      const config = {
+        win: { bg: 'rgba(16,185,129,0.15)', color: '#10B981', label: '🏆 WIN' },
+        loss: { bg: 'rgba(239,68,68,0.15)', color: '#EF4444', label: '✗ LOSS' },
+        pending: { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B', label: '⏳ PENDING' },
+        no_bid: { bg: 'rgba(107,114,128,0.15)', color: '#6B7280', label: '— NO BID' }
+      };
+      const c = config[outcome] || config.pending;
+      return React.createElement('span', { className: 'px-2 py-1 rounded text-xs font-bold', style: { background: c.bg, color: c.color } }, c.label);
+    };
+
+    const App = () => {
+      const [archives, setArchives] = useState(DEMO_ARCHIVES);
+      const [search, setSearch] = useState('');
+      const [filterOutcome, setFilterOutcome] = useState('all');
+      const [sortBy, setSortBy] = useState('date');
+      const [expandedId, setExpandedId] = useState(null);
+      const [connected, setConnected] = useState(false);
+
+      useEffect(() => {
+        const role = localStorage.getItem('missionpulse_role');
+        if (role && !ROLES_ALLOWED.includes(role)) { window.location.href = 'index.html'; return; }
+        const load = async () => {
+          try {
+            if (typeof sbClient !== 'undefined') {
+              const { data } = await sbClient.from('proposal_archives').select('*');
+              if (data?.length) { setArchives(data); setConnected(true); }
+            }
+          } catch (e) {}
+        };
+        load();
+      }, []);
+
+      const filtered = archives
+        .filter(a => filterOutcome === 'all' || a.outcome === filterOutcome)
+        .filter(a => !search || a.title.toLowerCase().includes(search.toLowerCase()) || a.solicitation.toLowerCase().includes(search.toLowerCase()) || a.agency.toLowerCase().includes(search.toLowerCase()))
+        .sort((a, b) => sortBy === 'date' ? new Date(b.submitDate) - new Date(a.submitDate) : (b.score || 0) - (a.score || 0));
+
+      const stats = { total: archives.length, wins: archives.filter(a => a.outcome === 'win').length, losses: archives.filter(a => a.outcome === 'loss').length, pending: archives.filter(a => a.outcome === 'pending').length };
+      const winRate = stats.wins + stats.losses > 0 ? Math.round(stats.wins / (stats.wins + stats.losses) * 100) : 0;
+
+      return React.createElement('div', { className: 'min-h-screen p-6', style: { background: '#00050F' } },
+        React.createElement('div', { className: 'flex items-center justify-between mb-6' },
+          React.createElement('div', null,
+            React.createElement('h1', { className: 'text-2xl font-bold text-white' }, '📦 Proposal Archive'),
+            React.createElement('p', { className: 'text-gray-400 text-sm mt-1' }, 'Historical proposals • Win/loss library • Reusable content')
+          ),
+          React.createElement('div', { className: 'flex items-center gap-3' },
+            React.createElement('div', {
+              className: 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs',
+              style: { background: connected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: connected ? '#10B981' : '#F59E0B', border: `1px solid ${connected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }
+            }, React.createElement('span', { className: `w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-yellow-500'}` }), connected ? 'Supabase Connected' : 'Demo Mode'),
+            React.createElement('a', { href: 'index.html', className: 'px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white transition-colors', style: { border: '1px solid rgba(255,255,255,0.1)' } }, '← Dashboard')
+          )
+        ),
+
+        React.createElement('div', { className: 'grid grid-cols-4 gap-4 mb-6' },
+          [
+            { label: 'Total Proposals', value: stats.total, color: '#00E5FA' },
+            { label: 'Win Rate', value: `${winRate}%`, color: '#10B981' },
+            { label: 'Wins', value: stats.wins, color: '#10B981' },
+            { label: 'Pending', value: stats.pending, color: '#F59E0B' }
+          ].map((s, i) =>
+            React.createElement('div', { key: i, className: 'glass-card rounded-lg p-4 text-center animate-fade-up', style: { animationDelay: `${i*0.1}s` } },
+              React.createElement('div', { className: 'font-mono text-2xl font-bold', style: { color: s.color } }, s.value),
+              React.createElement('div', { className: 'text-xs text-gray-400 mt-1' }, s.label)
+            )
+          )
+        ),
+
+        React.createElement('div', { className: 'flex gap-3 mb-6 flex-wrap' },
+          React.createElement('input', { type: 'text', placeholder: 'Search proposals, solicitations, agencies...', className: 'flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:border-cyan-400 focus:outline-none', value: search, onChange: e => setSearch(e.target.value) }),
+          ['all', 'win', 'loss', 'pending', 'no_bid'].map(f =>
+            React.createElement('button', { key: f, className: `px-3 py-2 rounded-lg text-xs font-medium transition-all ${filterOutcome === f ? 'text-white' : 'text-gray-400'}`, style: { background: filterOutcome === f ? 'rgba(0,229,250,0.15)' : 'transparent', border: `1px solid ${filterOutcome === f ? 'rgba(0,229,250,0.4)' : 'rgba(255,255,255,0.1)'}` }, onClick: () => setFilterOutcome(f) },
+              f === 'all' ? 'All' : f === 'no_bid' ? 'No Bid' : f.charAt(0).toUpperCase() + f.slice(1)
+            )
+          ),
+          React.createElement('select', { className: 'bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs', value: sortBy, onChange: e => setSortBy(e.target.value) },
+            React.createElement('option', { value: 'date' }, 'Sort: Date'),
+            React.createElement('option', { value: 'score' }, 'Sort: Score')
+          )
+        ),
+
+        React.createElement('div', { className: 'space-y-3 mb-8' },
+          filtered.map((a, i) =>
+            React.createElement('div', { key: a.id, className: 'glass-card rounded-lg overflow-hidden animate-fade-up', style: { animationDelay: `${i*0.05}s` } },
+              React.createElement('div', { className: 'p-4 cursor-pointer hover:bg-white/5 transition-colors', onClick: () => setExpandedId(expandedId === a.id ? null : a.id) },
+                React.createElement('div', { className: 'flex items-center justify-between' },
+                  React.createElement('div', { className: 'flex items-center gap-3' },
+                    React.createElement(OutcomeBadge, { outcome: a.outcome }),
+                    React.createElement('div', null,
+                      React.createElement('h3', { className: 'text-white font-semibold' }, a.title),
+                      React.createElement('div', { className: 'flex items-center gap-3 text-xs text-gray-400 mt-0.5' },
+                        React.createElement('span', { className: 'font-mono' }, a.solicitation),
+                        React.createElement('span', null, a.agency),
+                        React.createElement('span', null, a.submitDate)
+                      )
+                    )
+                  ),
+                  React.createElement('div', { className: 'flex items-center gap-4 text-right' },
+                    React.createElement('div', null,
+                      React.createElement('div', { className: 'font-mono text-lg text-white' }, a.value),
+                      React.createElement('div', { className: 'text-xs text-gray-500' }, a.team)
+                    ),
+                    a.score && React.createElement('div', { className: 'font-mono text-2xl font-bold', style: { color: a.score >= 85 ? '#10B981' : a.score >= 70 ? '#F59E0B' : '#EF4444' } }, a.score),
+                    React.createElement('span', { className: 'text-gray-500' }, expandedId === a.id ? '▾' : '▸')
+                  )
+                )
+              ),
+              expandedId === a.id && React.createElement('div', { className: 'border-t border-gray-800 p-4' },
+                React.createElement('div', { className: 'grid grid-cols-3 gap-4 mb-3' },
+                  React.createElement('div', { className: 'text-center' },
+                    React.createElement('div', { className: 'font-mono text-lg text-cyan-400' }, a.sections),
+                    React.createElement('div', { className: 'text-xs text-gray-400' }, 'Sections')
+                  ),
+                  React.createElement('div', { className: 'text-center' },
+                    React.createElement('div', { className: 'font-mono text-lg text-purple-400' }, a.attachments),
+                    React.createElement('div', { className: 'text-xs text-gray-400' }, 'Attachments')
+                  ),
+                  React.createElement('div', { className: 'text-center' },
+                    React.createElement('div', { className: 'font-mono text-lg text-green-400' }, a.outcome === 'win' ? 'Available' : 'Read-Only'),
+                    React.createElement('div', { className: 'text-xs text-gray-400' }, 'Reuse Status')
+                  )
+                ),
+                React.createElement('div', { className: 'flex gap-2' },
+                  React.createElement('button', { className: 'px-3 py-1.5 rounded text-xs font-medium', style: { background: 'rgba(0,229,250,0.15)', color: '#00E5FA', border: '1px solid rgba(0,229,250,0.3)' } }, '📋 Clone to New Proposal'),
+                  React.createElement('button', { className: 'px-3 py-1.5 rounded text-xs font-medium', style: { background: 'rgba(99,102,241,0.15)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.3)' } }, '📑 View Sections'),
+                  React.createElement('button', { className: 'px-3 py-1.5 rounded text-xs font-medium', style: { background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' } }, '📊 Debrief Report'),
+                  a.outcome === 'loss' && React.createElement('button', { className: 'px-3 py-1.5 rounded text-xs font-medium', style: { background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.3)' } }, '🔍 Loss Analysis')
+                )
+              )
+            )
+          )
+        ),
+
+        React.createElement('div', { className: 'text-center py-4 border-t border-gray-800' },
+          React.createElement('p', { className: 'text-xs text-gray-600' }, '⚠️ AI GENERATED - REQUIRES HUMAN REVIEW • MissionPulse by Mission Meets Tech • NIST 800-171 Compliant')
+        )
+      );
+    };
+
+    ReactDOM.render(React.createElement(App), document.getElementById('root'));
+  </script>
+</body>
+</html>
