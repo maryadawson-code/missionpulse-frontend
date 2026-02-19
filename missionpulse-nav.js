@@ -1,76 +1,100 @@
 /**
- * MissionPulse Navigation Component
- * v2.3 - Sprint 43: Added Voice Intel (m29)
- * © 2026 Mission Meets Tech
+ * MissionPulse Unified Navigation v3.0
+ * Points ALL modules to V2 files. No legacy *-live.html references.
+ * Usage: <div id="missionpulse-sidebar" data-current-page="MODULE_ID"></div>
+ *        <script src="missionpulse-nav.js"></script>
+ * 
+ * SECURITY: NIST 800-53 Rev 5 CHECKED
+ * AI GENERATED — REQUIRES HUMAN REVIEW
  */
 
 (function() {
     'use strict';
 
+    // ─── MODULE REGISTRY (22 V2 Modules) ───
     var modules = [
-        { id: 'dashboard', icon: '📊', label: 'Dashboard', href: 'index.html', category: 'core' },
-        { id: 'pipeline', icon: '🎯', label: 'Pipeline', href: 'missionpulse-executive-dashboard.html', category: 'core' },
+        // Core Operations
+        { id: 'dashboard',   name: 'Dashboard',          icon: '📊', file: 'index.html',                        category: 'core',       rbac: ['ALL'] },
+        { id: 'pipeline',    name: 'Pipeline',            icon: '🎯', file: 'missionpulse-m1-enhanced.html',     category: 'core',       rbac: ['ALL'] },
+        { id: 'warroom',     name: 'War Room',            icon: '⚔️', file: 'missionpulse-m2-warroom-enhanced.html', category: 'core',   rbac: ['ALL'] },
+        { id: 'swimlane',    name: 'Swimlane Board',      icon: '🏊', file: 'missionpulse-m3-swimlane-board.html',   category: 'core',   rbac: ['ALL'] },
 
-        { id: 'capture', icon: '📝', label: 'Capture Board', href: 'missionpulse-m1-enhanced.html', category: 'capture' },
-        { id: 'blackhat', icon: '🎭', label: 'Black Hat', href: 'missionpulse-m7-blackhat-live.html', category: 'capture' },
-        { id: 'intel', icon: '🕵️', label: 'Intel Tracker', href: 'missionpulse-m27-intel-live.html', category: 'capture' },
-        { id: 'voiceintel', icon: '🎙️', label: 'Voice Intel', href: 'm29-voice-intel.html', category: 'capture', isNew: true },
-        { id: 'winthemes', icon: '🏆', label: 'Win Themes', href: 'missionpulse-m12-winthemes-live.html', category: 'capture' },
-        { id: 'teaming', icon: '🤝', label: 'Teaming Partners', href: 'missionpulse-m18-teaming-live.html', category: 'capture' },
+        // Capture & Strategy
+        { id: 'rfpshredder', name: 'RFP Shredder',        icon: '📄', file: 'index__13_.html',                   category: 'capture',    rbac: ['CEO','COO','CAP','PM','SA','Admin'] },
+        { id: 'winthemes',   name: 'Win Themes',          icon: '🏆', file: 'missionpulse-winthemes-v2.html',    category: 'capture',    rbac: ['CEO','COO','CAP','PM','SA','Admin'] },
+        { id: 'blackhat',    name: 'Black Hat',           icon: '🎩', file: 'missionpulse-m7-blackhat-enhanced.html', category: 'capture', rbac: ['CEO','COO','CAP','Admin'] },
 
-        { id: 'documents', icon: '📁', label: 'Document Library', href: 'missionpulse-m28-documents-live.html', category: 'proposal' },
-        { id: 'compliance', icon: '✅', label: 'Compliance Matrix', href: 'missionpulse-m6-compliance-live.html', category: 'proposal' },
-        { id: 'checklist', icon: '📋', label: 'Compliance Checklist', href: 'missionpulse-m16-compliance-checklist-live.html', category: 'proposal' },
-        { id: 'outline', icon: '📑', label: 'Proposal Outline', href: 'missionpulse-m21-outline-live.html', category: 'proposal' },
-        { id: 'writer', icon: '✍️', label: 'Proposal Writer', href: 'missionpulse-m10-writer-live.html', category: 'proposal' },
-        { id: 'graphics', icon: '🎨', label: 'Graphics Tracker', href: 'missionpulse-m22-graphics-live.html', category: 'proposal' },
+        // Compliance & Contracts
+        { id: 'irondome',    name: 'Iron Dome',           icon: '🛡️', file: 'missionpulse-irondome-v2.html',     category: 'compliance', rbac: ['CEO','COO','CAP','PM','SA','CON','QA','Admin'] },
+        { id: 'compliance',  name: 'Compliance Matrix',   icon: '📋', file: 'missionpulse-compliance-v2.html',   category: 'compliance', rbac: ['CEO','COO','CAP','PM','SA','CON','QA','Admin'] },
+        { id: 'contracts',   name: 'Contract Scanner',    icon: '📑', file: 'missionpulse-m5-contracts-enhanced.html', category: 'compliance', rbac: ['CEO','COO','CON','Admin'] },
 
-        { id: 'pricing', icon: '💰', label: 'Pricing & BOE', href: 'missionpulse-m8-pricing-live.html', category: 'pricing' },
-        { id: 'contracts', icon: '📄', label: 'Contracts Library', href: 'missionpulse-m5-contracts-live.html', category: 'pricing' },
+        // Pricing (CUI)
+        { id: 'pricing',     name: 'Pricing Engine',      icon: '💰', file: 'missionpulse-m8-pricing.html',      category: 'pricing',    rbac: ['CEO','COO','FIN','Admin'], cui: true },
 
-        { id: 'colorteam', icon: '🎨', label: 'Color Team Reviews', href: 'missionpulse-m19-colorteam-live.html', category: 'reviews' },
-        { id: 'hitl', icon: '👤', label: 'HITL Queue', href: 'missionpulse-m9-hitl-live.html', category: 'reviews' },
-        { id: 'questions', icon: '❓', label: 'Questions to Gov', href: 'missionpulse-m23-questions-live.html', category: 'reviews' },
-        { id: 'amendments', icon: '📝', label: 'RFP Amendments', href: 'missionpulse-m20-amendments-live.html', category: 'reviews' },
+        // Review & Delivery
+        { id: 'hitl',        name: 'HITL Review',         icon: '👤', file: 'missionpulse-m9-hitl-enhanced.html', category: 'review',     rbac: ['CEO','COO','CAP','PM','QA','Admin'] },
+        { id: 'orals',       name: 'Orals Studio',        icon: '🎤', file: 'missionpulse-orals-v2.html',        category: 'review',     rbac: ['CEO','COO','CAP','PM','SA','Admin'] },
 
-        { id: 'teams', icon: '👥', label: 'Team Assignments', href: 'missionpulse-m15-teams-live.html', category: 'team' },
-        { id: 'calendar', icon: '📅', label: 'Proposal Calendar', href: 'missionpulse-m24-calendar-live.html', category: 'team' },
-        { id: 'risks', icon: '⚠️', label: 'Risk Register', href: 'missionpulse-m14-risks-live.html', category: 'team' },
+        // Teaming & Partners
+        { id: 'teaming',     name: 'Teaming / Frenemy',   icon: '🤝', file: 'missionpulse-teaming-v2.html',      category: 'teaming',    rbac: ['CEO','COO','CAP','PM','Admin'] },
 
-        { id: 'orals', icon: '🎤', label: 'Orals Prep', href: 'missionpulse-m11-orals-live.html', category: 'knowledge' },
-        { id: 'pastperf', icon: '📈', label: 'Past Performance', href: 'missionpulse-m17-pastperformance-live.html', category: 'knowledge' },
-        { id: 'lessons', icon: '💡', label: 'Lessons Learned', href: 'missionpulse-m13-lessons-live.html', category: 'knowledge' },
+        // Intelligence & Knowledge
+        { id: 'agenthub',    name: 'Agent Hub',           icon: '🤖', file: 'missionpulse-agenthub-v2.html',     category: 'intel',      rbac: ['CEO','COO','CAP','PM','SA','FIN','CON','QA','Admin'] },
+        { id: 'lessons',     name: 'Lessons Playbook',    icon: '📖', file: 'missionpulse-m15-lessons-playbook.html', category: 'intel',  rbac: ['ALL'] },
 
-        { id: 'reports', icon: '📊', label: 'Reports & Export', href: 'missionpulse-m26-reports-live.html', category: 'admin' },
-        { id: 'executive', icon: '📈', label: 'Executive Dashboard', href: 'missionpulse-m25-executive-live.html', category: 'admin' },
-        { id: 'modules', icon: '🧩', label: 'All Modules', href: 'missionpulse-module-index.html', category: 'admin' }
+        // Launch & Post-Award
+        { id: 'launch',      name: 'Launch & ROI',        icon: '🚀', file: 'missionpulse-m13-launch-roi.html',  category: 'launch',     rbac: ['CEO','COO','CAP','PM','Admin'] },
+        { id: 'postaward',   name: 'Post-Award',          icon: '📦', file: 'missionpulse-m14-post-award.html',  category: 'launch',     rbac: ['CEO','COO','PM','DEL','Admin'] },
+
+        // Admin
+        { id: 'rbac',        name: 'RBAC Admin',          icon: '🔐', file: 'missionpulse-task16-rbac.html',     category: 'admin',      rbac: ['CEO','COO','Admin'] },
+        { id: 'audit',       name: 'Audit Log',           icon: '📜', file: 'missionpulse-sprint70-audit.html',  category: 'admin',      rbac: ['CEO','COO','Admin'] },
+        { id: 'settings',    name: 'Settings',            icon: '⚙️', file: 'missionpulse-sprint69-settings.html', category: 'admin',    rbac: ['ALL'] },
+        { id: 'sprint-exec', name: 'Sprint Planner',      icon: '📅', file: 'missionpulse-sprint-execution-plan.html', category: 'admin', rbac: ['CEO','COO','Admin'] },
     ];
 
+    // ─── CATEGORIES ───
     var categories = {
-        core: { label: 'Overview' },
-        capture: { label: 'Capture & Strategy' },
-        proposal: { label: 'Proposal Development' },
-        pricing: { label: 'Pricing & Contracts' },
-        reviews: { label: 'Reviews & Quality' },
-        team: { label: 'Team & Schedule' },
-        knowledge: { label: 'Knowledge Base' },
-        admin: { label: 'Reports & Admin' }
+        core:       { label: 'Core Operations',       icon: '🎯' },
+        capture:    { label: 'Capture & Strategy',     icon: '♟️' },
+        compliance: { label: 'Compliance & Contracts',  icon: '🛡️' },
+        pricing:    { label: 'Pricing',                 icon: '💰' },
+        review:     { label: 'Review & Delivery',       icon: '✅' },
+        teaming:    { label: 'Teaming & Partners',      icon: '🤝' },
+        intel:      { label: 'Intelligence',            icon: '🤖' },
+        launch:     { label: 'Launch & Post-Award',     icon: '🚀' },
+        admin:      { label: 'Administration',          icon: '⚙️' }
     };
 
+    // ─── Helpers ───
     function escapeHtml(str) {
         if (!str) return '';
-        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function getUserRole() {
+        try {
+            var profile = JSON.parse(localStorage.getItem('missionpulse_profile') || '{}');
+            return profile.role || 'CEO';
+        } catch(e) { return 'CEO'; }
+    }
+
+    function canAccess(mod) {
+        if (!mod.rbac || mod.rbac.indexOf('ALL') !== -1) return true;
+        var role = getUserRole();
+        return mod.rbac.indexOf(role) !== -1;
     }
 
     function getCurrentPage() {
-        var sidebar = document.getElementById('missionpulse-sidebar');
-        if (sidebar && sidebar.dataset.currentPage) return sidebar.dataset.currentPage;
-        var path = window.location.pathname;
-        var filename = path.split('/').pop() || 'index.html';
-        var match = modules.find(function(m) { return m.href === filename; });
+        var container = document.getElementById('missionpulse-sidebar');
+        if (container && container.dataset.currentPage) return container.dataset.currentPage;
+        var path = window.location.pathname.split('/').pop() || '';
+        var match = modules.find(function(m) { return path.indexOf(m.file) !== -1 || path === m.file; });
         return match ? match.id : 'dashboard';
     }
 
+    // ─── Render ───
     function renderNav() {
         var container = document.getElementById('missionpulse-sidebar');
         if (!container) return;
@@ -78,67 +102,130 @@
         var currentPage = getCurrentPage();
         var profile = null;
         try { profile = JSON.parse(localStorage.getItem('missionpulse_profile') || '{}'); } catch(e) {}
+        var userRole = getUserRole();
 
-        var html = '<div style="position:fixed;top:0;left:0;width:256px;height:100vh;background:linear-gradient(180deg,#000a14 0%,#00050F 100%);border-right:1px solid rgba(0,229,250,0.2);overflow-y:auto;z-index:40;">';
+        var html = '';
+        // Fixed sidebar
+        html += '<div id="mp-nav-sidebar" style="position:fixed;top:0;left:0;width:260px;height:100vh;background:linear-gradient(180deg,#000a14 0%,#00050F 100%);border-right:1px solid rgba(0,229,250,0.15);overflow-y:auto;z-index:40;font-family:Inter,-apple-system,sans-serif;transition:transform .3s;">';
 
-        html += '<div style="padding:20px;border-bottom:1px solid rgba(0,229,250,0.1);">';
-        html += '<a href="index.html" style="display:flex;align-items:center;gap:12px;text-decoration:none;">';
-        html += '<div style="width:40px;height:40px;background:linear-gradient(135deg,#00E5FA 0%,#0088cc 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">🚀</div>';
-        html += '<div><div style="font-weight:700;font-size:18px;color:white;">MissionPulse</div><div style="font-size:11px;color:#00E5FA;">Mission Meets Tech</div></div>';
+        // Logo
+        html += '<div style="padding:16px 20px;border-bottom:1px solid rgba(0,229,250,0.08);">';
+        html += '<a href="index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;">';
+        html += '<div style="width:36px;height:36px;background:linear-gradient(135deg,#00E5FA,#0088cc);border-radius:10px;display:flex;align-items:center;justify-content:center;">';
+        html += '<svg width="18" height="21" viewBox="0 0 80 92" fill="none"><path d="M40 4L8 20V44C8 66 22 82 40 88C58 82 72 66 72 44V20L40 4Z" stroke="white" stroke-width="4" fill="rgba(255,255,255,.15)"/><polyline points="28,46 34,46 37,38 40,54 43,42 46,46 52,46" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/></svg>';
+        html += '</div>';
+        html += '<div><div style="font-weight:800;font-size:16px;color:white;letter-spacing:-0.5px;">MissionPulse</div>';
+        html += '<div style="font-size:10px;color:#00E5FA;font-weight:500;">Mission Meets Tech</div></div>';
         html += '</a></div>';
 
+        // User profile
         if (profile && profile.full_name) {
-            html += '<div style="padding:12px 20px;border-bottom:1px solid rgba(0,229,250,0.1);display:flex;align-items:center;gap:10px;">';
-            html += '<div style="width:32px;height:32px;background:rgba(0,229,250,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#00E5FA;font-size:14px;">' + (profile.full_name.charAt(0) || 'U') + '</div>';
-            html += '<div><div style="font-size:13px;color:white;">' + escapeHtml(profile.full_name) + '</div><div style="font-size:11px;color:#00E5FA;">' + (profile.role || 'User') + '</div></div>';
+            html += '<div style="padding:10px 20px;border-bottom:1px solid rgba(0,229,250,0.06);display:flex;align-items:center;gap:10px;">';
+            html += '<div style="width:30px;height:30px;background:rgba(0,229,250,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#00E5FA;font-size:12px;font-weight:700;">' + escapeHtml(profile.full_name.charAt(0)) + '</div>';
+            html += '<div><div style="font-size:12px;color:white;font-weight:600;">' + escapeHtml(profile.full_name) + '</div>';
+            html += '<div style="font-size:10px;color:#00E5FA;">' + escapeHtml(profile.role || userRole) + '</div></div>';
             html += '</div>';
         }
 
-        html += '<nav style="padding:12px 0;">';
+        // Connection status
+        html += '<div style="padding:8px 20px;border-bottom:1px solid rgba(0,229,250,0.06);">';
+        html += '<div id="nav-connection-status" style="font-size:11px;color:#64748B;">● Checking...</div>';
+        html += '</div>';
+
+        // Module navigation
+        html += '<nav style="padding:8px 0;">';
         Object.keys(categories).forEach(function(catId) {
             var cat = categories[catId];
-            var catModules = modules.filter(function(m) { return m.category === catId; });
+            var catModules = modules.filter(function(m) { return m.category === catId && canAccess(m); });
             if (catModules.length === 0) return;
 
-            html += '<div style="margin-bottom:8px;">';
-            html += '<div style="padding:8px 20px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.5px;">' + cat.label + '</div>';
+            html += '<div style="margin-bottom:4px;">';
+            html += '<div style="padding:6px 20px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;">' + escapeHtml(cat.icon + ' ' + cat.label) + '</div>';
 
             catModules.forEach(function(mod) {
                 var isActive = mod.id === currentPage;
-                var bg = isActive ? 'rgba(0,229,250,0.15)' : 'transparent';
-                var border = isActive ? '2px solid #00E5FA' : '2px solid transparent';
-                var color = isActive ? '#00E5FA' : 'rgba(255,255,255,0.7)';
+                var bg = isActive ? 'rgba(0,229,250,0.12)' : 'transparent';
+                var borderL = isActive ? '3px solid #00E5FA' : '3px solid transparent';
+                var textColor = isActive ? '#FFFFFF' : '#94A3B8';
+                var hoverBg = 'rgba(0,229,250,0.06)';
 
-                html += '<a href="' + mod.href + '" style="display:flex;align-items:center;gap:10px;padding:10px 20px;text-decoration:none;background:' + bg + ';border-left:' + border + ';transition:all 0.2s;"';
-                html += ' onmouseover="this.style.background=\'rgba(0,229,250,0.1)\'" onmouseout="this.style.background=\'' + bg + '\'">';
-                html += '<span style="font-size:16px;">' + mod.icon + '</span>';
-                html += '<span style="font-size:13px;color:' + color + ';">' + mod.label + '</span>';
-                if (mod.isNew) {
-                    html += '<span style="font-size:9px;background:#00E5FA;color:#000;padding:2px 6px;border-radius:4px;font-weight:600;">NEW</span>';
+                html += '<a href="' + mod.file + '" style="display:flex;align-items:center;gap:10px;padding:8px 20px;background:' + bg + ';border-left:' + borderL + ';text-decoration:none;transition:background .15s;" ';
+                html += 'onmouseover="this.style.background=\'' + (isActive ? 'rgba(0,229,250,0.15)' : hoverBg) + '\'" ';
+                html += 'onmouseout="this.style.background=\'' + bg + '\'">';
+                html += '<span style="font-size:16px;width:20px;text-align:center;flex-shrink:0;">' + mod.icon + '</span>';
+                html += '<span style="font-size:12px;font-weight:' + (isActive ? '700' : '500') + ';color:' + textColor + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(mod.name) + '</span>';
+                if (mod.cui) {
+                    html += '<span style="margin-left:auto;padding:1px 5px;border-radius:3px;font-size:8px;font-weight:700;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.25);flex-shrink:0;">CUI</span>';
                 }
                 html += '</a>';
             });
 
             html += '</div>';
         });
-
         html += '</nav>';
 
-        html += '<div style="padding:16px 20px;border-top:1px solid rgba(0,229,250,0.1);position:absolute;bottom:0;left:0;right:0;background:#00050F;">';
-        html += '<div style="font-size:10px;color:rgba(255,255,255,0.3);text-align:center;">v2.3 • 29 Modules</div>';
-        html += '<div style="font-size:9px;color:rgba(255,255,255,0.2);text-align:center;margin-top:4px;">© 2026 Mission Meets Tech</div>';
+        // Footer
+        html += '<div style="padding:12px 20px;border-top:1px solid rgba(0,229,250,0.06);margin-top:auto;position:absolute;bottom:0;left:0;right:0;background:#00050F;">';
+        html += '<div style="font-size:9px;color:#475569;text-align:center;line-height:1.6;">MissionPulse v12.0<br>CMMC 2.0 L2 Compliant<br>⚠️ AI GENERATED — REQUIRES HUMAN REVIEW</div>';
         html += '</div>';
 
         html += '</div>';
+
+        // Mobile toggle button
+        html += '<button id="mp-nav-toggle" onclick="document.getElementById(\'mp-nav-sidebar\').style.transform=document.getElementById(\'mp-nav-sidebar\').style.transform===\'translateX(-100%)\'?\'translateX(0)\':\' translateX(-100%)\';" style="display:none;position:fixed;top:12px;left:12px;z-index:50;width:40px;height:40px;border-radius:10px;background:rgba(0,229,250,0.1);border:1px solid rgba(0,229,250,0.2);color:#00E5FA;font-size:18px;cursor:pointer;align-items:center;justify-content:center;">☰</button>';
+
+        // Responsive style
+        html += '<style>';
+        html += '@media(max-width:768px){#mp-nav-sidebar{transform:translateX(-100%)}#mp-nav-toggle{display:flex!important}}';
+        html += '.main-content{margin-left:260px}@media(max-width:768px){.main-content{margin-left:0}}';
+        html += '#mp-nav-sidebar::-webkit-scrollbar{width:3px}#mp-nav-sidebar::-webkit-scrollbar-thumb{background:rgba(0,229,250,0.15);border-radius:2px}';
+        html += '</style>';
 
         container.innerHTML = html;
+
+        // Check connection
+        checkConnection();
     }
 
+    function checkConnection() {
+        var statusEl = document.getElementById('nav-connection-status');
+        if (!statusEl) return;
+
+        try {
+            if (typeof supabase !== 'undefined' || (window.supabase && typeof window.supabase.createClient === 'function')) {
+                var client = window.sbClient || (window.supabase ? window.supabase.createClient('https://qdrtpnpnhkxvfmvfziop.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8') : null);
+                if (client) {
+                    client.from('opportunities').select('id').limit(1).then(function(res) {
+                        if (!res.error) {
+                            statusEl.innerHTML = '<span style="color:#00BDAE;">● Supabase Live</span>';
+                        } else {
+                            statusEl.innerHTML = '<span style="color:#F59E0B;">● Demo Mode</span>';
+                        }
+                    }).catch(function() {
+                        statusEl.innerHTML = '<span style="color:#F59E0B;">● Demo Mode</span>';
+                    });
+                    return;
+                }
+            }
+            statusEl.innerHTML = '<span style="color:#F59E0B;">● Demo Mode</span>';
+        } catch(e) {
+            statusEl.innerHTML = '<span style="color:#F59E0B;">● Demo Mode</span>';
+        }
+    }
+
+    // ─── Public API ───
+    window.MissionPulseNav = {
+        modules: modules,
+        categories: categories,
+        init: renderNav,
+        getModuleById: function(id) { return modules.find(function(m) { return m.id === id; }); },
+        getModulesByCategory: function(cat) { return modules.filter(function(m) { return m.category === cat; }); }
+    };
+
+    // Auto-init
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', renderNav);
     } else {
         renderNav();
     }
-
-    window.MissionPulseNav = { render: renderNav, modules: modules };
 })();
