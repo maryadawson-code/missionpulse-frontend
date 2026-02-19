@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse — Compliance Mapping</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+        :root { --primary: #00E5FA; --bg-deep: #00050F; --bg-card: #0A1628; --bg-surface: #111D35; --border: #1E3A5F; --text-primary: #E8F0FE; --text-muted: #8BA3C7; --success: #10B981; --warning: #F59E0B; --danger: #EF4444; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-deep); color: var(--text-primary); }
+        h1, h2, h3, h4, .font-display { font-family: 'Space Grotesk', sans-serif; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+        .glow-line { height: 2px; background: linear-gradient(90deg, transparent, var(--primary), transparent); }
+        .badge { padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-green { background: rgba(16,185,129,0.15); color: #10B981; }
+        .badge-gold { background: rgba(245,158,11,0.15); color: #F59E0B; }
+        .badge-red { background: rgba(239,68,68,0.15); color: #EF4444; }
+        .badge-blue { background: rgba(0,229,250,0.15); color: #00E5FA; }
+        .badge-purple { background: rgba(139,92,246,0.15); color: #8B5CF6; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA, #0099AA); color: #00050F; font-weight: 600; padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer; }
+        .heatmap-cell { width: 100%; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; }
+        .table-row { transition: background 0.15s; }
+        .table-row:hover { background: rgba(0,229,250,0.04); }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="connStatus" class="fixed top-3 right-3 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium" style="background:var(--bg-card);border:1px solid var(--border);">
+        <span id="connDot" class="status-dot" style="background:#F59E0B;"></span>
+        <span id="connText">Connecting...</span>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#8B5CF6,#6D28D9);">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+                <div>
+                    <h1 class="font-display text-2xl font-bold">Compliance Mapping</h1>
+                    <p class="text-sm" style="color:var(--text-muted);">NIST · CMMC · FAR/DFARS → Proposal Section Mapping · Gap Heat Map</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <select id="frameworkFilter" class="text-sm px-3 py-2 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);" onchange="filterFramework()">
+                    <option value="all">All Frameworks</option>
+                    <option value="nist">NIST 800-171</option>
+                    <option value="cmmc">CMMC Level 2</option>
+                    <option value="far">FAR/DFARS</option>
+                </select>
+                <button class="btn-primary" onclick="exportMapping()">Export Matrix</button>
+            </div>
+        </div>
+        <div class="glow-line mb-6"></div>
+
+        <!-- Coverage Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#10B981;">87%</div>
+                <div class="text-xs" style="color:var(--text-muted);">NIST 800-171 Coverage</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#10B981;">92%</div>
+                <div class="text-xs" style="color:var(--text-muted);">CMMC L2 Coverage</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#F59E0B;">78%</div>
+                <div class="text-xs" style="color:var(--text-muted);">FAR/DFARS Coverage</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#EF4444;">6</div>
+                <div class="text-xs" style="color:var(--text-muted);">Open Gaps</div>
+            </div>
+        </div>
+
+        <!-- Heat Map -->
+        <div class="card p-5 mb-6">
+            <h3 class="font-display font-semibold mb-4">Gap Heat Map — Compliance by Proposal Section</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr>
+                            <th class="text-left px-2 py-2" style="color:var(--text-muted);min-width:140px;">Section</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">AC</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">AU</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">CM</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">IA</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">IR</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">MP</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">PE</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">RA</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">SC</th>
+                            <th class="text-center px-2 py-2" style="color:var(--text-muted);">SI</th>
+                        </tr>
+                    </thead>
+                    <tbody id="heatmapBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Mapping Table -->
+        <div class="card overflow-hidden">
+            <div class="px-4 py-3" style="background:var(--bg-surface);">
+                <h3 class="font-display font-semibold">Control-to-Section Mapping</h3>
+            </div>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr style="border-top:1px solid var(--border);">
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Control</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Framework</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Description</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Proposal Section</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="mappingBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mt-12 py-4 text-center text-xs" style="color:var(--text-muted);border-top:1px solid var(--border);">
+        ⚠️ AI GENERATED — REQUIRES HUMAN REVIEW · MissionPulse © 2026 Mission Meets Tech
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NzUxMjAsImV4cCI6MjA1MzE1MTEyMH0.xM8BE2jRLxfWNwFGDcKmFHfNgBOt0U4bMfUKb3Gn5xg';
+        var sbClient;
+        try { sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) {}
+        async function checkAuth() { try { const { data } = await sbClient.auth.getUser(); if (data?.user) { setConnected(); return; } } catch(e) {} setDemoMode(); }
+        function setConnected() { document.getElementById('connDot').style.background = '#10B981'; document.getElementById('connText').textContent = 'Connected'; }
+        function setDemoMode() { document.getElementById('connDot').style.background = '#F59E0B'; document.getElementById('connText').textContent = 'Demo Mode'; }
+
+        // Heatmap data: [section, AC, AU, CM, IA, IR, MP, PE, RA, SC, SI]
+        const heatData = [
+            ['Tech Volume', 95, 90, 88, 92, 85, 70, 60, 82, 95, 90],
+            ['Mgmt Volume', 80, 75, 92, 78, 90, 85, 65, 88, 70, 82],
+            ['Staffing Plan', 88, 60, 70, 85, 55, 80, 90, 65, 60, 70],
+            ['Past Performance', 70, 65, 55, 60, 70, 75, 80, 72, 55, 60],
+            ['Price Volume', 50, 40, 45, 55, 30, 60, 40, 50, 45, 35],
+            ['Exec Summary', 85, 80, 82, 80, 78, 75, 70, 80, 85, 80]
+        ];
+
+        function heatColor(val) {
+            if (val >= 85) return 'rgba(16,185,129,0.3)';
+            if (val >= 70) return 'rgba(245,158,11,0.25)';
+            if (val >= 50) return 'rgba(245,158,11,0.4)';
+            return 'rgba(239,68,68,0.3)';
+        }
+
+        document.getElementById('heatmapBody').innerHTML = heatData.map(row => `
+            <tr>
+                <td class="px-2 py-1 font-medium">${row[0]}</td>
+                ${row.slice(1).map(v => `<td class="px-1 py-1"><div class="heatmap-cell" style="background:${heatColor(v)};color:var(--text-primary);">${v}%</div></td>`).join('')}
+            </tr>
+        `).join('');
+
+        const demoMappings = [
+            { control: 'AC-3.1.1', framework: 'NIST', desc: 'Authorized access enforcement', section: 'Tech Vol 6.1', status: 'Mapped' },
+            { control: 'AC-3.1.2', framework: 'NIST', desc: 'Transaction & function control', section: 'Tech Vol 6.2', status: 'Mapped' },
+            { control: 'AU-3.3.1', framework: 'NIST', desc: 'System audit logging', section: 'Tech Vol 6.3', status: 'Mapped' },
+            { control: 'CM-3.4.1', framework: 'NIST', desc: 'Baseline configuration', section: 'Mgmt Vol 5.1', status: 'Mapped' },
+            { control: 'IA-3.5.1', framework: 'NIST', desc: 'User identification', section: 'Tech Vol 6.1', status: 'Mapped' },
+            { control: 'IR-3.6.1', framework: 'NIST', desc: 'Incident handling', section: 'Mgmt Vol 7.1', status: 'Gap' },
+            { control: 'SC-3.13.1', framework: 'NIST', desc: 'Boundary protection', section: 'Tech Vol 6.4', status: 'Mapped' },
+            { control: 'CMMC-L2-AC', framework: 'CMMC', desc: 'Access Control domain', section: 'Tech Vol 6.1-6.2', status: 'Mapped' },
+            { control: 'FAR 52.204-21', framework: 'FAR', desc: 'Basic safeguarding of CUI', section: 'Tech Vol 6.0', status: 'Mapped' },
+            { control: 'DFARS 252.204-7012', framework: 'DFARS', desc: 'Cyber incident reporting', section: 'Mgmt Vol 7.1', status: 'Gap' },
+            { control: 'DFARS 252.204-7020', framework: 'DFARS', desc: 'NIST 800-171 compliance', section: 'Full Proposal', status: 'Partial' },
+            { control: 'SI-3.14.1', framework: 'NIST', desc: 'Flaw remediation', section: 'Tech Vol 6.5', status: 'Gap' }
+        ];
+
+        const statusBadge = { 'Mapped': 'badge-green', 'Gap': 'badge-red', 'Partial': 'badge-gold' };
+        const fwBadge = { 'NIST': 'badge-blue', 'CMMC': 'badge-purple', 'FAR': 'badge-gold', 'DFARS': 'badge-gold' };
+
+        document.getElementById('mappingBody').innerHTML = demoMappings.map(m => `
+            <tr class="table-row" style="border-top:1px solid var(--border);">
+                <td class="px-4 py-3 font-mono text-xs">${m.control}</td>
+                <td class="px-4 py-3"><span class="badge ${fwBadge[m.framework]}">${m.framework}</span></td>
+                <td class="px-4 py-3" style="color:var(--text-muted);">${m.desc}</td>
+                <td class="px-4 py-3">${m.section}</td>
+                <td class="px-4 py-3"><span class="badge ${statusBadge[m.status]}">${m.status}</span></td>
+            </tr>
+        `).join('');
+
+        function filterFramework() {}
+        function exportMapping() { alert('Export to XLSX — next sprint'); }
+        checkAuth();
+    </script>
+</body>
+</html>

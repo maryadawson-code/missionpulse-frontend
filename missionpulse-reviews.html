@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse — Review Scheduler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+        :root { --primary: #00E5FA; --bg-deep: #00050F; --bg-card: #0A1628; --bg-surface: #111D35; --border: #1E3A5F; --text-primary: #E8F0FE; --text-muted: #8BA3C7; --success: #10B981; --warning: #F59E0B; --danger: #EF4444; --accent-purple: #8B5CF6; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-deep); color: var(--text-primary); }
+        h1, h2, h3, h4, .font-display { font-family: 'Space Grotesk', sans-serif; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+        .glow-line { height: 2px; background: linear-gradient(90deg, transparent, var(--primary), transparent); }
+        .badge { padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-blue { background: rgba(0,229,250,0.15); color: #00E5FA; }
+        .badge-pink { background: rgba(236,72,153,0.15); color: #EC4899; }
+        .badge-red { background: rgba(239,68,68,0.15); color: #EF4444; }
+        .badge-gold { background: rgba(245,158,11,0.15); color: #F59E0B; }
+        .badge-green { background: rgba(16,185,129,0.15); color: #10B981; }
+        .badge-purple { background: rgba(139,92,246,0.15); color: #8B5CF6; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA, #0099AA); color: #00050F; font-weight: 600; padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,229,250,0.3); }
+        .table-row { transition: background 0.15s; }
+        .table-row:hover { background: rgba(0,229,250,0.04); }
+        .progress-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Connection Indicator -->
+    <div id="connStatus" class="fixed top-3 right-3 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium" style="background:var(--bg-card);border:1px solid var(--border);">
+        <span id="connDot" class="status-dot" style="background:#F59E0B;"></span>
+        <span id="connText">Connecting...</span>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#8B5CF6,#6D28D9);">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                </div>
+                <div>
+                    <h1 class="font-display text-2xl font-bold" style="color:var(--text-primary);">Review Scheduler</h1>
+                    <p class="text-sm" style="color:var(--text-muted);">Color Team Reviews · Reviewer Assignments · Finding Log</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="btn-primary" onclick="showScheduleModal()">+ Schedule Review</button>
+            </div>
+        </div>
+        <div class="glow-line mb-6"></div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#00E5FA;" id="statUpcoming">3</div>
+                <div class="text-xs" style="color:var(--text-muted);">Upcoming</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#10B981;" id="statComplete">5</div>
+                <div class="text-xs" style="color:var(--text-muted);">Complete</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#EF4444;" id="statFindings">12</div>
+                <div class="text-xs" style="color:var(--text-muted);">Open Findings</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#F59E0B;" id="statOverdue">1</div>
+                <div class="text-xs" style="color:var(--text-muted);">Overdue</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#8B5CF6;" id="statReviewers">8</div>
+                <div class="text-xs" style="color:var(--text-muted);">Active Reviewers</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 mb-6 p-1 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border);width:fit-content;">
+            <button class="tab-btn px-4 py-2 rounded-md text-sm font-medium" data-tab="schedule" onclick="switchTab('schedule')" style="background:var(--primary);color:var(--bg-deep);">Schedule</button>
+            <button class="tab-btn px-4 py-2 rounded-md text-sm font-medium" data-tab="findings" onclick="switchTab('findings')" style="color:var(--text-muted);">Findings Log</button>
+            <button class="tab-btn px-4 py-2 rounded-md text-sm font-medium" data-tab="reviewers" onclick="switchTab('reviewers')" style="color:var(--text-muted);">Reviewers</button>
+        </div>
+
+        <!-- Schedule Tab -->
+        <div id="tab-schedule">
+            <div class="card overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr style="background:var(--bg-surface);">
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Review</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Color Team</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Opportunity</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Date</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Reviewers</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Status</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Findings</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scheduleBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Findings Tab -->
+        <div id="tab-findings" class="hidden">
+            <div class="card overflow-hidden">
+                <div class="px-4 py-3 flex items-center justify-between" style="background:var(--bg-surface);">
+                    <h3 class="font-display font-semibold">Finding Log</h3>
+                    <div class="flex gap-2">
+                        <select id="findingSeverity" class="text-xs px-3 py-1.5 rounded-md" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);" onchange="filterFindings()">
+                            <option value="all">All Severity</option>
+                            <option value="critical">Critical</option>
+                            <option value="major">Major</option>
+                            <option value="minor">Minor</option>
+                        </select>
+                        <select id="findingStatus" class="text-xs px-3 py-1.5 rounded-md" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);" onchange="filterFindings()">
+                            <option value="all">All Status</option>
+                            <option value="open">Open</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="deferred">Deferred</option>
+                        </select>
+                    </div>
+                </div>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr style="border-top:1px solid var(--border);">
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">ID</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Finding</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Section</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Severity</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Reviewer</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Due</th>
+                            <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="findingsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Reviewers Tab -->
+        <div id="tab-reviewers" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="reviewersGrid"></div>
+        </div>
+    </div>
+
+    <!-- AI Disclaimer Footer -->
+    <div class="mt-12 py-4 text-center text-xs" style="color:var(--text-muted);border-top:1px solid var(--border);">
+        ⚠️ AI GENERATED — REQUIRES HUMAN REVIEW · MissionPulse © 2026 Mission Meets Tech
+    </div>
+
+    <script>
+        // ─── Supabase Init ───
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NzUxMjAsImV4cCI6MjA1MzE1MTEyMH0.xM8BE2jRLxfWNwFGDcKmFHfNgBOt0U4bMfUKb3Gn5xg';
+        var sbClient;
+        try { sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) { console.warn('Supabase init failed, using demo data'); }
+
+        // ─── RBAC ───
+        let currentUser = null;
+        async function checkAuth() {
+            try {
+                const { data } = await sbClient.auth.getUser();
+                if (data?.user) {
+                    currentUser = data.user;
+                    setConnected();
+                    return;
+                }
+            } catch(e) {}
+            setDemoMode();
+        }
+
+        function setConnected() {
+            document.getElementById('connDot').style.background = '#10B981';
+            document.getElementById('connText').textContent = 'Connected';
+        }
+        function setDemoMode() {
+            document.getElementById('connDot').style.background = '#F59E0B';
+            document.getElementById('connText').textContent = 'Demo Mode';
+        }
+
+        // ─── Demo Data ───
+        const colorTeamBadge = { 'Blue': 'badge-blue', 'Pink': 'badge-pink', 'Red': 'badge-red', 'Gold': 'badge-gold', 'Green': 'badge-green' };
+        const severityBadge = { 'critical': 'badge-red', 'major': 'badge-gold', 'minor': 'badge-blue' };
+        const statusBadge = { 'Scheduled': 'badge-blue', 'In Progress': 'badge-gold', 'Complete': 'badge-green', 'Overdue': 'badge-red', 'open': 'badge-red', 'resolved': 'badge-green', 'deferred': 'badge-purple' };
+
+        const demoReviews = [
+            { id: 'R-001', name: 'Blue Team — Tech Volume', color: 'Blue', opportunity: 'DHA EHR Modernization', date: '2026-02-20', reviewers: ['J. Martinez', 'S. Chen'], status: 'Scheduled', findings: 0 },
+            { id: 'R-002', name: 'Pink Team — Full Draft', color: 'Pink', opportunity: 'VA Claims Processing', date: '2026-02-22', reviewers: ['M. Womack', 'R. Patel', 'K. Johnson'], status: 'Scheduled', findings: 0 },
+            { id: 'R-003', name: 'Red Team — Final', color: 'Red', opportunity: 'CMS Data Analytics', date: '2026-02-25', reviewers: ['D. Brooks', 'L. Nguyen'], status: 'Scheduled', findings: 0 },
+            { id: 'R-004', name: 'Blue Team — Mgmt Vol', color: 'Blue', opportunity: 'IHS Telehealth', date: '2026-02-14', reviewers: ['J. Martinez'], status: 'Complete', findings: 4 },
+            { id: 'R-005', name: 'Pink Team — Draft 1', color: 'Pink', opportunity: 'DHA EHR Modernization', date: '2026-02-10', reviewers: ['M. Womack', 'S. Chen', 'R. Patel'], status: 'Complete', findings: 8 },
+            { id: 'R-006', name: 'Red Team — Final', color: 'Red', opportunity: 'IHS Telehealth', date: '2026-02-16', reviewers: ['D. Brooks', 'L. Nguyen', 'K. Johnson'], status: 'Complete', findings: 3 },
+            { id: 'R-007', name: 'Gold Team — Exec', color: 'Gold', opportunity: 'VA Claims Processing', date: '2026-02-08', reviewers: ['M. Womack'], status: 'Complete', findings: 2 },
+            { id: 'R-008', name: 'Blue Team — Price Vol', color: 'Blue', opportunity: 'CMS Data Analytics', date: '2026-02-12', reviewers: ['R. Patel', 'J. Martinez'], status: 'Complete', findings: 5 },
+            { id: 'R-009', name: 'Pink Team — Past Perf', color: 'Pink', opportunity: 'DHA Cyber Defense', date: '2026-02-13', reviewers: ['K. Johnson'], status: 'Overdue', findings: 1 }
+        ];
+
+        const demoFindings = [
+            { id: 'F-001', finding: 'Tech approach lacks specific Azure Gov references', section: 'Tech Vol 3.2', severity: 'critical', reviewer: 'J. Martinez', due: '2026-02-19', status: 'open' },
+            { id: 'F-002', finding: 'Transition timeline missing Phase 2 milestones', section: 'Mgmt Vol 4.1', severity: 'major', reviewer: 'S. Chen', due: '2026-02-20', status: 'open' },
+            { id: 'F-003', finding: 'Past performance relevance score below threshold', section: 'Past Perf 2.1', severity: 'major', reviewer: 'K. Johnson', due: '2026-02-18', status: 'open' },
+            { id: 'F-004', finding: 'Pricing rates not competitive with incumbent', section: 'Price Vol 1.3', severity: 'critical', reviewer: 'R. Patel', due: '2026-02-17', status: 'open' },
+            { id: 'F-005', finding: 'Org chart missing deputy PM role', section: 'Mgmt Vol 2.2', severity: 'minor', reviewer: 'M. Womack', due: '2026-02-21', status: 'open' },
+            { id: 'F-006', finding: 'Key personnel resume exceeds page limit', section: 'Key Pers 1.1', severity: 'minor', reviewer: 'L. Nguyen', due: '2026-02-16', status: 'resolved' },
+            { id: 'F-007', finding: 'SOW cross-ref incomplete for CLIN 004', section: 'Tech Vol 5.4', severity: 'major', reviewer: 'D. Brooks', due: '2026-02-15', status: 'resolved' },
+            { id: 'F-008', finding: 'QCP missing continuous improvement metrics', section: 'Mgmt Vol 6.1', severity: 'minor', reviewer: 'J. Martinez', due: '2026-02-14', status: 'resolved' },
+            { id: 'F-009', finding: 'Win theme not threaded in Section L response', section: 'Tech Vol 1.1', severity: 'critical', reviewer: 'M. Womack', due: '2026-02-19', status: 'open' },
+            { id: 'F-010', finding: 'Risk register missing cybersecurity risks', section: 'Mgmt Vol 7.2', severity: 'major', reviewer: 'S. Chen', due: '2026-02-20', status: 'open' },
+            { id: 'F-011', finding: 'Subcontractor workshare percentages miscalculated', section: 'Price Vol 2.1', severity: 'major', reviewer: 'R. Patel', due: '2026-02-18', status: 'open' },
+            { id: 'F-012', finding: 'Executive summary tone too technical', section: 'Exec Sum 1.0', severity: 'minor', reviewer: 'M. Womack', due: '2026-02-22', status: 'open' }
+        ];
+
+        const demoReviewers = [
+            { name: 'M. Womack', role: 'CEO / Gold Team Lead', reviews: 4, findings: 3, avatar: 'MW' },
+            { name: 'J. Martinez', role: 'Solutions Architect', reviews: 3, findings: 3, avatar: 'JM' },
+            { name: 'S. Chen', role: 'Technical Writer', reviews: 2, findings: 2, avatar: 'SC' },
+            { name: 'R. Patel', role: 'Financial Analyst', reviews: 3, findings: 2, avatar: 'RP' },
+            { name: 'K. Johnson', role: 'Capture Manager', reviews: 3, findings: 1, avatar: 'KJ' },
+            { name: 'D. Brooks', role: 'Red Team Lead', reviews: 2, findings: 1, avatar: 'DB' },
+            { name: 'L. Nguyen', role: 'Contracts Specialist', reviews: 2, findings: 1, avatar: 'LN' },
+            { name: 'T. Williams', role: 'Subject Matter Expert', reviews: 1, findings: 0, avatar: 'TW' }
+        ];
+
+        // ─── Render ───
+        function renderSchedule() {
+            const body = document.getElementById('scheduleBody');
+            body.innerHTML = demoReviews.map(r => `
+                <tr class="table-row" style="border-top:1px solid var(--border);">
+                    <td class="px-4 py-3">
+                        <div class="font-medium">${r.name}</div>
+                        <div class="text-xs" style="color:var(--text-muted);">${r.id}</div>
+                    </td>
+                    <td class="px-4 py-3"><span class="badge ${colorTeamBadge[r.color]}">${r.color} Team</span></td>
+                    <td class="px-4 py-3" style="color:var(--text-muted);">${r.opportunity}</td>
+                    <td class="px-4 py-3" style="color:var(--text-muted);">${r.date}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex -space-x-2">
+                            ${r.reviewers.map(rv => `<div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style="background:var(--bg-surface);border:2px solid var(--border);color:var(--primary);" title="${rv}">${rv.split(' ').map(n=>n[0]).join('')}</div>`).join('')}
+                        </div>
+                    </td>
+                    <td class="px-4 py-3"><span class="badge ${statusBadge[r.status]}">${r.status}</span></td>
+                    <td class="px-4 py-3 font-medium" style="color:${r.findings > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${r.findings}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderFindings(filter) {
+            let data = [...demoFindings];
+            const sevFilter = document.getElementById('findingSeverity').value;
+            const statFilter = document.getElementById('findingStatus').value;
+            if (sevFilter !== 'all') data = data.filter(f => f.severity === sevFilter);
+            if (statFilter !== 'all') data = data.filter(f => f.status === statFilter);
+
+            const body = document.getElementById('findingsBody');
+            body.innerHTML = data.map(f => `
+                <tr class="table-row" style="border-top:1px solid var(--border);">
+                    <td class="px-4 py-3 font-mono text-xs" style="color:var(--text-muted);">${f.id}</td>
+                    <td class="px-4 py-3">${f.finding}</td>
+                    <td class="px-4 py-3" style="color:var(--text-muted);">${f.section}</td>
+                    <td class="px-4 py-3"><span class="badge ${severityBadge[f.severity]}">${f.severity}</span></td>
+                    <td class="px-4 py-3" style="color:var(--text-muted);">${f.reviewer}</td>
+                    <td class="px-4 py-3" style="color:var(--text-muted);">${f.due}</td>
+                    <td class="px-4 py-3"><span class="badge ${statusBadge[f.status]}">${f.status}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderReviewers() {
+            const grid = document.getElementById('reviewersGrid');
+            grid.innerHTML = demoReviewers.map(r => `
+                <div class="card p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style="background:linear-gradient(135deg,#00E5FA,#0099AA);color:var(--bg-deep);">${r.avatar}</div>
+                        <div>
+                            <div class="font-medium">${r.name}</div>
+                            <div class="text-xs" style="color:var(--text-muted);">${r.role}</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-xs mb-2" style="color:var(--text-muted);">
+                        <span>Reviews: <strong style="color:var(--primary);">${r.reviews}</strong></span>
+                        <span>Findings: <strong style="color:${r.findings > 0 ? 'var(--warning)' : 'var(--success)'};">${r.findings}</strong></span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width:${Math.min(r.reviews * 25, 100)}%;background:var(--primary);"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterFindings() { renderFindings(); }
+
+        function switchTab(tab) {
+            document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if (btn.dataset.tab === tab) {
+                    btn.style.background = 'var(--primary)';
+                    btn.style.color = 'var(--bg-deep)';
+                } else {
+                    btn.style.background = 'transparent';
+                    btn.style.color = 'var(--text-muted)';
+                }
+            });
+        }
+
+        function showScheduleModal() { alert('Schedule Review — coming in next sprint (Supabase write integration)'); }
+
+        // ─── Init ───
+        checkAuth();
+        renderSchedule();
+        renderFindings();
+        renderReviewers();
+    </script>
+</body>
+</html>

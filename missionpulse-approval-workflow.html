@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionPulse — Approval Workflow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+        :root { --primary: #00E5FA; --bg-deep: #00050F; --bg-card: #0A1628; --bg-surface: #111D35; --border: #1E3A5F; --text-primary: #E8F0FE; --text-muted: #8BA3C7; --success: #10B981; --warning: #F59E0B; --danger: #EF4444; --accent-purple: #8B5CF6; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-deep); color: var(--text-primary); }
+        h1, h2, h3, h4, .font-display { font-family: 'Space Grotesk', sans-serif; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+        .glow-line { height: 2px; background: linear-gradient(90deg, transparent, var(--primary), transparent); }
+        .badge { padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-green { background: rgba(16,185,129,0.15); color: #10B981; }
+        .badge-gold { background: rgba(245,158,11,0.15); color: #F59E0B; }
+        .badge-red { background: rgba(239,68,68,0.15); color: #EF4444; }
+        .badge-blue { background: rgba(0,229,250,0.15); color: #00E5FA; }
+        .badge-purple { background: rgba(139,92,246,0.15); color: #8B5CF6; }
+        .badge-gray { background: rgba(139,163,199,0.15); color: #8BA3C7; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .btn-primary { background: linear-gradient(135deg, #00E5FA, #0099AA); color: #00050F; font-weight: 600; padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,229,250,0.3); }
+        .btn-sm { padding: 4px 12px; font-size: 0.75rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; }
+        .btn-approve { background: rgba(16,185,129,0.2); color: #10B981; }
+        .btn-approve:hover { background: rgba(16,185,129,0.35); }
+        .btn-reject { background: rgba(239,68,68,0.2); color: #EF4444; }
+        .btn-reject:hover { background: rgba(239,68,68,0.35); }
+        .btn-delegate { background: rgba(139,92,246,0.2); color: #8B5CF6; }
+        .btn-delegate:hover { background: rgba(139,92,246,0.35); }
+        .pipeline-step { position: relative; padding-left: 32px; }
+        .pipeline-step::before { content: ''; position: absolute; left: 11px; top: 28px; bottom: -8px; width: 2px; background: var(--border); }
+        .pipeline-step:last-child::before { display: none; }
+        .pipeline-dot { position: absolute; left: 4px; top: 6px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; }
+        .pipeline-dot.done { background: #10B981; border-color: #10B981; }
+        .pipeline-dot.active { background: #F59E0B; border-color: #F59E0B; animation: pulse 2s infinite; }
+        .pipeline-dot.pending { background: var(--bg-surface); border-color: var(--border); }
+        .pipeline-dot.rejected { background: #EF4444; border-color: #EF4444; }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); } 50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); } }
+        .table-row { transition: background 0.15s; }
+        .table-row:hover { background: rgba(0,229,250,0.04); }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Connection Indicator -->
+    <div id="connStatus" class="fixed top-3 right-3 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium" style="background:var(--bg-card);border:1px solid var(--border);">
+        <span id="connDot" class="status-dot" style="background:#F59E0B;"></span>
+        <span id="connText">Connecting...</span>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#F59E0B,#D97706);">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <h1 class="font-display text-2xl font-bold" style="color:var(--text-primary);">Approval Workflow</h1>
+                    <p class="text-sm" style="color:var(--text-muted);">Multi-Stage Approvals · Sign-Off Tracking · Delegation · Escalation</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="btn-primary" onclick="createWorkflow()">+ New Workflow</button>
+            </div>
+        </div>
+        <div class="glow-line mb-6"></div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#F59E0B;">4</div>
+                <div class="text-xs" style="color:var(--text-muted);">Awaiting Approval</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#10B981;">11</div>
+                <div class="text-xs" style="color:var(--text-muted);">Approved</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#EF4444;">2</div>
+                <div class="text-xs" style="color:var(--text-muted);">Rejected</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#8B5CF6;">1</div>
+                <div class="text-xs" style="color:var(--text-muted);">Delegated</div>
+            </div>
+            <div class="card p-4 text-center">
+                <div class="text-2xl font-bold font-display" style="color:#EF4444;">1</div>
+                <div class="text-xs" style="color:var(--text-muted);">Escalated</div>
+            </div>
+        </div>
+
+        <!-- Active Workflows -->
+        <h3 class="font-display font-semibold mb-4">Active Approval Pipelines</h3>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8" id="workflowsGrid"></div>
+
+        <!-- History Table -->
+        <h3 class="font-display font-semibold mb-4">Approval History</h3>
+        <div class="card overflow-hidden">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr style="background:var(--bg-surface);">
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Item</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Type</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Submitted</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Approver</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Decision</th>
+                        <th class="text-left px-4 py-3 font-medium" style="color:var(--text-muted);">Date</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- AI Disclaimer Footer -->
+    <div class="mt-12 py-4 text-center text-xs" style="color:var(--text-muted);border-top:1px solid var(--border);">
+        ⚠️ AI GENERATED — REQUIRES HUMAN REVIEW · MissionPulse © 2026 Mission Meets Tech
+    </div>
+
+    <script>
+        // ─── Supabase Init ───
+        const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NzUxMjAsImV4cCI6MjA1MzE1MTEyMH0.xM8BE2jRLxfWNwFGDcKmFHfNgBOt0U4bMfUKb3Gn5xg';
+        var sbClient;
+        try { sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) {}
+
+        let currentUser = null;
+        async function checkAuth() {
+            try { const { data } = await sbClient.auth.getUser(); if (data?.user) { currentUser = data.user; setConnected(); return; } } catch(e) {}
+            setDemoMode();
+        }
+        function setConnected() { document.getElementById('connDot').style.background = '#10B981'; document.getElementById('connText').textContent = 'Connected'; }
+        function setDemoMode() { document.getElementById('connDot').style.background = '#F59E0B'; document.getElementById('connText').textContent = 'Demo Mode'; }
+
+        // ─── Demo Data ───
+        const demoWorkflows = [
+            {
+                id: 'WF-001', name: 'DHA EHR — Tech Volume Final', opportunity: 'DHA EHR Modernization',
+                steps: [
+                    { role: 'Solutions Architect', approver: 'J. Martinez', status: 'done', date: '2026-02-15' },
+                    { role: 'Capture Manager', approver: 'K. Johnson', status: 'done', date: '2026-02-16' },
+                    { role: 'COO Review', approver: 'D. Brooks', status: 'active', date: null },
+                    { role: 'CEO Final Sign-Off', approver: 'M. Womack', status: 'pending', date: null }
+                ]
+            },
+            {
+                id: 'WF-002', name: 'VA Claims — Price Volume', opportunity: 'VA Claims Processing',
+                steps: [
+                    { role: 'Financial Analyst', approver: 'R. Patel', status: 'done', date: '2026-02-14' },
+                    { role: 'Contracts Review', approver: 'L. Nguyen', status: 'done', date: '2026-02-15' },
+                    { role: 'COO Review', approver: 'D. Brooks', status: 'done', date: '2026-02-16' },
+                    { role: 'CEO Final Sign-Off', approver: 'M. Womack', status: 'active', date: null }
+                ]
+            },
+            {
+                id: 'WF-003', name: 'CMS Analytics — Go/No-Go', opportunity: 'CMS Data Analytics',
+                steps: [
+                    { role: 'Capture Manager', approver: 'K. Johnson', status: 'done', date: '2026-02-13' },
+                    { role: 'COO Review', approver: 'D. Brooks', status: 'rejected', date: '2026-02-14', note: 'Need stronger past performance evidence' },
+                    { role: 'CEO Final Sign-Off', approver: 'M. Womack', status: 'pending', date: null }
+                ]
+            },
+            {
+                id: 'WF-004', name: 'IHS Telehealth — Mgmt Volume', opportunity: 'IHS Telehealth',
+                steps: [
+                    { role: 'Technical Writer', approver: 'S. Chen', status: 'done', date: '2026-02-12' },
+                    { role: 'PM Review', approver: 'T. Williams', status: 'active', date: null, delegated: 'S. Chen (delegated 2/17)' },
+                    { role: 'COO Review', approver: 'D. Brooks', status: 'pending', date: null },
+                    { role: 'CEO Final Sign-Off', approver: 'M. Womack', status: 'pending', date: null }
+                ]
+            }
+        ];
+
+        const demoHistory = [
+            { item: 'DHA EHR — Exec Summary v3', type: 'Document', submitted: '2026-02-10', approver: 'M. Womack', decision: 'Approved', date: '2026-02-11' },
+            { item: 'VA Claims — Teaming Agreement', type: 'Agreement', submitted: '2026-02-08', approver: 'L. Nguyen', decision: 'Approved', date: '2026-02-09' },
+            { item: 'CMS Analytics — Staffing Plan', type: 'Document', submitted: '2026-02-07', approver: 'D. Brooks', decision: 'Rejected', date: '2026-02-08' },
+            { item: 'IHS — Go/No-Go Decision', type: 'Gate', submitted: '2026-02-05', approver: 'M. Womack', decision: 'Approved', date: '2026-02-06' },
+            { item: 'DHA EHR — Price Model v2', type: 'CUI Document', submitted: '2026-02-04', approver: 'R. Patel', decision: 'Approved', date: '2026-02-05' },
+            { item: 'VA Claims — Risk Register', type: 'Document', submitted: '2026-02-03', approver: 'K. Johnson', decision: 'Approved', date: '2026-02-04' },
+            { item: 'CMS Analytics — Capture Plan', type: 'Gate', submitted: '2026-02-01', approver: 'M. Womack', decision: 'Approved', date: '2026-02-02' }
+        ];
+
+        // ─── Render ───
+        function renderWorkflows() {
+            document.getElementById('workflowsGrid').innerHTML = demoWorkflows.map(wf => {
+                const completedSteps = wf.steps.filter(s => s.status === 'done').length;
+                const progress = Math.round((completedSteps / wf.steps.length) * 100);
+                const hasRejection = wf.steps.some(s => s.status === 'rejected');
+
+                return `
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-1">
+                        <h4 class="font-display font-semibold">${wf.name}</h4>
+                        <span class="text-xs font-mono" style="color:var(--text-muted);">${wf.id}</span>
+                    </div>
+                    <div class="text-xs mb-4" style="color:var(--text-muted);">${wf.opportunity} · ${progress}% complete</div>
+                    <div class="space-y-4">
+                        ${wf.steps.map(step => `
+                            <div class="pipeline-step">
+                                <div class="pipeline-dot ${step.status}">
+                                    ${step.status === 'done' ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : ''}
+                                    ${step.status === 'rejected' ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>' : ''}
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="text-sm font-medium">${step.role}</div>
+                                        <div class="text-xs" style="color:var(--text-muted);">${step.approver}${step.delegated ? ' → ' + step.delegated : ''}${step.date ? ' · ' + step.date : ''}</div>
+                                        ${step.note ? `<div class="text-xs mt-1" style="color:var(--danger);">⚠ ${step.note}</div>` : ''}
+                                    </div>
+                                    ${step.status === 'active' ? `
+                                        <div class="flex gap-1">
+                                            <button class="btn-sm btn-approve" onclick="approveStep('${wf.id}','${step.role}')">✓ Approve</button>
+                                            <button class="btn-sm btn-reject" onclick="rejectStep('${wf.id}','${step.role}')">✗ Reject</button>
+                                            <button class="btn-sm btn-delegate" onclick="delegateStep('${wf.id}','${step.role}')">↗ Delegate</button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderHistory() {
+            const decisionBadge = { 'Approved': 'badge-green', 'Rejected': 'badge-red', 'Delegated': 'badge-purple', 'Escalated': 'badge-gold' };
+            document.getElementById('historyBody').innerHTML = demoHistory.map(h => `
+                <tr class="table-row" style="border-top:1px solid var(--border);">
+                    <td class="px-4 py-3 font-medium">${h.item}</td>
+                    <td class="px-4 py-3"><span class="badge badge-blue">${h.type}</span></td>
+                    <td class="px-4 py-3" style="color:var(--text-muted);">${h.submitted}</td>
+                    <td class="px-4 py-3" style="color:var(--text-muted);">${h.approver}</td>
+                    <td class="px-4 py-3"><span class="badge ${decisionBadge[h.decision] || 'badge-gray'}">${h.decision}</span></td>
+                    <td class="px-4 py-3" style="color:var(--text-muted);">${h.date}</td>
+                </tr>
+            `).join('');
+        }
+
+        function approveStep(wfId, role) { alert(`Approved: ${role} on ${wfId}\n(Supabase write integration — next sprint)`); }
+        function rejectStep(wfId, role) { alert(`Rejected: ${role} on ${wfId}\n(Supabase write integration — next sprint)`); }
+        function delegateStep(wfId, role) { alert(`Delegate: ${role} on ${wfId}\n(Supabase write integration — next sprint)`); }
+        function createWorkflow() { alert('Create Workflow — coming in next sprint (Supabase write integration)'); }
+
+        // ─── Init ───
+        checkAuth();
+        renderWorkflows();
+        renderHistory();
+    </script>
+</body>
+</html>
