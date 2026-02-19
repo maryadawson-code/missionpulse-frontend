@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse — Price Analysis 🛡 CUI</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#00050F;min-height:100vh;color:#e2e8f0}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,229,250,0.2);border-radius:3px}input[type=range]{-webkit-appearance:none;background:rgba(245,158,11,0.15);height:6px;border-radius:3px;outline:none}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#f59e0b;cursor:pointer}</style>
+</head>
+<body>
+  <div id="missionpulse-sidebar"></div>
+  <div class="main-content"><div id="root"></div></div>
+  <script src="missionpulse-nav.js"></script>
+  <script type="text/babel">
+    const{useState,useEffect,useMemo}=React;
+    const SB_URL='https://qdrtpnpnhkxvfmvfziop.supabase.co';const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5MjMxNDMsImV4cCI6MjA1MzQ5OTE0M30.GFbjgRMgVhMMcnNaJMrLVnJI_u6yBGJOhO-LHKE8sZQ';
+    var sbClient;try{sbClient=supabase.createClient(SB_URL,SB_KEY)}catch(e){sbClient=null}
+    const ROLES_ALLOWED=['CEO','FIN'];
+
+    const DEMO_LCATS=[
+      {id:1,title:'Program Manager',gsaRate:185,proposedRate:180,incumbentRate:195,marketLow:170,marketHigh:210,hours:2080},
+      {id:2,title:'Deputy PM',gsaRate:155,proposedRate:150,incumbentRate:165,marketLow:140,marketHigh:175,hours:2080},
+      {id:3,title:'Solutions Architect',gsaRate:195,proposedRate:190,incumbentRate:205,marketLow:180,marketHigh:225,hours:1800},
+      {id:4,title:'Senior Developer',gsaRate:165,proposedRate:160,incumbentRate:175,marketLow:150,marketHigh:190,hours:2080},
+      {id:5,title:'DevSecOps Engineer',gsaRate:170,proposedRate:165,incumbentRate:180,marketLow:155,marketHigh:195,hours:2080},
+      {id:6,title:'Data Engineer',gsaRate:160,proposedRate:155,incumbentRate:170,marketLow:145,marketHigh:185,hours:1800},
+      {id:7,title:'AI/ML Engineer',gsaRate:180,proposedRate:175,incumbentRate:190,marketLow:165,marketHigh:210,hours:1800},
+      {id:8,title:'Cybersecurity Analyst',gsaRate:150,proposedRate:145,incumbentRate:160,marketLow:135,marketHigh:175,hours:2080},
+      {id:9,title:'ISSO',gsaRate:145,proposedRate:140,incumbentRate:155,marketLow:130,marketHigh:165,hours:1040},
+      {id:10,title:'Help Desk Lead',gsaRate:95,proposedRate:90,incumbentRate:100,marketLow:80,marketHigh:110,hours:2080},
+      {id:11,title:'Help Desk Tier 1',gsaRate:65,proposedRate:62,incumbentRate:70,marketLow:55,marketHigh:80,hours:4160},
+      {id:12,title:'QA Analyst',gsaRate:120,proposedRate:115,incumbentRate:130,marketLow:105,marketHigh:140,hours:1800},
+    ];
+
+    const DEMO_SCENARIOS=[
+      {id:1,name:'Baseline (GSA Rates)',wrapRate:1.45,odi:0.03,fee:0.08,escalation:0.03,description:'Standard GSA schedule pricing with competitive wrap rate.'},
+      {id:2,name:'Aggressive PTW',wrapRate:1.38,odi:0.02,fee:0.06,escalation:0.025,description:'Below-incumbent pricing to win on cost. Reduced fee and ODI.'},
+      {id:3,name:'Premium Value',wrapRate:1.52,odi:0.04,fee:0.10,escalation:0.035,description:'Higher rates justified by AI automation and FedRAMP inheritance.'},
+    ];
+
+    const DEMO_COMPETITORS_PRICE=[
+      {name:'Leidos Health',estimatedTotal:48200000,source:'Incumbent contract value (FPDS)'},
+      {name:'Booz Allen Hamilton',estimatedTotal:52100000,source:'GSA schedule analysis + 55% wrap'},
+      {name:'Accenture Federal',estimatedTotal:55800000,source:'Market intelligence + published rates'},
+      {name:'GDIT',estimatedTotal:46500000,source:'FPDS similar contract analysis'},
+    ];
+
+    const fmt=v=>v>=1000000?`$${(v/1000000).toFixed(2)}M`:v>=1000?`$${(v/1000).toFixed(0)}K`:`$${v.toFixed(0)}`;
+    const ConnectionDot=({c})=>(<div style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'11px',color:c?'#00ff88':'#f59e0b'}}><div style={{width:'8px',height:'8px',borderRadius:'50%',background:c?'#00ff88':'#f59e0b',boxShadow:`0 0 6px ${c?'#00ff88':'#f59e0b'}`}}/>{c?'LIVE':'DEMO'}</div>);
+
+    const RangeIndicator=({value,low,high,label})=>{
+      const range=high-low||1;
+      const pct=Math.max(0,Math.min(100,((value-low)/range)*100));
+      return(
+        <div style={{position:'relative',height:'8px',background:'rgba(255,255,255,0.04)',borderRadius:'4px',margin:'2px 0'}}>
+          <div style={{position:'absolute',left:`${Math.max(0,Math.min(95,pct))}%`,top:'-2px',width:'12px',height:'12px',borderRadius:'50%',background:pct<30?'#00ff88':pct<70?'#00E5FA':'#f59e0b',border:'2px solid #00050F',transform:'translateX(-50%)'}} title={`${label}: $${value}`}/>
+          <div style={{position:'absolute',left:'0',top:'10px',fontSize:'8px',color:'#3e4f63'}}>${low}</div>
+          <div style={{position:'absolute',right:'0',top:'10px',fontSize:'8px',color:'#3e4f63'}}>${high}</div>
+        </div>
+      );
+    };
+
+    const App=()=>{
+      const[connected,setConnected]=useState(false);
+      const[lcats,setLcats]=useState(DEMO_LCATS);
+      const[activeScenario,setActiveScenario]=useState(0);
+      const[customWrap,setCustomWrap]=useState(1.45);
+      const[customODI,setCustomODI]=useState(0.03);
+      const[customFee,setCustomFee]=useState(0.08);
+      const[tab,setTab]=useState('ptw');
+      const[years,setYears]=useState(5);
+
+      useEffect(()=>{if(!sbClient)return;(async()=>{try{const{data,error}=await sbClient.from('pricing_items').select('id');if(!error&&data&&data.length>0)setConnected(true)}catch{}})()},[]);
+
+      const scenario=activeScenario<DEMO_SCENARIOS.length?DEMO_SCENARIOS[activeScenario]:{name:'Custom',wrapRate:customWrap,odi:customODI,fee:customFee,escalation:0.03};
+
+      const pricing=useMemo(()=>{
+        const directLabor=lcats.reduce((s,l)=>s+l.proposedRate*l.hours,0);
+        const wrapped=directLabor*scenario.wrapRate;
+        const odi=wrapped*scenario.odi;
+        const subtotal=wrapped+odi;
+        const fee=subtotal*scenario.fee;
+        const yearOne=subtotal+fee;
+        let total=0;
+        const byYear=[];
+        for(let y=0;y<years;y++){
+          const esc=Math.pow(1+scenario.escalation,y);
+          const yv=yearOne*esc;
+          byYear.push({year:y+1,value:yv});
+          total+=yv;
+        }
+        return{directLabor,wrapped,odi,fee,yearOne,total,byYear};
+      },[lcats,scenario,years]);
+
+      const incumbentTotal=DEMO_COMPETITORS_PRICE[0].estimatedTotal*years/5;
+      const priceDiff=((pricing.total-incumbentTotal)/incumbentTotal*100).toFixed(1);
+
+      return(
+        <div style={{padding:'24px 32px',maxWidth:'1400px'}}>
+          {/* CUI Banner */}
+          <div style={{background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.25)',borderRadius:'10px',padding:'8px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'8px'}}>
+            <span style={{fontSize:'14px'}}>🛡</span>
+            <span style={{fontSize:'11px',fontWeight:700,color:'#f59e0b',letterSpacing:'0.5px'}}>CUI — CONTROLLED UNCLASSIFIED INFORMATION</span>
+            <span style={{fontSize:'10px',color:'#94a3b8',marginLeft:'8px'}}>Pricing data restricted to CEO, COO, FIN roles</span>
+          </div>
+
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'24px'}}>
+            <div>
+              <div style={{fontSize:'10px',fontWeight:700,color:'rgba(245,158,11,0.6)',letterSpacing:'2px',textTransform:'uppercase',marginBottom:'4px'}}>PRICING INTELLIGENCE</div>
+              <h1 style={{fontSize:'26px',fontWeight:800,color:'white',letterSpacing:'-0.5px',margin:0}}>Price Analysis</h1>
+              <div style={{fontSize:'12px',color:'#5a7a9a',marginTop:'4px'}}>Price-to-Win • Competitive range • Rate comparison • Scenario builder</div>
+            </div>
+            <ConnectionDot c={connected}/>
+          </div>
+
+          <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'20px'}}>
+            {[
+              {label:'Our Total ('+years+'yr)',value:fmt(pricing.total),color:'#00E5FA'},
+              {label:'Year 1',value:fmt(pricing.yearOne),color:'#a78bfa'},
+              {label:'Direct Labor',value:fmt(pricing.directLabor),color:'#94a3b8'},
+              {label:'Wrap Rate',value:`${(scenario.wrapRate*100).toFixed(0)}%`,color:'#00E5FA'},
+              {label:'vs Incumbent',value:`${priceDiff>0?'+':''}${priceDiff}%`,color:priceDiff<=0?'#00ff88':Math.abs(priceDiff)<=10?'#f59e0b':'#ef4444'},
+              {label:'Fee',value:`${(scenario.fee*100).toFixed(0)}%`,color:'#f59e0b'},
+            ].map(s=>(
+              <div key={s.label} style={{background:'rgba(10,22,40,0.7)',border:'1px solid rgba(245,158,11,0.08)',borderRadius:'10px',padding:'10px 16px',minWidth:'130px'}}>
+                <div style={{fontSize:'9px',fontWeight:700,color:'#5a7a9a',letterSpacing:'0.5px',textTransform:'uppercase'}}>{s.label}</div>
+                <div style={{fontSize:'22px',fontWeight:800,color:s.color,letterSpacing:'-0.5px'}}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Scenario Selector */}
+          <div style={{display:'flex',gap:'8px',marginBottom:'16px',flexWrap:'wrap',alignItems:'center'}}>
+            {DEMO_SCENARIOS.map((sc,i)=>(
+              <button key={i} onClick={()=>setActiveScenario(i)} style={{padding:'8px 14px',fontSize:'11px',fontWeight:600,borderRadius:'8px',border:'none',cursor:'pointer',background:activeScenario===i?'rgba(245,158,11,0.15)':'rgba(10,22,40,0.5)',color:activeScenario===i?'#f59e0b':'#5a7a9a'}}>
+                {sc.name}
+              </button>
+            ))}
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginLeft:'16px'}}>
+              <span style={{fontSize:'11px',color:'#5a7a9a'}}>POP:</span>
+              {[3,5,7].map(y=>(
+                <button key={y} onClick={()=>setYears(y)} style={{padding:'4px 10px',fontSize:'10px',fontWeight:600,borderRadius:'6px',border:'none',cursor:'pointer',background:years===y?'rgba(0,229,250,0.12)':'transparent',color:years===y?'#00E5FA':'#5a7a9a'}}>{y}yr</button>
+              ))}
+            </div>
+          </div>
+          <div style={{fontSize:'11px',color:'#5a7a9a',marginBottom:'16px'}}>{scenario.description||''}</div>
+
+          {/* Tabs */}
+          <div style={{display:'flex',gap:'4px',marginBottom:'16px'}}>
+            {[{k:'ptw',l:'Price-to-Win'},{k:'rates',l:'Rate Comparison'},{k:'yearly',l:'Year-by-Year'}].map(t=>(
+              <button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'7px 16px',fontSize:'12px',fontWeight:600,borderRadius:'8px',border:'none',cursor:'pointer',background:tab===t.k?'rgba(245,158,11,0.15)':'rgba(10,22,40,0.5)',color:tab===t.k?'#f59e0b':'#5a7a9a'}}>{t.l}</button>
+            ))}
+          </div>
+
+          {/* PTW TAB */}
+          {tab==='ptw'&&(
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
+              {/* Our Price Breakdown */}
+              <div style={{background:'rgba(10,22,40,0.5)',border:'1px solid rgba(0,229,250,0.08)',borderRadius:'12px',padding:'16px'}}>
+                <div style={{fontSize:'13px',fontWeight:700,color:'white',marginBottom:'12px'}}>Our Price Build-Up</div>
+                {[
+                  {label:'Direct Labor',value:pricing.directLabor,pct:100},
+                  {label:`Wrapped (${(scenario.wrapRate*100).toFixed(0)}%)`,value:pricing.wrapped,pct:(pricing.wrapped/pricing.directLabor*100)},
+                  {label:`ODI (${(scenario.odi*100).toFixed(0)}%)`,value:pricing.odi,pct:null},
+                  {label:`Fee (${(scenario.fee*100).toFixed(0)}%)`,value:pricing.fee,pct:null},
+                  {label:'Year 1 Total',value:pricing.yearOne,pct:null,bold:true},
+                  {label:`${years}-Year Total`,value:pricing.total,pct:null,bold:true,accent:true},
+                ].map(r=>(
+                  <div key={r.label} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:r.bold?'1px solid rgba(0,229,250,0.08)':'none'}}>
+                    <span style={{fontSize:'12px',color:r.bold?'white':'#94a3b8',fontWeight:r.bold?700:400}}>{r.label}</span>
+                    <span style={{fontSize:'12px',fontWeight:700,color:r.accent?'#f59e0b':r.bold?'#00E5FA':'#e2e8f0',fontFamily:'monospace'}}>{fmt(r.value)}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Competitive Landscape */}
+              <div style={{background:'rgba(10,22,40,0.5)',border:'1px solid rgba(0,229,250,0.08)',borderRadius:'12px',padding:'16px'}}>
+                <div style={{fontSize:'13px',fontWeight:700,color:'white',marginBottom:'12px'}}>Competitive Range ({years}-Year)</div>
+                {/* Our position */}
+                <div style={{background:'rgba(0,229,250,0.05)',borderRadius:'8px',padding:'10px 12px',marginBottom:'10px',border:'1px solid rgba(0,229,250,0.15)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span style={{fontSize:'13px',fontWeight:700,color:'#00E5FA'}}>Mission Meets Tech ★</span>
+                    <span style={{fontSize:'14px',fontWeight:800,color:'#00E5FA',fontFamily:'monospace'}}>{fmt(pricing.total)}</span>
+                  </div>
+                </div>
+                {DEMO_COMPETITORS_PRICE.map(c=>{
+                  const adjTotal=c.estimatedTotal*years/5;
+                  const diff=((pricing.total-adjTotal)/adjTotal*100).toFixed(1);
+                  return(
+                    <div key={c.name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid rgba(0,229,250,0.04)'}}>
+                      <div>
+                        <div style={{fontSize:'12px',fontWeight:500,color:'#e2e8f0'}}>{c.name}</div>
+                        <div style={{fontSize:'9px',color:'#3e4f63'}}>{c.source}</div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontSize:'12px',fontWeight:700,color:'#94a3b8',fontFamily:'monospace'}}>{fmt(adjTotal)}</div>
+                        <div style={{fontSize:'10px',fontWeight:600,color:diff<=0?'#00ff88':'#f59e0b'}}>{diff>0?'+':''}{diff}%</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* RATES TAB */}
+          {tab==='rates'&&(
+            <div style={{background:'rgba(10,22,40,0.5)',border:'1px solid rgba(245,158,11,0.08)',borderRadius:'12px',overflow:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'800px'}}>
+                <thead><tr style={{borderBottom:'1px solid rgba(245,158,11,0.1)'}}>
+                  {['LCAT','GSA Rate','Proposed','Incumbent','Market Range','Position','Hours','Annual Value'].map(h=>(
+                    <th key={h} style={{padding:'10px 10px',textAlign:'left',color:'#5a7a9a',fontWeight:700,fontSize:'10px',letterSpacing:'0.5px',textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {lcats.map(l=>{
+                    const pos=((l.proposedRate-l.marketLow)/(l.marketHigh-l.marketLow)*100).toFixed(0);
+                    return(
+                      <tr key={l.id} style={{borderBottom:'1px solid rgba(0,229,250,0.04)'}} onMouseOver={e=>e.currentTarget.style.background='rgba(0,229,250,0.03)'} onMouseOut={e=>e.currentTarget.style.background='transparent'}>
+                        <td style={{padding:'9px 10px',color:'white',fontWeight:500,whiteSpace:'nowrap'}}>{l.title}</td>
+                        <td style={{padding:'9px 10px',fontFamily:'monospace',fontSize:'11px',color:'#94a3b8'}}>${l.gsaRate}</td>
+                        <td style={{padding:'9px 10px',fontFamily:'monospace',fontSize:'11px',fontWeight:700,color:'#00E5FA'}}>${l.proposedRate}</td>
+                        <td style={{padding:'9px 10px',fontFamily:'monospace',fontSize:'11px',color:'#f59e0b'}}>${l.incumbentRate}</td>
+                        <td style={{padding:'9px 10px',width:'120px'}}><RangeIndicator value={l.proposedRate} low={l.marketLow} high={l.marketHigh} label={l.title}/></td>
+                        <td style={{padding:'9px 10px',fontSize:'10px',fontWeight:600,color:pos<=30?'#00ff88':pos<=60?'#00E5FA':'#f59e0b'}}>{pos}th pct</td>
+                        <td style={{padding:'9px 10px',fontFamily:'monospace',fontSize:'11px',color:'#94a3b8'}}>{l.hours.toLocaleString()}</td>
+                        <td style={{padding:'9px 10px',fontFamily:'monospace',fontSize:'11px',fontWeight:600,color:'#e2e8f0'}}>{fmt(l.proposedRate*l.hours)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot><tr style={{borderTop:'2px solid rgba(245,158,11,0.15)'}}>
+                  <td colSpan={6} style={{padding:'10px',fontWeight:700,color:'white',textAlign:'right'}}>Total Direct Labor:</td>
+                  <td style={{padding:'10px',fontFamily:'monospace',fontSize:'11px',color:'#94a3b8'}}>{lcats.reduce((s,l)=>s+l.hours,0).toLocaleString()}</td>
+                  <td style={{padding:'10px',fontFamily:'monospace',fontSize:'13px',fontWeight:800,color:'#f59e0b'}}>{fmt(pricing.directLabor)}</td>
+                </tr></tfoot>
+              </table>
+            </div>
+          )}
+
+          {/* YEARLY TAB */}
+          {tab==='yearly'&&(
+            <div style={{background:'rgba(10,22,40,0.5)',border:'1px solid rgba(0,229,250,0.08)',borderRadius:'12px',padding:'18px'}}>
+              <div style={{fontSize:'13px',fontWeight:700,color:'white',marginBottom:'14px'}}>Year-by-Year Pricing ({scenario.escalation*100}% escalation)</div>
+              <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'16px'}}>
+                {pricing.byYear.map(y=>(
+                  <div key={y.year} style={{flex:1,minWidth:'120px',background:'rgba(0,0,0,0.2)',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
+                    <div style={{fontSize:'10px',fontWeight:700,color:'#5a7a9a',marginBottom:'4px'}}>YEAR {y.year}</div>
+                    <div style={{fontSize:'18px',fontWeight:800,color:'#00E5FA'}}>{fmt(y.value)}</div>
+                    {y.year>1&&<div style={{fontSize:'9px',color:'#f59e0b',marginTop:'2px'}}>+{((y.value/pricing.byYear[0].value-1)*100).toFixed(1)}% from Y1</div>}
+                  </div>
+                ))}
+              </div>
+              {/* Visual bar */}
+              <div style={{display:'flex',gap:'4px',alignItems:'flex-end',height:'120px'}}>
+                {pricing.byYear.map(y=>{
+                  const maxVal=Math.max(...pricing.byYear.map(yy=>yy.value));
+                  const pct=(y.value/maxVal)*100;
+                  return(
+                    <div key={y.year} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}}>
+                      <div style={{fontSize:'9px',fontWeight:700,color:'#00E5FA',marginBottom:'4px'}}>{fmt(y.value)}</div>
+                      <div style={{width:'100%',maxWidth:'60px',height:`${pct}%`,background:'linear-gradient(180deg,#00E5FA,#0088cc)',borderRadius:'4px 4px 0 0',transition:'height 0.3s'}}/>
+                      <div style={{fontSize:'10px',color:'#5a7a9a',marginTop:'4px'}}>Y{y.year}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{textAlign:'center',marginTop:'12px',fontSize:'14px',fontWeight:800,color:'#f59e0b'}}>{years}-Year Total: {fmt(pricing.total)}</div>
+            </div>
+          )}
+
+          <div style={{textAlign:'center',padding:'20px 0',marginTop:'28px',borderTop:'1px solid rgba(245,158,11,0.1)',fontSize:'10px',color:'rgba(148,163,184,0.4)',lineHeight:'1.8'}}>
+            🛡 CUI — CONTROLLED UNCLASSIFIED INFORMATION<br/>
+            ⚠️ AI GENERATED — REQUIRES HUMAN REVIEW<br/>
+            MissionPulse v12.0 — Mission Meets Tech | CMMC 2.0 L2 Compliant
+          </div>
+        </div>
+      );
+    };
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
