@@ -1,43 +1,44 @@
-// FILE: lib/actions/opportunities.ts
-// SECURITY: NIST 800-53 Rev 5 CHECKED
-// Server Actions: CRUD for opportunities table
-// Exports verified against Sprint 1 imports:
-//   - updateOpportunityPhase (PipelineBoard.tsx)
-//   - getOpportunitiesByPhase (pipeline/page.tsx)
-//   - getPipelineStats (pipeline/page.tsx)
+// filepath: lib/actions/opportunities.ts
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { Opportunity, PipelineStats } from '@/lib/supabase/types'
-import { SHIPLEY_PHASES } from '@/lib/supabase/types'
+import type { OpportunityInsert, OpportunityUpdate } from '@/lib/types/opportunities'
 
-// ============================================================
-// READ
-// ============================================================
+interface ActionResult {
+  success: boolean
+  error?: string
+  id?: string
+}
 
 /**
- * Fetch all opportunities for the current user's company.
- * RLS handles data isolation.
+ * Fetch all opportunities the current user can see (RLS-enforced).
+ * Returns typed rows from the opportunities table.
  */
-export async function getOpportunities(): Promise<Opportunity[]> {
-  const supabase = createClient()
+export async function getOpportunities() {
+  const supabase = await createClient()
+
   const { data, error } = await supabase
     .from('opportunities')
-    .select('*')
+    .select(
+      'id, title, agency, ceiling, pwin, phase, status, set_aside, due_date, owner_id, priority, nickname, solicitation_number, created_at, updated_at'
+    )
     .order('updated_at', { ascending: false })
 
   if (error) {
-    console.error('[opportunities] getOpportunities:', error.message)
-    return []
+    console.error('[opportunities:list]', error.message)
+    return { data: null, error: error.message }
   }
-  return (data ?? []) as Opportunity[]
+
+  return { data: data ?? [], error: null }
 }
 
 /**
- * Fetch a single opportunity by ID.
+ * Fetch a single opportunity by ID (RLS-enforced).
  */
-export async function getOpportunity(id: string): Promise<Opportunity | null> {
-  const supabase = createClient()
+export async function getOpportunity(id: string) {
+  const supabase = await createClient()
+
   const { data, error } = await supabase
     .from('opportunities')
     .select('*')
@@ -45,164 +46,238 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
     .single()
 
   if (error) {
-    console.error('[opportunities] getOpportunity:', error.message)
-    return null
+    console.error('[opportunities:get]', error.message)
+    return { data: null, error: error.message }
   }
-  return data as Opportunity | null
+
+  return { data, error: null }
 }
 
 /**
- * Group opportunities by Shipley phase for pipeline board.
- * Returns a Record<phase_name, Opportunity[]>.
- */
-export async function getOpportunitiesByPhase(): Promise<
-  Record<string, Opportunity[]>
-> {
-  const opps = await getOpportunities()
-  const grouped: Record<string, Opportunity[]> = {}
-
-  // Initialize all phases with empty arrays
-  for (const phase of SHIPLEY_PHASES) {
-    grouped[phase] = []
-  }
-
-  for (const opp of opps) {
-    const phase = opp.phase ?? 'Gate 1'
-    if (!grouped[phase]) grouped[phase] = []
-    grouped[phase].push(opp)
-  }
-
-  return grouped
-}
-
-/**
- * Compute pipeline statistics.
- */
-export async function getPipelineStats(): Promise<PipelineStats> {
-  const opps = await getOpportunities()
-
-  const byPhase: Record<string, number> = {}
-  const byStatus: Record<string, number> = {}
-  let totalValue = 0
-  let pwinSum = 0
-  let pwinCount = 0
-
-  for (const opp of opps) {
-    const phase = opp.phase ?? 'Unknown'
-    byPhase[phase] = (byPhase[phase] ?? 0) + 1
-
-    const status = opp.status ?? 'Unknown'
-    byStatus[status] = (byStatus[status] ?? 0) + 1
-
-    if (opp.ceiling != null) totalValue += Number(opp.ceiling)
-    if (opp.pwin != null) {
-      pwinSum += opp.pwin
-      pwinCount++
-    }
-  }
-
-  return {
-    total: opps.length,
-    totalValue,
-    avgPwin: pwinCount > 0 ? Math.round(pwinSum / pwinCount) : 0,
-    byPhase,
-    byStatus,
-  }
-}
-
-// ============================================================
-// CREATE / UPDATE / DELETE
-// ============================================================
-
-/**
- * Create a new opportunity.
+ * Create a new opportunity. Validates required fields server-side.
+ * Writes to audit_logs after successful insert.
  */
 export async function createOpportunity(
-  fields: Partial<Opportunity> & { title: string }
-): Promise<{ data: Opportunity | null; error: string | null }> {
-  const supabase = createClient()
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const title = formData.get('title')
+  if (!title || typeof title !== 'string' || title.trim().length === 0) {
+    return { success: false, error: 'Title is required' }
+  }
+
+  // Parse ceiling — numeric field, allow empty
+  const ceilingRaw = formData.get('ceiling')
+  const ceiling =
+    ceilingRaw && String(ceilingRaw).trim()
+      ? Number(String(ceilingRaw).replace(/[,$]/g, ''))
+      : null
+
+  if (ceiling !== null && isNaN(ceiling)) {
+    return { success: false, error: 'Contract value must be a number' }
+  }
+
+  // Parse pwin — integer 0-100
+  const pwinRaw = formData.get('pwin')
+  const pwin = pwinRaw ? Number(pwinRaw) : 50
+
+  if (pwin < 0 || pwin > 100) {
+    return { success: false, error: 'Win probability must be 0–100' }
+  }
+
+  const insert: OpportunityInsert = {
+    title: title.trim(),
+    agency: formData.get('agency') as string | null,
+    sub_agency: formData.get('sub_agency') as string | null,
+    ceiling,
+    pwin: Math.round(pwin),
+    phase: (formData.get('phase') as string) || 'Gate 1',
+    status: (formData.get('status') as string) || 'Active',
+    priority: (formData.get('priority') as string) || 'Medium',
+    set_aside: formData.get('set_aside') as string | null,
+    due_date: formData.get('due_date') as string | null,
+    description: formData.get('description') as string | null,
+    nickname: formData.get('nickname') as string | null,
+    solicitation_number: formData.get('solicitation_number') as string | null,
+    contract_vehicle: formData.get('contract_vehicle') as string | null,
+    naics_code: formData.get('naics_code') as string | null,
+    period_of_performance: formData.get('period_of_performance') as string | null,
+    incumbent: formData.get('incumbent') as string | null,
+    contact_name: formData.get('contact_name') as string | null,
+    contact_email: formData.get('contact_email') as string | null,
+    place_of_performance: formData.get('place_of_performance') as string | null,
+    is_recompete: formData.get('is_recompete') === 'true',
+    owner_id: user.id,
+  }
 
   const { data, error } = await supabase
     .from('opportunities')
-    .insert({
-      ...fields,
-      owner_id: user?.id ?? null,
-      status: fields.status ?? 'Active',
-      phase: fields.phase ?? 'Gate 1',
-    })
-    .select()
+    .insert(insert)
+    .select('id')
     .single()
 
   if (error) {
-    console.error('[opportunities] createOpportunity:', error.message)
-    return { data: null, error: error.message }
+    console.error('[opportunities:create]', error.message)
+    return { success: false, error: error.message }
   }
-  return { data: data as Opportunity, error: null }
+
+  // Audit log
+  await supabase.from('audit_logs').insert({
+    action: 'CREATE',
+    entity_type: 'opportunity',
+    entity_id: data.id,
+    user_id: user.id,
+    details: { title: insert.title },
+  })
+
+  // Activity log (user-visible)
+  await supabase.from('activity_log').insert({
+    action: 'created_opportunity',
+    entity_type: 'opportunity',
+    entity_id: data.id,
+    user_id: user.id,
+  })
+
+  revalidatePath('/pipeline')
+  revalidatePath('/')
+  return { success: true, id: data.id }
 }
 
 /**
- * Update an existing opportunity.
+ * Update an existing opportunity by ID.
  */
 export async function updateOpportunity(
   id: string,
-  fields: Partial<Opportunity>
-): Promise<{ data: Opportunity | null; error: string | null }> {
-  const supabase = createClient()
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from('opportunities')
-    .update({ ...fields, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
 
-  if (error) {
-    console.error('[opportunities] updateOpportunity:', error.message)
-    return { data: null, error: error.message }
+  const title = formData.get('title')
+  if (!title || typeof title !== 'string' || title.trim().length === 0) {
+    return { success: false, error: 'Title is required' }
   }
-  return { data: data as Opportunity, error: null }
-}
 
-/**
- * Move an opportunity to a new Shipley phase.
- * Used by PipelineBoard drag-and-drop.
- */
-export async function updateOpportunityPhase(
-  id: string,
-  newPhase: string
-): Promise<{ data: Opportunity | null; error: string | null }> {
-  return updateOpportunity(id, { phase: newPhase } as Partial<Opportunity>)
-}
+  const ceilingRaw = formData.get('ceiling')
+  const ceiling =
+    ceilingRaw && String(ceilingRaw).trim()
+      ? Number(String(ceilingRaw).replace(/[,$]/g, ''))
+      : null
 
-/**
- * Delete an opportunity (soft or hard depending on RLS).
- */
-export async function deleteOpportunity(
-  id: string
-): Promise<{ success: boolean; error: string | null }> {
-  const supabase = createClient()
+  if (ceiling !== null && isNaN(ceiling)) {
+    return { success: false, error: 'Contract value must be a number' }
+  }
+
+  const pwinRaw = formData.get('pwin')
+  const pwin = pwinRaw ? Number(pwinRaw) : 50
+
+  const update: OpportunityUpdate = {
+    title: String(title).trim(),
+    agency: formData.get('agency') as string | null,
+    sub_agency: formData.get('sub_agency') as string | null,
+    ceiling,
+    pwin: Math.round(pwin),
+    phase: (formData.get('phase') as string) || 'Gate 1',
+    status: (formData.get('status') as string) || 'Active',
+    priority: (formData.get('priority') as string) || 'Medium',
+    set_aside: formData.get('set_aside') as string | null,
+    due_date: formData.get('due_date') as string | null,
+    description: formData.get('description') as string | null,
+    nickname: formData.get('nickname') as string | null,
+    solicitation_number: formData.get('solicitation_number') as string | null,
+    contract_vehicle: formData.get('contract_vehicle') as string | null,
+    naics_code: formData.get('naics_code') as string | null,
+    period_of_performance: formData.get('period_of_performance') as string | null,
+    incumbent: formData.get('incumbent') as string | null,
+    contact_name: formData.get('contact_name') as string | null,
+    contact_email: formData.get('contact_email') as string | null,
+    place_of_performance: formData.get('place_of_performance') as string | null,
+    is_recompete: formData.get('is_recompete') === 'true',
+    updated_at: new Date().toISOString(),
+  }
 
   const { error } = await supabase
     .from('opportunities')
-    .delete()
+    .update(update)
     .eq('id', id)
 
   if (error) {
-    console.error('[opportunities] deleteOpportunity:', error.message)
+    console.error('[opportunities:update]', error.message)
     return { success: false, error: error.message }
   }
-  return { success: true, error: null }
+
+  await supabase.from('audit_logs').insert({
+    action: 'UPDATE',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
+    details: { title: update.title },
+  })
+
+  await supabase.from('activity_log').insert({
+    action: 'updated_opportunity',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
+  })
+
+  revalidatePath('/pipeline')
+  revalidatePath(`/war-room/${id}`)
+  revalidatePath('/')
+  return { success: true, id }
 }
 
-// Re-exports for OpportunityForm.tsx
-export type { Opportunity } from '@/lib/supabase/types'
-export type OpportunityInput = Partial<Opportunity> & {
-  title: string
-  nickname?: string
-  go_no_go?: string
-  sam_url?: string
-  place_of_performance?: string
+/**
+ * Delete an opportunity by ID. Hard delete (no soft delete).
+ */
+export async function deleteOpportunity(id: string): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  // Fetch title for audit before deleting
+  const { data: existing } = await supabase
+    .from('opportunities')
+    .select('title')
+    .eq('id', id)
+    .single()
+
+  const { error } = await supabase.from('opportunities').delete().eq('id', id)
+
+  if (error) {
+    console.error('[opportunities:delete]', error.message)
+    return { success: false, error: error.message }
+  }
+
+  await supabase.from('audit_logs').insert({
+    action: 'DELETE',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
+    details: { title: existing?.title ?? 'Unknown' },
+  })
+
+  await supabase.from('activity_log').insert({
+    action: 'deleted_opportunity',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
+  })
+
+  revalidatePath('/pipeline')
+  revalidatePath('/')
+  return { success: true }
 }

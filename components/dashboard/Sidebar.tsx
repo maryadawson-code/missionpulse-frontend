@@ -1,209 +1,115 @@
-// FILE: components/dashboard/Sidebar.tsx
-// SECURITY: NIST 800-53 Rev 5 CHECKED — Invisible RBAC
-// Sprint 2 Fix: null-safe profile.role fallback, correct ModuleId types
-// T-4 Fix: Wired to new lib/rbac/config API (resolveRole + getModulePermission)
-'use client';
+// filepath: components/dashboard/Sidebar.tsx
+'use client'
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  GitBranch,
-  Swords,
-  Waves,
-  FileSearch,
-  Shield,
-  Skull,
-  DollarSign,
-  UserCheck,
-  Mic,
-  BookOpen,
-  Users,
-  Rocket,
-  Award,
-  ClipboardList,
-  Bot,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-} from 'lucide-react';
-import { resolveRole, getModulePermission, getRoleConfig } from '@/lib/rbac/config';
-import type { Profile } from '@/lib/supabase/types';
-import type { ModuleId } from '@/lib/rbac/config';
-
-// ============================================================
-// NAV ITEM DEFINITIONS
-// ============================================================
+import { usePathname } from 'next/navigation'
 
 interface NavItem {
-  id: ModuleId;
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  cuiBanner?: string;
+  label: string
+  href: string
+  icon: string // Simple emoji/symbol for now — swap for Lucide later
+  module: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { id: 'pipeline', label: 'Pipeline', href: '/pipeline', icon: GitBranch },
-  { id: 'strategy', label: 'War Room', href: '/war-room', icon: Swords },
-  { id: 'workflow_board', label: 'Swimlane', href: '/swimlane', icon: Waves },
-  { id: 'proposals', label: 'RFP Shredder', href: '/rfp-shredder', icon: FileSearch },
-  { id: 'compliance', label: 'Contract Scanner', href: '/contract-scanner', icon: ClipboardList },
-  { id: 'compliance', label: 'Iron Dome', href: '/compliance', icon: Shield },
-  { id: 'blackhat', label: 'Black Hat', href: '/blackhat', icon: Skull, cuiBanner: 'CUI // OPSEC' },
-  { id: 'pricing', label: 'Pricing', href: '/pricing', icon: DollarSign, cuiBanner: 'CUI // SP-PROPIN' },
-  { id: 'proposals', label: 'Review Queue', href: '/hitl', icon: UserCheck },
-  { id: 'proposals', label: 'Orals Prep', href: '/orals', icon: Mic },
-  { id: 'documents', label: 'Playbook', href: '/playbook', icon: BookOpen },
-  { id: 'analytics', label: 'Frenemy Intel', href: '/frenemy', icon: Users },
-  { id: 'pipeline', label: 'Launch', href: '/launch', icon: Rocket },
-  { id: 'pipeline', label: 'Post-Award', href: '/post-award', icon: Award },
-  { id: 'ai_chat', label: 'Agent Hub', href: '/agent-hub', icon: Bot },
-  { id: 'admin', label: 'Settings', href: '/settings', icon: Settings },
-];
-
-// ============================================================
-// SIDEBAR COMPONENT
-// ============================================================
+  { label: 'Dashboard', href: '/', icon: '◉', module: 'dashboard' },
+  { label: 'Pipeline', href: '/pipeline', icon: '⬡', module: 'pipeline' },
+  { label: 'Compliance', href: '/compliance', icon: '🛡', module: 'compliance' },
+  { label: 'Pricing', href: '/pricing', icon: '💲', module: 'pricing' },
+  { label: 'Black Hat', href: '/blackhat', icon: '🎯', module: 'blackhat' },
+  { label: 'Admin', href: '/admin', icon: '⚙', module: 'admin' },
+  { label: 'Settings', href: '/settings', icon: '⋯', module: 'settings' },
+]
 
 interface SidebarProps {
-  profile: Profile | null;
-  onSignOut?: () => void;
+  /** Modules this role is allowed to see (from RBAC config) */
+  allowedModules: string[]
+  isMobileOpen: boolean
+  onCloseMobile: () => void
 }
 
-export default function Sidebar({ profile, onSignOut }: SidebarProps) {
-  const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+export function Sidebar({
+  allowedModules,
+  isMobileOpen,
+  onCloseMobile,
+}: SidebarProps) {
+  const pathname = usePathname()
 
-  // Null-safe role access with 'Partner' fallback (lowest privilege)
-  const userRole = profile?.role ?? 'Partner';
-  const configRole = resolveRole(userRole);
-  const roleConfig = getRoleConfig(configRole);
+  // Invisible RBAC: only render nav items the user's role allows
+  const visibleItems = NAV_ITEMS.filter((item) =>
+    allowedModules.includes(item.module)
+  )
 
-  /**
-   * Invisible RBAC: If the role config says shouldRender=false,
-   * the nav item doesn't appear in the DOM at all.
-   */
-  const canSeeModule = (moduleId: ModuleId): boolean => {
-    const perm = getModulePermission(userRole, moduleId);
-    return perm.shouldRender && perm.canView;
-  };
-
-  const visibleItems = NAV_ITEMS.filter((item) => canSeeModule(item.id));
-
-  return (
-    <aside
-      className={`flex flex-col h-screen transition-all duration-300 ${
-        collapsed ? 'w-16' : 'w-64'
-      }`}
-      style={{ backgroundColor: '#0F172A', borderRight: '1px solid #1E293B' }}
-    >
-      {/* Brand Header */}
-      <div className="flex items-center justify-between px-4 py-4">
-        {!collapsed && (
-          <span
-            className="text-lg font-bold tracking-tight"
-            style={{ color: '#00E5FA' }}
-          >
+  const navContent = (
+    <div className="flex h-full flex-col">
+      {/* Logo */}
+      <div className="flex items-center gap-2 px-4 py-5 border-b border-border">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-cyan/10">
+          <span className="text-cyan font-bold text-sm">MP</span>
+        </div>
+        <div>
+          <p className="text-sm font-bold text-white leading-tight">
             MissionPulse
-          </span>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1 rounded hover:bg-white/5 transition-colors"
-          style={{ color: '#94A3B8' }}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <ChevronLeft className="w-4 h-4" />
-          )}
-        </button>
+          </p>
+          <p className="text-[10px] text-slate leading-tight">
+            Mission Meets Tech
+          </p>
+        </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+      {/* Nav items */}
+      <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
         {visibleItems.map((item) => {
           const isActive =
-            pathname === item.href ||
-            (item.href !== '/' && pathname.startsWith(item.href));
-          const Icon = item.icon;
+            item.href === '/'
+              ? pathname === '/'
+              : pathname.startsWith(item.href)
 
           return (
-            <Link
+            <a
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              onClick={onCloseMobile}
+              className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors ${
                 isActive
-                  ? 'text-white'
-                  : 'hover:bg-white/5'
+                  ? 'bg-cyan/10 text-white font-medium'
+                  : 'text-slate hover:text-white hover:bg-white/5'
               }`}
-              style={{
-                color: isActive ? '#00E5FA' : '#94A3B8',
-                backgroundColor: isActive ? 'rgba(0, 229, 250, 0.08)' : undefined,
-              }}
-              title={collapsed ? item.label : undefined}
             >
-              <Icon className="w-5 h-5 flex-shrink-0" />
-              {!collapsed && (
-                <span className="truncate">{item.label}</span>
-              )}
-              {!collapsed && item.cuiBanner && (
-                <span
-                  className="ml-auto text-[10px] px-1.5 py-0.5 rounded font-mono"
-                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#EF4444' }}
-                >
-                  CUI
-                </span>
-              )}
-            </Link>
-          );
+              <span className="w-5 text-center text-xs">{item.icon}</span>
+              {item.label}
+            </a>
+          )
         })}
       </nav>
 
-      {/* User Footer */}
-      {profile && (
-        <div
-          className="px-3 py-3 flex items-center gap-3"
-          style={{ borderTop: '1px solid #1E293B' }}
-        >
+      {/* Footer */}
+      <div className="border-t border-border px-4 py-3">
+        <p className="text-[10px] text-slate-600">
+          Mission. Technology. Transformation.
+        </p>
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex lg:w-56 lg:flex-col lg:fixed lg:inset-y-0 border-r border-border bg-navy">
+        {navContent}
+      </aside>
+
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <>
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-            style={{ backgroundColor: 'rgba(0, 229, 250, 0.15)', color: '#00E5FA' }}
-          >
-            {(profile.full_name ?? profile.email ?? '?')
-              .split(' ')
-              .map((n) => n[0])
-              .slice(0, 2)
-              .join('')
-              .toUpperCase()}
-          </div>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {profile.full_name ?? profile.email}
-              </p>
-              <p className="text-xs truncate" style={{ color: '#94A3B8' }}>
-                {roleConfig.displayName}
-              </p>
-            </div>
-          )}
-          {!collapsed && onSignOut && (
-            <button
-              onClick={onSignOut}
-              className="p-1.5 rounded hover:bg-white/5 transition-colors"
-              style={{ color: '#94A3B8' }}
-              aria-label="Sign out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+            className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+            onClick={onCloseMobile}
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 w-56 bg-navy border-r border-border lg:hidden">
+            {navContent}
+          </aside>
+        </>
       )}
-    </aside>
-  );
+    </>
+  )
 }
