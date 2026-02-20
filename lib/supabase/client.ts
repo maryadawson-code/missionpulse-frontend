@@ -4,7 +4,7 @@
  * © 2026 Mission Meets Tech
  */
 import { createBrowserClient } from '@supabase/ssr'
-import type { Database } from './types'
+import type { Database } from './database.types'
 
 export function createClient() {
   return createBrowserClient<Database>(

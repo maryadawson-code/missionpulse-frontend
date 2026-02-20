@@ -6,10 +6,14 @@
 'use server'
 
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import type { Database } from '@/lib/supabase/database.types'
 
-// ────────────────────────────────────────────────────────────
+// ── Supabase Json type alias ──
+type Json = Database['public']['Tables']['activity_log']['Row']['details']
+
+// ──────────────────────────────────────────────────────────────
 // TYPES
-// ────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────
 
 interface ActivityLogEntry {
   action: string
@@ -23,19 +27,22 @@ interface AuditResult {
   error?: string
 }
 
-// ────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────
 // ACTIVITY LOG (user-visible actions)
-// ────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────
 
 /**
  * Log a user-visible activity to the activity_log table.
  * Called after every successful mutation (create, update, archive).
  *
- * Schema: activity_log table (unverified — graceful fail if missing columns).
+ * Schema: activity_log has columns:
+ *   action, details (Json), id, ip_address, timestamp, user_name, user_role
+ *
+ * All metadata (user_id, resource_type, resource_id) is packed into `details`.
  */
 export async function logActivity(entry: ActivityLogEntry): Promise<AuditResult> {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -44,14 +51,29 @@ export async function logActivity(entry: ActivityLogEntry): Promise<AuditResult>
       return { success: false, error: 'No authenticated user' }
     }
 
-    const { error } = await (supabase as any).from('activity_log').insert({
+    // Fetch profile for user_name and user_role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, role')
+      .eq('id', user.id)
+      .single()
+
+    const detailsPayload: Record<string, unknown> = {
       user_id: user.id,
-      action: entry.action,
       resource_type: entry.resource_type,
-      resource_id: entry.resource_id ?? null,
-      details: entry.details ?? {},
-      created_at: new Date().toISOString(),
-    })
+      ...(entry.resource_id ? { resource_id: entry.resource_id } : {}),
+      ...(entry.details ?? {}),
+    }
+
+    const { error } = await supabase
+      .from('activity_log')
+      .insert({
+        action: entry.action,
+        details: detailsPayload as unknown as Json,
+        user_name: profile?.full_name ?? user.email ?? null,
+        user_role: profile?.role ?? null,
+        timestamp: new Date().toISOString(),
+      })
 
     if (error) {
       // Non-blocking: log failure but don't break the parent operation
@@ -66,14 +88,17 @@ export async function logActivity(entry: ActivityLogEntry): Promise<AuditResult>
   }
 }
 
-// ────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────
 // AUDIT LOG (immutable compliance records — AU-9)
-// ────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────
 
 /**
  * Log an immutable audit record.
  * The `audit_logs_immutable` trigger prevents UPDATE/DELETE on this table.
  * Use for: CUI access, gate decisions, role changes, data exports.
+ *
+ * NOTE: audit_logs schema may differ from activity_log.
+ * All event metadata is packed into `details` for forward compatibility.
  */
 export async function logAudit(entry: {
   event_type: string
@@ -82,7 +107,7 @@ export async function logAudit(entry: {
   details?: Record<string, unknown>
 }): Promise<AuditResult> {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -91,13 +116,29 @@ export async function logAudit(entry: {
       return { success: false, error: 'No authenticated user' }
     }
 
-    const { error } = await (supabase as any).from('audit_logs').insert({
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, role')
+      .eq('id', user.id)
+      .single()
+
+    const detailsPayload: Record<string, unknown> = {
       user_id: user.id,
+      user_name: profile?.full_name ?? user.email ?? null,
       event_type: entry.event_type,
       resource_type: entry.resource_type,
-      resource_id: entry.resource_id ?? null,
-      details: entry.details ?? {},
-    })
+      ...(entry.resource_id ? { resource_id: entry.resource_id } : {}),
+      ...(entry.details ?? {}),
+    }
+
+    const { error } = await supabase
+      .from('audit_logs')
+      .insert({
+        action: entry.event_type,
+        user_id: user.id,
+        metadata: detailsPayload as unknown as Json,
+        user_role: profile?.role ?? null,
+      })
 
     if (error) {
       console.error('[audit] audit_logs insert failed:', error.message)
@@ -111,18 +152,19 @@ export async function logAudit(entry: {
   }
 }
 
-// ────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────
 // RECENT ACTIVITY (read — for Dashboard feed)
-// ────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────
+
+type ActivityLogRow = Database['public']['Tables']['activity_log']['Row']
 
 export interface ActivityItem {
   id: string
-  user_id: string
   action: string
-  resource_type: string
-  resource_id: string | null
-  details: Record<string, unknown>
-  created_at: string
+  user_name: string | null
+  user_role: string | null
+  details: Json
+  timestamp: string | null
 }
 
 /**
@@ -134,12 +176,12 @@ export async function getRecentActivity(limit = 10): Promise<{
   error?: string
 }> {
   try {
-    const supabase = await createServerClient()
+    const supabase = createServerClient()
 
     const { data, error } = await supabase
       .from('activity_log')
-      .select('*')
-      .order('created_at', { ascending: false })
+      .select('id, action, user_name, user_role, details, timestamp')
+      .order('timestamp', { ascending: false })
       .limit(limit)
 
     if (error) {
@@ -147,7 +189,16 @@ export async function getRecentActivity(limit = 10): Promise<{
       return { data: [], error: error.message }
     }
 
-    return { data: (data as ActivityItem[]) ?? [] }
+    const items: ActivityItem[] = (data ?? []).map((row: Pick<ActivityLogRow, 'id' | 'action' | 'user_name' | 'user_role' | 'details' | 'timestamp'>) => ({
+      id: row.id,
+      action: row.action,
+      user_name: row.user_name,
+      user_role: row.user_role,
+      details: row.details,
+      timestamp: row.timestamp,
+    }))
+
+    return { data: items }
   } catch (err) {
     console.error('[audit] unexpected error:', err)
     return { data: [], error: 'Failed to load activity' }

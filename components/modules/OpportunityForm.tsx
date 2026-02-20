@@ -41,7 +41,6 @@ export function OpportunityForm({
     agency: opportunity?.agency ?? '',
     sub_agency: opportunity?.sub_agency ?? '',
     contract_vehicle: opportunity?.contract_vehicle ?? '',
-    naics_code: opportunity?.naics_code ?? '',
     set_aside: opportunity?.set_aside ?? '',
     ceiling: opportunity?.ceiling ?? null,
     due_date: opportunity?.due_date?.slice(0, 10) ?? '',
@@ -185,12 +184,9 @@ export function OpportunityForm({
             </Field>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <Field label="Contract Vehicle">
               <input type="text" value={form.contract_vehicle ?? ''} onChange={(e) => handleChange('contract_vehicle', e.target.value)} placeholder="IDIQ, BPA, GSA..." className="form-input" />
-            </Field>
-            <Field label="NAICS Code">
-              <input type="text" value={form.naics_code ?? ''} onChange={(e) => handleChange('naics_code', e.target.value)} placeholder="541512" className="form-input" />
             </Field>
             <Field label="Set-Aside" tooltip="Small business designation">
               <input type="text" value={form.set_aside ?? ''} onChange={(e) => handleChange('set_aside', e.target.value)} placeholder="SDVOSB, 8(a)..." className="form-input" />

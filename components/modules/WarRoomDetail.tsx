@@ -62,9 +62,9 @@ export default function WarRoomDetail({ opportunity }: Props) {
                 {opp.set_aside}
               </span>
             )}
-            {opp.contract_type && (
+            {opp.contract_vehicle && (
               <span className="rounded bg-purple-500/10 px-2 py-1 text-xs text-purple-400">
-                {opp.contract_type}
+                {opp.contract_vehicle}
               </span>
             )}
             <span className="rounded bg-white/5 px-2 py-1 text-xs text-slate-400">
@@ -127,7 +127,7 @@ export default function WarRoomDetail({ opportunity }: Props) {
           valueClass={pwinColor}
         />
         <MetricCard label="Due Date" value={formatDate(opp.due_date)} />
-        <MetricCard label="NAICS" value={opp.naics_code || '—'} />
+        <MetricCard label="Set-Aside" value={opp.set_aside || '—'} />
       </div>
 
       {/* Two-column details */}

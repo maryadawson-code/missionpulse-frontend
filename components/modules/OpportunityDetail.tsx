@@ -1,6 +1,6 @@
 // FILE: components/modules/OpportunityDetail.tsx
 // SECURITY: NIST 800-53 Rev 5 CHECKED
-// Sprint 2 Fix: Removed unused getLabel, COLUMN_TOOLTIPS imports
+// Sprint 2 Fix: Column names aligned to live database.types.ts
 'use client';
 
 import { useState } from 'react';
@@ -240,26 +240,18 @@ export default function OpportunityDetail({
             label={COLUMN_LABELS.set_aside ?? 'Set-Aside'}
             value={opp.set_aside}
           />
-          <DetailRow
-            label="Contract Type"
-            value={opp.contract_type}
-          />
-          <DetailRow
-            label="NAICS"
-            value={opp.naics_code}
-          />
-          {opp.source_url && (
+          {opp.sam_url && (
             <DetailRow
               label="Source"
               value={
                 <a
-                  href={opp.source_url}
+                  href={opp.sam_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 hover:underline"
                   style={{ color: '#00E5FA' }}
                 >
-                  {opp.source ?? 'View source'} <ExternalLink className="w-3 h-3" />
+                  View source <ExternalLink className="w-3 h-3" />
                 </a>
               }
               icon={ExternalLink}

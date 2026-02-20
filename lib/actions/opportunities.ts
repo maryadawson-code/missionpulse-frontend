@@ -5,11 +5,11 @@
 //   - updateOpportunityPhase (PipelineBoard.tsx)
 //   - getOpportunitiesByPhase (pipeline/page.tsx)
 //   - getPipelineStats (pipeline/page.tsx)
-'use server';
+'use server'
 
-import { createClient } from '@/lib/supabase/server';
-import type { Opportunity, PipelineStats } from '@/lib/supabase/types';
-import { SHIPLEY_PHASES } from '@/lib/supabase/types';
+import { createClient } from '@/lib/supabase/server'
+import type { Opportunity, PipelineStats } from '@/lib/supabase/types'
+import { SHIPLEY_PHASES } from '@/lib/supabase/types'
 
 // ============================================================
 // READ
@@ -20,35 +20,35 @@ import { SHIPLEY_PHASES } from '@/lib/supabase/types';
  * RLS handles data isolation.
  */
 export async function getOpportunities(): Promise<Opportunity[]> {
-  const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const supabase = createClient()
+  const { data, error } = await supabase
     .from('opportunities')
     .select('*')
-    .order('updated_at', { ascending: false });
+    .order('updated_at', { ascending: false })
 
   if (error) {
-    console.error('[opportunities] getOpportunities:', error.message);
-    return [];
+    console.error('[opportunities] getOpportunities:', error.message)
+    return []
   }
-  return (data ?? []) as Opportunity[];
+  return (data ?? []) as Opportunity[]
 }
 
 /**
  * Fetch a single opportunity by ID.
  */
 export async function getOpportunity(id: string): Promise<Opportunity | null> {
-  const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const supabase = createClient()
+  const { data, error } = await supabase
     .from('opportunities')
     .select('*')
     .eq('id', id)
-    .single();
+    .single()
 
   if (error) {
-    console.error('[opportunities] getOpportunity:', error.message);
-    return null;
+    console.error('[opportunities] getOpportunity:', error.message)
+    return null
   }
-  return data as Opportunity | null;
+  return data as Opportunity | null
 }
 
 /**
@@ -58,46 +58,46 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
 export async function getOpportunitiesByPhase(): Promise<
   Record<string, Opportunity[]>
 > {
-  const opps = await getOpportunities();
-  const grouped: Record<string, Opportunity[]> = {};
+  const opps = await getOpportunities()
+  const grouped: Record<string, Opportunity[]> = {}
 
   // Initialize all phases with empty arrays
   for (const phase of SHIPLEY_PHASES) {
-    grouped[phase] = [];
+    grouped[phase] = []
   }
 
   for (const opp of opps) {
-    const phase = opp.phase ?? 'Gate 1';
-    if (!grouped[phase]) grouped[phase] = [];
-    grouped[phase].push(opp);
+    const phase = opp.phase ?? 'Gate 1'
+    if (!grouped[phase]) grouped[phase] = []
+    grouped[phase].push(opp)
   }
 
-  return grouped;
+  return grouped
 }
 
 /**
  * Compute pipeline statistics.
  */
 export async function getPipelineStats(): Promise<PipelineStats> {
-  const opps = await getOpportunities();
+  const opps = await getOpportunities()
 
-  const byPhase: Record<string, number> = {};
-  const byStatus: Record<string, number> = {};
-  let totalValue = 0;
-  let pwinSum = 0;
-  let pwinCount = 0;
+  const byPhase: Record<string, number> = {}
+  const byStatus: Record<string, number> = {}
+  let totalValue = 0
+  let pwinSum = 0
+  let pwinCount = 0
 
   for (const opp of opps) {
-    const phase = opp.phase ?? 'Unknown';
-    byPhase[phase] = (byPhase[phase] ?? 0) + 1;
+    const phase = opp.phase ?? 'Unknown'
+    byPhase[phase] = (byPhase[phase] ?? 0) + 1
 
-    const status = opp.status ?? 'Unknown';
-    byStatus[status] = (byStatus[status] ?? 0) + 1;
+    const status = opp.status ?? 'Unknown'
+    byStatus[status] = (byStatus[status] ?? 0) + 1
 
-    if (opp.ceiling != null) totalValue += Number(opp.ceiling);
+    if (opp.ceiling != null) totalValue += Number(opp.ceiling)
     if (opp.pwin != null) {
-      pwinSum += opp.pwin;
-      pwinCount++;
+      pwinSum += opp.pwin
+      pwinCount++
     }
   }
 
@@ -107,7 +107,7 @@ export async function getPipelineStats(): Promise<PipelineStats> {
     avgPwin: pwinCount > 0 ? Math.round(pwinSum / pwinCount) : 0,
     byPhase,
     byStatus,
-  };
+  }
 }
 
 // ============================================================
@@ -120,12 +120,12 @@ export async function getPipelineStats(): Promise<PipelineStats> {
 export async function createOpportunity(
   fields: Partial<Opportunity> & { title: string }
 ): Promise<{ data: Opportunity | null; error: string | null }> {
-  const supabase = await createClient();
+  const supabase = createClient()
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser()
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('opportunities')
     .insert({
       ...fields,
@@ -134,13 +134,13 @@ export async function createOpportunity(
       phase: fields.phase ?? 'Gate 1',
     })
     .select()
-    .single();
+    .single()
 
   if (error) {
-    console.error('[opportunities] createOpportunity:', error.message);
-    return { data: null, error: error.message };
+    console.error('[opportunities] createOpportunity:', error.message)
+    return { data: null, error: error.message }
   }
-  return { data: data as Opportunity, error: null };
+  return { data: data as Opportunity, error: null }
 }
 
 /**
@@ -150,20 +150,20 @@ export async function updateOpportunity(
   id: string,
   fields: Partial<Opportunity>
 ): Promise<{ data: Opportunity | null; error: string | null }> {
-  const supabase = await createClient();
+  const supabase = createClient()
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('opportunities')
     .update({ ...fields, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
-    .single();
+    .single()
 
   if (error) {
-    console.error('[opportunities] updateOpportunity:', error.message);
-    return { data: null, error: error.message };
+    console.error('[opportunities] updateOpportunity:', error.message)
+    return { data: null, error: error.message }
   }
-  return { data: data as Opportunity, error: null };
+  return { data: data as Opportunity, error: null }
 }
 
 /**
@@ -174,7 +174,7 @@ export async function updateOpportunityPhase(
   id: string,
   newPhase: string
 ): Promise<{ data: Opportunity | null; error: string | null }> {
-  return updateOpportunity(id, { phase: newPhase } as Partial<Opportunity>);
+  return updateOpportunity(id, { phase: newPhase } as Partial<Opportunity>)
 }
 
 /**
@@ -183,20 +183,26 @@ export async function updateOpportunityPhase(
 export async function deleteOpportunity(
   id: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const supabase = await createClient();
+  const supabase = createClient()
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('opportunities')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
 
   if (error) {
-    console.error('[opportunities] deleteOpportunity:', error.message);
-    return { success: false, error: error.message };
+    console.error('[opportunities] deleteOpportunity:', error.message)
+    return { success: false, error: error.message }
   }
-  return { success: true, error: null };
+  return { success: true, error: null }
 }
 
 // Re-exports for OpportunityForm.tsx
-export type { Opportunity } from '@/lib/supabase/types';
-export type OpportunityInput = Partial<Opportunity> & { title: string; nickname?: string; go_no_go?: string; sam_url?: string; place_of_performance?: string; };
+export type { Opportunity } from '@/lib/supabase/types'
+export type OpportunityInput = Partial<Opportunity> & {
+  title: string
+  nickname?: string
+  go_no_go?: string
+  sam_url?: string
+  place_of_performance?: string
+}
