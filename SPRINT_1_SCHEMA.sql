@@ -1,459 +1,219 @@
 -- =============================================================================
--- MISSIONPULSE SPRINT 1 SCHEMA — Reconstructed Reference
+-- MISSIONPULSE SPRINT 1 SCHEMA — Verified Reference (DO NOT RUN IN SUPABASE)
 -- =============================================================================
 -- Generated: 2026-02-19
--- Source: GROUND_TRUTH_v2.md, Database_Schema_Documentation.docx,
---         supabase-client.js field mappings, deployed RLS helper functions
+-- Verified: profiles (13 cols) + opportunities (46 cols) from live info_schema
 -- Instance: djuviwarqdvlbgcfuupa.supabase.co
 --
--- ⚠ WARNING: This is a RECONSTRUCTION, not a raw pg_dump.
--- Some column names may differ from live schema. Before building Next.js
--- queries against any table, run the verification query in Section 9.
---
--- Tables: profiles, companies, opportunities, roles, pipeline_stages,
---         activity_log, audit_logs, pricing_items, labor_categories,
---         competitors
+-- ⚠ THIS IS A REFERENCE DOCUMENT, NOT A MIGRATION.
+-- These tables and policies ALREADY EXIST in Supabase.
+-- Running this will error with "already exists" messages.
+-- Use this file to understand the schema when building Next.js queries.
 -- =============================================================================
 
 
 -- =========================================================================
--- SECTION 1: RBAC HELPER FUNCTIONS (Deployed & Verified)
+-- SECTION 1: RBAC HELPER FUNCTIONS (Already Deployed)
 -- =========================================================================
--- These are called by RLS policies. They are the auth enforcement layer.
+-- Included for reference. These are called by RLS policies.
 
-CREATE OR REPLACE FUNCTION public.is_authenticated()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN auth.uid() IS NOT NULL;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE id = auth.uid()
-        AND role IN ('executive', 'operations', 'admin', 'CEO', 'COO')
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.is_internal_user()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE id = auth.uid()
-        AND role IN (
-            'executive', 'operations', 'capture_manager', 'volume_lead',
-            'author', 'admin', 'CEO', 'COO', 'CAP', 'PM', 'SA',
-            'FIN', 'CON', 'DEL', 'QA'
-        )
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.can_access_sensitive()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE id = auth.uid()
-        AND role IN ('executive', 'operations', 'admin', 'CEO', 'COO', 'FIN')
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.get_user_role()
-RETURNS TEXT AS $$
-DECLARE
-    user_role TEXT;
-BEGIN
-    SELECT role INTO user_role
-    FROM public.profiles
-    WHERE id = auth.uid();
-    RETURN COALESCE(user_role, 'viewer');
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.get_my_role()
-RETURNS TEXT AS $$
-DECLARE
-    user_role TEXT;
-BEGIN
-    SELECT role INTO user_role
-    FROM public.profiles
-    WHERE id = auth.uid();
-    RETURN COALESCE(user_role, 'viewer');
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.get_my_company_id()
-RETURNS UUID AS $$
-DECLARE
-    cid UUID;
-BEGIN
-    SELECT company_id INTO cid
-    FROM public.profiles
-    WHERE id = auth.uid();
-    RETURN cid;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- is_authenticated() → auth.uid() IS NOT NULL
+-- is_admin()         → profiles.role IN ('executive','operations','admin','CEO','COO')
+-- is_internal_user() → profiles.role IN (15 internal roles)
+-- can_access_sensitive() → profiles.role IN ('executive','operations','admin','CEO','COO','FIN')
+-- get_user_role()    → profiles.role for auth.uid(), defaults to 'viewer'
+-- get_my_role()      → same as above
+-- get_my_company_id() → profiles.company_id for auth.uid()
 
 
 -- =========================================================================
--- SECTION 2: PROFILES (Auth Pivot — 3 rows)
+-- SECTION 2: PROFILES (Auth Pivot — 13 columns, 3 rows)
 -- =========================================================================
--- Every RLS function queries this table. handle_new_user trigger inserts here.
+-- ✅ VERIFIED from live information_schema export 2/19/2026
+-- Every RLS function queries this table.
+-- handle_new_user trigger inserts here on auth.users INSERT.
 
-CREATE TABLE IF NOT EXISTS public.profiles (
-    id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    email           TEXT UNIQUE NOT NULL,
-    full_name       TEXT,
-    role            TEXT NOT NULL DEFAULT 'CEO',
-    company_id      UUID REFERENCES public.companies(id),
-    avatar_url      TEXT,
-    mfa_enabled     BOOLEAN DEFAULT false,
-    last_login      TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
+-- CREATE TABLE public.profiles (
+--     id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+--     email           VARCHAR NOT NULL UNIQUE,
+--     full_name       VARCHAR,
+--     role            VARCHAR DEFAULT 'Partner',
+--                     -- ⚠ Column default is 'Partner'
+--                     -- handle_new_user trigger OVERRIDES to 'CEO'
+--                     -- Change trigger to 'viewer' before multi-user
+--     company         VARCHAR,             -- Display name (text)
+--     phone           VARCHAR,
+--     avatar_url      TEXT,
+--     preferences     JSONB DEFAULT '{}',  -- User preferences
+--     created_at      TIMESTAMPTZ DEFAULT now(),
+--     updated_at      TIMESTAMPTZ DEFAULT now(),
+--     company_id      UUID,                -- FK → companies(id), used by RLS
+--     status          TEXT DEFAULT 'active', -- Account status
+--     last_login      TIMESTAMPTZ
+-- );
 
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY profiles_select_own ON public.profiles
-    FOR SELECT USING (auth.uid() = id);
-CREATE POLICY profiles_select_admin ON public.profiles
-    FOR SELECT USING (is_admin());
-CREATE POLICY profiles_update_own ON public.profiles
-    FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY profiles_update_admin ON public.profiles
-    FOR UPDATE USING (is_admin());
-
--- Trigger: auto-create profile on signup
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO public.profiles (id, email, full_name, role)
-    VALUES (
-        NEW.id,
-        NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
-        'CEO'  -- ⚠ Change to 'viewer' before multi-user launch
-    );
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger binding (already deployed)
--- CREATE TRIGGER on_auth_user_created
---     AFTER INSERT ON auth.users
---     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+-- NOTES:
+-- ❌ NO mfa_enabled column exists (GROUND_TRUTH was wrong)
+-- ✅ company_id (uuid FK) AND company (varchar display) both exist
+-- ✅ preferences (jsonb) exists for user settings
 
 
 -- =========================================================================
--- SECTION 3: COMPANIES (Tenant Root — 1 row)
+-- SECTION 3: OPPORTUNITIES (Pipeline — 46 columns, 5 rows)
 -- =========================================================================
+-- ✅ VERIFIED from live information_schema export 2/19/2026
+--
+-- DUPLICATE COLUMNS (use the preferred one in Next.js):
+--   pwin (preferred) vs win_probability (ignore)
+--   phase (preferred, default 'Gate 1') vs shipley_phase (ignore) vs pipeline_stage (ignore)
+--   custom_properties (user-facing) vs metadata (system)
 
-CREATE TABLE IF NOT EXISTS public.companies (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name            TEXT NOT NULL,
-    domain          TEXT,
-    logo_url        TEXT,
-    solo_mode       BOOLEAN DEFAULT false,
-    trial_ends_at   TIMESTAMPTZ,
-    subscription_tier TEXT DEFAULT 'trial',
-    settings        JSONB DEFAULT '{}',
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY companies_select ON public.companies
-    FOR SELECT USING (is_authenticated());
-CREATE POLICY companies_update ON public.companies
-    FOR UPDATE USING (is_admin());
-
-
--- =========================================================================
--- SECTION 4: OPPORTUNITIES (Pipeline — 5 rows)
--- =========================================================================
--- ⚠ COLUMN NAME UNCERTAINTY:
--- GROUND_TRUTH says: title, value, pwin, status
--- supabase-client.js maps: name, contract_value, win_probability, shipley_phase
--- RUN VERIFICATION QUERY (Section 9) BEFORE BUILDING QUERIES.
-
-CREATE TABLE IF NOT EXISTS public.opportunities (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id          UUID REFERENCES public.companies(id),
-    title               TEXT NOT NULL,               -- May be 'name' in live schema
-    nickname            TEXT,
-    description         TEXT,
-    solicitation_number TEXT,
-    agency              TEXT,
-    sub_agency          TEXT,
-    naics_code          TEXT,
-    set_aside           TEXT,
-    contract_type       TEXT,
-    contract_vehicle    TEXT,
-    value               NUMERIC,                     -- May be 'contract_value'
-    pwin                INTEGER CHECK (pwin >= 0 AND pwin <= 100),  -- May be 'win_probability'
-    status              TEXT NOT NULL DEFAULT 'Identification',      -- May be 'shipley_phase'
-    stage_id            UUID,                        -- May reference pipeline_stages
-    submission_date     DATE,                        -- Exists per schema doc
-    award_date          DATE,
-    pop_start           DATE,
-    pop_end             DATE,
-    created_by          UUID REFERENCES public.profiles(id),
-    capture_manager_id  UUID REFERENCES public.profiles(id),
-    source              TEXT,
-    tags                TEXT[],
-    metadata            JSONB DEFAULT '{}',
-    created_at          TIMESTAMPTZ DEFAULT now(),
-    updated_at          TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.opportunities ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY opportunities_select_internal ON public.opportunities
-    FOR SELECT USING (is_internal_user());
-CREATE POLICY opportunities_select_partner ON public.opportunities
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.partner_access pa
-            WHERE pa.opportunity_id = opportunities.id
-            AND pa.partner_user_id = auth.uid()
-            AND pa.is_active = true
-        )
-    );
-CREATE POLICY opportunities_insert ON public.opportunities
-    FOR INSERT WITH CHECK (is_internal_user());
-CREATE POLICY opportunities_update ON public.opportunities
-    FOR UPDATE USING (is_internal_user());
-
-
--- =========================================================================
--- SECTION 5: ROLES (Reference — 11 rows)
--- =========================================================================
-
-CREATE TABLE IF NOT EXISTS public.roles (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name            TEXT UNIQUE NOT NULL,
-    display_name    TEXT NOT NULL,
-    description     TEXT,
-    shipley_function TEXT,
-    type            TEXT DEFAULT 'internal',
-    ui_complexity   TEXT DEFAULT 'standard',
-    is_active       BOOLEAN DEFAULT true,
-    created_at      TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY roles_select ON public.roles
-    FOR SELECT USING (is_authenticated());
+-- CREATE TABLE public.opportunities (
+--     -- Core identification
+--     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     title                   VARCHAR NOT NULL,          -- ⚠ Phase 1 JS used 'name'
+--     nickname                VARCHAR,
+--     description             TEXT,
+--
+--     -- Agency & contract info
+--     agency                  VARCHAR,
+--     sub_agency              VARCHAR,
+--     contract_vehicle        VARCHAR,
+--     naics_code              VARCHAR,
+--     set_aside               VARCHAR,                   -- SDVOSB, 8(a), etc.
+--     ceiling                 NUMERIC,                   -- ⚠ Phase 1 JS used 'contract_value'
+--     period_of_performance   VARCHAR,
+--
+--     -- Dates
+--     due_date                TIMESTAMPTZ,               -- Proposal due date
+--     submission_date         TIMESTAMPTZ,
+--     award_date              TIMESTAMPTZ,
+--     close_date              DATE,                      -- Expected close
+--     pop_start               TIMESTAMPTZ,
+--     pop_end                 TIMESTAMPTZ,
+--
+--     -- Pipeline tracking (⚠ 4 overlapping fields)
+--     phase                   VARCHAR DEFAULT 'Gate 1',  -- ✅ USE THIS: Shipley gates
+--     status                  VARCHAR DEFAULT 'Active',  -- ✅ USE THIS: lifecycle
+--     priority                VARCHAR DEFAULT 'Medium',
+--     pwin                    INTEGER DEFAULT 50,        -- ✅ USE THIS: win probability
+--     go_no_go                VARCHAR,
+--     pipeline_stage          TEXT DEFAULT 'qualification', -- ⚠ IGNORE: duplicate of phase
+--     shipley_phase           TEXT,                      -- ⚠ IGNORE: duplicate of phase
+--     win_probability         INTEGER DEFAULT 50,        -- ⚠ IGNORE: duplicate of pwin
+--
+--     -- Competitive intelligence
+--     incumbent               VARCHAR,
+--     is_recompete            BOOLEAN DEFAULT false,
+--     bd_investment           NUMERIC DEFAULT 0,         -- B&P dollars spent
+--
+--     -- Source tracking
+--     solicitation_number     VARCHAR,
+--     sam_url                 TEXT,
+--     sam_opportunity_id      TEXT,
+--     govwin_id               TEXT,
+--     deal_source             TEXT DEFAULT 'manual',     -- manual, hubspot, sam_gov
+--
+--     -- Contact
+--     contact_name            TEXT,                      -- ⚠ Phase 1 JS used 'primaryContact'
+--     contact_email           TEXT,
+--     place_of_performance    TEXT,
+--     notes                   TEXT,
+--
+--     -- Relationships
+--     owner_id                UUID,                      -- FK → profiles(id)
+--                                                        -- ⚠ Phase 1 JS used 'created_by'
+--     company_id              UUID,                      -- FK → companies(id)
+--
+--     -- HubSpot CRM integration
+--     hubspot_deal_id         TEXT,
+--     hubspot_synced_at       TIMESTAMPTZ,
+--
+--     -- Extensibility
+--     tags                    TEXT[],                    -- Array
+--     custom_properties       JSONB DEFAULT '{}',        -- User-facing metadata
+--     metadata                JSONB DEFAULT '{}',        -- System metadata
+--
+--     -- Timestamps
+--     created_at              TIMESTAMPTZ DEFAULT now(),
+--     updated_at              TIMESTAMPTZ DEFAULT now()
+-- );
 
 
 -- =========================================================================
--- SECTION 6: PIPELINE_STAGES (Shipley Config — 10 rows)
+-- SECTION 4: NEXT.JS QUERY QUICK REFERENCE
 -- =========================================================================
+-- Copy these patterns into your Server Components / Server Actions.
 
-CREATE TABLE IF NOT EXISTS public.pipeline_stages (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name            TEXT NOT NULL,
-    display_name    TEXT NOT NULL,
-    stage_order     INTEGER NOT NULL,
-    description     TEXT,
-    color           TEXT,
-    icon            TEXT,
-    is_active       BOOLEAN DEFAULT true,
-    created_at      TIMESTAMPTZ DEFAULT now()
-);
+-- Pipeline page (list all opportunities):
+--   supabase.from('opportunities')
+--     .select('id, title, nickname, agency, ceiling, phase, status, priority, pwin, due_date, owner_id, set_aside, is_recompete')
+--     .order('updated_at', { ascending: false })
 
-ALTER TABLE public.pipeline_stages ENABLE ROW LEVEL SECURITY;
+-- Opportunity detail page:
+--   supabase.from('opportunities')
+--     .select('*')
+--     .eq('id', opportunityId)
+--     .single()
 
-CREATE POLICY pipeline_stages_select ON public.pipeline_stages
-    FOR SELECT USING (is_authenticated());
+-- Dashboard stats:
+--   supabase.from('opportunities')
+--     .select('id, ceiling, pwin, phase, status')
 
+-- User profile (current user):
+--   supabase.from('profiles')
+--     .select('id, email, full_name, role, company, company_id, phone, avatar_url, preferences, status')
+--     .eq('id', userId)
+--     .single()
 
--- =========================================================================
--- SECTION 7: ACTIVITY_LOG (User Events — 8 rows)
--- =========================================================================
-
-CREATE TABLE IF NOT EXISTS public.activity_log (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES public.profiles(id),
-    action          TEXT NOT NULL,
-    entity_type     TEXT,
-    entity_id       UUID,
-    description     TEXT,
-    metadata        JSONB DEFAULT '{}',
-    ip_address      INET,
-    created_at      TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.activity_log ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY activity_log_select ON public.activity_log
-    FOR SELECT USING (is_internal_user());
-CREATE POLICY activity_log_insert ON public.activity_log
-    FOR INSERT WITH CHECK (is_authenticated());
+-- Display name mapping for Next.js UI:
+--   pwin         → "Win Probability"
+--   ceiling      → "Contract Value" or "Ceiling"
+--   phase        → "Shipley Phase" or "Gate"
+--   set_aside    → "Set-Aside"
+--   bd_investment → "B&P Investment"
+--   is_recompete → "Recompete"
+--   pop_start/pop_end → "Period of Performance"
 
 
 -- =========================================================================
--- SECTION 8: AUDIT_LOGS (Immutable — NIST AU-9 — 2 rows)
+-- SECTION 5: VERIFICATION QUERIES (Run in Supabase SQL Editor)
 -- =========================================================================
+-- Use these to verify any table before building queries against it.
 
-CREATE TABLE IF NOT EXISTS public.audit_logs (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES public.profiles(id),
-    action          TEXT NOT NULL,
-    table_name      TEXT NOT NULL,
-    record_id       UUID,
-    old_values      JSONB,
-    new_values      JSONB,
-    ip_address      INET,
-    user_agent      TEXT,
-    created_at      TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY audit_logs_select ON public.audit_logs
-    FOR SELECT USING (is_admin());
-CREATE POLICY audit_logs_insert ON public.audit_logs
-    FOR INSERT WITH CHECK (is_authenticated());
-
--- Immutability trigger (NIST AU-9)
-CREATE OR REPLACE FUNCTION public.audit_logs_immutable()
-RETURNS TRIGGER AS $$
-BEGIN
-    RAISE EXCEPTION 'Audit logs are immutable. UPDATE/DELETE prohibited (NIST AU-9).';
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
--- Trigger binding (already deployed)
--- CREATE TRIGGER enforce_audit_immutability
---     BEFORE UPDATE OR DELETE ON public.audit_logs
---     FOR EACH ROW EXECUTE FUNCTION public.audit_logs_immutable();
-
-
--- =========================================================================
--- SECTION 8b: CUI TABLES (Restricted Access)
--- =========================================================================
-
--- PRICING_ITEMS (CUI // SP-PROPIN — 0 rows)
-CREATE TABLE IF NOT EXISTS public.pricing_items (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    opportunity_id  UUID REFERENCES public.opportunities(id),
-    category        TEXT NOT NULL,
-    description     TEXT,
-    quantity        NUMERIC,
-    unit_price      NUMERIC,
-    total_price     NUMERIC,
-    labor_cat_id    UUID REFERENCES public.labor_categories(id),
-    period          TEXT,
-    notes           TEXT,
-    created_by      UUID REFERENCES public.profiles(id),
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.pricing_items ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY pricing_items_select ON public.pricing_items
-    FOR SELECT USING (can_access_sensitive());
-CREATE POLICY pricing_items_insert ON public.pricing_items
-    FOR INSERT WITH CHECK (can_access_sensitive());
-
--- LABOR_CATEGORIES (CUI // SP-PROPIN — 35 rows)
-CREATE TABLE IF NOT EXISTS public.labor_categories (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id      UUID REFERENCES public.companies(id),
-    name            TEXT NOT NULL,
-    abbreviation    TEXT,
-    description     TEXT,
-    hourly_rate     NUMERIC,
-    annual_rate     NUMERIC,
-    gsa_schedule    TEXT,
-    education_min   TEXT,
-    experience_min  INTEGER,
-    is_active       BOOLEAN DEFAULT true,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.labor_categories ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY labor_categories_select ON public.labor_categories
-    FOR SELECT USING (can_access_sensitive());
-
--- COMPETITORS (CUI // OPSEC — 3 rows)
-CREATE TABLE IF NOT EXISTS public.competitors (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id      UUID REFERENCES public.companies(id),
-    name            TEXT NOT NULL,
-    duns_number     TEXT,
-    cage_code       TEXT,
-    strengths       TEXT,
-    weaknesses      TEXT,
-    threat_level    TEXT DEFAULT 'medium',
-    notes           TEXT,
-    metadata        JSONB DEFAULT '{}',
-    created_by      UUID REFERENCES public.profiles(id),
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.competitors ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY competitors_select ON public.competitors
-    FOR SELECT USING (
-        get_user_role() IN ('CEO', 'COO', 'CAP', 'executive', 'operations')
-    );
-
-
--- =========================================================================
--- SECTION 9: VERIFICATION QUERIES
--- =========================================================================
--- Run these in Supabase SQL Editor BEFORE building Next.js queries.
-
--- 9a. Verify exact column names for opportunities
+-- 5a. Verify companies table (NOT YET VERIFIED)
 -- SELECT column_name, data_type, is_nullable, column_default
 -- FROM information_schema.columns
--- WHERE table_schema = 'public' AND table_name = 'opportunities'
+-- WHERE table_schema = 'public' AND table_name = 'companies'
 -- ORDER BY ordinal_position;
 
--- 9b. Verify exact column names for profiles
+-- 5b. Verify roles table
 -- SELECT column_name, data_type, is_nullable, column_default
 -- FROM information_schema.columns
--- WHERE table_schema = 'public' AND table_name = 'profiles'
+-- WHERE table_schema = 'public' AND table_name = 'roles'
 -- ORDER BY ordinal_position;
 
--- 9c. Verify all RLS policies on MVP tables
+-- 5c. Verify pipeline_stages table
+-- SELECT column_name, data_type, is_nullable, column_default
+-- FROM information_schema.columns
+-- WHERE table_schema = 'public' AND table_name = 'pipeline_stages'
+-- ORDER BY ordinal_position;
+
+-- 5d. Verify audit_logs table
+-- SELECT column_name, data_type, is_nullable, column_default
+-- FROM information_schema.columns
+-- WHERE table_schema = 'public' AND table_name = 'audit_logs'
+-- ORDER BY ordinal_position;
+
+-- 5e. Full RLS policy dump (ALL tables)
 -- SELECT tablename, policyname, permissive, roles, cmd, qual, with_check
--- FROM pg_policies
--- WHERE schemaname = 'public'
--- AND tablename IN ('profiles','companies','opportunities','roles',
---                   'pipeline_stages','activity_log','audit_logs',
---                   'pricing_items','labor_categories','competitors')
+-- FROM pg_policies WHERE schemaname = 'public'
 -- ORDER BY tablename, policyname;
 
--- 9d. Verify helper functions exist
--- SELECT routine_name, data_type
--- FROM information_schema.routines
--- WHERE routine_schema = 'public'
--- AND routine_name IN ('is_authenticated','is_admin','is_internal_user',
---                      'can_access_sensitive','get_user_role','get_my_company_id',
---                      'get_my_role','handle_new_user','audit_logs_immutable')
--- ORDER BY routine_name;
+-- 5f. Check if mfa_enabled exists ANYWHERE
+-- SELECT table_name, column_name
+-- FROM information_schema.columns
+-- WHERE table_schema = 'public' AND column_name LIKE '%mfa%';
 
--- 9e. Verify triggers
--- SELECT trigger_name, event_object_table, event_manipulation, action_statement
--- FROM information_schema.triggers
--- WHERE trigger_schema = 'public'
--- AND event_object_table IN ('audit_logs', 'profiles')
--- ORDER BY event_object_table;
+-- 5g. Check what is_mfa_enabled() actually does
+-- SELECT prosrc FROM pg_proc WHERE proname = 'is_mfa_enabled';

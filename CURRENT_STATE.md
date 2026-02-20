@@ -1,15 +1,15 @@
 # CURRENT_STATE.md — MissionPulse System Truth
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Generated:** 2026-02-19  
-**Baseline:** Post-cleanup audit. Replaces all Phase 1 state assumptions.  
+**Verified against:** Live `information_schema.columns` exports from `djuviwarqdvlbgcfuupa`  
 **Authority:** This is the single source of truth for "what exists right now."
 
 ---
 
 ## 1. System Overview
 
-### What Is Locked (Sprint 8 Baseline — Database Layer)
+### What Is Locked (Database Layer)
 
 The Supabase PostgreSQL database is the production-hardened layer. It is **not being rebuilt** — it is being **wired to a new frontend**.
 
@@ -22,7 +22,7 @@ The Supabase PostgreSQL database is the production-hardened layer. It is **not b
 
 ### What Is Changing (Phase 2 — Next.js Migration)
 
-The frontend is migrating from standalone HTML files (React CDN + Tailwind CDN) to a Next.js 14 App Router application. The Python/FastAPI backend is being replaced by Next.js server components and route handlers that query Supabase directly.
+The frontend migrates from standalone HTML files (React CDN + Tailwind CDN) to a Next.js 14 App Router application. The Python/FastAPI backend is replaced by Next.js server components and route handlers that query Supabase directly.
 
 ### Environments
 
@@ -31,315 +31,227 @@ The frontend is migrating from standalone HTML files (React CDN + Tailwind CDN) 
 | Production | missionpulse.netlify.app | `main` | Netlify |
 | Staging | Preview deploys | `v2-development` | Netlify |
 | Database | djuviwarqdvlbgcfuupa.supabase.co | — | Supabase |
-| Legacy API | missionpulse-api.onrender.com | — | Render (to be deprecated) |
+| Legacy API | missionpulse-api.onrender.com | — | Render (deprecated) |
 
 ### Repository
 
-- **Single repo:** `missionpulse-frontend` on desktop at `C:\Users\MaryWomack\Desktop\missionpulse-frontend`
+- **Single repo:** `missionpulse-frontend` at `C:\Users\MaryWomack\Desktop\missionpulse-frontend`
 - **No second repo.** `missionpulse-v1` does NOT exist on desktop.
 - **Branches:** `main` (production), `v2-development` (staging/dev)
 
 ---
 
-## 2. Database Schema (MVP Tables)
+## 2. Database Schema (Verified from Live Exports)
 
-### 2.1 `profiles` — Auth Pivot Table
+### 2.1 `profiles` — Auth Pivot Table (13 columns, 3 rows)
 
-The single most important table. Every RLS function queries it. The `handle_new_user` trigger inserts here on signup.
+Every RLS helper function queries this table. `handle_new_user` trigger inserts here on signup.
 
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | UUID | NO | — | PK, FK → `auth.users(id)` ON DELETE CASCADE |
-| `email` | TEXT | NO | — | UNIQUE |
-| `full_name` | TEXT | YES | — | Extracted from `raw_user_meta_data` or email prefix |
-| `role` | TEXT | NO | `'CEO'` | See valid roles below |
-| `company_id` | UUID | YES | — | FK → `companies(id)` |
-| `avatar_url` | TEXT | YES | — | |
-| `mfa_enabled` | BOOLEAN | NO | `false` | |
-| `last_login` | TIMESTAMPTZ | YES | — | |
-| `created_at` | TIMESTAMPTZ | NO | `now()` | |
-| `updated_at` | TIMESTAMPTZ | YES | `now()` | |
+| # | Column | Type | Nullable | Default | Notes |
+|---|--------|------|----------|---------|-------|
+| 1 | `id` | uuid | NO | — | PK, FK → `auth.users(id)` ON DELETE CASCADE |
+| 2 | `email` | varchar | NO | — | UNIQUE |
+| 3 | `full_name` | varchar | YES | — | From `raw_user_meta_data` or email prefix |
+| 4 | `role` | varchar | YES | `'Partner'` | **Column default is 'Partner'.** `handle_new_user` trigger overrides to 'CEO'. |
+| 5 | `company` | varchar | YES | — | Company name (text). See also `company_id`. |
+| 6 | `phone` | varchar | YES | — | |
+| 7 | `avatar_url` | text | YES | — | |
+| 8 | `preferences` | jsonb | YES | `'{}'` | User preference store |
+| 9 | `created_at` | timestamptz | YES | `now()` | |
+| 10 | `updated_at` | timestamptz | YES | `now()` | |
+| 11 | `company_id` | uuid | YES | — | FK → `companies(id)`. Coexists with `company` (varchar). |
+| 12 | `status` | text | YES | `'active'` | Account status |
+| 13 | `last_login` | timestamptz | YES | — | |
 
-**Valid roles (from `is_internal_user()`):** executive, operations, capture_manager, volume_lead, author, admin, CEO, COO, CAP, PM, SA, FIN, CON, DEL, QA, subcontractor, teaming_partner, viewer
+**⚠ CRITICAL FINDINGS:**
 
-**Triggers:** `handle_new_user` (INSERT on auth.users → creates profiles row)  
-**Indexes:** PK on `id`, UNIQUE on `email`  
-**Data:** 3 rows (Mary's test accounts)
+1. **No `mfa_enabled` column exists.** GROUND_TRUTH_v2.md listed `is_mfa_enabled()`, `requires_mfa()`, and `check_mfa_compliance()` as deployed functions. These functions either query a different table or are broken. **Must verify before referencing MFA in SSP claims.**
 
-### 2.2 `companies` — Tenant Root
+2. **Dual company reference:** Both `company` (varchar — display name) and `company_id` (uuid — FK) exist. RLS functions use `get_my_company_id()` which queries `company_id`. The `company` varchar field is for display.
 
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `name` | TEXT | NO | — | |
-| `domain` | TEXT | YES | — | |
-| `solo_mode` | BOOLEAN | NO | `false` | Referenced by `is_user_solo_mode()` |
-| `trial_ends_at` | TIMESTAMPTZ | YES | — | Set by `handle_new_company` trigger |
-| `subscription_tier` | TEXT | YES | `'trial'` | |
-| `settings` | JSONB | YES | `'{}'` | |
-| `created_at` | TIMESTAMPTZ | NO | `now()` | |
+3. **Role default is 'Partner', not 'CEO'.** The `handle_new_user` trigger hardcodes `role = 'CEO'` which overrides the column default. If someone inserts into profiles directly (bypassing the trigger), they get 'Partner'.
 
-**Triggers:** `handle_new_company` (sets 14-day trial on INSERT)  
-**Data:** 1 row (Mission Meets Tech)
+**Valid roles (from RBAC helper functions):** executive, operations, capture_manager, volume_lead, author, admin, CEO, COO, CAP, PM, SA, FIN, CON, DEL, QA, subcontractor, teaming_partner, viewer, Partner
 
-### 2.3 `opportunities` — Pipeline Core
+---
 
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `company_id` | UUID | YES | — | FK → `companies(id)` |
-| `title` | TEXT | NO | — | |
-| `nickname` | TEXT | YES | — | |
-| `description` | TEXT | YES | — | |
-| `solicitation_number` | TEXT | YES | — | |
-| `agency` | TEXT | YES | — | |
-| `value` | NUMERIC | YES | — | Contract ceiling ($) |
-| `pwin` | INTEGER | YES | — | CHECK 0–100 |
-| `status` | TEXT | NO | `'Identification'` | Pipeline stage name |
-| `submission_date` | DATE | YES | — | |
-| `created_by` | UUID | YES | — | FK → `profiles(id)` |
-| `tags` | TEXT[] | YES | — | |
-| `metadata` | JSONB | YES | `'{}'` | |
-| `created_at` | TIMESTAMPTZ | NO | `now()` | |
-| `updated_at` | TIMESTAMPTZ | YES | `now()` | |
+### 2.2 `opportunities` — Pipeline Core (46 columns, 5 rows)
 
-**Data:** 5 rows
+**Verified from live `information_schema` export on 2026-02-19.**
 
-**⚠ SCHEMA DRIFT WARNING:** The Phase 1 `supabase-client.js` maps different column names: `name` (not `title`), `contract_value` (not `value`), `win_probability` (not `pwin`), `due_date` (column may not exist per GROUND_TRUTH), `shipley_phase` (not `status`). Before building Next.js queries, run this in Supabase SQL Editor to get the actual columns:
+| # | Column | Type | Nullable | Default | Notes |
+|---|--------|------|----------|---------|-------|
+| 1 | `id` | uuid | NO | `gen_random_uuid()` | PK |
+| 2 | `title` | varchar | NO | — | Primary display name |
+| 3 | `nickname` | varchar | YES | — | Short name |
+| 4 | `description` | text | YES | — | |
+| 5 | `agency` | varchar | YES | — | Contracting agency |
+| 6 | `sub_agency` | varchar | YES | — | |
+| 7 | `contract_vehicle` | varchar | YES | — | IDIQ, BPA, etc. |
+| 8 | `naics_code` | varchar | YES | — | |
+| 9 | `set_aside` | varchar | YES | — | SDVOSB, 8(a), etc. |
+| 10 | `ceiling` | numeric | YES | — | Contract dollar value |
+| 11 | `period_of_performance` | varchar | YES | — | PoP description |
+| 12 | `due_date` | timestamptz | YES | — | Proposal due date |
+| 13 | `phase` | varchar | YES | `'Gate 1'` | Shipley gate (Gate 1–6) |
+| 14 | `status` | varchar | YES | `'Active'` | Active, Won, Lost, No-Bid |
+| 15 | `priority` | varchar | YES | `'Medium'` | Low, Medium, High, Critical |
+| 16 | `pwin` | integer | YES | `50` | Win probability (0–100) |
+| 17 | `go_no_go` | varchar | YES | — | Go/No-Go decision |
+| 18 | `incumbent` | varchar | YES | — | Current contract holder |
+| 19 | `solicitation_number` | varchar | YES | — | |
+| 20 | `sam_url` | text | YES | — | SAM.gov listing URL |
+| 21 | `notes` | text | YES | — | |
+| 22 | `owner_id` | uuid | YES | — | FK → `profiles(id)` — opportunity owner |
+| 23 | `created_at` | timestamptz | YES | `now()` | |
+| 24 | `updated_at` | timestamptz | YES | `now()` | |
+| 25 | `hubspot_deal_id` | text | YES | — | HubSpot CRM link |
+| 26 | `hubspot_synced_at` | timestamptz | YES | — | Last HubSpot sync |
+| 27 | `deal_source` | text | YES | `'manual'` | manual, hubspot, sam_gov |
+| 28 | `pipeline_stage` | text | YES | `'qualification'` | ⚠ DUPLICATE — prefer `phase` |
+| 29 | `close_date` | date | YES | — | Expected close |
+| 30 | `contact_email` | text | YES | — | Primary contact email |
+| 31 | `contact_name` | text | YES | — | Primary contact name |
+| 32 | `sam_opportunity_id` | text | YES | — | SAM.gov ID |
+| 33 | `govwin_id` | text | YES | — | GovWin tracking ID |
+| 34 | `place_of_performance` | text | YES | — | |
+| 35 | `is_recompete` | boolean | YES | `false` | |
+| 36 | `bd_investment` | numeric | YES | `0` | B&P spend tracking ($) |
+| 37 | `tags` | ARRAY | YES | — | Text array |
+| 38 | `custom_properties` | jsonb | YES | `'{}'` | User-facing metadata |
+| 39 | `company_id` | uuid | YES | — | FK → `companies(id)` |
+| 40 | `win_probability` | integer | YES | `50` | ⚠ DUPLICATE of `pwin` |
+| 41 | `shipley_phase` | text | YES | — | ⚠ DUPLICATE of `phase` |
+| 42 | `submission_date` | timestamptz | YES | — | |
+| 43 | `award_date` | timestamptz | YES | — | |
+| 44 | `pop_start` | timestamptz | YES | — | Period of performance start |
+| 45 | `pop_end` | timestamptz | YES | — | Period of performance end |
+| 46 | `metadata` | jsonb | YES | `'{}'` | System metadata |
 
+**⚠ DUPLICATE COLUMN STANDARDIZATION:**
+
+| Concept | Use This | Ignore These | Rationale |
+|---------|----------|-------------|-----------|
+| Win probability | `pwin` (col 16) | `win_probability` (col 40) | Shorter, same default, more readable |
+| Pipeline stage | `phase` (col 13, default 'Gate 1') | `shipley_phase` (col 41), `pipeline_stage` (col 28) | Has default value, maps to Shipley gates |
+| Lifecycle status | `status` (col 14, default 'Active') | — | Active/Won/Lost/No-Bid |
+| Metadata | `custom_properties` (col 38) | `metadata` (col 46) | User-facing vs system |
+
+**Phase 1 JS → Actual DB Column Mapping:**
+
+| supabase-client.js used | Actual column | Match? |
+|------------------------|---------------|--------|
+| `name` | `title` | ❌ WRONG |
+| `contractValue` / `contract_value` | `ceiling` | ❌ WRONG |
+| `winProbability` / `win_probability` | `pwin` (preferred) | ⚠ DUPLICATE EXISTS |
+| `shipleyPhase` / `shipley_phase` | `phase` (preferred) | ⚠ DUPLICATE EXISTS |
+| `dueDate` / `due_date` | `due_date` | ✅ CORRECT |
+| `primaryContact` | `contact_name` + `contact_email` | ❌ SPLIT |
+
+---
+
+### 2.3 Other Tables (Not Yet Verified)
+
+| Table | Rows | Verified? | Notes |
+|-------|------|-----------|-------|
+| `companies` | 1 | ❌ | Run info_schema query to verify |
+| `roles` | 11 | ❌ | |
+| `pipeline_stages` | 10 | ❌ | |
+| `activity_log` | 8 | ❌ | |
+| `audit_logs` | 2 | ❌ | Immutability trigger verified |
+| `labor_categories` | 35 | ❌ | CUI // SP-PROPIN |
+| `competitors` | 3 | ❌ | CUI // OPSEC |
+
+To verify any table:
 ```sql
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
-WHERE table_schema = 'public' AND table_name = 'opportunities'
+WHERE table_schema = 'public' AND table_name = 'TABLE_NAME_HERE'
 ORDER BY ordinal_position;
 ```
-
-### 2.4 `roles` — Reference Table
-
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `name` | TEXT | NO | — | UNIQUE |
-| `display_name` | TEXT | NO | — | |
-| `description` | TEXT | YES | — | |
-| `type` | TEXT | YES | `'internal'` | internal / external |
-| `is_active` | BOOLEAN | NO | `true` | |
-| `created_at` | TIMESTAMPTZ | NO | `now()` | |
-
-**Data:** 11 rows
-
-### 2.5 `pipeline_stages` — Shipley Phase Config
-
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `name` | TEXT | NO | — | |
-| `display_name` | TEXT | NO | — | |
-| `stage_order` | INTEGER | NO | — | Sort order |
-| `color` | TEXT | YES | — | Hex for UI |
-| `is_active` | BOOLEAN | NO | `true` | |
-| `created_at` | TIMESTAMPTZ | NO | `now()` | |
-
-**Data:** 10 rows
-
-### 2.6 `activity_log` — User Activity
-
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `user_id` | UUID | YES | — | FK → `profiles(id)` |
-| `action` | TEXT | NO | — | |
-| `entity_type` | TEXT | YES | — | |
-| `entity_id` | UUID | YES | — | |
-| `description` | TEXT | YES | — | |
-| `metadata` | JSONB | YES | `'{}'` | |
-| `created_at` | TIMESTAMPTZ | NO | `now()` | |
-
-**Data:** 8 rows
-
-### 2.7 `audit_logs` — Immutable (NIST AU-9)
-
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `user_id` | UUID | YES | — | FK → `profiles(id)` |
-| `action` | TEXT | NO | — | |
-| `table_name` | TEXT | NO | — | |
-| `record_id` | UUID | YES | — | |
-| `old_values` | JSONB | YES | — | |
-| `new_values` | JSONB | YES | — | |
-| `ip_address` | INET | YES | — | |
-| `created_at` | TIMESTAMPTZ | NO | `now()` | |
-
-**Triggers:** `audit_logs_immutable` — RAISES EXCEPTION on UPDATE/DELETE  
-**Data:** 2 rows
-
-### 2.8 CUI Tables (Restricted Access)
-
-| Table | CUI Category | Rows | Authorized Roles | RLS Function |
-|-------|-------------|------|-----------------|-------------|
-| `pricing_items` | SP-PROPIN | 0 | CEO, COO, CAP, FIN | `can_access_sensitive()` |
-| `labor_categories` | SP-PROPIN | 35 | CEO, COO, CAP, FIN | `can_access_sensitive()` |
-| `competitors` | OPSEC | 3 | CEO, COO, CAP | Role-list check |
-| `competitor_ghosts` | OPSEC | 0 | CEO, COO, CAP | Role-list check |
-| `intel_collection` | OPSEC | 0 | CEO, COO, CAP | Role-list check |
-| `personnel_records` | SP-PRVCY | 0 | CEO, COO, DEL, Admin | Role-list check |
 
 ---
 
 ## 3. Supabase Auth Flow
 
-### Providers Enabled
+### Providers
 
 - **Email/password:** YES — signups open, email confirmation disabled
-- **Social (Google, GitHub, etc.):** NO
-- **Phone/SMS:** NO
-- **SSO/SAML:** NO
+- **Social, Phone, SSO:** NO
 
 ### Signup → Profile Creation
 
-1. User calls `supabase.auth.signUp({ email, password })`
-2. Supabase creates row in `auth.users`
-3. `handle_new_user` trigger fires, inserting into `public.profiles`:
-   - `id` = `NEW.id` (from auth.users)
-   - `email` = `NEW.email`
-   - `full_name` = `COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1))`
-   - `role` = `'CEO'` ← **WARNING: Must change to 'viewer' before multi-user**
+1. `supabase.auth.signUp({ email, password })` → row in `auth.users`
+2. `handle_new_user` trigger → row in `profiles` with `role = 'CEO'`
+3. Column default is `'Partner'` but trigger overrides to `'CEO'`
+4. **⚠ Change trigger to `'viewer'` before multi-user launch**
 
-### Session & Refresh
+### Session Management
 
-**Current state: DOES NOT EXIST in frontend code.**
-
-- No `signIn()` call in any HTML/JS file
-- No session cookie management
-- No token refresh middleware
-- `supabase-client.js` creates an anonymous Supabase client with the anon key — no auth session
-
-**Phase 2 will implement:** `@supabase/ssr` with cookie-based sessions and Next.js middleware refresh.
+**Does not exist.** No `signIn()`, no cookies, no refresh. Phase 2 implements `@supabase/ssr`.
 
 ### Role Derivation
 
-Roles are stored in `profiles.role` (not JWT custom claims). All RLS helper functions (`is_admin()`, `is_internal_user()`, `can_access_sensitive()`) query `profiles.role` via `auth.uid()` at query time.
+`profiles.role` queried by all RLS functions via `auth.uid()`. Not in JWT claims.
 
 ---
 
-## 4. RLS Policies
+## 4. RLS & Helper Functions
 
-### Global State
+### Core Functions (Verified Deployed)
 
-All 200 tables have RLS enabled. The following policies are verified from GROUND_TRUTH_v2 and project knowledge:
+| Function | Checks `profiles.role` IN |
+|----------|--------------------------|
+| `is_admin()` | executive, operations, admin, CEO, COO |
+| `is_internal_user()` | 15 internal roles |
+| `can_access_sensitive()` | executive, operations, admin, CEO, COO, FIN |
+| `get_user_role()` | Returns role, defaults to 'viewer' |
+| `get_my_company_id()` | Returns `company_id` from profiles |
+| `is_authenticated()` | `auth.uid() IS NOT NULL` |
 
-### Helper Functions (All Deployed)
+### MFA Functions (⚠ LIKELY BROKEN)
 
-| Function | Returns | Checks |
-|----------|---------|--------|
-| `is_authenticated()` | boolean | `auth.uid() IS NOT NULL` |
-| `is_admin()` | boolean | `profiles.role IN ('executive','operations','admin','CEO','COO')` |
-| `is_internal_user()` | boolean | `profiles.role IN (15 internal roles)` |
-| `can_access_sensitive()` | boolean | `profiles.role IN ('executive','operations','admin','CEO','COO','FIN')` |
-| `get_user_role()` | text | Returns `profiles.role` for `auth.uid()` |
-| `get_my_role()` | text | Same, defaults to `'viewer'` |
-| `get_my_company_id()` | uuid | Returns `profiles.company_id` for `auth.uid()` |
+| Function | Expects | Reality |
+|----------|---------|---------|
+| `is_mfa_enabled()` | `profiles.mfa_enabled` column | **Column does not exist** |
+| `requires_mfa()` | Hardcoded role check | Roles exist, no enforcement |
+| `check_mfa_compliance()` | Combines above | **Broken** |
 
-### Per-Table Policy Summary (MVP Tables)
-
-| Table | RLS | SELECT | INSERT | UPDATE | DELETE |
-|-------|-----|--------|--------|--------|--------|
-| `profiles` | ✅ | Own row OR `is_admin()` | Via trigger only | Own row OR `is_admin()` | — |
-| `companies` | ✅ | `is_authenticated()` | `is_admin()` | `is_admin()` | — |
-| `opportunities` | ✅ | `is_internal_user()` OR partner_access check | `is_internal_user()` | `is_internal_user()` | — |
-| `roles` | ✅ | `is_authenticated()` | — | — | — |
-| `pipeline_stages` | ✅ | `is_authenticated()` | — | — | — |
-| `activity_log` | ✅ | `is_internal_user()` | `is_authenticated()` | — | — |
-| `audit_logs` | ✅ | `is_admin()` | `is_authenticated()` | ❌ BLOCKED by trigger | ❌ BLOCKED by trigger |
-| `pricing_items` | ✅ | `can_access_sensitive()` | `can_access_sensitive()` | — | — |
-| `labor_categories` | ✅ | `can_access_sensitive()` | — | — | — |
-| `competitors` | ✅ | Role-list (CEO/COO/CAP) | — | — | — |
-
-**⚠ UNSUPPORTED:** Exact policy names and verbatim USING/WITH CHECK clauses are not available without a `pg_dump` of policy definitions. The logic above is derived from GROUND_TRUTH_v2 function descriptions and `Database_Schema_Documentation.docx`. To make this authoritative, run:
-
-```sql
-SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
-FROM pg_policies
-WHERE schemaname = 'public'
-ORDER BY tablename, policyname;
-```
+**Action:** Either add `ALTER TABLE profiles ADD COLUMN mfa_enabled BOOLEAN DEFAULT false;` or remove MFA references from SSP.
 
 ---
 
-## 5. Operational Checks
+## 5. Known Schema Debt
 
-### Local Setup (Phase 2 — Next.js)
-
-```bash
-# Clone and setup
-cd C:\Users\MaryWomack\Desktop\missionpulse-frontend
-git checkout v2-development
-
-# Install dependencies (after Next.js scaffold is created)
-npm install
-
-# Copy env template
-cp .env.example .env.local
-# Fill in Supabase keys
-
-# Run dev server
-npm run dev
-```
-
-### Verify RLS (Run in Supabase SQL Editor)
-
-```sql
--- Confirm all MVP tables have RLS
-SELECT tablename, rowsecurity
-FROM pg_tables
-WHERE schemaname = 'public'
-AND tablename IN ('profiles','companies','opportunities','roles','pipeline_stages','activity_log','audit_logs')
-ORDER BY tablename;
-
--- Confirm helper functions exist
-SELECT routine_name FROM information_schema.routines
-WHERE routine_schema = 'public'
-AND routine_name IN ('is_authenticated','is_admin','is_internal_user','can_access_sensitive','get_user_role','get_my_company_id');
-
--- Confirm audit immutability trigger
-SELECT trigger_name, event_manipulation, action_statement
-FROM information_schema.triggers
-WHERE trigger_schema = 'public' AND event_object_table = 'audit_logs';
-```
-
-### Tests
-
-**Existing:** `test_agents.py` — pytest suite for FastAPI backend (uses mock headers, not real auth). Will be deprecated when FastAPI is replaced.
-
-**Phase 2 deliverable:** Playwright E2E tests (do not exist yet — defined in PHASE_2_RULES.md as Sprint 0).
+| Issue | Severity | Recommended Action |
+|-------|----------|-------------------|
+| `mfa_enabled` column missing | **HIGH** | Add to profiles OR remove MFA SSP claims |
+| `handle_new_user` defaults to CEO | **HIGH** | Change to 'viewer' before multi-user |
+| `pwin` + `win_probability` duplicates | MEDIUM | Use `pwin` in Next.js. Ignore `win_probability`. |
+| `phase` + `shipley_phase` + `pipeline_stage` triplicates | MEDIUM | Use `phase` for gates, `status` for lifecycle |
+| `company` (varchar) + `company_id` (uuid) on profiles | LOW | `company_id` for FK/RLS. `company` for display. |
+| `hubspot_field_mapping` + `hubspot_field_mappings` | LOW | Consolidate later |
+| 163 empty tables | LOW | Populate as modules wire up |
 
 ---
 
 ## 6. Evidence Map
 
-| Claim | Source | Method | Status |
-|-------|--------|--------|--------|
-| 200 tables with RLS | GROUND_TRUTH_v2.md | SQL query `pg_tables` on 2026-02-19 | ✅ VERIFIED |
-| 37 tables with data | GROUND_TRUTH_v2.md | SQL query `pg_stat_user_tables` | ✅ VERIFIED |
-| `handle_new_user` trigger deployed | GROUND_TRUTH_v2.md | `pg_trigger` + `pg_proc` queries | ✅ VERIFIED |
-| `audit_logs_immutable` trigger | GROUND_TRUTH_v2.md | `pg_trigger` query | ✅ VERIFIED |
-| All 6 RBAC helper functions deployed | GROUND_TRUTH_v2.md | `information_schema.routines` | ✅ VERIFIED |
-| pgvector with 6 embeddings | GROUND_TRUTH_v2.md | Row count query | ✅ VERIFIED |
-| 3 profiles exist | GROUND_TRUTH_v2.md | Row count query | ✅ VERIFIED |
-| Email auth, no confirmation | GROUND_TRUTH_v2.md | Supabase dashboard inspection | ✅ VERIFIED |
-| Supabase instance = djuviwarqdvlbgcfuupa | supabase-client.js line 23 | Code inspection | ✅ VERIFIED |
-| Exact `opportunities` column names | — | — | ⚠ UNSUPPORTED — needs `information_schema` query |
-| Exact RLS policy USING clauses | — | — | ⚠ UNSUPPORTED — needs `pg_policies` query |
-| `profiles` column list | Database_Schema_Documentation.docx + GROUND_TRUTH_v2 | Inference from function logic | ⚠ PARTIAL — verify with `information_schema` |
-
-### Assumptions (Non-Authoritative)
-
-1. **`opportunities` columns** — Schema shown in §2.3 is reconstructed from `Database_Schema_Documentation.docx` and `supabase-client.js` field mappings. The two sources disagree on column names (`title` vs `name`, `value` vs `contract_value`, `pwin` vs `win_probability`). Must verify with live `information_schema` query.
-
-2. **`profiles` has `company_id` column** — Inferred from `get_my_company_id()` function logic. Not directly confirmed.
-
-3. **`profiles` has `avatar_url` and `updated_at`** — Common Supabase pattern but not explicitly confirmed in GROUND_TRUTH.
+| Claim | Source | Status |
+|-------|--------|--------|
+| `profiles` has 13 columns, no `mfa_enabled` | Live info_schema export 2/19 | ✅ VERIFIED |
+| `profiles.role` defaults to `'Partner'` | Live export | ✅ VERIFIED |
+| `opportunities` has 46 columns | Live info_schema export 2/19 | ✅ VERIFIED |
+| `ceiling` is dollar field (not `value`) | Live export | ✅ VERIFIED |
+| `owner_id` is profile FK (not `created_by`) | Live export | ✅ VERIFIED |
+| `pwin` AND `win_probability` both exist | Live export | ✅ VERIFIED |
+| 200 tables with RLS, 37 with data | GROUND_TRUTH_v2.md | ✅ VERIFIED |
+| `handle_new_user` trigger deployed | GROUND_TRUTH_v2.md | ✅ VERIFIED |
+| `audit_logs_immutable` trigger | GROUND_TRUTH_v2.md | ✅ VERIFIED |
+| All 6 core RBAC functions | GROUND_TRUTH_v2.md | ✅ VERIFIED |
+| Supabase instance ID | supabase-client.js line 23 | ✅ VERIFIED |
+| `companies` columns | GROUND_TRUTH inference | ⚠ UNVERIFIED |
+| MFA functions query `profiles.mfa_enabled` | GROUND_TRUTH_v2.md claim | ❌ COLUMN MISSING |
 
 ---
 
