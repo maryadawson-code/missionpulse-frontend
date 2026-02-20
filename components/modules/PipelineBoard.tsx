@@ -5,12 +5,12 @@
  * Columns = Shipley gates (active pipeline stages)
  * © 2026 Mission Meets Tech
  */
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateOpportunityPhase } from '@/lib/actions/opportunities'
+import { ACTIVE_STAGES } from '@/lib/utils/constants'
 import OpportunityCard from '@/components/modules/OpportunityCard'
 import type { Opportunity } from '@/lib/supabase/types'
-import { PIPELINE_STAGES, ACTIVE_STAGES, STAGE_MAP } from '@/lib/utils/constants'
 
 interface Props {
   initialData: Record<string, Opportunity[]>
@@ -60,7 +60,7 @@ export default function PipelineBoard({ initialData }: Props) {
 
     // Persist
     const result = await updateOpportunityPhase(draggedOpp.id, targetPhase)
-    if (!result.success) {
+    if (result.error) {
       // Revert on failure
       router.refresh()
     }
@@ -89,7 +89,7 @@ export default function PipelineBoard({ initialData }: Props) {
               <div className="flex items-center gap-2">
                 <div
                   className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: stage.color }}
+                  style={{ backgroundColor: '#00E5FA' }}
                 />
                 <span className="text-sm font-semibold text-white">{stage.name}</span>
               </div>

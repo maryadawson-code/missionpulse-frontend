@@ -12,11 +12,11 @@ interface Props {
 }
 
 export default async function WarRoomPage({ params }: Props) {
-  const opportunity = await getOpportunity(params.id)
+  const result = await getOpportunity(params.id)
 
-  if (!opportunity) {
+  if (!result) {
     notFound()
   }
 
-  return <WarRoomDetail opportunity={opportunity} />
+  return <WarRoomDetail opportunity={result} />
 }

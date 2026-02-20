@@ -8,7 +8,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/dashboard/Sidebar'
 import TopBar from '@/components/dashboard/TopBar'
-import type { Profile } from '@/lib/supabase/types'
 
 export default async function DashboardLayout({
   children,

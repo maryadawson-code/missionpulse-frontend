@@ -1,143 +1,209 @@
-'use client'
+// FILE: components/dashboard/Sidebar.tsx
+// SECURITY: NIST 800-53 Rev 5 CHECKED — Invisible RBAC
+// Sprint 2 Fix: null-safe profile.role fallback, correct ModuleId types
+'use client';
 
-/**
- * Sidebar — RBAC-filtered navigation
- * Invisible RBAC: items with shouldRender=false don't appear
- * © 2026 Mission Meets Tech
- */
-import { useState } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import type { Profile } from '@/lib/supabase/types'
-import { ROLE_TO_CONFIG, type ModuleId } from '@/lib/supabase/types'
-import { ROLES as RBAC_CONFIG } from '@/lib/rbac/config'
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  GitBranch,
+  Swords,
+  Waves,
+  FileSearch,
+  Shield,
+  Skull,
+  DollarSign,
+  UserCheck,
+  Mic,
+  BookOpen,
+  Users,
+  Rocket,
+  Award,
+  ClipboardList,
+  Bot,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+} from 'lucide-react';
+import { ROLES as RBAC_CONFIG } from '@/lib/rbac/config';
+import type { Profile, ModuleId } from '@/lib/supabase/types';
+
+// ============================================================
+// NAV ITEM DEFINITIONS
+// ============================================================
 
 interface NavItem {
-  id: ModuleId
-  label: string
-  href: string
-  icon: string
-  group: string
-  cuiMarking?: string
+  id: ModuleId;
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  cuiBanner?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  // Core Operations
-  { id: 'pipeline', label: 'Pipeline', href: '/pipeline', icon: '🎯', group: 'Core Operations' },
-  { id: 'war_room', label: 'War Room', href: '/pipeline', icon: '⚔️', group: 'Core Operations' },
-  { id: 'swimlane', label: 'Swimlane', href: '/swimlane', icon: '🏊', group: 'Core Operations' },
-  // Capture & Strategy
-  { id: 'rfp_shredder', label: 'RFP Shredder', href: '/rfp-shredder', icon: '📄', group: 'Capture & Strategy' },
-  { id: 'black_hat', label: 'Black Hat', href: '/black-hat', icon: '🎩', group: 'Capture & Strategy' },
-  // Compliance & Contracts
-  { id: 'iron_dome', label: 'Iron Dome', href: '/iron-dome', icon: '🛡️', group: 'Compliance & Contracts' },
-  { id: 'contract_scanner', label: 'Contract Scanner', href: '/contract-scanner', icon: '📑', group: 'Compliance & Contracts' },
-  // Pricing
-  { id: 'pricing', label: 'Pricing Engine', href: '/pricing', icon: '💰', group: 'Pricing', cuiMarking: 'CUI' },
-  // Review & Delivery
-  { id: 'hitl', label: 'HITL Review', href: '/hitl', icon: '👤', group: 'Review & Delivery' },
-  { id: 'orals', label: 'Orals Studio', href: '/orals', icon: '🎤', group: 'Review & Delivery' },
-  // Teaming
-  { id: 'frenemy', label: 'Teaming / Frenemy', href: '/teaming', icon: '🤝', group: 'Teaming & Partners' },
-  // Intelligence
-  { id: 'agent_hub', label: 'Agent Hub', href: '/agent-hub', icon: '🤖', group: 'Intelligence' },
-  { id: 'playbook', label: 'Lessons Playbook', href: '/playbook', icon: '📖', group: 'Intelligence' },
-  // Launch & Post-Award
-  { id: 'launch', label: 'Launch & ROI', href: '/launch', icon: '🚀', group: 'Launch & Post-Award' },
-  { id: 'post_award', label: 'Post-Award', href: '/post-award', icon: '📦', group: 'Launch & Post-Award' },
-]
+  { id: 'dashboard', label: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { id: 'pipeline', label: 'Pipeline', href: '/pipeline', icon: GitBranch },
+  { id: 'war_room', label: 'War Room', href: '/war-room', icon: Swords },
+  { id: 'swimlane', label: 'Swimlane', href: '/swimlane', icon: Waves },
+  { id: 'rfp_shredder', label: 'RFP Shredder', href: '/rfp-shredder', icon: FileSearch },
+  { id: 'contract_scanner', label: 'Contract Scanner', href: '/contract-scanner', icon: ClipboardList },
+  { id: 'iron_dome', label: 'Iron Dome', href: '/compliance', icon: Shield },
+  { id: 'black_hat', label: 'Black Hat', href: '/blackhat', icon: Skull, cuiBanner: 'CUI // OPSEC' },
+  { id: 'pricing', label: 'Pricing', href: '/pricing', icon: DollarSign, cuiBanner: 'CUI // SP-PROPIN' },
+  { id: 'hitl', label: 'Review Queue', href: '/hitl', icon: UserCheck },
+  { id: 'orals', label: 'Orals Prep', href: '/orals', icon: Mic },
+  { id: 'playbook', label: 'Playbook', href: '/playbook', icon: BookOpen },
+  { id: 'frenemy', label: 'Frenemy Intel', href: '/frenemy', icon: Users },
+  { id: 'launch', label: 'Launch', href: '/launch', icon: Rocket },
+  { id: 'post_award', label: 'Post-Award', href: '/post-award', icon: Award },
+  { id: 'agent_hub', label: 'Agent Hub', href: '/agent-hub', icon: Bot },
+  { id: 'settings', label: 'Settings', href: '/settings', icon: Settings },
+];
 
-export default function Sidebar({ profile }: { profile: Profile }) {
-  const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
+// ============================================================
+// SIDEBAR COMPONENT
+// ============================================================
 
-  const roleKey = ROLE_TO_CONFIG[profile.role] || 'viewer'
-  const roleConfig = RBAC_CONFIG[roleKey]
+interface SidebarProps {
+  profile: Profile | null;
+  onSignOut?: () => void;
+}
 
-  // Filter nav items by RBAC shouldRender
-  const visibleItems = NAV_ITEMS.filter((item) => {
-    const perm = roleConfig?.modules?.[item.id]
-    return perm?.shouldRender !== false
-  })
+export default function Sidebar({ profile, onSignOut }: SidebarProps) {
+  const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
 
-  // Group items
-  const groups = visibleItems.reduce<Record<string, NavItem[]>>((acc, item) => {
-    if (!acc[item.group]) acc[item.group] = []
-    acc[item.group].push(item)
-    return acc
-  }, {})
+  // FIX: Null-safe role access with 'Partner' fallback (lowest privilege)
+  const userRole = profile?.role ?? 'Partner';
+  const roleConfig = RBAC_CONFIG[userRole] ?? RBAC_CONFIG['partner'] ?? null;
+
+  /**
+   * Invisible RBAC: If the role config says shouldRender=false,
+   * the nav item doesn't appear in the DOM at all.
+   */
+  const canSeeModule = (moduleId: string): boolean => {
+    if (!roleConfig) return false;
+    const moduleAccess = roleConfig.modules?.[moduleId as ModuleId];
+    // If no config entry exists for this module, hide it (fail closed)
+    if (!moduleAccess) return false;
+    return moduleAccess.shouldRender && moduleAccess.canView;
+  };
+
+  const visibleItems = NAV_ITEMS.filter((item) => canSeeModule(item.id));
 
   return (
     <aside
-      className={`flex flex-col border-r border-white/10 bg-[#000A1A] transition-all duration-200 ${
-        collapsed ? 'w-16' : 'w-60'
+      className={`flex flex-col h-screen transition-all duration-300 ${
+        collapsed ? 'w-16' : 'w-64'
       }`}
+      style={{ backgroundColor: '#0F172A', borderRight: '1px solid #1E293B' }}
     >
-      {/* Logo */}
-      <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
+      {/* Brand Header */}
+      <div className="flex items-center justify-between px-4 py-4">
         {!collapsed && (
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00E5FA] to-[#0099AA]">
-              <span className="text-sm font-bold text-[#00050F]">MP</span>
-            </div>
-            <span className="text-sm font-semibold text-white">MissionPulse</span>
-          </Link>
+          <span
+            className="text-lg font-bold tracking-tight"
+            style={{ color: '#00E5FA' }}
+          >
+            MissionPulse
+          </span>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="rounded p-1 text-slate-400 hover:bg-white/5 hover:text-white"
+          className="p-1 rounded hover:bg-white/5 transition-colors"
+          style={{ color: '#94A3B8' }}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? '→' : '←'}
+          {collapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
+            <ChevronLeft className="w-4 h-4" />
+          )}
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
-        {Object.entries(groups).map(([group, items]) => (
-          <div key={group} className="mb-4">
-            {!collapsed && (
-              <p className="mb-1 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                {group}
-              </p>
-            )}
-            {items.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  title={collapsed ? item.label : undefined}
-                  className={`mx-2 mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                    isActive
-                      ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                  }`}
+      <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+        {visibleItems.map((item) => {
+          const isActive =
+            pathname === item.href ||
+            (item.href !== '/' && pathname.startsWith(item.href));
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive
+                  ? 'text-white'
+                  : 'hover:bg-white/5'
+              }`}
+              style={{
+                color: isActive ? '#00E5FA' : '#94A3B8',
+                backgroundColor: isActive ? 'rgba(0, 229, 250, 0.08)' : undefined,
+              }}
+              title={collapsed ? item.label : undefined}
+            >
+              <Icon className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && (
+                <span className="truncate">{item.label}</span>
+              )}
+              {!collapsed && item.cuiBanner && (
+                <span
+                  className="ml-auto text-[10px] px-1.5 py-0.5 rounded font-mono"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#EF4444' }}
                 >
-                  <span className="text-base">{item.icon}</span>
-                  {!collapsed && (
-                    <span className="flex-1 truncate">{item.label}</span>
-                  )}
-                  {!collapsed && item.cuiMarking && (
-                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
-                      {item.cuiMarking}
-                    </span>
-                  )}
-                </Link>
-              )
-            })}
-          </div>
-        ))}
+                  CUI
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-white/10 p-4">
-        {!collapsed && (
-          <p className="text-[10px] text-slate-500">
-            MissionPulse v2.0 · CMMC L2
-          </p>
-        )}
-      </div>
+      {/* User Footer */}
+      {profile && (
+        <div
+          className="px-3 py-3 flex items-center gap-3"
+          style={{ borderTop: '1px solid #1E293B' }}
+        >
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+            style={{ backgroundColor: 'rgba(0, 229, 250, 0.15)', color: '#00E5FA' }}
+          >
+            {(profile.full_name ?? profile.email ?? '?')
+              .split(' ')
+              .map((n) => n[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase()}
+          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {profile.full_name ?? profile.email}
+              </p>
+              <p className="text-xs truncate" style={{ color: '#94A3B8' }}>
+                {userRole}
+              </p>
+            </div>
+          )}
+          {!collapsed && onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="p-1.5 rounded hover:bg-white/5 transition-colors"
+              style={{ color: '#94A3B8' }}
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
     </aside>
-  )
+  );
 }

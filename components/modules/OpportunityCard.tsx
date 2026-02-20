@@ -24,7 +24,7 @@ export default function OpportunityCard({ opportunity, onDragStart }: Props) {
         ? 'text-amber-400'
         : 'text-red-400'
 
-  const pwinBg =
+  const _pwinBg =
     (opp.pwin || 0) >= 70
       ? 'bg-emerald-500/10'
       : (opp.pwin || 0) >= 40

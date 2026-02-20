@@ -127,7 +127,7 @@ export default function WarRoomDetail({ opportunity }: Props) {
           valueClass={pwinColor}
         />
         <MetricCard label="Due Date" value={formatDate(opp.due_date)} />
-        <MetricCard label="NAICS" value={opp.naics || '—'} />
+        <MetricCard label="NAICS" value={opp.naics_code || '—'} />
       </div>
 
       {/* Two-column details */}
@@ -138,33 +138,29 @@ export default function WarRoomDetail({ opportunity }: Props) {
           <dl className="space-y-3">
             <DetailRow label="Solicitation #" value={opp.solicitation_number} />
             <DetailRow label="Contract Vehicle" value={opp.contract_vehicle} />
-            <DetailRow label="Period of Performance" value={opp.period_of_performance} />
-            <DetailRow label="Place of Performance" value={opp.place_of_performance} />
-            <DetailRow label="Competition" value={opp.competition_type} />
+            <DetailRow
+              label="Period of Performance"
+              value={opp.pop_start ? `${opp.pop_start.slice(0,10)} – ${opp.pop_end?.slice(0,10) ?? 'TBD'}` : null}
+            />
+            <DetailRow label="Place of Performance" value={null} />
+            <DetailRow label="Competition" value={null} />
             <DetailRow label="Incumbent" value={opp.incumbent} />
           </dl>
         </div>
 
-        {/* Right: Strategy Summary */}
+        {/* Right: Strategy Summary (placeholder — fields added in Sprint 3) */}
         <div className="rounded-xl border border-white/10 bg-[#000A1A] p-5">
           <h2 className="mb-4 text-sm font-semibold text-white">Capture Strategy</h2>
           <dl className="space-y-3">
-            <DetailRow label="Win Theme" value={opp.win_theme} />
-            <DetailRow label="Ghost Statement" value={opp.ghost_statement} />
-            <DetailRow label="Discriminators" value={opp.discriminators} />
-            <DetailRow label="Customer Pain" value={opp.customer_pain} />
-            <DetailRow label="Teaming Partners" value={opp.teaming_partners} />
+            <DetailRow label="Win Theme" value={null} />
+            <DetailRow label="Ghost Statement" value={null} />
+            <DetailRow label="Discriminators" value={null} />
+            <DetailRow label="Customer Pain" value={null} />
+            <DetailRow label="Teaming Partners" value={null} />
           </dl>
-
-          {/* Capture notes */}
-          {opp.capture_notes && (
-            <div className="mt-4 rounded-lg bg-white/5 p-3">
-              <p className="mb-1 text-[10px] font-semibold uppercase text-slate-500">
-                Capture Notes
-              </p>
-              <p className="text-xs leading-relaxed text-slate-300">{opp.capture_notes}</p>
-            </div>
-          )}
+          <p className="mt-4 text-[10px] text-slate-600 italic">
+            Capture strategy fields available after custom_properties migration.
+          </p>
         </div>
       </div>
 
@@ -172,7 +168,7 @@ export default function WarRoomDetail({ opportunity }: Props) {
       <div className="rounded-xl border border-white/10 bg-[#000A1A] p-5">
         <h2 className="mb-4 text-sm font-semibold text-white">Activity Timeline</h2>
         <p className="text-xs text-slate-500">
-          Activity feed and collaboration coming in Sprint 2.
+          Activity feed and collaboration coming in Sprint 3.
         </p>
       </div>
     </div>

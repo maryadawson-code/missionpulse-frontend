@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ROLE_TO_CONFIG } from '@/lib/supabase/types'
+const ROLE_TO_CONFIG: Record<string, string> = { CEO: 'executive', COO: 'operations', CAP: 'capture_manager', PM: 'proposal_manager', SA: 'solution_architect', FIN: 'pricing_lead', CON: 'contracts_lead', DEL: 'delivery_lead', QA: 'quality_lead', Partner: 'partner', Admin: 'executive', executive: 'executive', operations: 'operations', capture_manager: 'capture_manager', proposal_manager: 'proposal_manager', solution_architect: 'solution_architect', pricing_lead: 'pricing_lead', contracts_lead: 'contracts_lead', delivery_lead: 'delivery_lead', quality_lead: 'quality_lead', author: 'author', partner: 'partner', viewer: 'viewer', admin: 'executive' }
 import type { UserRole, ModuleId } from '@/lib/supabase/types'
 import { ROLES, type RoleConfig, type ModulePermission } from './config'
 
@@ -32,7 +32,7 @@ export function useRole() {
         return
       }
 
-      const { data: profile } = await supabase
+      const { data: profile } = await (supabase as any)
         .from('profiles')
         .select('role')
         .eq('id', user.id)

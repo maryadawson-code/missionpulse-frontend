@@ -4,7 +4,6 @@
  * Maps config role IDs to module permissions
  * © 2026 Mission Meets Tech
  */
-import type { ModuleId } from '@/lib/supabase/types'
 
 export interface ModulePermission {
   shouldRender: boolean
@@ -17,7 +16,7 @@ export interface RoleConfig {
   displayName: string
   type: 'internal' | 'external'
   uiComplexityLevel: 'simplified' | 'standard' | 'advanced' | 'admin'
-  modules: Record<ModuleId, ModulePermission>
+  modules: Record<string, ModulePermission>
 }
 
 /** All 12 roles from config v9.5 */
