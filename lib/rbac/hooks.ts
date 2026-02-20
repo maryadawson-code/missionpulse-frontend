@@ -1,59 +1,60 @@
+// filepath: lib/rbac/hooks.ts
 'use client'
 
-/**
- * RBAC Hooks
- * useRole() — get current user's role config
- * useModuleAccess() — check module permissions
- * © 2026 Mission Meets Tech
- */
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import type { UserRole, ModuleId } from '@/lib/supabase/types'
-import { ROLES, type RoleConfig, type ModulePermission } from './config'
+import { createBrowserClient } from '@supabase/ssr'
+import {
+  type ConfigRoleId,
+  type ModuleId,
+  type ModulePermission,
+  type NavItem,
+  resolveRole,
+  getModulePermission,
+  getVisibleNav,
+  getRoleConfig,
+  isInternalRole,
+} from './config'
 
-const ROLE_TO_CONFIG: Record<string, string> = {
-  CEO: 'executive',
-  COO: 'operations',
-  CAP: 'capture_manager',
-  PM: 'proposal_manager',
-  SA: 'solution_architect',
-  FIN: 'pricing_lead',
-  CON: 'contracts_lead',
-  DEL: 'delivery_lead',
-  QA: 'quality_lead',
-  Partner: 'partner',
-  Admin: 'executive',
-  executive: 'executive',
-  operations: 'operations',
-  capture_manager: 'capture_manager',
-  proposal_manager: 'proposal_manager',
-  solution_architect: 'solution_architect',
-  pricing_lead: 'pricing_lead',
-  contracts_lead: 'contracts_lead',
-  delivery_lead: 'delivery_lead',
-  quality_lead: 'quality_lead',
-  author: 'author',
-  partner: 'partner',
-  viewer: 'viewer',
-  admin: 'executive',
+// ---------------------------------------------------------------------------
+// Browser Supabase client (singleton)
+// ---------------------------------------------------------------------------
+function getSupabase() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
 
-const DEFAULT_CONFIG = ROLES.viewer
+// ---------------------------------------------------------------------------
+// useRole — fetches the current user's DB role and resolves to ConfigRoleId
+// ---------------------------------------------------------------------------
+interface UseRoleReturn {
+  /** Raw DB value from profiles.role */
+  dbRole: string | null
+  /** Resolved canonical config role */
+  role: ConfigRoleId
+  /** Display name for the resolved role */
+  displayName: string
+  /** Loading state — true until first fetch completes */
+  loading: boolean
+  /** Whether the resolved role is internal */
+  isInternal: boolean
+}
 
-/** Get the RBAC config for the current user's role */
-export function useRole() {
-  const [roleConfig, setRoleConfig] = useState<RoleConfig>(DEFAULT_CONFIG)
+export function useRole(): UseRoleReturn {
+  const [dbRole, setDbRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
     async function fetchRole() {
-      const supabase = createClient()
+      const supabase = getSupabase()
       const {
         data: { user },
       } = await supabase.auth.getUser()
 
-      if (!user) {
-        setRoleConfig(DEFAULT_CONFIG)
+      if (!user || cancelled) {
         setLoading(false)
         return
       }
@@ -64,27 +65,89 @@ export function useRole() {
         .eq('id', user.id)
         .single()
 
-      const dbRole = (profile?.role ?? 'Partner') as UserRole
-      const configKey = ROLE_TO_CONFIG[dbRole] ?? 'viewer'
-      setRoleConfig(ROLES[configKey] ?? DEFAULT_CONFIG)
-      setLoading(false)
+      if (!cancelled) {
+        setDbRole(profile?.role ?? null)
+        setLoading(false)
+      }
     }
 
     fetchRole()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  return { roleConfig, loading }
+  const resolved = resolveRole(dbRole)
+  const config = getRoleConfig(resolved)
+
+  return {
+    dbRole,
+    role: resolved,
+    displayName: config.displayName,
+    loading,
+    isInternal: isInternalRole(dbRole),
+  }
 }
 
-/** Check if current role can access a specific module */
-export function useModuleAccess(moduleId: ModuleId): ModulePermission & { loading: boolean } {
-  const { roleConfig, loading } = useRole()
+// ---------------------------------------------------------------------------
+// useModuleAccess — returns permissions for a specific module
+// ---------------------------------------------------------------------------
+interface UseModuleAccessReturn {
+  /** Should this module's UI be rendered at all? (Invisible RBAC) */
+  shouldRender: boolean
+  /** Can the user view content in this module? */
+  canView: boolean
+  /** Can the user edit/mutate in this module? */
+  canEdit: boolean
+  /** Scope restriction (external users) */
+  scopeRestriction?: string
+  /** Loading — permissions unknown until role resolves */
+  loading: boolean
+}
 
-  const permission = roleConfig.modules[moduleId] ?? {
-    shouldRender: false,
-    canView: false,
-    canEdit: false,
+export function useModuleAccess(moduleId: ModuleId): UseModuleAccessReturn {
+  const { dbRole, loading } = useRole()
+
+  if (loading) {
+    // Fail closed: render nothing while loading
+    return {
+      shouldRender: false,
+      canView: false,
+      canEdit: false,
+      loading: true,
+    }
   }
 
-  return { ...permission, loading }
+  const perm: ModulePermission = getModulePermission(dbRole, moduleId)
+
+  return {
+    shouldRender: perm.shouldRender,
+    canView: perm.canView,
+    canEdit: perm.canEdit,
+    scopeRestriction: perm.scopeRestriction,
+    loading: false,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// useVisibleNav — returns filtered nav arrays for sidebar rendering
+// ---------------------------------------------------------------------------
+interface UseVisibleNavReturn {
+  primary: NavItem[]
+  secondary: NavItem[]
+  admin: NavItem[]
+  loading: boolean
+}
+
+export function useVisibleNav(): UseVisibleNavReturn {
+  const { dbRole, loading } = useRole()
+
+  if (loading) {
+    return { primary: [], secondary: [], admin: [], loading: true }
+  }
+
+  return {
+    ...getVisibleNav(dbRole),
+    loading: false,
+  }
 }
