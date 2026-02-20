@@ -1,0 +1,158 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - alert [ref=e2]: MissionPulse — Mission. Technology. Transformation.
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: MissionPulse
+        - button "Collapse sidebar" [ref=e7] [cursor=pointer]:
+          - img [ref=e8]
+      - navigation [ref=e10]:
+        - link "Dashboard" [ref=e11] [cursor=pointer]:
+          - /url: /
+          - img [ref=e12]
+          - generic [ref=e17]: Dashboard
+        - link "Pipeline" [ref=e18] [cursor=pointer]:
+          - /url: /pipeline
+          - img [ref=e19]
+          - generic [ref=e23]: Pipeline
+        - link "War Room" [ref=e24] [cursor=pointer]:
+          - /url: /war-room
+          - img [ref=e25]
+          - generic [ref=e34]: War Room
+        - link "Swimlane" [ref=e35] [cursor=pointer]:
+          - /url: /swimlane
+          - img [ref=e36]
+          - generic [ref=e40]: Swimlane
+        - link "RFP Shredder" [ref=e41] [cursor=pointer]:
+          - /url: /rfp-shredder
+          - img [ref=e42]
+          - generic [ref=e47]: RFP Shredder
+        - link "Contract Scanner" [ref=e48] [cursor=pointer]:
+          - /url: /contract-scanner
+          - img [ref=e49]
+          - generic [ref=e52]: Contract Scanner
+        - link "Iron Dome" [ref=e53] [cursor=pointer]:
+          - /url: /compliance
+          - img [ref=e54]
+          - generic [ref=e56]: Iron Dome
+        - link "Black Hat CUI" [ref=e57] [cursor=pointer]:
+          - /url: /blackhat
+          - img [ref=e58]
+          - generic [ref=e63]: Black Hat
+          - generic [ref=e64]: CUI
+        - link "Pricing CUI" [ref=e65] [cursor=pointer]:
+          - /url: /pricing
+          - img [ref=e66]
+          - generic [ref=e68]: Pricing
+          - generic [ref=e69]: CUI
+        - link "Review Queue" [ref=e70] [cursor=pointer]:
+          - /url: /hitl
+          - img [ref=e71]
+          - generic [ref=e75]: Review Queue
+        - link "Orals Prep" [ref=e76] [cursor=pointer]:
+          - /url: /orals
+          - img [ref=e77]
+          - generic [ref=e80]: Orals Prep
+        - link "Playbook" [ref=e81] [cursor=pointer]:
+          - /url: /playbook
+          - img [ref=e82]
+          - generic [ref=e84]: Playbook
+        - link "Frenemy Intel" [ref=e85] [cursor=pointer]:
+          - /url: /frenemy
+          - img [ref=e86]
+          - generic [ref=e91]: Frenemy Intel
+        - link "Launch" [ref=e92] [cursor=pointer]:
+          - /url: /launch
+          - img [ref=e93]
+          - generic [ref=e98]: Launch
+        - link "Post-Award" [ref=e99] [cursor=pointer]:
+          - /url: /post-award
+          - img [ref=e100]
+          - generic [ref=e103]: Post-Award
+        - link "Agent Hub" [ref=e104] [cursor=pointer]:
+          - /url: /agent-hub
+          - img [ref=e105]
+          - generic [ref=e108]: Agent Hub
+        - link "Settings" [ref=e109] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e110]
+          - generic [ref=e113]: Settings
+      - generic [ref=e114]:
+        - generic [ref=e115]: MW
+        - generic [ref=e116]:
+          - paragraph [ref=e117]: Mary Womack
+          - paragraph [ref=e118]: Executive / Admin
+    - generic [ref=e119]:
+      - banner [ref=e120]:
+        - heading "Pipeline Intelligence" [level=1] [ref=e122]
+        - generic [ref=e123]:
+          - generic [ref=e124]: CEO
+          - generic [ref=e125]:
+            - generic [ref=e126]: MW
+            - generic [ref=e127]: Mary Womack
+          - button "Sign Out" [ref=e129] [cursor=pointer]
+      - main [ref=e130]:
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e133]:
+              - paragraph [ref=e134]: Pipeline Value
+              - paragraph [ref=e135]: $375M
+            - generic [ref=e136]:
+              - paragraph [ref=e137]: Weighted Value
+              - paragraph [ref=e138]: $221M
+            - generic [ref=e139]:
+              - paragraph [ref=e140]: Opportunities
+              - paragraph [ref=e141]: "5"
+            - generic [ref=e142]:
+              - paragraph [ref=e143]: Active Pursuits
+              - paragraph [ref=e144]: "5"
+            - generic [ref=e145]:
+              - paragraph [ref=e146]: Avg Win Prob
+              - paragraph [ref=e147]: 59%
+          - generic [ref=e148]:
+            - generic [ref=e149]:
+              - generic [ref=e150]:
+                - generic [ref=e153]: Long Range
+                - generic [ref=e154]: "0"
+              - paragraph [ref=e156]: No opportunities
+              - paragraph [ref=e158]: Empty
+            - generic [ref=e159]:
+              - generic [ref=e160]:
+                - generic [ref=e163]: "Gate 1: Qualify"
+                - generic [ref=e164]: "0"
+              - paragraph [ref=e166]: No opportunities
+              - paragraph [ref=e168]: Empty
+            - generic [ref=e169]:
+              - generic [ref=e170]:
+                - generic [ref=e173]: "Gate 2: Capture"
+                - generic [ref=e174]: "0"
+              - paragraph [ref=e176]: No opportunities
+              - paragraph [ref=e178]: Empty
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - generic [ref=e183]: "Gate 3: Proposal"
+                - generic [ref=e184]: "0"
+              - paragraph [ref=e186]: No opportunities
+              - paragraph [ref=e188]: Empty
+            - generic [ref=e189]:
+              - generic [ref=e190]:
+                - generic [ref=e193]: Blue Team Review
+                - generic [ref=e194]: "0"
+              - paragraph [ref=e196]: No opportunities
+              - paragraph [ref=e198]: Empty
+            - generic [ref=e199]:
+              - generic [ref=e200]:
+                - generic [ref=e203]: Red Team Review
+                - generic [ref=e204]: "0"
+              - paragraph [ref=e206]: No opportunities
+              - paragraph [ref=e208]: Empty
+            - generic [ref=e209]:
+              - generic [ref=e210]:
+                - generic [ref=e213]: Gold Team / Final
+                - generic [ref=e214]: "0"
+              - paragraph [ref=e216]: No opportunities
+              - paragraph [ref=e218]: Empty
+```
