@@ -1,8 +1,14 @@
+﻿> **STATUS: NOT IMPLEMENTED**
+> This document describes planned/aspirational architecture.
+> See REALITY.md for current system state.
+> Moved to docs/future/ on 2026-02-19 per Phase 2 Reset.
+
+---
 # MissionPulse
 
 **AI-Powered Proposal Management for Federal Contractors**
 
-Mission Meets Tech — *Mission. Technology. Transformation.*
+Mission Meets Tech â€” *Mission. Technology. Transformation.*
 
 ---
 
@@ -24,10 +30,10 @@ See **[ROUTES.md](ROUTES.md)** for the complete list of live API endpoints.
 | Layer | Tech | Status |
 |-------|------|--------|
 | Frontend | 29 standalone HTML files (React + Tailwind via CDN) | Live on Netlify |
-| API | FastAPI (Python) — 8 AI agent endpoints | Live on Render |
-| Database | Supabase PostgreSQL (`djuviwarqdvlbgcfuupa`) | Live — canonical DB |
+| API | FastAPI (Python) â€” 8 AI agent endpoints | Live on Render |
+| Database | Supabase PostgreSQL (`djuviwarqdvlbgcfuupa`) | Live â€” canonical DB |
 | AI | Anthropic Claude via `anthropic` SDK | Live |
-| Auth | Header-based stub (TECH-DEBT — AUTH-001 planned) | Functional, not secure |
+| Auth | Header-based stub (TECH-DEBT â€” AUTH-001 planned) | Functional, not secure |
 
 ### Key Files
 
@@ -53,10 +59,10 @@ roles_permissions_config.json  # RBAC role definitions
 
 See **[STABILIZATION_ROADMAP.md](STABILIZATION_ROADMAP.md)** for the 4-ticket plan:
 
-1. **API-001** — Truth alignment (docs match code) ✅
-2. **DB-001** — Canonical DB connection (migrate SQLite → Supabase)
-3. **AUTH-001** — Real JWT authentication (replace header stub)
-4. **AUDIT-001** — Audit log writes (compliance-ready logging)
+1. **API-001** â€” Truth alignment (docs match code) âœ…
+2. **DB-001** â€” Canonical DB connection (migrate SQLite â†’ Supabase)
+3. **AUTH-001** â€” Real JWT authentication (replace header stub)
+4. **AUDIT-001** â€” Audit log writes (compliance-ready logging)
 
 ## Aspirational Documentation
 
@@ -78,8 +84,9 @@ pytest test_agents.py test_projects.py -v
 
 ## Compliance
 
-CMMC 2.0 Level 2 documentation exists in repo root (`.docx` and `.xlsx` files). **Note:** Several SSP control narratives reference code-level enforcement that is not yet implemented (auth, audit logging, RLS from backend). See REALITY.md §5 for the gap analysis.
+CMMC 2.0 Level 2 documentation exists in repo root (`.docx` and `.xlsx` files). **Note:** Several SSP control narratives reference code-level enforcement that is not yet implemented (auth, audit logging, RLS from backend). See REALITY.md Â§5 for the gap analysis.
 
 ---
 
-© 2026 Mission Meets Tech. All rights reserved. Proprietary and confidential.
+Â© 2026 Mission Meets Tech. All rights reserved. Proprietary and confidential.
+
