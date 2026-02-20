@@ -64,12 +64,6 @@ interface CUIBannerProps {
 }
 
 export function CUIBanner({ classification }: CUIBannerProps) {
-  const { dbRole, loading } = useRole()
-
-  if (loading) return null
-
-  // Only show CUI banner if role's security config forces watermark
-  // The banner is purely informational — RLS enforces actual access
   return (
     <div
       className="w-full bg-amber-900/30 border border-amber-500/40 text-amber-200 text-center text-xs font-mono py-1.5 px-4"

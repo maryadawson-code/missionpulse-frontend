@@ -1,6 +1,7 @@
 // FILE: components/dashboard/Sidebar.tsx
 // SECURITY: NIST 800-53 Rev 5 CHECKED — Invisible RBAC
 // Sprint 2 Fix: null-safe profile.role fallback, correct ModuleId types
+// T-4 Fix: Wired to new lib/rbac/config API (resolveRole + getModulePermission)
 'use client';
 
 import { useState } from 'react';
@@ -28,8 +29,9 @@ import {
   ChevronRight,
   LogOut,
 } from 'lucide-react';
-import { ROLES as RBAC_CONFIG } from '@/lib/rbac/config';
-import type { Profile, ModuleId } from '@/lib/supabase/types';
+import { resolveRole, getModulePermission, getRoleConfig } from '@/lib/rbac/config';
+import type { Profile } from '@/lib/supabase/types';
+import type { ModuleId } from '@/lib/rbac/config';
 
 // ============================================================
 // NAV ITEM DEFINITIONS
@@ -46,21 +48,21 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/', icon: LayoutDashboard },
   { id: 'pipeline', label: 'Pipeline', href: '/pipeline', icon: GitBranch },
-  { id: 'war_room', label: 'War Room', href: '/war-room', icon: Swords },
-  { id: 'swimlane', label: 'Swimlane', href: '/swimlane', icon: Waves },
-  { id: 'rfp_shredder', label: 'RFP Shredder', href: '/rfp-shredder', icon: FileSearch },
-  { id: 'contract_scanner', label: 'Contract Scanner', href: '/contract-scanner', icon: ClipboardList },
-  { id: 'iron_dome', label: 'Iron Dome', href: '/compliance', icon: Shield },
-  { id: 'black_hat', label: 'Black Hat', href: '/blackhat', icon: Skull, cuiBanner: 'CUI // OPSEC' },
+  { id: 'strategy', label: 'War Room', href: '/war-room', icon: Swords },
+  { id: 'workflow_board', label: 'Swimlane', href: '/swimlane', icon: Waves },
+  { id: 'proposals', label: 'RFP Shredder', href: '/rfp-shredder', icon: FileSearch },
+  { id: 'compliance', label: 'Contract Scanner', href: '/contract-scanner', icon: ClipboardList },
+  { id: 'compliance', label: 'Iron Dome', href: '/compliance', icon: Shield },
+  { id: 'blackhat', label: 'Black Hat', href: '/blackhat', icon: Skull, cuiBanner: 'CUI // OPSEC' },
   { id: 'pricing', label: 'Pricing', href: '/pricing', icon: DollarSign, cuiBanner: 'CUI // SP-PROPIN' },
-  { id: 'hitl', label: 'Review Queue', href: '/hitl', icon: UserCheck },
-  { id: 'orals', label: 'Orals Prep', href: '/orals', icon: Mic },
-  { id: 'playbook', label: 'Playbook', href: '/playbook', icon: BookOpen },
-  { id: 'frenemy', label: 'Frenemy Intel', href: '/frenemy', icon: Users },
-  { id: 'launch', label: 'Launch', href: '/launch', icon: Rocket },
-  { id: 'post_award', label: 'Post-Award', href: '/post-award', icon: Award },
-  { id: 'agent_hub', label: 'Agent Hub', href: '/agent-hub', icon: Bot },
-  { id: 'settings', label: 'Settings', href: '/settings', icon: Settings },
+  { id: 'proposals', label: 'Review Queue', href: '/hitl', icon: UserCheck },
+  { id: 'proposals', label: 'Orals Prep', href: '/orals', icon: Mic },
+  { id: 'documents', label: 'Playbook', href: '/playbook', icon: BookOpen },
+  { id: 'analytics', label: 'Frenemy Intel', href: '/frenemy', icon: Users },
+  { id: 'pipeline', label: 'Launch', href: '/launch', icon: Rocket },
+  { id: 'pipeline', label: 'Post-Award', href: '/post-award', icon: Award },
+  { id: 'ai_chat', label: 'Agent Hub', href: '/agent-hub', icon: Bot },
+  { id: 'admin', label: 'Settings', href: '/settings', icon: Settings },
 ];
 
 // ============================================================
@@ -76,20 +78,18 @@ export default function Sidebar({ profile, onSignOut }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
-  // FIX: Null-safe role access with 'Partner' fallback (lowest privilege)
+  // Null-safe role access with 'Partner' fallback (lowest privilege)
   const userRole = profile?.role ?? 'Partner';
-  const roleConfig = RBAC_CONFIG[userRole] ?? RBAC_CONFIG['partner'] ?? null;
+  const configRole = resolveRole(userRole);
+  const roleConfig = getRoleConfig(configRole);
 
   /**
    * Invisible RBAC: If the role config says shouldRender=false,
    * the nav item doesn't appear in the DOM at all.
    */
-  const canSeeModule = (moduleId: string): boolean => {
-    if (!roleConfig) return false;
-    const moduleAccess = roleConfig.modules?.[moduleId as ModuleId];
-    // If no config entry exists for this module, hide it (fail closed)
-    if (!moduleAccess) return false;
-    return moduleAccess.shouldRender && moduleAccess.canView;
+  const canSeeModule = (moduleId: ModuleId): boolean => {
+    const perm = getModulePermission(userRole, moduleId);
+    return perm.shouldRender && perm.canView;
   };
 
   const visibleItems = NAV_ITEMS.filter((item) => canSeeModule(item.id));
@@ -135,7 +135,7 @@ export default function Sidebar({ profile, onSignOut }: SidebarProps) {
 
           return (
             <Link
-              key={item.id}
+              key={item.href}
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                 isActive
@@ -188,7 +188,7 @@ export default function Sidebar({ profile, onSignOut }: SidebarProps) {
                 {profile.full_name ?? profile.email}
               </p>
               <p className="text-xs truncate" style={{ color: '#94A3B8' }}>
-                {userRole}
+                {roleConfig.displayName}
               </p>
             </div>
           )}
