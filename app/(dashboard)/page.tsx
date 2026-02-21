@@ -107,7 +107,7 @@ function DeadlineRow({ opp }: { opp: Opportunity }) {
 
 // ─── Dashboard Page ─────────────────────────────────────────────
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  const supabase = createClient()
 
   // Fetch all opportunities for the user's company (RLS enforces tenant isolation)
   const { data: opportunities, error } = await supabase
@@ -118,7 +118,13 @@ export default async function DashboardPage() {
   const opps: Opportunity[] = opportunities ?? []
 
   // Fetch recent activity for feed
-  const { data: activityItems } = await getRecentActivity(10)
+  let activityItems: Awaited<ReturnType<typeof getRecentActivity>>['data'] = []
+  try {
+    const result = await getRecentActivity(10)
+    activityItems = result.data ?? []
+  } catch {
+    // Non-critical — continue without activity feed
+  }
 
   // ─── Compute KPIs ───────────────────────────────────────────
   const totalOpps = opps.length
