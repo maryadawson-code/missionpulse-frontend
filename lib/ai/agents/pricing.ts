@@ -2,6 +2,7 @@
 
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
+import { buildPricingContext } from '@/lib/integrations/fpds/client'
 
 export async function runPricingAgent(context: {
   title: string
@@ -22,6 +23,16 @@ export async function runPricingAgent(context: {
       ? `\n\nExisting LCATs already defined:\n${context.existingLCATs.join(', ')}`
       : ''
 
+  // Fetch FPDS pricing benchmarks if agency + NAICS available
+  let fpdsContext = ''
+  if (context.agency && context.naicsCode) {
+    try {
+      fpdsContext = await buildPricingContext(context.agency, context.naicsCode)
+    } catch {
+      fpdsContext = 'FPDS data temporarily unavailable.'
+    }
+  }
+
   const prompt = `Generate pricing recommendations for this government contract opportunity:
 
 Title: ${context.title}
@@ -34,10 +45,11 @@ Key Requirements:
 ${reqList || 'No specific requirements listed'}
 ${lcatList}
 
+${fpdsContext ? `\n--- FPDS MARKET DATA ---\n${fpdsContext}\n---\n` : ''}
 Please provide:
 1. **Recommended LCATs**: Labor categories needed with suggested levels, typical hourly rates for ${context.agency}, and headcount estimates
 2. **BOE Framework**: Basis of Estimate structure — how to justify proposed staffing levels and hours
-3. **Price-to-Win Analysis**: Market benchmarks, competitor rate ranges, recommended pricing strategy (aggressive/moderate/conservative)
+3. **Price-to-Win Analysis**: Market benchmarks, competitor rate ranges, recommended pricing strategy (aggressive/moderate/conservative)${fpdsContext ? ' — incorporate the FPDS market data above' : ''}
 4. **Margin Scenarios**: Three pricing scenarios with different margin targets and their implications
 5. **Wrap Rate Guidance**: Recommended fringe, overhead, G&A, and fee percentages for this contract type
 
@@ -50,6 +62,6 @@ IMPORTANT: This analysis contains CUI//SP-PROPIN data. All pricing information i
     prompt,
     opportunityId: context.opportunityId,
     systemPrompt:
-      'You are a GovCon pricing strategist with deep expertise in government cost proposals. Provide specific rate recommendations based on agency, NAICS, and market data. Focus on realistic, competitive pricing that maximizes win probability while maintaining acceptable margins. All output is CUI//SP-PROPIN.',
+      'You are a GovCon pricing strategist with deep expertise in government cost proposals. Provide specific rate recommendations based on agency, NAICS, and market data. When FPDS market data is provided, use it to calibrate your pricing recommendations and validate your rate ranges against actual market transactions. Focus on realistic, competitive pricing that maximizes win probability while maintaining acceptable margins. All output is CUI//SP-PROPIN.',
   })
 }
