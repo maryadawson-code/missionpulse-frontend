@@ -1,7 +1,7 @@
 # MissionPulse v1.1 + v1.2 Roadmap Extension
 
 **From Launch to Market Leader**
-9 Sprints • ~42 Tickets • Phases G–H
+10 Sprints • ~46 Tickets • Phases G–H
 
 Supersedes nothing — extends MissionPulse_v2_Master_Roadmap.docx (S3–S18)
 Sprint numbering continues from S18. Ticket numbering continues from T-18.4.
@@ -20,14 +20,14 @@ HEAD: d2b5e13 on main. Both branches synced. Build: CLEAR — 0 errors, 0 type e
 
 ### 1.2 Where We're Going
 
-v1.1 delivers the integrations and performance layer. v1.2 delivers real-time collaboration, proactive AI, and the advanced intelligence features that create competitive moats.
+v1.1 delivers the integrations, performance layer, and revenue protection (token budget enforcement + Stripe billing). v1.2 delivers real-time collaboration, proactive AI, and the advanced intelligence features that create competitive moats.
 
 ### 1.3 Phase Map
 
 | Phase | Sprints | What Ships |
 |-------|---------|------------|
-| G: Integrations & Performance (v1.1) | S19–S23 | Redis caching, advanced doc gen (PPTX/XLSX/DOCX), Salesforce, GovWin IQ, M365, Slack, Playbook v2, model analytics |
-| H: Collaboration & Proactive AI (v1.2) | S24–S27 | USAspending/FPDS, Google Workspace, DocuSign, advanced RAG, proactive AI, real-time collab, Teams, model fine-tuning |
+| G: Integrations & Performance (v1.1) | S19–S24 | Redis caching, token budget enforcement, Stripe billing, advanced doc gen (PPTX/XLSX/DOCX), Salesforce, GovWin IQ, M365, Slack, Playbook v2, model analytics |
+| H: Collaboration & Proactive AI (v1.2) | S25–S28 | USAspending/FPDS, Google Workspace, DocuSign, advanced RAG, proactive AI, real-time collab, Teams, model fine-tuning |
 
 ### 1.4 Sprint Cadence
 
@@ -54,7 +54,7 @@ v1.1 delivers the integrations and performance layer. v1.2 delivers real-time co
 
 ## 2. PHASE G: Integrations, Docs & Performance (v1.1)
 
-Goal: Connect MissionPulse to every tool GovCon teams already use. Generate publication-ready documents. Make the platform fast enough that teams forget they're using a web app.
+Goal: Connect MissionPulse to every tool GovCon teams already use. Generate publication-ready documents. Enforce token budgets so one customer can't eat the AskSage bill. Make the platform fast enough that teams forget they're using a web app.
 
 ---
 
@@ -131,11 +131,102 @@ Instrument key user flows with timing metrics. Page load, AI response time, sear
 
 ---
 
-### SPRINT 20 — Advanced Document Generation
+### SPRINT 20 — Token Budget Enforcement & Billing
+
+*Plan-aware token ledger. Soft/hard caps with graduated alerts. In-app overage purchase via Stripe. Gateway-level enforcement middleware. Revenue protection before scaling users.*
+
+**Why this sprint exists:** The Product Spec (Section 17) promises tiered token allocations — 500K/mo (Starter), 2M/mo (Professional), 10M/mo (Enterprise) — with per-MTok overage pricing. v1.0 ships a usage dashboard (T-12.4) but NO enforcement. Without this sprint, a single Starter customer running aggressive AI queries could burn through your AskSage bill in hours. This is revenue protection, not a feature.
+
+#### T-20.1 Subscription Plans & Token Ledger
+
+Plan definitions stored in DB. Per-company token ledger that tracks allocation, consumption, and remaining balance. Monthly reset via cron. Ledger is the single source of truth for "can this company make an AI call?"
+
+**Acceptance Criteria:**
+- [ ] SQL migration: `subscription_plans` table (plan_id, name, monthly_token_limit, overage_rate_per_mtok, max_users, max_opportunities, features JSONB)
+- [ ] SQL migration: `company_subscriptions` table (company_id FK, plan_id FK, status, current_period_start, current_period_end, stripe_subscription_id, stripe_customer_id)
+- [ ] SQL migration: `token_ledger` table (company_id FK, period_start, period_end, tokens_allocated, tokens_consumed, tokens_purchased, overage_tokens_used)
+- [ ] Seed data: 3 plans matching Product Spec Section 17 (Starter: 500K tokens/$0.80 overage, Professional: 2M/$0.60, Enterprise: 10M/volume)
+- [ ] Monthly ledger reset Edge Function (cron: 1st of month, creates new period, carries zero balance)
+- [ ] RLS policies: company members can read own ledger, admin can read all
+- [ ] `supabase gen types` run after migration
+- [ ] npm run build passes
+
+**Depends on:** Supabase dashboard access
+**Files:** supabase/migrations/YYYYMMDD_token_billing.sql, lib/billing/plans.ts, lib/billing/ledger.ts, supabase/functions/ledger-reset/index.ts
+
+---
+
+#### T-20.2 Gateway Token Metering & Enforcement
+
+Every AskSage call passes through a token gate. Before routing, check remaining balance. After response, debit actual tokens used. Graduated enforcement: warn at thresholds, soft-block at 100% (allow active proposals to finish), hard-block at 120% (no new AI calls).
+
+**Acceptance Criteria:**
+- [ ] `lib/billing/token-gate.ts` — middleware called by AI gateway before every AskSage request
+- [ ] Pre-flight check: read token_ledger → if remaining > 0, proceed; if 0, check overage allowance
+- [ ] Post-response debit: update tokens_consumed in token_ledger with actual token count from AskSage response
+- [ ] Graduated enforcement:
+  - 50% consumed → info banner on AI Chat ("50% of monthly AI credits used")
+  - 75% consumed → warning banner + notification to executive role
+  - 90% consumed → urgent banner + email notification to executive
+  - 100% consumed → soft-block: new AI requests return "Monthly limit reached" with upgrade CTA; in-progress proposals (active HITL queue items) get grace period of 10K tokens
+  - 120% consumed (overage) → hard-block: all AI features disabled until purchase or new period
+- [ ] Grace period: proposals with gate_decisions in last 48hr get 10K bonus tokens (prevents submission-day lockout)
+- [ ] All enforcement decisions logged to audit_logs
+- [ ] npm run build passes
+
+**Depends on:** T-20.1, T-10.1 (AskSage gateway)
+**Files:** lib/billing/token-gate.ts, lib/ai/gateway.ts (modify to call token-gate), components/features/ai/TokenBudgetBanner.tsx
+
+---
+
+#### T-20.3 Budget Alerts & Usage Dashboard Upgrade
+
+Upgrade the existing token usage dashboard (T-12.4) with plan-aware context. Show allocation vs consumption gauge. Budget burn rate projection ("At current pace, you'll hit your limit on March 18"). Threshold alerts via notification system.
+
+**Acceptance Criteria:**
+- [ ] Token gauge widget: consumed / allocated with color zones (green <50%, yellow 50-75%, orange 75-90%, red >90%)
+- [ ] Burn rate projection: linear extrapolation of daily consumption → projected exhaustion date
+- [ ] Plan name and tier displayed ("Professional — 2M tokens/mo")
+- [ ] Usage breakdown: tokens by agent, by proposal, by model
+- [ ] Budget alerts pushed via T-14.4 notification system at 50%, 75%, 90%, 100% thresholds
+- [ ] Alert preferences: executive/operations can configure which thresholds trigger email vs in-app
+- [ ] "Upgrade Plan" and "Buy More Tokens" CTAs visible when >75% consumed
+- [ ] RBAC: all roles see their company's gauge; only executive/operations/admin see full breakdown
+- [ ] npm run build passes
+
+**Depends on:** T-20.1, T-20.2, T-12.4 (existing dashboard), T-14.4 (Notification System)
+**Files:** app/(dashboard)/admin/ai-usage/page.tsx (modify), components/features/admin/TokenGauge.tsx, components/features/admin/BurnRateProjection.tsx, lib/billing/burn-rate.ts
+
+---
+
+#### T-20.4 Stripe Integration & Overage Purchase Flow
+
+Stripe Checkout for in-app token purchases. Three flows: (1) plan upgrade (Starter→Professional), (2) one-time token pack purchase, (3) auto-overage billing (charge per-MTok when limit exceeded, if enabled). Webhook handler for payment confirmation → instant token credit.
+
+**Acceptance Criteria:**
+- [ ] Stripe SDK configured in lib/billing/stripe.ts (server-side only, key in env)
+- [ ] Plan upgrade flow: select new plan → Stripe Checkout → webhook confirms → update company_subscriptions + token_ledger
+- [ ] Token pack purchase: "Buy 500K tokens" button → Stripe Checkout → webhook → credit tokens_purchased in token_ledger
+- [ ] Token pack options: 500K ($50), 1M ($90), 5M ($400) — displayed as cards with per-token savings
+- [ ] Auto-overage toggle (enterprise only): if enabled, charges overage_rate_per_mtok from plan automatically instead of blocking
+- [ ] Stripe webhook handler: /api/webhooks/stripe (validates signature, processes checkout.session.completed + invoice.paid events)
+- [ ] Receipt stored in company_subscriptions metadata
+- [ ] Purchase confirmation notification to executive role
+- [ ] Purchased tokens credited instantly (no manual intervention)
+- [ ] RBAC: only executive can purchase/upgrade
+- [ ] STRIPE_SECRET_KEY in .env.local only, never in NEXT_PUBLIC_*
+- [ ] npm run build passes
+
+**Depends on:** T-20.1, T-20.2
+**Files:** lib/billing/stripe.ts, lib/billing/checkout.ts, app/api/webhooks/stripe/route.ts, app/(dashboard)/settings/billing/page.tsx, components/features/billing/TokenPackCards.tsx, components/features/billing/PlanUpgradeModal.tsx
+
+---
+
+### SPRINT 21 — Advanced Document Generation
 
 *PPTX generation for orals and gate decks. XLSX export for compliance matrices and cost models. DOCX generation for technical volumes. Enhanced binder assembly.*
 
-#### T-20.1 PPTX Generation Engine
+#### T-21.1 PPTX Generation Engine
 
 Generate PowerPoint decks from structured data. Two templates: Orals Prep deck (slides + speaker notes + Q&A) and Gate Decision deck (Go/No-Go recommendation with metrics). Shield & Pulse branding baked into templates.
 
@@ -153,7 +244,7 @@ Generate PowerPoint decks from structured data. Two templates: Orals Prep deck (
 
 ---
 
-#### T-20.2 XLSX Generation Engine
+#### T-21.2 XLSX Generation Engine
 
 Export structured data to formatted Excel workbooks. Three outputs: Compliance Matrix (from Iron Dome), Cost Model (from Pricing module), Red Team Scorecard (from Black Hat). Formatted headers, conditional formatting, freeze panes.
 
@@ -171,7 +262,7 @@ Export structured data to formatted Excel workbooks. Three outputs: Compliance M
 
 ---
 
-#### T-20.3 DOCX Generation Engine
+#### T-21.3 DOCX Generation Engine
 
 Generate Word documents from AI-drafted content. Technical Volume (formatted per RFP instructions with CUI banners), Key Personnel resumes (RFP-templated), FAR Risk Memo (clause analysis with risk ratings). Track-changes preserved in output.
 
@@ -188,7 +279,7 @@ Generate Word documents from AI-drafted content. Technical Volume (formatted per
 
 ---
 
-#### T-20.4 Enhanced Binder Assembly
+#### T-21.4 Enhanced Binder Assembly
 
 Upgrade one-click binder assembly to use new doc gen engines. ZIP contains formatted DOCX volumes, XLSX compliance matrix, PPTX gate deck, and a generated table of contents. CUI markings on all applicable files.
 
@@ -199,16 +290,16 @@ Upgrade one-click binder assembly to use new doc gen engines. ZIP contains forma
 - [ ] File naming convention: [OpportunityTitle]_[Volume]_[Date].ext
 - [ ] npm run build passes
 
-**Depends on:** T-14.2 (Launch Control), T-20.1, T-20.2, T-20.3
+**Depends on:** T-14.2 (Launch Control), T-21.1, T-21.2, T-21.3
 **Files:** lib/utils/binder-assembly.ts (rewrite), lib/docgen/binder-toc.ts
 
 ---
 
-### SPRINT 21 — Salesforce + GovWin IQ
+### SPRINT 22 — Salesforce + GovWin IQ
 
 *Bi-directional CRM sync. Competitor intelligence feed. Pipeline auto-enrichment.*
 
-#### T-21.1 Salesforce OAuth + Field Mapping
+#### T-22.1 Salesforce OAuth + Field Mapping
 
 OAuth 2.0 connection to Salesforce. Admin-configurable field mapping: MissionPulse opportunity fields ↔ Salesforce deal properties. Mapping stored in integration_configs table.
 
@@ -225,7 +316,7 @@ OAuth 2.0 connection to Salesforce. Admin-configurable field mapping: MissionPul
 
 ---
 
-#### T-21.2 Salesforce Bi-directional Sync
+#### T-22.2 Salesforce Bi-directional Sync
 
 Sync engine: MissionPulse → Salesforce, Salesforce → MissionPulse, or bidirectional. Conflict resolution: last-write-wins with audit log entry on every conflict. Webhook-based real-time + manual sync button.
 
@@ -238,12 +329,12 @@ Sync engine: MissionPulse → Salesforce, Salesforce → MissionPulse, or bidire
 - [ ] Shipley phase changes auto-update Salesforce deal stage
 - [ ] npm run build passes
 
-**Depends on:** T-21.1, T-5.3 (opportunity CRUD)
+**Depends on:** T-22.1, T-5.3 (opportunity CRUD)
 **Files:** lib/integrations/salesforce/sync-engine.ts, lib/integrations/salesforce/webhooks.ts
 
 ---
 
-#### T-21.3 Salesforce Contact Sync
+#### T-22.3 Salesforce Contact Sync
 
 Sync contacts between Salesforce and opportunity stakeholder records. Map Salesforce contacts to MissionPulse opportunity_contacts. Role mapping (Decision Maker, Influencer, Technical POC).
 
@@ -251,15 +342,15 @@ Sync contacts between Salesforce and opportunity stakeholder records. Map Salesf
 - [ ] Contact sync from Salesforce → opportunity_contacts table
 - [ ] Role mapping: Salesforce contact role → MissionPulse stakeholder type
 - [ ] Contact deduplication by email address
-- [ ] Sync runs on opportunity sync (piggybacks on T-21.2)
+- [ ] Sync runs on opportunity sync (piggybacks on T-22.2)
 - [ ] npm run build passes
 
-**Depends on:** T-21.2
+**Depends on:** T-22.2
 **Files:** lib/integrations/salesforce/contact-sync.ts
 
 ---
 
-#### T-21.4 GovWin IQ Integration
+#### T-22.4 GovWin IQ Integration
 
 OAuth connection to GovWin IQ. Pull opportunity alerts matching NAICS codes and agency focus. Competitor tracking feed showing who's bidding. Agency intel summaries (budget forecasts, acquisition timelines).
 
@@ -277,11 +368,11 @@ OAuth connection to GovWin IQ. Pull opportunity alerts matching NAICS codes and 
 
 ---
 
-### SPRINT 22 — Microsoft 365 + Slack
+### SPRINT 23 — Microsoft 365 + Slack
 
 *OneDrive doc collaboration. Outlook calendar sync. Slack channel notifications. Gate approvals via Slack.*
 
-#### T-22.1 Microsoft 365 OAuth + OneDrive
+#### T-23.1 Microsoft 365 OAuth + OneDrive
 
 OAuth 2.0 via Microsoft identity platform (MSAL). OneDrive integration: save generated documents directly to user's OneDrive. Open proposal volumes in Word Online for collaborative editing. Bi-directional file sync.
 
@@ -293,12 +384,12 @@ OAuth 2.0 via Microsoft identity platform (MSAL). OneDrive integration: save gen
 - [ ] Folder structure: /MissionPulse/[OpportunityTitle]/[Volume]/
 - [ ] npm run build passes
 
-**Depends on:** T-15.1, T-20.3
+**Depends on:** T-15.1, T-21.3
 **Files:** lib/integrations/m365/auth.ts, lib/integrations/m365/onedrive.ts, app/(dashboard)/integrations/m365/page.tsx
 
 ---
 
-#### T-22.2 Outlook Calendar + SharePoint
+#### T-23.2 Outlook Calendar + SharePoint
 
 Push MissionPulse deadlines (gate reviews, color teams, submission dates) to Outlook calendar. SharePoint document library as alternative to OneDrive for team-level storage.
 
@@ -309,12 +400,12 @@ Push MissionPulse deadlines (gate reviews, color teams, submission dates) to Out
 - [ ] SharePoint site/library picker for document storage
 - [ ] npm run build passes
 
-**Depends on:** T-22.1
+**Depends on:** T-23.1
 **Files:** lib/integrations/m365/calendar.ts, lib/integrations/m365/sharepoint.ts
 
 ---
 
-#### T-22.3 Slack OAuth + Channel Notifications
+#### T-23.3 Slack OAuth + Channel Notifications
 
 Slack OAuth. Create or link a Slack channel per opportunity. Push notifications for: gate approvals needed, deadline warnings (48hr/24hr), HITL queue items, pWin changes >10%, new team assignments.
 
@@ -331,7 +422,7 @@ Slack OAuth. Create or link a Slack channel per opportunity. Push notifications 
 
 ---
 
-#### T-22.4 Slack Gate Approval Workflows
+#### T-23.4 Slack Gate Approval Workflows
 
 Interactive Slack messages for gate approvals. Exec receives message with opportunity summary, pWin, compliance %, and Approve/Reject buttons. Response writes to gate_decisions table and triggers downstream notifications.
 
@@ -343,16 +434,16 @@ Interactive Slack messages for gate approvals. Exec receives message with opport
 - [ ] RBAC enforced: only users with canEdit on proposals can approve via Slack
 - [ ] npm run build passes
 
-**Depends on:** T-22.3, T-14.2 (Launch Control)
+**Depends on:** T-23.3, T-14.2 (Launch Control)
 **Files:** lib/integrations/slack/gate-approval.ts, lib/integrations/slack/webhook-handler.ts
 
 ---
 
-### SPRINT 23 — Playbook v2 + v1.1 Hardening
+### SPRINT 24 — Playbook v2 + v1.1 Hardening
 
 *Anti-homogenization engine. Quality scoring. Integration regression testing. Performance benchmarking.*
 
-#### T-23.1 Playbook v2 Anti-Homogenization Engine
+#### T-24.1 Playbook v2 Anti-Homogenization Engine
 
 Company voice fingerprinting: analyze uploaded past proposals to extract writing patterns, vocabulary, sentence structure, and domain-specific terminology. AI outputs are filtered through the voice profile to prevent generic "AI-sounding" text. Addresses Lohfeld's "regression to average" concern.
 
@@ -369,7 +460,7 @@ Company voice fingerprinting: analyze uploaded past proposals to extract writing
 
 ---
 
-#### T-23.2 Playbook Quality Scoring
+#### T-24.2 Playbook Quality Scoring
 
 Score every Playbook entry on: relevance to current opportunities, freshness (days since last use), win correlation (entries used in won proposals score higher). Surface highest-quality entries first in AI retrieval.
 
@@ -386,24 +477,26 @@ Score every Playbook entry on: relevance to current opportunities, freshness (da
 
 ---
 
-#### T-23.3 v1.1 Integration Regression Testing
+#### T-24.3 v1.1 Integration Regression Testing
 
-End-to-end test suite covering all v1.1 integrations. Verify: OAuth flows, sync operations, notification delivery, document generation, cache behavior. Mock external APIs for CI reliability.
+End-to-end test suite covering all v1.1 integrations. Verify: OAuth flows, sync operations, notification delivery, document generation, cache behavior, token enforcement. Mock external APIs for CI reliability.
 
 **Acceptance Criteria:**
 - [ ] Playwright tests for: Salesforce sync, GovWin import, M365 save, Slack notification
+- [ ] Token gate tests: verify soft-block at 100%, hard-block at 120%, grace period for active proposals
+- [ ] Stripe webhook tests: mock checkout.session.completed → verify token credit
 - [ ] Mock API server for external services (no live API calls in CI)
 - [ ] Document generation tests: verify PPTX/XLSX/DOCX output validity
 - [ ] Cache tests: verify hit/miss behavior, TTL expiry, invalidation
 - [ ] All tests pass in CI pipeline
 - [ ] npm run build passes
 
-**Depends on:** All S19–S22 tickets
-**Files:** tests/integrations/*.spec.ts, tests/mocks/*.ts
+**Depends on:** All S19–S23 tickets
+**Files:** tests/integrations/*.spec.ts, tests/billing/*.spec.ts, tests/mocks/*.ts
 
 ---
 
-#### T-23.4 v1.1 Performance Benchmarking
+#### T-24.4 v1.1 Performance Benchmarking
 
 Benchmark all key flows against v1.0 baseline. Target: 40% improvement in AI response time (cache hits), <2s page loads, <500ms search. Optimize any flow exceeding thresholds.
 
@@ -426,11 +519,11 @@ Goal: Make MissionPulse the place where proposals are written, not just managed.
 
 ---
 
-### SPRINT 24 — Federal Data Sources + Data Migration
+### SPRINT 25 — Federal Data Sources + Data Migration
 
 *USAspending award intelligence. FPDS contract actions. Bulk data import for new customers.*
 
-#### T-24.1 USAspending API Integration
+#### T-25.1 USAspending API Integration
 
 Connect to USAspending.gov API. Pull award history, prime/sub relationships, spending trends by agency. Enrich opportunity records with historical award data for the same agency/NAICS.
 
@@ -448,7 +541,7 @@ Connect to USAspending.gov API. Pull award history, prime/sub relationships, spe
 
 ---
 
-#### T-24.2 FPDS API Integration
+#### T-25.2 FPDS API Integration
 
 Connect to FPDS (Federal Procurement Data System). Pull contract actions, vendor history, pricing benchmarks. Feed pricing data into Pricing Agent for price-to-win analysis.
 
@@ -465,7 +558,7 @@ Connect to FPDS (Federal Procurement Data System). Pull contract actions, vendor
 
 ---
 
-#### T-24.3 Data Migration Tools
+#### T-25.3 Data Migration Tools
 
 Import wizard for new customers migrating from Excel, Deltek, or manual tracking. CSV/XLSX import for: opportunities, contacts, past performance narratives. Bulk document upload for Playbook seeding. Validation + preview before commit.
 
@@ -484,11 +577,11 @@ Import wizard for new customers migrating from Excel, Deltek, or manual tracking
 
 ---
 
-### SPRINT 25 — Google Workspace + DocuSign
+### SPRINT 26 — Google Workspace + DocuSign
 
 *Google Drive doc collaboration. Calendar deadlines. Gmail notifications. E-signature for gate decisions and NDAs.*
 
-#### T-25.1 Google Workspace Integration
+#### T-26.1 Google Workspace Integration
 
 OAuth to Google Workspace. Google Drive for document collaboration (alternative to M365). Calendar event push for deadlines. Gmail notification dispatch.
 
@@ -501,12 +594,12 @@ OAuth to Google Workspace. Google Drive for document collaboration (alternative 
 - [ ] Gmail notification option in notification preferences (alternative to native email)
 - [ ] npm run build passes
 
-**Depends on:** T-15.1, T-20.3, T-14.4
+**Depends on:** T-15.1, T-21.3, T-14.4
 **Files:** lib/integrations/google/auth.ts, lib/integrations/google/drive.ts, lib/integrations/google/calendar.ts, app/(dashboard)/integrations/google/page.tsx
 
 ---
 
-#### T-25.2 DocuSign Integration
+#### T-26.2 DocuSign Integration
 
 OAuth to DocuSign. Route documents for e-signature: gate decision approvals (Go/No-Go), NDA/Teaming Agreement signatures for partners, certification attestations. Signed documents stored with audit trail.
 
@@ -524,11 +617,11 @@ OAuth to DocuSign. Route documents for e-signature: gate decision approvals (Go/
 
 ---
 
-### SPRINT 26 — Advanced RAG + Proactive AI
+### SPRINT 27 — Advanced RAG + Proactive AI
 
 *Smarter retrieval. Cross-proposal knowledge. AI that warns before deadlines slip and sections go missing.*
 
-#### T-26.1 Advanced RAG Pipeline
+#### T-27.1 Advanced RAG Pipeline
 
 Upgrade pgvector retrieval: semantic chunking (respect document structure, not fixed token windows), hybrid search (vector + keyword TF-IDF), re-ranking with cross-encoder model via AskSage. Measurably better retrieval quality for Playbook and past performance matching.
 
@@ -545,7 +638,7 @@ Upgrade pgvector retrieval: semantic chunking (respect document structure, not f
 
 ---
 
-#### T-26.2 Cross-Proposal Knowledge Graph
+#### T-27.2 Cross-Proposal Knowledge Graph
 
 Entity extraction from uploaded proposals: agencies, contract vehicles, key personnel, technologies, past performance references. Relationship mapping stored in knowledge_graph table. Powers: "Show me every proposal where we mentioned FHIR integration."
 
@@ -557,12 +650,12 @@ Entity extraction from uploaded proposals: agencies, contract vehicles, key pers
 - [ ] Visual graph explorer (optional, stretch goal)
 - [ ] npm run build passes
 
-**Depends on:** T-26.1, T-12.1 (AI Chat)
+**Depends on:** T-27.1, T-12.1 (AI Chat)
 **Files:** lib/rag/entity-extractor.ts, lib/rag/knowledge-graph.ts, SQL migration for knowledge_graph table
 
 ---
 
-#### T-26.3 Proactive AI — Deadline Risk Alerts
+#### T-27.3 Proactive AI — Deadline Risk Alerts
 
 AI monitors proposal timelines and flags at-risk sections. Inputs: section due dates, current completion %, historical velocity. Output: risk score per section with recommended actions. Alerts push to War Room and notifications.
 
@@ -580,7 +673,7 @@ AI monitors proposal timelines and flags at-risk sections. Inputs: section due d
 
 ---
 
-#### T-26.4 Proactive AI — Missing Section Detection
+#### T-27.4 Proactive AI — Missing Section Detection
 
 AI scans compliance matrix against proposal document tree. Detects: requirements with no assigned section, sections with no content, orphan sections not tied to any requirement. Alerts push as HITL queue items.
 
@@ -596,7 +689,7 @@ AI scans compliance matrix against proposal document tree. Detects: requirements
 
 ---
 
-#### T-26.5 Model Fine-tuning Pipeline
+#### T-27.5 Model Fine-tuning Pipeline
 
 Prepare company-specific training data from Playbook library. Export prompt/completion pairs from accepted AI outputs. Integration with AskSage fine-tuning API (when available) or direct provider fine-tune endpoints. Admin UI to trigger fine-tuning jobs and monitor progress.
 
@@ -609,16 +702,16 @@ Prepare company-specific training data from Playbook library. Export prompt/comp
 - [ ] RBAC: executive only for fine-tune trigger
 - [ ] npm run build passes
 
-**Depends on:** T-23.1 (Playbook v2), T-10.1 (AskSage gateway)
+**Depends on:** T-24.1 (Playbook v2), T-10.1 (AskSage gateway)
 **Files:** lib/ai/fine-tune/data-exporter.ts, lib/ai/fine-tune/job-manager.ts, app/(dashboard)/admin/fine-tune/page.tsx
 
 ---
 
-### SPRINT 27 — Real-time Collaboration + Teams + v1.2 Ship
+### SPRINT 28 — Real-time Collaboration + Teams + v1.2 Ship
 
 *Concurrent editing. In-app commenting. Microsoft Teams deep integration. v1.2 regression testing and production deploy.*
 
-#### T-27.1 Real-time Collaboration
+#### T-28.1 Real-time Collaboration
 
 Presence indicators showing who's viewing/editing each section. Section-level locking (user claims a section, others see it as locked). Optimistic UI with conflict resolution on save.
 
@@ -635,7 +728,7 @@ Presence indicators showing who's viewing/editing each section. Section-level lo
 
 ---
 
-#### T-27.2 In-app Commenting
+#### T-28.2 In-app Commenting
 
 Threaded comments on proposal sections. Role-tagged (@capture_manager, @contracts). Comment notifications via existing notification system. Resolve/unresolve workflow.
 
@@ -653,7 +746,7 @@ Threaded comments on proposal sections. Role-tagged (@capture_manager, @contract
 
 ---
 
-#### T-27.3 Microsoft Teams Deep Integration
+#### T-28.3 Microsoft Teams Deep Integration
 
 Beyond Slack-style notifications: Teams tab app showing opportunity dashboard, meeting scheduling for color team reviews, channel sync bidirectional with War Room activity feed.
 
@@ -661,15 +754,15 @@ Beyond Slack-style notifications: Teams tab app showing opportunity dashboard, m
 - [ ] Teams tab app: embed MissionPulse opportunity dashboard in Teams channel tab
 - [ ] Meeting scheduling: create Teams meeting for gate review from MissionPulse
 - [ ] Activity feed sync: War Room updates → Teams channel messages
-- [ ] Adaptive cards for gate approval (similar to Slack T-22.4 pattern)
+- [ ] Adaptive cards for gate approval (similar to Slack T-23.4 pattern)
 - [ ] npm run build passes
 
-**Depends on:** T-22.1 (M365 OAuth), T-6.2 (War Room)
+**Depends on:** T-23.1 (M365 OAuth), T-6.2 (War Room)
 **Files:** lib/integrations/m365/teams.ts, lib/integrations/m365/teams-tab.ts
 
 ---
 
-#### T-27.4 v1.2 Regression Testing + Security Audit
+#### T-28.4 v1.2 Regression Testing + Security Audit
 
 Full regression suite covering all v1.1 + v1.2 features. Security audit of all new OAuth integrations, data flows, and API surfaces. Penetration test prep documentation.
 
@@ -682,12 +775,12 @@ Full regression suite covering all v1.1 + v1.2 features. Security audit of all n
 - [ ] Pen test checklist document generated
 - [ ] npm run build passes
 
-**Depends on:** All S24–S27 tickets
+**Depends on:** All S25–S28 tickets
 **Files:** tests/e2e/*.spec.ts, docs/security-audit-v1.2.md
 
 ---
 
-#### T-27.5 v1.2 Production Deploy + Documentation
+#### T-28.5 v1.2 Production Deploy + Documentation
 
 Merge v2-development to main. DNS cutover verification for missionpulse.io. Update user documentation. Release notes. Marketing changelog for customers.
 
@@ -698,7 +791,7 @@ Merge v2-development to main. DNS cutover verification for missionpulse.io. Upda
 - [ ] Release notes document: v1.2 changelog with screenshots
 - [ ] npm run build passes on main branch
 
-**Depends on:** T-27.4
+**Depends on:** T-28.4
 **Files:** docs/release-notes-v1.2.md, docs/user-guide/ (updates)
 
 ---
@@ -709,13 +802,16 @@ New tables needed for v1.1/v1.2. All require RLS policies, audit triggers, and `
 
 | Table | Sprint | Purpose |
 |-------|--------|---------|
-| integration_configs | S21 | OAuth tokens, field mappings, sync preferences per integration per company |
-| integration_sync_log | S21 | Audit trail for sync operations (direction, record count, errors, duration) |
-| company_voice_profiles | S23 | JSONB voice fingerprint per company for anti-homogenization |
-| knowledge_graph | S26 | Entity-relationship store (entity_type, name, relationships JSONB) |
-| section_comments | S27 | Threaded comments on proposal sections (parent_id for threading) |
+| subscription_plans | S20 | Plan definitions: name, monthly_token_limit, overage_rate, max_users, features JSONB |
+| company_subscriptions | S20 | Per-company plan binding: plan_id FK, stripe IDs, billing period, status |
+| token_ledger | S20 | Per-company per-period token accounting: allocated, consumed, purchased, overage |
+| integration_configs | S22 | OAuth tokens, field mappings, sync preferences per integration per company |
+| integration_sync_log | S22 | Audit trail for sync operations (direction, record count, errors, duration) |
+| company_voice_profiles | S24 | JSONB voice fingerprint per company for anti-homogenization |
+| knowledge_graph | S27 | Entity-relationship store (entity_type, name, relationships JSONB) |
+| section_comments | S28 | Threaded comments on proposal sections (parent_id for threading) |
 | performance_metrics | S19 | Page load, query time, AI response time metrics |
-| fine_tune_jobs | S26 | Fine-tuning job status tracking (status, model, training_data_ref, metrics) |
+| fine_tune_jobs | S27 | Fine-tuning job status tracking (status, model, training_data_ref, metrics) |
 
 ---
 
@@ -723,12 +819,14 @@ New tables needed for v1.1/v1.2. All require RLS policies, audit triggers, and `
 
 | Ticket | Blocks | Risk |
 |--------|--------|------|
-| T-15.1 (Integrations Hub Shell) | T-21.1, T-22.1, T-22.3, T-24.1, T-25.1, T-25.2 | Must exist before ANY new integration. Already shipped in v1.0 S15. |
-| T-10.1 (AskSage Gateway) | T-19.1 (cache), T-19.3 (analytics), T-26.1 (RAG), T-26.5 (fine-tune) | All AI features depend on gateway. Already shipped in v1.0 S10. |
-| T-19.1 (Redis Cache) | T-19.3 (analytics dashboard), T-23.4 (benchmarking) | Cache metrics feed analytics. Build cache first. |
-| T-20.1/20.2/20.3 (Doc Gen) | T-20.4 (binder), T-22.1 (OneDrive save) | Binder needs all three engines. OneDrive needs DOCX output. |
-| T-22.1 (M365 OAuth) | T-22.2 (Calendar/SharePoint), T-27.3 (Teams) | All M365 features share one OAuth connection. |
-| T-26.1 (Advanced RAG) | T-26.2 (knowledge graph), T-26.5 (fine-tune data) | Knowledge graph needs chunking pipeline. Fine-tune needs quality retrieval. |
+| T-15.1 (Integrations Hub Shell) | T-22.1, T-23.1, T-23.3, T-25.1, T-26.1, T-26.2 | Must exist before ANY new integration. Already shipped in v1.0 S15. |
+| T-10.1 (AskSage Gateway) | T-19.1 (cache), T-19.3 (analytics), T-20.2 (token gate), T-27.1 (RAG), T-27.5 (fine-tune) | All AI features depend on gateway. Already shipped in v1.0 S10. |
+| T-20.1 (Token Ledger) | T-20.2 (enforcement), T-20.3 (dashboard), T-20.4 (Stripe) | Entire billing stack depends on ledger. Build first. |
+| T-20.2 (Token Gate) | T-20.3 (budget alerts), T-24.3 (regression tests) | Enforcement middleware feeds alert system and must be tested. |
+| T-19.1 (Redis Cache) | T-19.3 (analytics dashboard), T-24.4 (benchmarking) | Cache metrics feed analytics. Build cache first. |
+| T-21.1/21.2/21.3 (Doc Gen) | T-21.4 (binder), T-23.1 (OneDrive save) | Binder needs all three engines. OneDrive needs DOCX output. |
+| T-23.1 (M365 OAuth) | T-23.2 (Calendar/SharePoint), T-28.3 (Teams) | All M365 features share one OAuth connection. |
+| T-27.1 (Advanced RAG) | T-27.2 (knowledge graph), T-27.5 (fine-tune data) | Knowledge graph needs chunking pipeline. Fine-tune needs quality retrieval. |
 
 ---
 
@@ -738,6 +836,8 @@ New tables needed for v1.1/v1.2. All require RLS policies, audit triggers, and `
 |------|--------|------------|------------|
 | Third-party API changes (Salesforce, GovWin, M365) | Integration breaks | Medium | Adapter pattern per integration. Version-pin APIs. Health check endpoints. |
 | OAuth token management complexity | Auth failures, data loss | Medium | Centralized token refresh in lib/integrations/oauth-manager.ts. Retry with exponential backoff. |
+| Stripe webhook reliability | Missed payments, uncredited tokens | Medium | Idempotent webhook handler. Stripe event replay. Reconciliation cron job. Manual credit override for admin. |
+| Token gate false-blocks during proposals | User locked out at submission deadline | High | Grace period: 10K tokens for proposals with gate activity in last 48hr. Admin override. Soft-block shows "Buy More" before hard-block. |
 | Real-time collaboration conflicts | Data loss on concurrent edits | High | Section locking (not character-level). Last-save-wins with diff view. Supabase Realtime for presence. |
 | Fine-tuning API availability via AskSage | Feature delayed | Medium | Fallback to direct provider fine-tune APIs. Feature flagged for progressive rollout. |
 | Scope creep from customer feedback post-launch | Sprint delays | High | v1.1/v1.2 scope locked. Customer requests go to v2.0 backlog unless critical bug. |
