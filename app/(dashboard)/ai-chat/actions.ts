@@ -1,0 +1,88 @@
+'use server'
+
+import { createClient } from '@/lib/supabase/server'
+import { aiRequest } from '@/lib/ai/pipeline'
+
+interface ChatResult {
+  success: boolean
+  response?: string
+  model?: string
+  error?: string
+}
+
+export async function sendChatMessage(
+  sessionId: string,
+  message: string,
+  opportunityContext?: string
+): Promise<ChatResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  // Store user message
+  await supabase.from('chat_messages').insert({
+    id: crypto.randomUUID(),
+    session_id: sessionId,
+    role: 'user',
+    content: message,
+  })
+
+  // Build context-aware system prompt
+  const systemPrompt = opportunityContext
+    ? `You are MissionPulse AI, a GovCon proposal assistant. The user is currently viewing an opportunity. Here is the context:\n\n${opportunityContext}\n\nHelp the user with their question about this opportunity or general GovCon topics.`
+    : 'You are MissionPulse AI, a GovCon proposal assistant. Help the user with pipeline management, compliance, proposal writing, pricing strategy, and government contracting best practices.'
+
+  // Run through AI pipeline
+  const aiResponse = await aiRequest({
+    taskType: 'chat',
+    prompt: message,
+    systemPrompt,
+    context: opportunityContext,
+  })
+
+  // Store assistant message
+  await supabase.from('chat_messages').insert({
+    id: crypto.randomUUID(),
+    session_id: sessionId,
+    role: 'assistant',
+    content: aiResponse.content,
+    tokens_used: aiResponse.tokens_in + aiResponse.tokens_out,
+  })
+
+  // Update session timestamp
+  await supabase
+    .from('chat_sessions')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', sessionId)
+
+  return {
+    success: true,
+    response: aiResponse.content,
+    model: aiResponse.model_used,
+  }
+}
+
+export async function createChatSession(
+  opportunityId?: string
+): Promise<{ success: boolean; sessionId?: string; error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const sessionId = crypto.randomUUID()
+
+  const { error } = await supabase.from('chat_sessions').insert({
+    id: sessionId,
+    user_id: user.id,
+    agent_type: 'general',
+    opportunity_id: opportunityId ?? null,
+  })
+
+  if (error) return { success: false, error: error.message }
+
+  return { success: true, sessionId }
+}
