@@ -11,8 +11,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/api/auth/callback', '/api/debug']
 
 export async function middleware(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
   // If env vars are missing, let public routes through and block protected ones
   if (!supabaseUrl || !supabaseKey) {
