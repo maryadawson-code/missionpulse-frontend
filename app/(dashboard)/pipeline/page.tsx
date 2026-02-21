@@ -2,12 +2,15 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { PipelineTable } from '@/components/modules/PipelineTable'
+import { KanbanView } from './KanbanView'
+import { ViewToggle } from './ViewToggle'
+import { CreateOpportunityButton } from './CreateOpportunityModal'
 import type { Opportunity } from '@/lib/types'
 
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: { q?: string }
+  searchParams: { q?: string; view?: string }
 }) {
   const supabase = await createClient()
 
@@ -18,15 +21,22 @@ export default async function PipelinePage({
     .order('updated_at', { ascending: false })
 
   const opps = (opportunities ?? []) as Opportunity[]
+  const view = searchParams.view ?? 'table'
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Pipeline</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {opps.length} opportunit{opps.length === 1 ? 'y' : 'ies'} in pipeline
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Pipeline</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {opps.length} opportunit{opps.length === 1 ? 'y' : 'ies'} in pipeline
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <ViewToggle />
+          <CreateOpportunityButton />
+        </div>
       </div>
 
       {/* Error State */}
@@ -36,8 +46,9 @@ export default async function PipelinePage({
         </div>
       )}
 
-      {/* Pipeline Table with client-side sort/filter/search/delete */}
-      {!error && (
+      {/* Pipeline Views */}
+      {!error && view === 'kanban' && <KanbanView opportunities={opps} />}
+      {!error && view !== 'kanban' && (
         <PipelineTable opportunities={opps} initialSearch={searchParams.q ?? ''} />
       )}
     </div>
