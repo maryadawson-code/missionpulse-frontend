@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
+import Script from 'next/script'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Zap, Menu, X } from 'lucide-react'
+import { GA4_ID, trackPageView } from '@/lib/analytics/gtag'
 
 const NAV_LINKS = [
   { href: '/#features', label: 'Features' },
@@ -19,8 +21,31 @@ export default function PublicLayout({
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  // Track page views on route change (public pages only)
+  useEffect(() => {
+    if (GA4_ID) trackPageView(pathname)
+  }, [pathname])
+
   return (
     <div className="min-h-screen bg-[#00050F] text-white">
+      {/* GA4 — public marketing pages only, not loaded on dashboard */}
+      {GA4_ID && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}
+            strategy="afterInteractive"
+          />
+          <Script id="ga4-init" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${GA4_ID}', { page_path: window.location.pathname });
+            `}
+          </Script>
+        </>
+      )}
+
       {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-gray-800/50 bg-[#00050F]/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
