@@ -16,7 +16,8 @@ test.describe('Route Guards', () => {
     await page.context().clearCookies()
 
     // Try to access protected routes directly
-    const protectedRoutes = ['/pipeline', '/war-room/test-id', '/']
+    // Note: '/' is now the public landing page, not a protected route
+    const protectedRoutes = ['/pipeline', '/war-room/test-id', '/settings']
 
     for (const route of protectedRoutes) {
       await page.goto(route)
