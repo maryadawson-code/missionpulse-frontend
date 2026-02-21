@@ -1,9 +1,20 @@
 // filepath: components/modules/SettingsForm.tsx
 'use client'
 
-import { useTransition } from 'react'
-import { updateProfile, updatePassword } from '@/lib/actions/settings'
+import { useState, useTransition } from 'react'
+import {
+  updateProfile,
+  updatePassword,
+  updateNotificationPreferences,
+} from '@/lib/actions/settings'
 import { addToast } from '@/components/ui/Toast'
+
+interface NotificationPref {
+  notification_type: string
+  email_enabled: boolean
+  in_app_enabled: boolean
+  push_enabled: boolean
+}
 
 interface SettingsFormProps {
   profile: {
@@ -15,11 +26,36 @@ interface SettingsFormProps {
     avatar_url: string
     role: string
   }
+  notificationPrefs?: NotificationPref[]
 }
 
-export function SettingsForm({ profile }: SettingsFormProps) {
+const NOTIFICATION_TYPES = [
+  { type: 'gate_review', label: 'Gate Reviews' },
+  { type: 'deadline_warning', label: 'Deadline Warnings' },
+  { type: 'assignment', label: 'Task Assignments' },
+  { type: 'pipeline_update', label: 'Pipeline Updates' },
+  { type: 'compliance_alert', label: 'Compliance Alerts' },
+  { type: 'team_mention', label: 'Team Mentions' },
+]
+
+export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormProps) {
   const [isPending, startTransition] = useTransition()
   const [passwordPending, startPasswordTransition] = useTransition()
+  const [notifPending, startNotifTransition] = useTransition()
+
+  const [prefs, setPrefs] = useState<NotificationPref[]>(() =>
+    NOTIFICATION_TYPES.map((nt) => {
+      const existing = notificationPrefs.find(
+        (p) => p.notification_type === nt.type
+      )
+      return {
+        notification_type: nt.type,
+        email_enabled: existing?.email_enabled ?? true,
+        in_app_enabled: existing?.in_app_enabled ?? true,
+        push_enabled: existing?.push_enabled ?? false,
+      }
+    })
+  )
 
 
   const inputClass =
@@ -221,6 +257,103 @@ export function SettingsForm({ profile }: SettingsFormProps) {
           </div>
         </fieldset>
       </form>
+
+      {/* Notification Preferences */}
+      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-white">
+              Notification Preferences
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Choose how you want to be notified
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={notifPending}
+            onClick={() => {
+              startNotifTransition(async () => {
+                const result = await updateNotificationPreferences(prefs)
+                if (result.success) {
+                  addToast('success', 'Notification preferences saved')
+                } else {
+                  addToast('error', result.error ?? 'Failed to save preferences')
+                }
+              })
+            }}
+            className="rounded-lg bg-[#00E5FA] px-4 py-1.5 text-xs font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90 disabled:opacity-50"
+          >
+            {notifPending ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-800">
+                <th className="py-2 text-xs font-semibold text-gray-500 pr-4">
+                  Type
+                </th>
+                <th className="py-2 text-xs font-semibold text-gray-500 text-center px-4">
+                  In-App
+                </th>
+                <th className="py-2 text-xs font-semibold text-gray-500 text-center px-4">
+                  Email
+                </th>
+                <th className="py-2 text-xs font-semibold text-gray-500 text-center px-4">
+                  Push
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800/50">
+              {NOTIFICATION_TYPES.map((nt, idx) => (
+                <tr key={nt.type}>
+                  <td className="py-2.5 text-xs text-gray-300 pr-4">
+                    {nt.label}
+                  </td>
+                  <td className="py-2.5 text-center px-4">
+                    <input
+                      type="checkbox"
+                      checked={prefs[idx].in_app_enabled}
+                      onChange={(e) => {
+                        const next = [...prefs]
+                        next[idx] = { ...next[idx], in_app_enabled: e.target.checked }
+                        setPrefs(next)
+                      }}
+                      className="rounded border-gray-700 text-[#00E5FA]"
+                    />
+                  </td>
+                  <td className="py-2.5 text-center px-4">
+                    <input
+                      type="checkbox"
+                      checked={prefs[idx].email_enabled}
+                      onChange={(e) => {
+                        const next = [...prefs]
+                        next[idx] = { ...next[idx], email_enabled: e.target.checked }
+                        setPrefs(next)
+                      }}
+                      className="rounded border-gray-700 text-[#00E5FA]"
+                    />
+                  </td>
+                  <td className="py-2.5 text-center px-4">
+                    <input
+                      type="checkbox"
+                      checked={prefs[idx].push_enabled}
+                      onChange={(e) => {
+                        const next = [...prefs]
+                        next[idx] = { ...next[idx], push_enabled: e.target.checked }
+                        setPrefs(next)
+                      }}
+                      className="rounded border-gray-700 text-[#00E5FA]"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Account Info */}
       <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">

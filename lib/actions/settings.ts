@@ -77,3 +77,45 @@ export async function updatePassword(
 
   return { success: true }
 }
+
+/**
+ * Save notification preferences for the current user.
+ */
+export async function updateNotificationPreferences(
+  preferences: {
+    notification_type: string
+    email_enabled: boolean
+    in_app_enabled: boolean
+    push_enabled: boolean
+  }[]
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  for (const pref of preferences) {
+    const { error } = await supabase
+      .from('notification_preferences')
+      .upsert(
+        {
+          user_id: user.id,
+          notification_type: pref.notification_type,
+          email_enabled: pref.email_enabled,
+          in_app_enabled: pref.in_app_enabled,
+          push_enabled: pref.push_enabled,
+        },
+        { onConflict: 'user_id,notification_type' }
+      )
+
+    if (error) {
+      console.error('[settings:notif-prefs]', error.message)
+      return { success: false, error: error.message }
+    }
+  }
+
+  revalidatePath('/settings')
+  return { success: true }
+}

@@ -19,6 +19,11 @@ export default async function SettingsPage() {
     .eq('id', user.id)
     .single()
 
+  const { data: notifPrefs } = await supabase
+    .from('notification_preferences')
+    .select('notification_type, email_enabled, in_app_enabled, push_enabled')
+    .eq('user_id', user.id)
+
   return (
     <div className="space-y-6">
       <div>
@@ -38,6 +43,14 @@ export default async function SettingsPage() {
           avatar_url: profile?.avatar_url ?? '',
           role: profile?.role ?? 'viewer',
         }}
+        notificationPrefs={
+          (notifPrefs ?? []).map((p) => ({
+            notification_type: p.notification_type,
+            email_enabled: p.email_enabled ?? true,
+            in_app_enabled: p.in_app_enabled ?? true,
+            push_enabled: p.push_enabled ?? false,
+          }))
+        }
       />
     </div>
   )
