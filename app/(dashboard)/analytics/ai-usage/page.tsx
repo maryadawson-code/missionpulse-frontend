@@ -19,7 +19,7 @@ export default async function AIUsageAnalyticsPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'analytics', 'canView')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   // Fetch last 90 days of token usage

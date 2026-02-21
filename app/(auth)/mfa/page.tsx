@@ -64,7 +64,7 @@ export default function MFAPage() {
         return
       }
 
-      router.push('/')
+      router.push('/dashboard')
     })
   }
 
@@ -199,7 +199,7 @@ export default function MFAPage() {
         {/* Skip option for non-CUI roles */}
         <div className="mt-4 text-center">
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/dashboard')}
             className="text-xs text-gray-500 hover:text-gray-300"
           >
             Skip for now

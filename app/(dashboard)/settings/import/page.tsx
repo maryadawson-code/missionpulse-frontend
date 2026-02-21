@@ -24,7 +24,7 @@ export default async function ImportPage() {
   // RBAC: require admin module access for data import
   const effectiveRole = resolveRole(profile.role)
   const perm = getModulePermission(effectiveRole, 'admin')
-  if (!perm || !perm.canView) redirect('/')
+  if (!perm || !perm.canView) redirect('/dashboard')
 
   const canImport = ['admin', 'executive', 'operations', 'CEO', 'COO'].includes(effectiveRole)
 

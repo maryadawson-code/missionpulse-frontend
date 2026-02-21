@@ -60,7 +60,7 @@ export default async function WorkflowPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'workflow_board', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const { data: tasks, error } = await supabase

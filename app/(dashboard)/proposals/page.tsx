@@ -29,7 +29,7 @@ export default async function ProposalsPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'proposals', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   // Fetch compliance requirements needing review (status = 'Addressed' but not 'Verified')

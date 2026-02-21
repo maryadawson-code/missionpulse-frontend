@@ -24,10 +24,10 @@ export default async function FineTunePage() {
   // RBAC: executive only
   const effectiveRole = resolveRole(profile.role)
   const perm = getModulePermission(effectiveRole, 'admin')
-  if (!perm || !perm.canView) redirect('/')
+  if (!perm || !perm.canView) redirect('/dashboard')
 
   const executiveRoles = ['executive', 'admin', 'CEO', 'COO']
-  if (!executiveRoles.includes(effectiveRole)) redirect('/')
+  if (!executiveRoles.includes(effectiveRole)) redirect('/dashboard')
 
   const jobs = await listJobs(profile.company_id ?? '')
 

@@ -32,7 +32,7 @@ export default async function BlackhatPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'blackhat', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const { data: competitors, error } = await supabase

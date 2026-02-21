@@ -19,7 +19,7 @@ export default async function PlaybookPage() {
   const role = resolveRole(profile?.role)
   // Playbook maps to 'documents' RBAC module per roadmap
   if (!hasPermission(role, 'documents', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const { data: entries } = await supabase

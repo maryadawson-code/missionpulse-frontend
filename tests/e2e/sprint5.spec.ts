@@ -35,10 +35,10 @@ test.describe('Sidebar Navigation (T-17)', () => {
     await page.goto('/pipeline')
     await assertOnProtectedRoute(page)
 
-    const dashboardLink = page.locator('aside a[href="/"]')
+    const dashboardLink = page.locator('aside a[href="/dashboard"]')
     if (await dashboardLink.count() > 0) {
       await dashboardLink.click()
-      await page.waitForURL('/')
+      await page.waitForURL('/dashboard')
       await expect(page.locator('h1')).toHaveText('Dashboard')
     }
   })

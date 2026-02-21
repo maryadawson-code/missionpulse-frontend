@@ -20,7 +20,7 @@ export default async function IntegrationsPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'integrations', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const { data: integrations, error } = await supabase

@@ -20,7 +20,7 @@ export default async function BillingPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'admin', 'canView')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const companyId = profile?.company_id

@@ -18,7 +18,7 @@ export default async function M365Page() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'integrations', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const { data: integration } = await supabase

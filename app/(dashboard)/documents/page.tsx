@@ -18,7 +18,7 @@ export default async function DocumentsPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'documents', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   // Fetch all company-level documents + opportunity documents

@@ -18,7 +18,7 @@ export default async function AIProvidersPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'admin', 'canView')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   return (

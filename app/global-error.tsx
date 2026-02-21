@@ -28,7 +28,7 @@ export default function GlobalError({
                 Try Again
               </button>
               <a
-                href="/"
+                href="/dashboard"
                 className="rounded-lg border border-gray-700 px-6 py-2.5 font-semibold text-gray-300 transition hover:border-gray-500"
               >
                 Go Home

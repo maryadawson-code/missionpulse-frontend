@@ -22,7 +22,7 @@ export default async function GoogleIntegrationPage() {
 
   const effectiveRole = resolveRole(profile.role)
   const perm = getModulePermission(effectiveRole, 'integrations')
-  if (!perm || !perm.canView) redirect('/')
+  if (!perm || !perm.canView) redirect('/dashboard')
 
   // Get integration status
   const { data: integration } = await supabase

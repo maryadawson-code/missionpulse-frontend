@@ -117,7 +117,7 @@ export async function requireModuleAccess(
 
   if (!allowed) {
     // Invisible RBAC: redirect to dashboard, not an error page
-    redirect('/')
+    redirect('/dashboard')
   }
 
   return roleInfo

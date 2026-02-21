@@ -18,7 +18,7 @@ export default async function HubSpotPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'integrations', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   // Check if HubSpot integration exists

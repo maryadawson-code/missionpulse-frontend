@@ -25,7 +25,7 @@ export default async function AIUsagePage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'admin', 'canView')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const companyId = profile?.company_id

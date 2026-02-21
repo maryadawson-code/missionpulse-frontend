@@ -111,7 +111,7 @@ export async function middleware(request: NextRequest) {
   // Authenticated user trying to access auth pages → send to dashboard
   if (user && isPublicRoute && pathname !== '/api/auth/callback') {
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 

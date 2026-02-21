@@ -22,7 +22,7 @@ export default async function LaunchPage({ params }: Props) {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'proposals', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const { data: opportunity } = await supabase

@@ -18,7 +18,7 @@ export default async function AdminUsersPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'admin', 'canView')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   const { data: users } = await supabase

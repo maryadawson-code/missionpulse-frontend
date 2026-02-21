@@ -20,7 +20,7 @@ export default async function IronDomePage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'compliance', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   // Fetch all compliance_requirements across all opportunities

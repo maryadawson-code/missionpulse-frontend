@@ -18,7 +18,7 @@ export default async function AuditPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'audit_log', 'shouldRender')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   // Read from immutable audit_logs table (NIST AU-9)

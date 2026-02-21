@@ -18,7 +18,7 @@ export default async function AdminSettingsPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'admin', 'canView')) {
-    redirect('/')
+    redirect('/dashboard')
   }
 
   let company = null
