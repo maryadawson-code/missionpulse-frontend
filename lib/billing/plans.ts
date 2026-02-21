@@ -43,13 +43,17 @@ export interface CompanySubscription {
   id: string
   company_id: string
   plan_id: string
-  status: 'active' | 'past_due' | 'canceled' | 'trialing'
+  status: 'active' | 'past_due' | 'canceled' | 'trialing' | 'pilot' | 'expired'
   billing_interval: 'monthly' | 'annual'
   current_period_start: string
   current_period_end: string
   stripe_subscription_id: string | null
   stripe_customer_id: string | null
   auto_overage_enabled: boolean
+  pilot_start_date?: string | null
+  pilot_end_date?: string | null
+  pilot_amount_cents?: number | null
+  pilot_converted?: boolean
   plan?: SubscriptionPlan
 }
 

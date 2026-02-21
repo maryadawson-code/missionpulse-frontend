@@ -1695,6 +1695,10 @@ export type Database = {
           stripe_subscription_id: string | null
           stripe_customer_id: string | null
           auto_overage_enabled: boolean
+          pilot_start_date: string | null
+          pilot_end_date: string | null
+          pilot_amount_cents: number | null
+          pilot_converted: boolean | null
           metadata: Json | null
           created_at: string
           updated_at: string
@@ -1710,6 +1714,10 @@ export type Database = {
           stripe_subscription_id?: string | null
           stripe_customer_id?: string | null
           auto_overage_enabled?: boolean
+          pilot_start_date?: string | null
+          pilot_end_date?: string | null
+          pilot_amount_cents?: number | null
+          pilot_converted?: boolean | null
           metadata?: Json | null
           created_at?: string
           updated_at?: string
@@ -1725,6 +1733,10 @@ export type Database = {
           stripe_subscription_id?: string | null
           stripe_customer_id?: string | null
           auto_overage_enabled?: boolean
+          pilot_start_date?: string | null
+          pilot_end_date?: string | null
+          pilot_amount_cents?: number | null
+          pilot_converted?: boolean | null
           metadata?: Json | null
           created_at?: string
           updated_at?: string
