@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Launch Readiness | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="mp-responsive.css">
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="mp-polish.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'deep-navy': '#00050F',
+            'cyber-cyan': '#00E5FA',
+            'slate-dark': '#0a1628'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: linear-gradient(135deg, #00050F 0%, #0a1628 50%, #00050F 100%); }
+    .glow-border { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+    .progress-ring { transform: rotate(-90deg); }
+    .checklist-item:hover { background: rgba(0, 229, 250, 0.05); }
+  </style>
+  <script src="mp-rbac.js"></script>
+</head>
+<body class="min-h-screen text-white">
+  <header class="border-b border-slate-800/50 bg-deep-navy/80 backdrop-blur-sm sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="text-lg font-bold text-white">Launch Readiness</span>
+          <span class="text-xs text-slate-500 block">MissionPulse v2 Go-Live Checklist</span>
+        </div>
+      </div>
+      <a href="index.html" class="text-sm text-slate-400 hover:text-cyber-cyan transition-colors">← Dashboard</a>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <!-- Auth Check -->
+    <div id="authCheck" class="text-center py-12">
+      <div class="w-8 h-8 border-2 border-cyber-cyan border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <p class="text-slate-400 mt-4">Loading...</p>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="hidden">
+      <!-- Hero Section -->
+      <div class="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 rounded-2xl p-8 mb-8">
+        <div class="flex flex-col md:flex-row items-center gap-8">
+          <!-- Progress Ring -->
+          <div class="relative">
+            <svg class="w-40 h-40">
+              <circle cx="80" cy="80" r="70" stroke="#1e293b" stroke-width="12" fill="none"/>
+              <circle id="progressRing" class="progress-ring" cx="80" cy="80" r="70" stroke="url(#gradient)" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="439.8" stroke-dashoffset="439.8"/>
+              <defs>
+                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#10b981"/>
+                  <stop offset="100%" stop-color="#00E5FA"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span id="progressPercent" class="text-4xl font-bold">0%</span>
+              <span class="text-xs text-slate-500">Complete</span>
+            </div>
+          </div>
+
+          <!-- Status Summary -->
+          <div class="flex-1 text-center md:text-left">
+            <h1 class="text-2xl font-bold mb-2">MissionPulse v2 Launch Status</h1>
+            <p id="statusMessage" class="text-slate-400 mb-4">Checking readiness...</p>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+                <p class="text-2xl font-bold text-emerald-400" id="statComplete">0</p>
+                <p class="text-xs text-slate-500">Complete</p>
+              </div>
+              <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+                <p class="text-2xl font-bold text-amber-400" id="statInProgress">0</p>
+                <p class="text-xs text-slate-500">In Progress</p>
+              </div>
+              <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+                <p class="text-2xl font-bold text-red-400" id="statBlocked">0</p>
+                <p class="text-xs text-slate-500">Blocked</p>
+              </div>
+              <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+                <p class="text-2xl font-bold text-slate-400" id="statNotStarted">0</p>
+                <p class="text-xs text-slate-500">Not Started</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Launch Button -->
+          <div class="text-center">
+            <button id="launchBtn" disabled onclick="confirmLaunch()" class="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-bold rounded-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all">
+              🚀 Ready to Launch
+            </button>
+            <p id="launchBlocker" class="text-xs text-red-400 mt-2 hidden">Complete all critical items first</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="flex flex-wrap gap-3 mb-6">
+        <button class="filter-btn active px-3 py-1.5 bg-cyber-cyan/20 text-cyber-cyan rounded-lg text-sm" data-filter="all">All</button>
+        <button class="filter-btn px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-sm hover:bg-slate-700" data-filter="infrastructure">Infrastructure</button>
+        <button class="filter-btn px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-sm hover:bg-slate-700" data-filter="security">Security</button>
+        <button class="filter-btn px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-sm hover:bg-slate-700" data-filter="data">Data</button>
+        <button class="filter-btn px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-sm hover:bg-slate-700" data-filter="testing">Testing</button>
+        <button class="filter-btn px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-sm hover:bg-slate-700" data-filter="documentation">Documentation</button>
+        <button class="filter-btn px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-sm hover:bg-slate-700" data-filter="training">Training</button>
+      </div>
+
+      <!-- Checklist Categories -->
+      <div class="space-y-6" id="checklistContainer">
+        
+        <!-- Infrastructure -->
+        <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl overflow-hidden" data-category="infrastructure">
+          <div class="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/30">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🏗️</span>
+              <div>
+                <h3 class="font-semibold">Infrastructure</h3>
+                <p class="text-xs text-slate-500">Hosting, domains, deployments</p>
+              </div>
+            </div>
+            <span class="cat-progress text-xs text-slate-500">0/0</span>
+          </div>
+          <div class="divide-y divide-slate-800" id="infrastructure-items"></div>
+        </div>
+
+        <!-- Security -->
+        <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl overflow-hidden" data-category="security">
+          <div class="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/30">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🔐</span>
+              <div>
+                <h3 class="font-semibold">Security & Compliance</h3>
+                <p class="text-xs text-slate-500">Auth, RLS, CMMC requirements</p>
+              </div>
+            </div>
+            <span class="cat-progress text-xs text-slate-500">0/0</span>
+          </div>
+          <div class="divide-y divide-slate-800" id="security-items"></div>
+        </div>
+
+        <!-- Data -->
+        <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl overflow-hidden" data-category="data">
+          <div class="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/30">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🗄️</span>
+              <div>
+                <h3 class="font-semibold">Data & Database</h3>
+                <p class="text-xs text-slate-500">Schema, migrations, backups</p>
+              </div>
+            </div>
+            <span class="cat-progress text-xs text-slate-500">0/0</span>
+          </div>
+          <div class="divide-y divide-slate-800" id="data-items"></div>
+        </div>
+
+        <!-- Testing -->
+        <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl overflow-hidden" data-category="testing">
+          <div class="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/30">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🧪</span>
+              <div>
+                <h3 class="font-semibold">Testing & QA</h3>
+                <p class="text-xs text-slate-500">Test suites, UAT, performance</p>
+              </div>
+            </div>
+            <span class="cat-progress text-xs text-slate-500">0/0</span>
+          </div>
+          <div class="divide-y divide-slate-800" id="testing-items"></div>
+        </div>
+
+        <!-- Documentation -->
+        <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl overflow-hidden" data-category="documentation">
+          <div class="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/30">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">📚</span>
+              <div>
+                <h3 class="font-semibold">Documentation</h3>
+                <p class="text-xs text-slate-500">User guides, API docs, runbooks</p>
+              </div>
+            </div>
+            <span class="cat-progress text-xs text-slate-500">0/0</span>
+          </div>
+          <div class="divide-y divide-slate-800" id="documentation-items"></div>
+        </div>
+
+        <!-- Training -->
+        <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl overflow-hidden" data-category="training">
+          <div class="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/30">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🎓</span>
+              <div>
+                <h3 class="font-semibold">Training & Onboarding</h3>
+                <p class="text-xs text-slate-500">Team training, beta users</p>
+              </div>
+            </div>
+            <span class="cat-progress text-xs text-slate-500">0/0</span>
+          </div>
+          <div class="divide-y divide-slate-800" id="training-items"></div>
+        </div>
+
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="mt-8 grid md:grid-cols-3 gap-4">
+        <a href="qa-gauntlet.html" class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-5 hover:border-cyber-cyan/30 transition-colors">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-2xl">🧪</span>
+            <h3 class="font-semibold">Run QA Gauntlet</h3>
+          </div>
+          <p class="text-sm text-slate-400">Execute automated test suite</p>
+        </a>
+        <a href="feature-suggestions.html" class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-5 hover:border-cyber-cyan/30 transition-colors">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-2xl">💡</span>
+            <h3 class="font-semibold">Feature Backlog</h3>
+          </div>
+          <p class="text-sm text-slate-400">Review pending feature requests</p>
+        </a>
+        <div onclick="exportReport()" class="cursor-pointer bg-slate-900/60 border border-slate-700/50 rounded-xl p-5 hover:border-cyber-cyan/30 transition-colors">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-2xl">📊</span>
+            <h3 class="font-semibold">Export Report</h3>
+          </div>
+          <p class="text-sm text-slate-400">Download launch readiness PDF</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Item Detail Modal -->
+    <div id="itemModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-lg mx-4">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span id="modalCategory" class="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300"></span>
+            <h3 id="modalTitle" class="text-lg font-bold mt-2"></h3>
+          </div>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <p id="modalDescription" class="text-slate-400 text-sm mb-4"></p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs text-slate-500 block mb-1">Status</label>
+            <select id="modalStatus" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm">
+              <option value="not_started">Not Started</option>
+              <option value="in_progress">In Progress</option>
+              <option value="blocked">Blocked</option>
+              <option value="complete">Complete</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-xs text-slate-500 block mb-1">Notes</label>
+            <textarea id="modalNotes" rows="3" placeholder="Add notes..." class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm resize-none"></textarea>
+          </div>
+
+          <button onclick="saveItem()" class="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-bold rounded-lg hover:opacity-90 transition-all">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-800/50 mt-12">
+    <div class="max-w-6xl mx-auto px-6 py-4 text-center text-slate-500 text-xs">AI GENERATED - REQUIRES HUMAN REVIEW</div>
+  </footer>
+
+  <script>
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NDIsImV4cCI6MjA1MzQxMDQ0Mn0.gMzJAb3GkUNJBnfoDSpWPbKDnJBATkTNwdB2D1kMiFo';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentUser = null;
+    let checklistItems = [];
+    let currentItemId = null;
+
+    // Default checklist items
+    const DEFAULT_ITEMS = [
+      // Infrastructure
+      { category: 'infrastructure', item_name: 'Netlify production deployment', description: 'Main branch deploys to missionpulse.netlify.app', priority: 'critical' },
+      { category: 'infrastructure', item_name: 'Custom domain DNS', description: 'missionpulse.io DNS configured and propagated', priority: 'high' },
+      { category: 'infrastructure', item_name: 'SSL certificate active', description: 'HTTPS enabled with valid certificate', priority: 'critical' },
+      { category: 'infrastructure', item_name: 'API backend on Render', description: 'missionpulse-api.onrender.com responding', priority: 'critical' },
+      { category: 'infrastructure', item_name: 'Environment variables set', description: 'All API keys and secrets configured', priority: 'critical' },
+      { category: 'infrastructure', item_name: 'CDN caching configured', description: 'Static assets cached appropriately', priority: 'medium' },
+      
+      // Security
+      { category: 'security', item_name: 'Supabase RLS policies', description: 'All tables have row-level security enabled', priority: 'critical' },
+      { category: 'security', item_name: 'Authentication flow tested', description: 'Login, logout, session refresh working', priority: 'critical' },
+      { category: 'security', item_name: 'RBAC enforcement verified', description: 'Role-based access controls functional', priority: 'critical' },
+      { category: 'security', item_name: 'API key rotation', description: 'Production API keys different from development', priority: 'high' },
+      { category: 'security', item_name: 'CORS configuration', description: 'Only allowed origins can access API', priority: 'high' },
+      { category: 'security', item_name: 'Input sanitization', description: 'XSS and injection protection in place', priority: 'high' },
+      { category: 'security', item_name: 'AI disclaimer footers', description: 'All AI outputs show required disclaimer', priority: 'critical' },
+      
+      // Data
+      { category: 'data', item_name: 'Database schema finalized', description: 'All tables created with proper indexes', priority: 'critical' },
+      { category: 'data', item_name: 'Seed data loaded', description: 'Initial opportunities and labor categories', priority: 'high' },
+      { category: 'data', item_name: 'Backup strategy configured', description: 'Supabase daily backups enabled', priority: 'high' },
+      { category: 'data', item_name: 'Data migration tested', description: 'Import from Excel working correctly', priority: 'medium' },
+      { category: 'data', item_name: 'Company/tenant isolation', description: 'Multi-tenant data properly separated', priority: 'critical' },
+      
+      // Testing
+      { category: 'testing', item_name: 'QA Gauntlet passed', description: 'All automated tests green', priority: 'critical' },
+      { category: 'testing', item_name: 'UAT with beta users', description: 'Real users tested key workflows', priority: 'high' },
+      { category: 'testing', item_name: 'Mobile responsiveness', description: 'All pages work on mobile devices', priority: 'medium' },
+      { category: 'testing', item_name: 'Cross-browser testing', description: 'Chrome, Firefox, Safari, Edge verified', priority: 'medium' },
+      { category: 'testing', item_name: 'Performance benchmarks', description: 'Page loads under 3s, API under 2s', priority: 'high' },
+      { category: 'testing', item_name: 'Error handling verified', description: 'Graceful failures, no crashes', priority: 'high' },
+      
+      // Documentation
+      { category: 'documentation', item_name: 'User guide created', description: 'End-user documentation for key features', priority: 'medium' },
+      { category: 'documentation', item_name: 'Admin guide created', description: 'Administration and configuration docs', priority: 'medium' },
+      { category: 'documentation', item_name: 'API documentation', description: 'Backend API endpoints documented', priority: 'low' },
+      { category: 'documentation', item_name: 'Release notes written', description: 'v2 feature summary for announcement', priority: 'medium' },
+      { category: 'documentation', item_name: 'Support escalation path', description: 'Who to contact for issues defined', priority: 'high' },
+      
+      // Training
+      { category: 'training', item_name: 'Team walkthrough completed', description: 'Internal team trained on v2 features', priority: 'high' },
+      { category: 'training', item_name: 'Beta user onboarding', description: 'First customer tenant configured', priority: 'high' },
+      { category: 'training', item_name: 'Demo script prepared', description: 'Sales/demo flow documented', priority: 'medium' },
+      { category: 'training', item_name: 'FAQ prepared', description: 'Common questions and answers ready', priority: 'low' }
+    ];
+
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; return; }
+      
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      
+      if (!['CEO', 'COO', 'Admin'].includes(profile?.role)) {
+        alert('Access denied. Admin role required.');
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      currentUser = { ...session.user, ...profile };
+      
+      document.getElementById('authCheck').classList.add('hidden');
+      document.getElementById('mainContent').classList.remove('hidden');
+      
+      await loadChecklist();
+      bindFilters();
+    }
+
+    async function loadChecklist() {
+      // Try to load from database
+      let { data, error } = await supabase
+        .from('launch_checklist_items')
+        .select('*')
+        .order('category', { ascending: true });
+
+      // If no items exist, seed the defaults
+      if (!data || data.length === 0) {
+        const itemsToInsert = DEFAULT_ITEMS.map(item => ({
+          ...item,
+          company_id: currentUser.company_id,
+          status: 'not_started'
+        }));
+        
+        await supabase.from('launch_checklist_items').insert(itemsToInsert);
+        
+        // Reload
+        const result = await supabase
+          .from('launch_checklist_items')
+          .select('*')
+          .order('category', { ascending: true });
+        data = result.data;
+      }
+
+      checklistItems = data || [];
+      renderChecklist();
+      updateStats();
+    }
+
+    function renderChecklist() {
+      const categories = ['infrastructure', 'security', 'data', 'testing', 'documentation', 'training'];
+      
+      categories.forEach(cat => {
+        const container = document.getElementById(`${cat}-items`);
+        const items = checklistItems.filter(i => i.category === cat);
+        
+        if (items.length === 0) {
+          container.innerHTML = '<p class="px-5 py-3 text-slate-500 text-sm">No items</p>';
+          return;
+        }
+
+        container.innerHTML = items.map(item => {
+          const statusConfig = {
+            not_started: { icon: '○', class: 'text-slate-500', bg: 'bg-slate-700' },
+            in_progress: { icon: '◐', class: 'text-amber-400', bg: 'bg-amber-500/20' },
+            blocked: { icon: '⊘', class: 'text-red-400', bg: 'bg-red-500/20' },
+            complete: { icon: '●', class: 'text-emerald-400', bg: 'bg-emerald-500/20' }
+          };
+          const status = statusConfig[item.status] || statusConfig.not_started;
+          const priorityColors = {
+            critical: 'text-red-400',
+            high: 'text-amber-400',
+            medium: 'text-blue-400',
+            low: 'text-slate-400'
+          };
+
+          return `
+            <div class="checklist-item px-5 py-3 flex items-center justify-between cursor-pointer transition-colors" onclick="openItem('${item.id}')">
+              <div class="flex items-center gap-3">
+                <span class="text-lg ${status.class}">${status.icon}</span>
+                <div>
+                  <p class="text-sm font-medium">${item.item_name}</p>
+                  <p class="text-xs text-slate-500">${item.description || ''}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs ${priorityColors[item.priority] || ''}">${item.priority}</span>
+                <span class="text-xs px-2 py-0.5 rounded ${status.bg} ${status.class}">${item.status.replace('_', ' ')}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Update category progress
+        const complete = items.filter(i => i.status === 'complete').length;
+        const catEl = document.querySelector(`[data-category="${cat}"] .cat-progress`);
+        if (catEl) catEl.textContent = `${complete}/${items.length}`;
+      });
+    }
+
+    function updateStats() {
+      const total = checklistItems.length;
+      const complete = checklistItems.filter(i => i.status === 'complete').length;
+      const inProgress = checklistItems.filter(i => i.status === 'in_progress').length;
+      const blocked = checklistItems.filter(i => i.status === 'blocked').length;
+      const notStarted = checklistItems.filter(i => i.status === 'not_started').length;
+
+      document.getElementById('statComplete').textContent = complete;
+      document.getElementById('statInProgress').textContent = inProgress;
+      document.getElementById('statBlocked').textContent = blocked;
+      document.getElementById('statNotStarted').textContent = notStarted;
+
+      // Update progress ring
+      const percent = total > 0 ? Math.round((complete / total) * 100) : 0;
+      document.getElementById('progressPercent').textContent = percent + '%';
+      
+      const circumference = 439.8;
+      const offset = circumference - (percent / 100) * circumference;
+      document.getElementById('progressRing').style.strokeDashoffset = offset;
+
+      // Update status message
+      const critical = checklistItems.filter(i => i.priority === 'critical' && i.status !== 'complete');
+      let message = '';
+      if (percent === 100) {
+        message = '🎉 All systems go! Ready for launch!';
+        document.getElementById('launchBtn').disabled = false;
+        document.getElementById('launchBlocker').classList.add('hidden');
+      } else if (critical.length > 0) {
+        message = `⚠️ ${critical.length} critical items remaining`;
+        document.getElementById('launchBtn').disabled = true;
+        document.getElementById('launchBlocker').classList.remove('hidden');
+      } else {
+        message = `${total - complete} items remaining (no critical blockers)`;
+        document.getElementById('launchBtn').disabled = false;
+        document.getElementById('launchBlocker').classList.add('hidden');
+      }
+      document.getElementById('statusMessage').textContent = message;
+    }
+
+    function bindFilters() {
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => {
+            b.classList.remove('active', 'bg-cyber-cyan/20', 'text-cyber-cyan');
+            b.classList.add('bg-slate-800', 'text-slate-400');
+          });
+          btn.classList.add('active', 'bg-cyber-cyan/20', 'text-cyber-cyan');
+          btn.classList.remove('bg-slate-800', 'text-slate-400');
+          
+          const filter = btn.dataset.filter;
+          document.querySelectorAll('[data-category]').forEach(cat => {
+            if (filter === 'all' || cat.dataset.category === filter) {
+              cat.classList.remove('hidden');
+            } else {
+              cat.classList.add('hidden');
+            }
+          });
+        });
+      });
+    }
+
+    function openItem(id) {
+      const item = checklistItems.find(i => i.id === id);
+      if (!item) return;
+
+      currentItemId = id;
+      document.getElementById('modalCategory').textContent = item.category;
+      document.getElementById('modalTitle').textContent = item.item_name;
+      document.getElementById('modalDescription').textContent = item.description || 'No description';
+      document.getElementById('modalStatus').value = item.status;
+      document.getElementById('modalNotes').value = item.notes || '';
+      
+      document.getElementById('itemModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('itemModal').classList.add('hidden');
+      currentItemId = null;
+    }
+
+    async function saveItem() {
+      if (!currentItemId) return;
+
+      const status = document.getElementById('modalStatus').value;
+      const notes = document.getElementById('modalNotes').value.trim();
+
+      const updates = {
+        status,
+        notes,
+        updated_at: new Date().toISOString()
+      };
+
+      if (status === 'complete') {
+        updates.completed_at = new Date().toISOString();
+        updates.completed_by = currentUser.id;
+      }
+
+      const { error } = await supabase
+        .from('launch_checklist_items')
+        .update(updates)
+        .eq('id', currentItemId);
+
+      if (error) {
+        alert('Failed to save: ' + error.message);
+        return;
+      }
+
+      // Update local data
+      const item = checklistItems.find(i => i.id === currentItemId);
+      if (item) {
+        item.status = status;
+        item.notes = notes;
+      }
+
+      closeModal();
+      renderChecklist();
+      updateStats();
+    }
+
+    function confirmLaunch() {
+      if (confirm('🚀 Ready to launch MissionPulse v2?\n\nThis will merge v2-development to main branch.')) {
+        alert('Launch initiated!\n\nNext steps:\n1. git checkout main\n2. git merge v2-development\n3. git push origin main\n\nNetlify will auto-deploy to production.');
+      }
+    }
+
+    function exportReport() {
+      const report = {
+        generated: new Date().toISOString(),
+        summary: {
+          total: checklistItems.length,
+          complete: checklistItems.filter(i => i.status === 'complete').length,
+          inProgress: checklistItems.filter(i => i.status === 'in_progress').length,
+          blocked: checklistItems.filter(i => i.status === 'blocked').length,
+          notStarted: checklistItems.filter(i => i.status === 'not_started').length
+        },
+        items: checklistItems
+      };
+
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `launch-readiness-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    checkAuth();
+  </script>
+  <script src="mp-trial-banner.js"></script>`n</body>
+</html>
+
+

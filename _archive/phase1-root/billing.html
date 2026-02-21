@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billing &amp; Plan -- MissionPulse</title>
+<link rel="icon" type="image/png" sizes="32x32" href="MMT_icon_32px.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="mp-responsive.css">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="mp-polish.js"></script>
+<script src="mp-rbac.js"></script>
+<style>
+body{background:#00050F;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.glow-border{border:1px solid rgba(0,229,250,0.2);box-shadow:0 0 15px rgba(0,229,250,0.03)}
+.plan-card{border:1px solid rgba(100,116,139,0.3);border-radius:12px;padding:28px;transition:all 0.2s}
+.plan-card:hover{border-color:rgba(0,229,250,0.4)}
+.plan-card.active{border-color:#00E5FA;box-shadow:0 0 20px rgba(0,229,250,0.1)}
+.plan-card.active .plan-badge{display:inline-block}
+.plan-badge{display:none;background:#00E5FA;color:#00050F;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.5px}
+.trial-bar{background:linear-gradient(90deg,#F59E0B,#EF4444);height:4px;border-radius:2px}
+</style>
+</head>
+<body class="text-slate-300 min-h-screen">
+
+<!-- Loading -->
+<div id="loadingScreen" style="position:fixed;inset:0;background:#00050F;display:flex;align-items:center;justify-content:center;z-index:99">
+  <div style="text-align:center">
+    <div style="width:32px;height:32px;border:2px solid rgba(0,229,250,0.3);border-top-color:#00E5FA;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto"></div>
+    <p style="color:#475569;font-size:13px;margin-top:12px">Loading billing...</p>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</div>
+
+<div class="max-w-5xl mx-auto p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <div class="flex items-center gap-3">
+        <a href="dashboard.html" class="text-slate-500 hover:text-cyan-400 text-sm">&larr; Dashboard</a>
+        <h1 class="text-2xl font-bold text-white">Billing &amp; Plan</h1>
+      </div>
+      <p class="text-slate-500 text-sm mt-1">Manage your subscription and payment</p>
+    </div>
+    <span id="dataBadge" class="text-xs px-2 py-1 rounded font-mono"></span>
+  </div>
+
+  <!-- Trial Banner (only shows if on trial) -->
+  <div id="trialBanner" style="display:none" class="mb-6 rounded-lg p-4" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3)">
+    <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:16px">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-amber-400 font-semibold text-sm">Free Trial</p>
+          <p class="text-slate-400 text-xs mt-1" id="trialMessage">Your trial expires in -- days</p>
+        </div>
+        <div style="width:200px">
+          <div style="background:rgba(100,116,139,0.2);height:4px;border-radius:2px;overflow:hidden">
+            <div id="trialProgress" class="trial-bar" style="width:100%"></div>
+          </div>
+          <p class="text-slate-500 text-xs mt-1 text-right" id="trialDates"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Current Plan -->
+  <div class="glow-border rounded-lg p-6 mb-8" style="background:#0A1628">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-slate-500 text-xs uppercase tracking-wider mb-1">Current Plan</p>
+        <p class="text-white text-xl font-bold" id="currentPlanName">--</p>
+        <p class="text-slate-400 text-sm mt-1" id="currentPlanDesc">--</p>
+      </div>
+      <div class="text-right">
+        <p class="text-white text-2xl font-bold" id="currentPlanPrice">--</p>
+        <p class="text-slate-500 text-xs" id="currentPlanCycle">per month</p>
+      </div>
+    </div>
+    <!-- Usage -->
+    <div class="grid grid-cols-3 gap-4 mt-6 pt-6" style="border-top:1px solid rgba(100,116,139,0.2)">
+      <div>
+        <p class="text-slate-500 text-xs">Users</p>
+        <p class="text-white font-semibold" id="usageUsers">-- / --</p>
+      </div>
+      <div>
+        <p class="text-slate-500 text-xs">Active Pursuits</p>
+        <p class="text-white font-semibold" id="usagePursuits">-- / --</p>
+      </div>
+      <div>
+        <p class="text-slate-500 text-xs">AI Queries (mo)</p>
+        <p class="text-white font-semibold" id="usageAI">-- / --</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan Cards -->
+  <h2 class="text-white text-lg font-semibold mb-4">Available Plans</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+
+    <!-- Starter -->
+    <div class="plan-card" id="planStarter" style="background:#0A1628">
+      <span class="plan-badge">CURRENT PLAN</span>
+      <h3 class="text-white font-bold text-lg mt-2">Starter</h3>
+      <p class="text-3xl font-bold text-white mt-2">$499<span class="text-sm text-slate-400 font-normal">/mo</span></p>
+      <ul class="mt-4 space-y-2 text-sm text-slate-400">
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> 5 users</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> 5 active pursuits</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> Pipeline + Compliance + RFP</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> CSV exports</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> 100 AI queries/mo</li>
+      </ul>
+      <a id="starterBtn" href="#" target="_blank" class="block mt-6 text-center py-2.5 rounded-lg text-sm font-semibold transition-all"
+         style="background:transparent;border:1px solid rgba(0,229,250,0.3);color:#00E5FA">
+        Select Starter
+      </a>
+    </div>
+
+    <!-- Professional -->
+    <div class="plan-card" id="planProfessional" style="background:#0A1628;position:relative">
+      <span class="plan-badge">CURRENT PLAN</span>
+      <div style="position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:#00E5FA;color:#00050F;font-size:9px;font-weight:700;padding:2px 12px;border-radius:0 0 6px 6px;letter-spacing:0.5px">RECOMMENDED</div>
+      <h3 class="text-white font-bold text-lg mt-2">Professional</h3>
+      <p class="text-3xl font-bold text-white mt-2">$999<span class="text-sm text-slate-400 font-normal">/mo</span></p>
+      <ul class="mt-4 space-y-2 text-sm text-slate-400">
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> 15 users</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> Unlimited pursuits</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> All modules + Black Hat</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> DOCX + CSV exports</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> 500 AI queries/mo</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> Priority support</li>
+      </ul>
+      <a id="professionalBtn" href="#" target="_blank" class="block mt-6 text-center py-2.5 rounded-lg text-sm font-semibold transition-all"
+         style="background:#00E5FA;color:#00050F">
+        Select Professional
+      </a>
+    </div>
+
+    <!-- Enterprise -->
+    <div class="plan-card" id="planEnterprise" style="background:#0A1628">
+      <span class="plan-badge">CURRENT PLAN</span>
+      <h3 class="text-white font-bold text-lg mt-2">Enterprise</h3>
+      <p class="text-3xl font-bold text-white mt-2">Custom</p>
+      <ul class="mt-4 space-y-2 text-sm text-slate-400">
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> Unlimited users</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> Unlimited pursuits</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> SSO / SAML</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> Dedicated CSM</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> Unlimited AI queries</li>
+        <li class="flex items-center gap-2"><span class="text-cyan-400">&#10003;</span> Custom integrations</li>
+      </ul>
+      <a href="mailto:hello@missionmeetstech.com?subject=MissionPulse Enterprise Inquiry" class="block mt-6 text-center py-2.5 rounded-lg text-sm font-semibold transition-all"
+         style="background:transparent;border:1px solid rgba(139,92,246,0.3);color:#A78BFA">
+        Contact Sales
+      </a>
+    </div>
+  </div>
+
+  <!-- Billing History -->
+  <div class="glow-border rounded-lg p-6" style="background:#0A1628">
+    <h3 class="text-white font-semibold mb-3">Billing History</h3>
+    <p class="text-slate-500 text-sm" id="billingHistory">No invoices yet. Payment history will appear here after your first payment.</p>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-center">
+    <p class="text-slate-600 text-xs">Payments processed securely by Stripe. Questions? <a href="mailto:hello@missionmeetstech.com" class="text-cyan-400 hover:underline">hello@missionmeetstech.com</a></p>
+    <p class="text-slate-700 text-xs mt-2">AI GENERATED -- REQUIRES HUMAN REVIEW</p>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NDIsImV4cCI6MjA1MzQxMDQ0Mn0.gMzJAb3GkUNJBnfoDSpWPbKDnJBATkTNwdB2D1kMiFo';
+  var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  // ── S4 RBAC GUARD ──
+  (async function rbacGuard() {
+    const ok = await MP_RBAC.guardPage('admin');
+    if (!ok) return;
+    MP_RBAC.hideEditControls('admin');
+  })();
+
+  // ══════════════════════════════════════════
+  // STRIPE PAYMENT LINKS — Replace with your real links after s6-1/s6-2
+  // ══════════════════════════════════════════
+  const STRIPE_LINKS = {
+    starter:      'https://buy.stripe.com/YOUR_STARTER_LINK',
+    professional: 'https://buy.stripe.com/YOUR_PROFESSIONAL_LINK'
+  };
+
+  // Plan metadata
+  const PLANS = {
+    trial:        { name: 'Free Trial', price: '$0', desc: '14-day full access trial', users: 5, pursuits: 5, ai: 50 },
+    starter:      { name: 'Starter', price: '$499', desc: '5 users, 5 active pursuits', users: 5, pursuits: 5, ai: 100 },
+    professional: { name: 'Professional', price: '$999', desc: '15 users, unlimited pursuits', users: 15, pursuits: 999, ai: 500 },
+    enterprise:   { name: 'Enterprise', price: 'Custom', desc: 'Unlimited everything', users: 999, pursuits: 999, ai: 9999 }
+  };
+
+  async function loadBilling() {
+    try {
+      const { data: { session } } = await sbClient.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; return; }
+
+      // Get company data
+      const { data: profile } = await sbClient
+        .from('profiles')
+        .select('company_id, role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile) return;
+
+      const { data: company } = await sbClient
+        .from('companies')
+        .select('*')
+        .eq('id', profile.company_id)
+        .single();
+
+      if (!company) return;
+
+      const tier = company.subscription_tier || 'trial';
+      const plan = PLANS[tier] || PLANS.trial;
+
+      // Current plan display
+      document.getElementById('currentPlanName').textContent = plan.name;
+      document.getElementById('currentPlanDesc').textContent = plan.desc;
+      document.getElementById('currentPlanPrice').textContent = plan.price;
+      document.getElementById('currentPlanCycle').textContent = tier === 'trial' ? '14 days free' : 'per month';
+
+      // Usage counts
+      const { count: userCount } = await sbClient
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', profile.company_id);
+
+      const { count: pursuitCount } = await sbClient
+        .from('opportunities')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', profile.company_id);
+
+      document.getElementById('usageUsers').textContent =
+        (userCount || 0) + ' / ' + (plan.users >= 999 ? 'Unlimited' : plan.users);
+      document.getElementById('usagePursuits').textContent =
+        (pursuitCount || 0) + ' / ' + (plan.pursuits >= 999 ? 'Unlimited' : plan.pursuits);
+      document.getElementById('usageAI').textContent =
+        '-- / ' + (plan.ai >= 9999 ? 'Unlimited' : plan.ai);
+
+      // Highlight current plan card
+      var cardId = 'plan' + tier.charAt(0).toUpperCase() + tier.slice(1);
+      var activeCard = document.getElementById(cardId);
+      if (activeCard) activeCard.classList.add('active');
+      // Trial highlights Starter as next step
+      if (tier === 'trial') {
+        document.getElementById('planStarter').classList.add('active');
+      }
+
+      // Set Stripe links
+      document.getElementById('starterBtn').href = STRIPE_LINKS.starter;
+      document.getElementById('professionalBtn').href = STRIPE_LINKS.professional;
+
+      // Update button text for current plan
+      if (tier === 'starter') {
+        document.getElementById('starterBtn').textContent = 'Current Plan';
+        document.getElementById('starterBtn').style.opacity = '0.5';
+        document.getElementById('starterBtn').style.pointerEvents = 'none';
+      } else if (tier === 'professional') {
+        document.getElementById('professionalBtn').textContent = 'Current Plan';
+        document.getElementById('professionalBtn').style.opacity = '0.5';
+        document.getElementById('professionalBtn').style.pointerEvents = 'none';
+      }
+
+      // Trial banner
+      if (tier === 'trial' && company.trial_ends_at) {
+        var trialEnd = new Date(company.trial_ends_at);
+        var now = new Date();
+        var daysLeft = Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
+        var totalDays = 14;
+        var elapsed = totalDays - daysLeft;
+        var pct = Math.min(100, Math.round((elapsed / totalDays) * 100));
+
+        document.getElementById('trialBanner').style.display = 'block';
+        document.getElementById('trialMessage').textContent =
+          daysLeft > 0
+            ? 'Your trial expires in ' + daysLeft + ' day' + (daysLeft !== 1 ? 's' : '') + '. Upgrade to keep your data.'
+            : 'Your trial has expired. Upgrade now to continue using MissionPulse.';
+        document.getElementById('trialProgress').style.width = pct + '%';
+        document.getElementById('trialDates').textContent =
+          'Expires ' + trialEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      // Data badge
+      document.getElementById('dataBadge').textContent = 'LIVE';
+      document.getElementById('dataBadge').style.background = 'rgba(16,185,129,0.1)';
+      document.getElementById('dataBadge').style.color = '#10B981';
+
+    } catch (err) {
+      console.error('[Billing] Error:', err);
+      document.getElementById('dataBadge').textContent = 'ERROR';
+      document.getElementById('dataBadge').style.background = 'rgba(239,68,68,0.1)';
+      document.getElementById('dataBadge').style.color = '#EF4444';
+    } finally {
+      document.getElementById('loadingScreen').style.display = 'none';
+    }
+  }
+
+  loadBilling();
+</script>
+  <script src="mp-trial-banner.js"></script>`n</body>
+</html>
+

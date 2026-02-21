@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Outline Builder | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="mp-rbac.js"></script>
+  <style>
+    body { background: #00050F; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+    .card { background: #0d1f3c; border: 1px solid #1e3a5f; border-radius: 12px; }
+    .btn-primary { background: #00E5FA; color: #00050F; font-weight: 600; }
+    .btn-primary:hover { background: #00c4d6; }
+    .section-bar { border-left: 3px solid #00E5FA; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const VOLUMES = ['Technical','Management','Past Performance','Pricing','Staffing'];
+    const STATUSES = ['Not Started','In Progress','Draft','Review','Final'];
+    const STATUS_COLORS = { 'Not Started':'bg-slate-500', 'In Progress':'bg-amber-500', 'Draft':'bg-blue-500', 'Review':'bg-purple-500', 'Final':'bg-emerald-500' };
+
+    const DEMO_OUTLINES = [
+      { id: 'demo-1', volume: 'Technical', sections: [
+        { id: 's1', title: '1.0 Executive Summary', status: 'Final', page_limit: 2 },
+        { id: 's2', title: '2.0 Technical Approach', status: 'In Progress', page_limit: 15 },
+        { id: 's3', title: '2.1 Understanding of Requirements', status: 'Draft', page_limit: 5 },
+        { id: 's4', title: '2.2 Solution Architecture', status: 'Not Started', page_limit: 8 },
+        { id: 's5', title: '3.0 Transition Plan', status: 'Not Started', page_limit: 4 },
+        { id: 's6', title: '4.0 Quality Assurance', status: 'Review', page_limit: 3 },
+      ]},
+      { id: 'demo-2', volume: 'Management', sections: [
+        { id: 's7', title: '1.0 Program Management', status: 'Draft', page_limit: 8 },
+        { id: 's8', title: '2.0 Staffing Plan', status: 'Not Started', page_limit: 6 },
+        { id: 's9', title: '3.0 Risk Management', status: 'Not Started', page_limit: 4 },
+      ]},
+    ];
+
+    function App() {
+      const [outlines, setOutlines] = useState([]);
+      const [sections, setSections] = useState({});
+      const [opps, setOpps] = useState([]);
+      const [selectedOpp, setSelectedOpp] = useState('all');
+      const [connected, setConnected] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [showAddVolume, setShowAddVolume] = useState(false);
+      const [newVolume, setNewVolume] = useState('Technical');
+      const [showAddSection, setShowAddSection] = useState(null);
+      const [sectionForm, setSectionForm] = useState({ title: '', page_limit: '', status: 'Not Started' });
+
+      const loadData = useCallback(async () => {
+        setLoading(true);
+        try {
+          const { data: oppData } = await sb.from('opportunities').select('id, title, agency');
+          if (oppData) setOpps(oppData);
+
+          let oQuery = sb.from('proposal_outlines').select('*').order('created_at');
+          if (selectedOpp !== 'all') oQuery = oQuery.eq('opportunity_id', selectedOpp);
+          const { data: oData, error: oErr } = await oQuery;
+          if (oErr) throw oErr;
+
+          setOutlines(oData || []);
+
+          if (oData && oData.length > 0) {
+            const ids = oData.map(o => o.id);
+            const { data: sData } = await sb.from('outline_sections').select('*').in('outline_id', ids).order('order_index');
+            const grouped = {};
+            (sData || []).forEach(s => { if (!grouped[s.outline_id]) grouped[s.outline_id] = []; grouped[s.outline_id].push(s); });
+            setSections(grouped);
+          } else { setSections({}); }
+          setConnected(true);
+        } catch (e) {
+          console.warn('Demo mode:', e.message);
+          setOutlines(DEMO_OUTLINES);
+          const demoSections = {};
+          DEMO_OUTLINES.forEach(o => { demoSections[o.id] = o.sections; });
+          setSections(demoSections);
+          setConnected(false);
+        }
+        setLoading(false);
+      }, [selectedOpp]);
+
+      useEffect(() => { loadData(); }, [loadData]);
+
+      const addVolume = async () => {
+        try {
+          const payload = { volume: newVolume };
+          if (selectedOpp !== 'all') payload.opportunity_id = selectedOpp;
+          await sb.from('proposal_outlines').insert([payload]);
+          setShowAddVolume(false);
+          loadData();
+        } catch (e) { alert('Failed: ' + e.message); }
+      };
+
+      const addSection = async (outlineId) => {
+        const existing = sections[outlineId] || [];
+        try {
+          await sb.from('outline_sections').insert([{
+            outline_id: outlineId,
+            title: sectionForm.title,
+            page_limit: parseInt(sectionForm.page_limit) || null,
+            status: sectionForm.status,
+            order_index: existing.length,
+          }]);
+          setShowAddSection(null);
+          setSectionForm({ title: '', page_limit: '', status: 'Not Started' });
+          loadData();
+        } catch (e) { alert('Failed: ' + e.message); }
+      };
+
+      const updateStatus = async (sectionId, newStatus) => {
+        try {
+          await sb.from('outline_sections').update({ status: newStatus }).eq('id', sectionId);
+          loadData();
+        } catch (e) { alert('Failed: ' + e.message); }
+      };
+
+      const deleteSection = async (id) => {
+        if (!confirm('Delete this section?')) return;
+        try { await sb.from('outline_sections').delete().eq('id', id); loadData(); }
+        catch (e) { alert('Failed: ' + e.message); }
+      };
+
+      const deleteOutline = async (id) => {
+        if (!confirm('Delete this volume and all sections?')) return;
+        try { await sb.from('proposal_outlines').delete().eq('id', id); loadData(); }
+        catch (e) { alert('Failed: ' + e.message); }
+      };
+
+      const allSections = Object.values(sections).flat();
+      const totalPages = allSections.reduce((s, sec) => s + (sec.page_limit || 0), 0);
+      const finalCount = allSections.filter(s => s.status === 'Final').length;
+      const progress = allSections.length > 0 ? Math.round((finalCount / allSections.length) * 100) : 0;
+
+      return (
+        <div className="min-h-screen p-6 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white font-bold">OB</div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Outline Builder</h1>
+                <p className="text-sm text-slate-400">Proposal volume structure & section tracking</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                {connected ? '● Connected' : '● Demo Mode'}
+              </div>
+              <a href="dashboard-v2.html" className="text-slate-400 hover:text-white text-sm">← Dashboard</a>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-6">
+            <select value={selectedOpp} onChange={e => setSelectedOpp(e.target.value)} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+              <option value="all">All Opportunities</option>
+              {opps.map(o => <option key={o.id} value={o.id}>{o.title} ({o.agency})</option>)}
+            </select>
+            <button onClick={() => setShowAddVolume(true)} className="btn-primary px-4 py-2 rounded-lg text-sm">+ Add Volume</button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Volumes', value: outlines.length, color: 'cyan' },
+              { label: 'Sections', value: allSections.length, color: 'blue' },
+              { label: 'Total Pages', value: totalPages, color: 'amber' },
+              { label: 'Progress', value: progress + '%', color: 'emerald' },
+            ].map((s, i) => (
+              <div key={i} className="card p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">{s.label}</p>
+                <p className={`text-2xl font-bold text-${s.color}-400 mt-1`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Add Volume Modal */}
+          {showAddVolume && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddVolume(false)}>
+              <div className="card p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                <h2 className="text-lg font-bold text-white mb-4">Add Volume</h2>
+                <select value={newVolume} onChange={e => setNewVolume(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white mb-4">
+                  {VOLUMES.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setShowAddVolume(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400">Cancel</button>
+                  <button onClick={addVolume} className="btn-primary px-4 py-2 rounded-lg text-sm">Create</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Volumes & Sections */}
+          {loading ? (
+            <div className="space-y-4">{[1,2].map(i => <div key={i} className="card h-48 animate-pulse" />)}</div>
+          ) : outlines.length === 0 ? (
+            <div className="card p-12 text-center"><p className="text-slate-400">No outlines created yet. Add a volume to begin.</p></div>
+          ) : (
+            <div className="space-y-6">
+              {outlines.map(o => {
+                const secs = sections[o.id] || [];
+                return (
+                  <div key={o.id} className="card p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-bold text-white">{o.volume || 'Volume'}</h2>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-400">{secs.length} sections</span>
+                        <button onClick={() => { setShowAddSection(o.id); setSectionForm({ title: '', page_limit: '', status: 'Not Started' }); }} className="text-xs text-cyan-400 hover:text-cyan-300">+ Section</button>
+                        {connected && <button onClick={() => deleteOutline(o.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>}
+                      </div>
+                    </div>
+
+                    {showAddSection === o.id && (
+                      <div className="bg-slate-800/50 rounded-lg p-4 mb-4">
+                        <div className="grid grid-cols-3 gap-3">
+                          <input placeholder="Section title (e.g. 2.1 Approach)" value={sectionForm.title} onChange={e => setSectionForm({...sectionForm, title: e.target.value})} className="col-span-2 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                          <input placeholder="Page limit" type="number" value={sectionForm.page_limit} onChange={e => setSectionForm({...sectionForm, page_limit: e.target.value})} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                        </div>
+                        <div className="flex justify-end gap-2 mt-3">
+                          <button onClick={() => setShowAddSection(null)} className="text-xs text-slate-400">Cancel</button>
+                          <button onClick={() => addSection(o.id)} disabled={!sectionForm.title} className="btn-primary px-3 py-1 rounded text-xs disabled:opacity-40">Add</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {secs.length === 0 ? (
+                      <p className="text-sm text-slate-500 italic">No sections yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {secs.map(s => (
+                          <div key={s.id} className="section-bar pl-4 py-2 flex items-center justify-between hover:bg-slate-800/30 rounded-r-lg">
+                            <div className="flex items-center gap-3">
+                              <span className={`status-dot ${STATUS_COLORS[s.status] || 'bg-slate-500'}`} />
+                              <span className="text-sm text-white">{s.title}</span>
+                              {s.page_limit && <span className="text-xs text-slate-500">{s.page_limit}p</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {connected && (
+                                <select value={s.status} onChange={e => updateStatus(s.id, e.target.value)} className="bg-transparent border border-slate-700 rounded px-2 py-1 text-xs text-slate-300">
+                                  {STATUSES.map(st => <option key={st} value={st}>{st}</option>)}
+                                </select>
+                              )}
+                              {!connected && <span className="text-xs text-slate-500">{s.status}</span>}
+                              {connected && <button onClick={() => deleteSection(s.id)} className="text-xs text-red-400 hover:text-red-300 ml-2">×</button>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-8 text-center text-xs text-slate-600 border-t border-slate-800 pt-4">
+            AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse &copy; 2026 Mission Meets Tech
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+  <script src="mp-trial-banner.js"></script>
+</body>
+</html>

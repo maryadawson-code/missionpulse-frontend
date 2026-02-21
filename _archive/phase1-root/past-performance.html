@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Past Performance | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="mp-rbac.js"></script>
+  <style>
+    body { background: #00050F; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+    .card { background: #0d1f3c; border: 1px solid #1e3a5f; border-radius: 12px; }
+    .btn-primary { background: #00E5FA; color: #00050F; font-weight: 600; }
+    .btn-primary:hover { background: #00c4d6; }
+    .rating-exceptional { color: #10b981; } .rating-verygood { color: #22d3ee; }
+    .rating-satisfactory { color: #facc15; } .rating-marginal { color: #f97316; }
+    .rating-unsatisfactory { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const DEMO_DATA = [
+      { id: 'demo-1', contract_name: 'MHS GENESIS EHR Support', contract_number: 'W81K04-20-D-0032', agency: 'DHA', contract_value: 12500000, period_of_performance: '2020-2025', relevance: 'Direct MHS modernization support including EHR deployment across 56 MTFs', cpars_rating: 'Exceptional' },
+      { id: 'demo-2', contract_name: 'VA Enterprise Cloud Migration', contract_number: 'VA118-19-D-1013', agency: 'VA', contract_value: 8700000, period_of_performance: '2019-2024', relevance: 'Migrated 12 VA systems to AWS GovCloud with FedRAMP High authorization', cpars_rating: 'Very Good' },
+      { id: 'demo-3', contract_name: 'CMS Data Analytics Platform', contract_number: 'HHSM-500-2021-00012', agency: 'CMS', contract_value: 4200000, period_of_performance: '2021-2024', relevance: 'Built predictive analytics for Medicare claims processing', cpars_rating: 'Exceptional' },
+      { id: 'demo-4', contract_name: 'IHS Telehealth Network', contract_number: 'HHSI-242-2022-00045', agency: 'IHS', contract_value: 3100000, period_of_performance: '2022-2025', relevance: 'Deployed telehealth infrastructure across 28 tribal health facilities', cpars_rating: 'Satisfactory' },
+    ];
+
+    const RATINGS = ['Exceptional','Very Good','Satisfactory','Marginal','Unsatisfactory'];
+
+    function App() {
+      const [records, setRecords] = useState([]);
+      const [opps, setOpps] = useState([]);
+      const [selectedOpp, setSelectedOpp] = useState('all');
+      const [connected, setConnected] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [showForm, setShowForm] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const [form, setForm] = useState({ contract_name:'', contract_number:'', agency:'', contract_value:'', period_of_performance:'', relevance:'', cpars_rating:'Satisfactory' });
+
+      const loadData = useCallback(async () => {
+        setLoading(true);
+        try {
+          const { data: oppData } = await sb.from('opportunities').select('id, title, agency');
+          if (oppData) setOpps(oppData);
+
+          let query = sb.from('past_performance').select('*').order('created_at', { ascending: false });
+          if (selectedOpp !== 'all') query = query.eq('opportunity_id', selectedOpp);
+          const { data, error } = await query;
+
+          if (error) throw error;
+          setRecords(data || []);
+          setConnected(true);
+        } catch (e) {
+          console.warn('Supabase unavailable, using demo data:', e.message);
+          setRecords(DEMO_DATA);
+          setConnected(false);
+        }
+        setLoading(false);
+      }, [selectedOpp]);
+
+      useEffect(() => { loadData(); }, [loadData]);
+
+      const handleSave = async () => {
+        const payload = { ...form, contract_value: parseFloat(form.contract_value) || 0 };
+        if (selectedOpp !== 'all') payload.opportunity_id = selectedOpp;
+
+        try {
+          if (editing) {
+            await sb.from('past_performance').update(payload).eq('id', editing);
+          } else {
+            await sb.from('past_performance').insert([payload]);
+          }
+          setShowForm(false); setEditing(null);
+          setForm({ contract_name:'', contract_number:'', agency:'', contract_value:'', period_of_performance:'', relevance:'', cpars_rating:'Satisfactory' });
+          loadData();
+        } catch (e) { alert('Save failed: ' + e.message); }
+      };
+
+      const handleEdit = (r) => {
+        setForm({ contract_name: r.contract_name, contract_number: r.contract_number || '', agency: r.agency || '', contract_value: r.contract_value || '', period_of_performance: r.period_of_performance || '', relevance: r.relevance || '', cpars_rating: r.cpars_rating || 'Satisfactory' });
+        setEditing(r.id); setShowForm(true);
+      };
+
+      const handleDelete = async (id) => {
+        if (!confirm('Delete this past performance citation?')) return;
+        try { await sb.from('past_performance').delete().eq('id', id); loadData(); }
+        catch (e) { alert('Delete failed: ' + e.message); }
+      };
+
+      const ratingClass = (r) => {
+        const map = { 'Exceptional':'rating-exceptional', 'Very Good':'rating-verygood', 'Satisfactory':'rating-satisfactory', 'Marginal':'rating-marginal', 'Unsatisfactory':'rating-unsatisfactory' };
+        return map[r] || '';
+      };
+
+      const formatCurrency = (v) => v ? '$' + Number(v).toLocaleString() : '$0';
+
+      const totalValue = records.reduce((s, r) => s + (Number(r.contract_value) || 0), 0);
+      const exceptionalCount = records.filter(r => r.cpars_rating === 'Exceptional').length;
+      const agencies = [...new Set(records.map(r => r.agency).filter(Boolean))];
+
+      return (
+        <div className="min-h-screen p-6 max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white font-bold">PP</div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">Past Performance</h1>
+                  <p className="text-sm text-slate-400">Contract citations & CPARS ratings</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                {connected ? '● Connected' : '● Demo Mode'}
+              </div>
+              <a href="dashboard-v2.html" className="text-slate-400 hover:text-white text-sm">← Dashboard</a>
+            </div>
+          </div>
+
+          {/* Filters + Add */}
+          <div className="flex items-center gap-3 mb-6">
+            <select value={selectedOpp} onChange={e => setSelectedOpp(e.target.value)} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+              <option value="all">All Opportunities</option>
+              {opps.map(o => <option key={o.id} value={o.id}>{o.title} ({o.agency})</option>)}
+            </select>
+            <button onClick={() => { setEditing(null); setForm({ contract_name:'', contract_number:'', agency:'', contract_value:'', period_of_performance:'', relevance:'', cpars_rating:'Satisfactory' }); setShowForm(true); }} className="btn-primary px-4 py-2 rounded-lg text-sm">+ Add Citation</button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Total Citations', value: records.length, color: 'cyan' },
+              { label: 'Total Value', value: formatCurrency(totalValue), color: 'emerald' },
+              { label: 'Exceptional Ratings', value: exceptionalCount, color: 'amber' },
+              { label: 'Agencies Served', value: agencies.length, color: 'purple' },
+            ].map((s, i) => (
+              <div key={i} className="card p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">{s.label}</p>
+                <p className={`text-2xl font-bold text-${s.color}-400 mt-1`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Form Modal */}
+          {showForm && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowForm(false)}>
+              <div className="card p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                <h2 className="text-lg font-bold text-white mb-4">{editing ? 'Edit' : 'Add'} Past Performance</h2>
+                <div className="space-y-3">
+                  <input placeholder="Contract Name *" value={form.contract_name} onChange={e => setForm({...form, contract_name: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input placeholder="Contract Number" value={form.contract_number} onChange={e => setForm({...form, contract_number: e.target.value})} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                    <input placeholder="Agency (e.g. DHA)" value={form.agency} onChange={e => setForm({...form, agency: e.target.value})} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input placeholder="Contract Value" type="number" value={form.contract_value} onChange={e => setForm({...form, contract_value: e.target.value})} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                    <input placeholder="PoP (e.g. 2020-2025)" value={form.period_of_performance} onChange={e => setForm({...form, period_of_performance: e.target.value})} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                  </div>
+                  <select value={form.cpars_rating} onChange={e => setForm({...form, cpars_rating: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    {RATINGS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <textarea placeholder="Relevance description" rows={3} value={form.relevance} onChange={e => setForm({...form, relevance: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                </div>
+                <div className="flex justify-end gap-3 mt-4">
+                  <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white">Cancel</button>
+                  <button onClick={handleSave} disabled={!form.contract_name} className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-40">Save</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Records */}
+          {loading ? (
+            <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="card h-32 animate-pulse" />)}</div>
+          ) : records.length === 0 ? (
+            <div className="card p-12 text-center"><p className="text-slate-400">No past performance citations found.</p></div>
+          ) : (
+            <div className="space-y-4">
+              {records.map(r => (
+                <div key={r.id} className="card p-5 hover:border-cyan-500/30 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-white font-semibold">{r.contract_name}</h3>
+                        <span className={`text-xs font-bold ${ratingClass(r.cpars_rating)}`}>{r.cpars_rating}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-slate-400 mb-2">
+                        {r.contract_number && <span>#{r.contract_number}</span>}
+                        {r.agency && <span className="bg-slate-700 px-2 py-0.5 rounded">{r.agency}</span>}
+                        {r.period_of_performance && <span>{r.period_of_performance}</span>}
+                        {r.contract_value && <span className="text-emerald-400 font-medium">{formatCurrency(r.contract_value)}</span>}
+                      </div>
+                      {r.relevance && <p className="text-sm text-slate-300 line-clamp-2">{r.relevance}</p>}
+                    </div>
+                    {connected && (
+                      <div className="flex gap-2 ml-4">
+                        <button onClick={() => handleEdit(r)} className="text-xs text-cyan-400 hover:text-cyan-300">Edit</button>
+                        <button onClick={() => handleDelete(r.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="mt-8 text-center text-xs text-slate-600 border-t border-slate-800 pt-4">
+            AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse &copy; 2026 Mission Meets Tech
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+  <script src="mp-trial-banner.js"></script>
+</body>
+</html>

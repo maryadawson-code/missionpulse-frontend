@@ -14,7 +14,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  const supabase = createClient()
 
   // ─── Auth Gate ──────────────────────────────────────────────
   const {
@@ -36,19 +36,29 @@ export default async function DashboardLayout({
   const userRole = profile?.role ?? 'partner'
 
   // ─── RBAC Permission Resolution ─────────────────────────────
-  // getRolePermissions reads roles_permissions_config.json and returns
-  // the module permissions for the given role.
-  // This function is expected from Sprint 2's lib/rbac/config.ts.
-  const permissions: Record<string, ModulePermission> = getRolePermissions(userRole)
+  let permissions: Record<string, ModulePermission> = {}
+  try {
+    permissions = getRolePermissions(userRole)
+  } catch {
+    // Fallback: deny all if RBAC config fails
+    const modules = ['dashboard','pipeline','proposals','pricing','strategy','blackhat','compliance','workflow_board','ai_chat','documents','analytics','admin','integrations','audit_log','personnel']
+    for (const m of modules) permissions[m] = { shouldRender: false, canView: false, canEdit: false }
+    permissions.dashboard = { shouldRender: true, canView: true, canEdit: false }
+  }
 
   // ─── Recent Activity for Notifications ────────────────────
-  const { data: recentActivity } = await getRecentActivity(5)
-  const notifications = recentActivity.map((a) => ({
-    id: a.id,
-    action: a.action,
-    user_name: a.user_name,
-    timestamp: a.timestamp,
-  }))
+  let notifications: { id: string; action: string; user_name: string | null; timestamp: string | null }[] = []
+  try {
+    const { data: recentActivity } = await getRecentActivity(5)
+    notifications = (recentActivity ?? []).map((a) => ({
+      id: a.id,
+      action: a.action,
+      user_name: a.user_name,
+      timestamp: a.timestamp,
+    }))
+  } catch {
+    // Non-critical — continue without notifications
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">

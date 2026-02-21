@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teaming Manager | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="mp-rbac.js"></script>
+  <style>
+    body { background: #00050F; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+    .card { background: #0d1f3c; border: 1px solid #1e3a5f; border-radius: 12px; }
+    .btn-primary { background: #00E5FA; color: #00050F; font-weight: 600; }
+    .btn-primary:hover { background: #00c4d6; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const SHIPLEY_ROLES = ['CEO','COO','CAP','PM','SA','FIN','CON','DEL','QA','Partner','Admin'];
+    const ROLE_COLORS = { CEO:'bg-red-500', COO:'bg-orange-500', CAP:'bg-amber-500', PM:'bg-yellow-500', SA:'bg-cyan-500', FIN:'bg-emerald-500', CON:'bg-blue-500', DEL:'bg-indigo-500', QA:'bg-purple-500', Partner:'bg-pink-500', Admin:'bg-slate-500' };
+    const ROLE_LABELS = { CEO:'Chief Executive', COO:'Operations Lead', CAP:'Capture Manager', PM:'Proposal Manager', SA:'Solution Architect', FIN:'Pricing Manager', CON:'Contracts Manager', DEL:'Delivery/HR', QA:'Quality Assurance', Partner:'Teaming Partner', Admin:'Administrator' };
+
+    const DEMO_ASSIGNMENTS = [
+      { id: 'demo-1', role: 'CAP', is_active: true, assigned_at: '2026-01-15T10:00:00Z', user_name: 'Sarah Mitchell' },
+      { id: 'demo-2', role: 'PM', is_active: true, assigned_at: '2026-01-15T10:00:00Z', user_name: 'James Chen' },
+      { id: 'demo-3', role: 'SA', is_active: true, assigned_at: '2026-01-16T14:00:00Z', user_name: 'Dr. Priya Patel' },
+      { id: 'demo-4', role: 'FIN', is_active: true, assigned_at: '2026-01-16T14:00:00Z', user_name: 'Michael Torres' },
+      { id: 'demo-5', role: 'CON', is_active: true, assigned_at: '2026-01-17T09:00:00Z', user_name: 'Lisa Washington' },
+      { id: 'demo-6', role: 'QA', is_active: false, assigned_at: '2026-01-12T08:00:00Z', user_name: 'Robert Kim' },
+      { id: 'demo-7', role: 'Partner', is_active: true, assigned_at: '2026-01-18T11:00:00Z', user_name: 'Apex Health Solutions' },
+    ];
+
+    function App() {
+      const [assignments, setAssignments] = useState([]);
+      const [opps, setOpps] = useState([]);
+      const [selectedOpp, setSelectedOpp] = useState('all');
+      const [connected, setConnected] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [showForm, setShowForm] = useState(false);
+      const [form, setForm] = useState({ role: 'CAP', user_name: '', is_active: true });
+      const [editing, setEditing] = useState(null);
+
+      const loadData = useCallback(async () => {
+        setLoading(true);
+        try {
+          const { data: oppData } = await sb.from('opportunities').select('id, title, agency');
+          if (oppData) setOpps(oppData);
+
+          let query = sb.from('team_assignments').select('*').order('assigned_at', { ascending: false });
+          if (selectedOpp !== 'all') query = query.eq('opportunity_id', selectedOpp);
+          const { data, error } = await query;
+          if (error) throw error;
+          setAssignments(data || []);
+          setConnected(true);
+        } catch (e) {
+          console.warn('Demo mode:', e.message);
+          setAssignments(DEMO_ASSIGNMENTS);
+          setConnected(false);
+        }
+        setLoading(false);
+      }, [selectedOpp]);
+
+      useEffect(() => { loadData(); }, [loadData]);
+
+      const handleSave = async () => {
+        const payload = { role: form.role, is_active: form.is_active };
+        if (selectedOpp !== 'all') payload.opportunity_id = selectedOpp;
+        try {
+          if (editing) {
+            await sb.from('team_assignments').update(payload).eq('id', editing);
+          } else {
+            await sb.from('team_assignments').insert([payload]);
+          }
+          setShowForm(false); setEditing(null);
+          setForm({ role: 'CAP', user_name: '', is_active: true });
+          loadData();
+        } catch (e) { alert('Save failed: ' + e.message); }
+      };
+
+      const toggleActive = async (id, current) => {
+        try {
+          await sb.from('team_assignments').update({ is_active: !current }).eq('id', id);
+          loadData();
+        } catch (e) { alert('Update failed: ' + e.message); }
+      };
+
+      const handleDelete = async (id) => {
+        if (!confirm('Remove this team assignment?')) return;
+        try { await sb.from('team_assignments').delete().eq('id', id); loadData(); }
+        catch (e) { alert('Delete failed: ' + e.message); }
+      };
+
+      const activeCount = assignments.filter(a => a.is_active).length;
+      const filledRoles = [...new Set(assignments.filter(a => a.is_active).map(a => a.role))];
+      const unfilledRoles = SHIPLEY_ROLES.filter(r => !filledRoles.includes(r));
+      const partnerCount = assignments.filter(a => a.role === 'Partner' && a.is_active).length;
+
+      return (
+        <div className="min-h-screen p-6 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-400 to-pink-600 flex items-center justify-center text-white font-bold">TM</div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Teaming Manager</h1>
+                <p className="text-sm text-slate-400">Shipley role assignments & team composition</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                {connected ? '● Connected' : '● Demo Mode'}
+              </div>
+              <a href="dashboard-v2.html" className="text-slate-400 hover:text-white text-sm">← Dashboard</a>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-6">
+            <select value={selectedOpp} onChange={e => setSelectedOpp(e.target.value)} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+              <option value="all">All Opportunities</option>
+              {opps.map(o => <option key={o.id} value={o.id}>{o.title} ({o.agency})</option>)}
+            </select>
+            <button onClick={() => { setEditing(null); setForm({ role: 'CAP', user_name: '', is_active: true }); setShowForm(true); }} className="btn-primary px-4 py-2 rounded-lg text-sm">+ Assign Role</button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Active Members', value: activeCount, color: 'cyan' },
+              { label: 'Roles Filled', value: `${filledRoles.length}/${SHIPLEY_ROLES.length}`, color: 'emerald' },
+              { label: 'Partners', value: partnerCount, color: 'pink' },
+              { label: 'Gaps', value: unfilledRoles.length, color: unfilledRoles.length > 3 ? 'red' : 'amber' },
+            ].map((s, i) => (
+              <div key={i} className="card p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">{s.label}</p>
+                <p className={`text-2xl font-bold text-${s.color}-400 mt-1`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Unfilled Roles Warning */}
+          {unfilledRoles.length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-6">
+              <p className="text-sm text-amber-400 font-medium">Unfilled Roles:</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {unfilledRoles.map(r => (
+                  <span key={r} className="bg-amber-500/20 text-amber-300 text-xs px-2 py-1 rounded">{r} — {ROLE_LABELS[r]}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Form Modal */}
+          {showForm && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowForm(false)}>
+              <div className="card p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <h2 className="text-lg font-bold text-white mb-4">{editing ? 'Edit' : 'Add'} Assignment</h2>
+                <div className="space-y-3">
+                  <select value={form.role} onChange={e => setForm({...form, role: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    {SHIPLEY_ROLES.map(r => <option key={r} value={r}>{r} — {ROLE_LABELS[r]}</option>)}
+                  </select>
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <input type="checkbox" checked={form.is_active} onChange={e => setForm({...form, is_active: e.target.checked})} className="rounded" />
+                    Active assignment
+                  </label>
+                </div>
+                <div className="flex justify-end gap-3 mt-4">
+                  <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400">Cancel</button>
+                  <button onClick={handleSave} className="btn-primary px-4 py-2 rounded-lg text-sm">Save</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Assignments Grid */}
+          {loading ? (
+            <div className="grid grid-cols-2 gap-4">{[1,2,3,4].map(i => <div key={i} className="card h-24 animate-pulse" />)}</div>
+          ) : assignments.length === 0 ? (
+            <div className="card p-12 text-center"><p className="text-slate-400">No team assignments yet.</p></div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {assignments.map(a => (
+                <div key={a.id} className={`card p-4 flex items-center justify-between ${!a.is_active ? 'opacity-50' : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg ${ROLE_COLORS[a.role] || 'bg-slate-600'} flex items-center justify-center text-white text-xs font-bold`}>
+                      {a.role}
+                    </div>
+                    <div>
+                      <p className="text-white font-medium text-sm">{ROLE_LABELS[a.role] || a.role}</p>
+                      <p className="text-xs text-slate-400">
+                        {a.user_name || 'Unassigned'} {!a.is_active && <span className="text-red-400 ml-1">(Inactive)</span>}
+                      </p>
+                    </div>
+                  </div>
+                  {connected && (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => toggleActive(a.id, a.is_active)} className={`text-xs px-2 py-1 rounded ${a.is_active ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'}`}>
+                        {a.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button onClick={() => handleDelete(a.id)} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-8 text-center text-xs text-slate-600 border-t border-slate-800 pt-4">
+            AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse &copy; 2026 Mission Meets Tech
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+  <script src="mp-trial-banner.js"></script>
+</body>
+</html>

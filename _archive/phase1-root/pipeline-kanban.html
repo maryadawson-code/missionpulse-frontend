@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pipeline Kanban | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="mp-responsive.css">
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="mp-polish.js"></script>
+<script src="mp-rbac.js"></script>
+<script src="mp-exports.js"></script>
+  <link rel="icon" type="image/png" href="MMT_icon_32px.png">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'deep-navy': '#00050F',
+            'cyber-cyan': '#00E5FA',
+            'slate-dark': '#0a1628'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: linear-gradient(135deg, #00050F 0%, #0a1628 50%, #00050F 100%); }
+    .glow-border { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+    .kanban-col { min-height: 400px; }
+    .opp-card { cursor: grab; transition: all 0.2s; }
+    .opp-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 229, 250, 0.12); }
+    .opp-card.dragging { opacity: 0.5; transform: rotate(2deg); }
+    .kanban-col.drag-over { background: rgba(0, 229, 250, 0.05); border-color: #00E5FA; }
+    .pwin-bar { height: 4px; border-radius: 2px; transition: width 0.4s ease; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0a1628; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+  <script src="mp-rbac.js"></script>
+</head>
+<body class="min-h-screen text-white">
+  <header class="border-b border-slate-800/50 bg-deep-navy/80 backdrop-blur-sm sticky top-0 z-40">
+    <div class="max-w-full mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+          </svg>
+        </div>
+        <div>
+          <span class="text-lg font-bold text-white">Pipeline Kanban</span>
+          <span class="text-xs text-slate-500 block">Shipley Phase Tracking</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-xs text-slate-500" id="pipelineValue">$0 Pipeline</span>
+        <a href="dashboard.html" class="text-sm text-slate-400 hover:text-cyber-cyan transition-colors">← Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="px-4 py-6">
+    <!-- Auth Check -->
+    <div id="authCheck" class="text-center py-12">
+      <p class="text-slate-400">Verifying access...</p>
+    </div>
+
+    <!-- Kanban Board -->
+    <div id="kanbanBoard" class="hidden">
+      <!-- Filters -->
+      <div class="flex items-center gap-4 mb-6 flex-wrap">
+        <select id="agencyFilter" onchange="renderBoard()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyber-cyan outline-none">
+          <option value="">All Agencies</option>
+        </select>
+        <select id="valueFilter" onchange="renderBoard()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyber-cyan outline-none">
+          <option value="">All Values</option>
+          <option value="small">&lt; $10M</option>
+          <option value="mid">$10M - $50M</option>
+          <option value="large">&gt; $50M</option>
+        </select>
+        <button onclick="showAddModal()" class="ml-auto bg-cyber-cyan/20 hover:bg-cyber-cyan/30 text-cyber-cyan border border-cyber-cyan/30 rounded-lg px-4 py-2 text-sm font-medium transition-all">
+          + New Opportunity
+        </button>
+      </div>
+
+      <!-- Columns -->
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 overflow-x-auto" id="columnsContainer">
+      </div>
+    </div>
+  </main>
+
+  <!-- Add/Edit Modal -->
+  <div id="oppModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg p-6">
+      <h3 class="text-lg font-bold mb-4" id="modalTitle">New Opportunity</h3>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Opportunity Name</label>
+          <input id="oppName" type="text" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyber-cyan outline-none" placeholder="e.g., MHS Genesis Phase 4">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Agency</label>
+            <input id="oppAgency" type="text" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyber-cyan outline-none" placeholder="e.g., DHA">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Estimated Value ($M)</label>
+            <input id="oppValue" type="number" step="0.1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyber-cyan outline-none" placeholder="25.0">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Win Probability (%)</label>
+            <input id="oppPwin" type="number" min="0" max="100" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyber-cyan outline-none" placeholder="65">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Solicitation #</label>
+            <input id="oppSol" type="text" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyber-cyan outline-none" placeholder="W91CRB-25-R-0042">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Shipley Phase</label>
+          <select id="oppPhase" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyber-cyan outline-none">
+            <option value="identified">Identified</option>
+            <option value="capture">Capture</option>
+            <option value="gate_1">Gate 1</option>
+            <option value="blue_team">Blue Team</option>
+            <option value="pink_team">Pink Team</option>
+            <option value="red_team">Red Team</option>
+            <option value="gold_team">Gold Team</option>
+            <option value="submitted">Submitted</option>
+            <option value="awarded">Awarded</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
+        <button onclick="closeModal()" class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Cancel</button>
+        <button onclick="saveOpportunity()" class="px-4 py-2 text-sm bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30 rounded-lg hover:bg-cyber-cyan/30 transition-all">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-800/30 mt-12 py-4 text-center">
+    <p class="text-xs text-slate-600">AI GENERATED — REQUIRES HUMAN REVIEW &bull; MissionPulse &copy; Mission Meets Tech</p>
+  </footer>
+
+<script>
+// =========================================================================
+// CONFIG
+// =========================================================================
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NDIsImV4cCI6MjA1MzQxMDQ0Mn0.gMzJAb3GkUNJBnfoDSpWPbKDnJBATkTNwdB2D1kMiFo';
+var sbClient;
+try { sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e) { console.warn('Supabase init failed, using demo mode'); }
+
+const PHASES = ['identified', 'capture', 'gate_1', 'blue_team', 'pink_team', 'red_team', 'gold_team', 'submitted', 'awarded'];
+const PHASE_LABELS = {
+  'identified': 'Identified', 'capture': 'Capture', 'gate_1': 'Gate 1',
+  'blue_team': 'Blue Team', 'pink_team': 'Pink Team', 'red_team': 'Red Team',
+  'gold_team': 'Gold Team', 'submitted': 'Submitted', 'awarded': 'Awarded'
+};
+const PHASE_COLORS = {
+  'identified':  { bg: 'bg-violet-500/20', border: 'border-violet-500/30', text: 'text-violet-400', dot: 'bg-violet-500' },
+  'capture':     { bg: 'bg-blue-500/20',   border: 'border-blue-500/30',   text: 'text-blue-400',   dot: 'bg-blue-500' },
+  'gate_1':      { bg: 'bg-amber-500/20',  border: 'border-amber-500/30',  text: 'text-amber-400',  dot: 'bg-amber-500' },
+  'blue_team':   { bg: 'bg-sky-500/20',    border: 'border-sky-500/30',    text: 'text-sky-400',    dot: 'bg-sky-500' },
+  'pink_team':   { bg: 'bg-pink-500/20',   border: 'border-pink-500/30',   text: 'text-pink-400',   dot: 'bg-pink-500' },
+  'red_team':    { bg: 'bg-red-500/20',    border: 'border-red-500/30',    text: 'text-red-400',    dot: 'bg-red-500' },
+  'gold_team':   { bg: 'bg-yellow-500/20', border: 'border-yellow-500/30', text: 'text-yellow-400', dot: 'bg-yellow-500' },
+  'submitted':   { bg: 'bg-emerald-500/20', border: 'border-emerald-500/30', text: 'text-emerald-400', dot: 'bg-emerald-500' },
+  'awarded':     { bg: 'bg-purple-500/20', border: 'border-purple-500/30', text: 'text-purple-400', dot: 'bg-purple-500' }
+};
+
+// =========================================================================
+// DEMO DATA
+// =========================================================================
+const DEMO_OPPS = [
+  { id: '1', name: 'MHS Genesis Wave 4', agency: 'DHA', estimated_value: 85000000, win_probability: 72, shipley_phase: 'pink_team', solicitation_number: 'W91CRB-25-R-0042' },
+  { id: '2', name: 'VA EHR Modernization', agency: 'VA', estimated_value: 120000000, win_probability: 45, shipley_phase: 'capture', solicitation_number: 'VA-25-00198' },
+  { id: '3', name: 'CMS Data Analytics', agency: 'CMS', estimated_value: 32000000, win_probability: 68, shipley_phase: 'gate_1', solicitation_number: 'CMS-25-0087' },
+  { id: '4', name: 'IHS Telehealth Platform', agency: 'IHS', estimated_value: 18500000, win_probability: 81, shipley_phase: 'red_team', solicitation_number: 'IHS-25-0034' },
+  { id: '5', name: 'DHA Cybersecurity Ops', agency: 'DHA', estimated_value: 45000000, win_probability: 55, shipley_phase: 'identified', solicitation_number: '' },
+  { id: '6', name: 'TRICARE Claims Engine', agency: 'DHA', estimated_value: 67000000, win_probability: 38, shipley_phase: 'identified', solicitation_number: '' },
+  { id: '7', name: 'Navy Medical Logistics', agency: 'BUMED', estimated_value: 28000000, win_probability: 62, shipley_phase: 'capture', solicitation_number: 'N00189-25-R-0091' },
+  { id: '8', name: 'AF Health Readiness', agency: 'AFMS', estimated_value: 41000000, win_probability: 50, shipley_phase: 'gate_1', solicitation_number: '' },
+  { id: '9', name: 'DHA ITSM Consolidation', agency: 'DHA', estimated_value: 55000000, win_probability: 73, shipley_phase: 'blue_team', solicitation_number: 'W91CRB-25-R-0088' },
+  { id: '10', name: 'VA Cerner Optimization', agency: 'VA', estimated_value: 95000000, win_probability: 30, shipley_phase: 'submitted', solicitation_number: 'VA-25-00211' },
+  { id: '11', name: 'CMS Interoperability Hub', agency: 'CMS', estimated_value: 22000000, win_probability: 77, shipley_phase: 'gold_team', solicitation_number: 'CMS-25-0112' },
+  { id: '12', name: 'PHS Clinical Decision AI', agency: 'HHS', estimated_value: 38000000, win_probability: 60, shipley_phase: 'submitted', solicitation_number: 'HHS-25-0055' }
+];
+
+let opportunities = [...DEMO_OPPS];
+let editingId = null;
+
+// =========================================================================
+// AUTH
+// =========================================================================
+async function checkAuth() {
+  const authDiv = document.getElementById('authCheck');
+  const board = document.getElementById('kanbanBoard');
+  let user = null;
+  try {
+    if (sbClient) {
+      const { data } = await sbClient.auth.getUser();
+      user = data?.user;
+    }
+  } catch(e) { console.warn('Auth check failed'); }
+
+  // Show board regardless (demo fallback)
+  authDiv.classList.add('hidden');
+  board.classList.remove('hidden');
+
+  if (user) { await loadFromSupabase(); }
+  populateFilters();
+  renderBoard();
+}
+
+async function loadFromSupabase() {
+  try {
+    const { data, error } = await sbClient.from('opportunities').select('*').order('created_at', { ascending: false });
+    if (data && data.length > 0) {
+      opportunities = data.map(r => ({
+        id: String(r.id),
+        name: r.title || r.name || 'Untitled',
+        agency: r.agency || 'Unknown',
+        estimated_value: r.ceiling || r.estimated_value || 0,
+        win_probability: r.pwin || r.win_probability || 0,
+        shipley_phase: r.stage || r.shipley_phase || 'identified',
+        solicitation_number: r.solicitation_number || ''
+      }));
+    }
+  } catch(e) { console.warn('Supabase load failed, using demo data'); }
+}
+
+// =========================================================================
+// RENDER
+// =========================================================================
+function populateFilters() {
+  const agencies = [...new Set(opportunities.map(o => o.agency))].sort();
+  const sel = document.getElementById('agencyFilter');
+  sel.innerHTML = '<option value="">All Agencies</option>' + agencies.map(a => `<option value="${a}">${a}</option>`).join('');
+}
+
+function getFilteredOpps() {
+  let filtered = [...opportunities];
+  const agency = document.getElementById('agencyFilter').value;
+  const value = document.getElementById('valueFilter').value;
+  if (agency) filtered = filtered.filter(o => o.agency === agency);
+  if (value === 'small') filtered = filtered.filter(o => o.estimated_value < 10000000);
+  if (value === 'mid') filtered = filtered.filter(o => o.estimated_value >= 10000000 && o.estimated_value <= 50000000);
+  if (value === 'large') filtered = filtered.filter(o => o.estimated_value > 50000000);
+  return filtered;
+}
+
+function formatValue(v) {
+  if (v >= 1000000000) return '$' + (v/1000000000).toFixed(1) + 'B';
+  if (v >= 1000000) return '$' + (v/1000000).toFixed(1) + 'M';
+  if (v >= 1000) return '$' + (v/1000).toFixed(0) + 'K';
+  return '$' + v;
+}
+
+function pwinColor(p) {
+  if (p >= 70) return 'bg-emerald-500';
+  if (p >= 50) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
+function renderBoard() {
+  const filtered = getFilteredOpps();
+  const container = document.getElementById('columnsContainer');
+
+  // Pipeline value
+  const total = filtered.reduce((s, o) => s + (o.estimated_value || 0), 0);
+  document.getElementById('pipelineValue').textContent = formatValue(total) + ' Pipeline';
+
+  container.innerHTML = PHASES.map(phase => {
+    const phaseOpps = filtered.filter(o => o.shipley_phase === phase);
+    const phaseValue = phaseOpps.reduce((s, o) => s + (o.estimated_value || 0), 0);
+    const c = PHASE_COLORS[phase] || PHASE_COLORS['identified'];
+    const label = PHASE_LABELS[phase] || phase;
+    return `
+      <div class="kanban-col border border-slate-800/50 rounded-xl bg-slate-900/40 p-3 flex flex-col"
+           ondragover="onDragOver(event)" ondrop="onDrop(event, '${phase}')" ondragleave="onDragLeave(event)">
+        <div class="flex items-center justify-between mb-3 px-1">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full ${c.dot}"></div>
+            <span class="text-sm font-semibold text-white">${label}</span>
+            <span class="text-xs ${c.text} ${c.bg} px-2 py-0.5 rounded-full">${phaseOpps.length}</span>
+          </div>
+          <span class="text-xs text-slate-500">${formatValue(phaseValue)}</span>
+        </div>
+        <div class="flex-1 space-y-2 overflow-y-auto max-h-[60vh]">
+          ${phaseOpps.map(o => renderCard(o, c)).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderCard(o, c) {
+  return `
+    <div class="opp-card bg-slate-800/60 border border-slate-700/50 rounded-lg p-3 group"
+         draggable="true" ondragstart="onDragStart(event, '${o.id}')" data-id="${o.id}">
+      <div class="flex items-start justify-between mb-2">
+        <h4 class="text-sm font-medium text-white leading-tight flex-1">${o.name}</h4>
+        <button onclick="editOpp('${o.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-cyber-cyan transition-all ml-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+      </div>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300">${o.agency}</span>
+        <span class="text-xs text-slate-400">${formatValue(o.estimated_value)}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="flex-1 bg-slate-700/30 rounded-full overflow-hidden">
+          <div class="pwin-bar ${pwinColor(o.win_probability)}" style="width: ${o.win_probability}%"></div>
+        </div>
+        <span class="text-xs font-mono ${o.win_probability >= 70 ? 'text-emerald-400' : o.win_probability >= 50 ? 'text-amber-400' : 'text-red-400'}">${o.win_probability}%</span>
+      </div>
+      ${o.solicitation_number ? `<p class="text-[10px] text-slate-600 mt-2 font-mono">${o.solicitation_number}</p>` : ''}
+    </div>
+  `;
+}
+
+// =========================================================================
+// DRAG & DROP
+// =========================================================================
+let dragId = null;
+
+function onDragStart(e, id) {
+  dragId = id;
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onDrop(e, phase) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragId) return;
+  const opp = opportunities.find(o => o.id === dragId);
+  if (opp) {
+    opp.shipley_phase = phase;
+    updateSupabase(opp);
+    renderBoard();
+  }
+  dragId = null;
+}
+
+async function updateSupabase(opp) {
+  try {
+    if (sbClient) {
+      await sbClient.from('opportunities').update({ stage: opp.shipley_phase }).eq('id', opp.id);
+    }
+  } catch(e) { console.warn('Supabase update failed'); }
+}
+
+// =========================================================================
+// MODAL (ADD / EDIT)
+// =========================================================================
+function showAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'New Opportunity';
+  document.getElementById('oppName').value = '';
+  document.getElementById('oppAgency').value = '';
+  document.getElementById('oppValue').value = '';
+  document.getElementById('oppPwin').value = '';
+  document.getElementById('oppSol').value = '';
+  document.getElementById('oppPhase').value = 'identified';
+  document.getElementById('oppModal').classList.remove('hidden');
+}
+
+function editOpp(id) {
+  const opp = opportunities.find(o => o.id === id);
+  if (!opp) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'Edit Opportunity';
+  document.getElementById('oppName').value = opp.name;
+  document.getElementById('oppAgency').value = opp.agency;
+  document.getElementById('oppValue').value = (opp.estimated_value / 1000000).toFixed(1);
+  document.getElementById('oppPwin').value = opp.win_probability;
+  document.getElementById('oppSol').value = opp.solicitation_number || '';
+  document.getElementById('oppPhase').value = opp.shipley_phase;
+  document.getElementById('oppModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('oppModal').classList.add('hidden');
+}
+
+function saveOpportunity() {
+  const name = document.getElementById('oppName').value.trim();
+  if (!name) return;
+  const data = {
+    title: name,
+    agency: document.getElementById('oppAgency').value.trim() || 'TBD',
+    ceiling: parseFloat(document.getElementById('oppValue').value || 0) * 1000000,
+    pwin: parseInt(document.getElementById('oppPwin').value || 0),
+    solicitation_number: document.getElementById('oppSol').value.trim(),
+    stage: document.getElementById('oppPhase').value
+  };
+
+  if (editingId) {
+    const opp = opportunities.find(o => o.id === editingId);
+    if (opp) Object.assign(opp, data);
+  } else {
+    data.id = 'new-' + Date.now();
+    opportunities.push(data);
+  }
+
+  closeModal();
+  populateFilters();
+  renderBoard();
+}
+
+// =========================================================================
+// INIT
+// =========================================================================
+checkAuth();
+</script>
+<div id="mp-export-bar" style="position:fixed;bottom:16px;right:16px;z-index:40;background:#0A1628;border:1px solid rgba(0,229,250,0.2);border-radius:10px;padding:8px 12px;"></div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    MP_EXPORT.addExportBar('mp-export-bar', {
+      moduleId: 'pipeline',
+      onCSV: function() {
+        var rows = (window._mpData || []).map(function(r) { return [r.name||r.title||'', r.agency||'', r.solicitation_number||'', r.stage||r.status||'', r.pwin||'', r.ceiling||r.value||'', r.priority||'']; });
+        MP_EXPORT.toCSV('pipeline-' + MP_EXPORT.dateStamp() + '.csv', ['Opportunity','Agency','Solicitation #','Stage','Win Prob','Ceiling','Priority'], rows, 'pipeline');
+      }
+    });
+  }, 1500);
+});
+</script>
+  <script src="mp-trial-banner.js"></script>`n</body>
+</html>
+
+
+
+

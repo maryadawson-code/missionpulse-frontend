@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse — Mission Command Center</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="mp-responsive.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#00050F;min-height:100vh;color:#fff}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    @keyframes shieldPulse{0%,100%{filter:drop-shadow(0 0 6px rgba(0,229,250,.2))}50%{filter:drop-shadow(0 0 16px rgba(0,229,250,.5))}}
+    .animate-fadeIn{animation:fadeIn .4s ease-out forwards}
+    .glass{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);backdrop-filter:blur(20px)}
+    .glow{box-shadow:0 0 20px rgba(0,229,250,.08)}
+    .shield-pulse{animation:shieldPulse 3s ease-in-out infinite}
+    .module-card{transition:all .2s;border:1px solid rgba(255,255,255,.06);cursor:pointer}
+    .module-card:hover{border-color:rgba(0,229,250,.3);transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,229,250,.1)}
+    .opp-card{transition:all .2s}.opp-card:hover{transform:translateY(-1px);border-color:rgba(0,229,250,.25)}
+  </style>
+  <script src="mp-rbac.js"></script>
+</head>
+<body>
+<!-- Sidebar Nav -->
+<div id="missionpulse-sidebar" data-current-page="dashboard"></div>
+<script src="missionpulse-nav.js"></script>
+
+<div class="main-content">
+<div id="root"></div>
+</div>
+
+<script type="text/babel">
+const {useState,useEffect,useMemo} = React;
+
+const SB_URL='https://djuviwarqdvlbgcfuupa.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3MTcyNjUsImV4cCI6MjA1MjI5MzI2NX0.DACT1xnVtJeHx5tL7_K8y1hOx9NyJE7B6UBhPqwHHx8';
+var sbClient;try{sbClient=supabase.createClient(SB_URL,SB_KEY)}catch(e){sbClient=null}
+
+// ─── 22 V2 Modules (mirrors nav.js) ───
+const MODULE_REGISTRY = [
+  {id:'pipeline',icon:'🎯',name:'Pipeline Intelligence',file:'missionpulse-m1-enhanced.html',group:'core',desc:'Opportunity tracking & win probability'},
+  {id:'warroom',icon:'⚔️',name:'War Room',file:'missionpulse-m2-warroom-enhanced.html',group:'core',desc:'Active pursuit command center'},
+  {id:'swimlane',icon:'🏊',name:'Swimlane Board',file:'missionpulse-m3-swimlane-board.html',group:'core',desc:'Kanban workflow management'},
+  {id:'rfpshredder',icon:'📄',name:'RFP Shredder',file:'index__13_.html',group:'capture',desc:'Requirements extraction & mapping'},
+  {id:'winthemes',icon:'🏆',name:'Win Themes',file:'missionpulse-winthemes-v2.html',group:'capture',desc:'Discriminator tracking & scoring'},
+  {id:'blackhat',icon:'🎩',name:'Black Hat',file:'missionpulse-m7-blackhat-enhanced.html',group:'capture',desc:'Competitive intelligence',rbac:['CEO','COO','CAP','Admin']},
+  {id:'irondome',icon:'🛡️',name:'Iron Dome',file:'missionpulse-irondome-v2.html',group:'compliance',desc:'Section tracker & compliance shield'},
+  {id:'compliance',icon:'📋',name:'Compliance Matrix',file:'missionpulse-compliance-v2.html',group:'compliance',desc:'Section L/M requirement mapping'},
+  {id:'contracts',icon:'📑',name:'Contract Scanner',file:'missionpulse-m5-contracts-enhanced.html',group:'compliance',desc:'FAR/DFARS clause analysis'},
+  {id:'pricing',icon:'💰',name:'Pricing Engine',file:'missionpulse-m8-pricing.html',group:'pricing',desc:'BOE & cost modeling',cui:true},
+  {id:'hitl',icon:'👤',name:'HITL Review',file:'missionpulse-m9-hitl-enhanced.html',group:'review',desc:'Human-in-the-loop AI review'},
+  {id:'orals',icon:'🎤',name:'Orals Studio',file:'missionpulse-orals-v2.html',group:'review',desc:'Presentation prep & timing'},
+  {id:'teaming',icon:'🤝',name:'Teaming / Frenemy',file:'missionpulse-teaming-v2.html',group:'teaming',desc:'Partner Wall & data masking'},
+  {id:'agenthub',icon:'🤖',name:'Agent Hub',file:'missionpulse-agenthub-v2.html',group:'intel',desc:'8 AI agents for capture & strategy'},
+  {id:'lessons',icon:'📖',name:'Lessons Playbook',file:'missionpulse-m15-lessons-playbook.html',group:'intel',desc:'Knowledge capture & reuse'},
+  {id:'launch',icon:'🚀',name:'Launch & ROI',file:'missionpulse-m13-launch-roi.html',group:'launch',desc:'Go-live tracking & ROI'},
+  {id:'postaward',icon:'📦',name:'Post-Award',file:'missionpulse-m14-post-award.html',group:'launch',desc:'Transition & delivery management'},
+  {id:'rbac',icon:'🔐',name:'RBAC Admin',file:'missionpulse-task16-rbac.html',group:'admin',desc:'Roles & permissions',rbac:['CEO','COO','Admin']},
+  {id:'audit',icon:'📜',name:'Audit Log',file:'missionpulse-sprint70-audit.html',group:'admin',desc:'Activity & compliance trail'},
+  {id:'settings',icon:'⚙️',name:'Settings',file:'missionpulse-sprint69-settings.html',group:'admin',desc:'System configuration'},
+  {id:'sprint',icon:'📅',name:'Sprint Planner',file:'missionpulse-sprint-execution-plan.html',group:'admin',desc:'Development sprint tracker'},
+  {id:'demo',icon:'🎬',name:'Partner Demo',file:'missionpulse-v12-PRODUCTION.html',group:'admin',desc:'v12 interactive demo script'},
+];
+
+const GROUP_META = {
+  core:{label:'Core Operations',color:'#00E5FA'},
+  capture:{label:'Capture & Strategy',color:'#A855F7'},
+  compliance:{label:'Compliance & Contracts',color:'#00BDAE'},
+  pricing:{label:'Pricing',color:'#F59E0B'},
+  review:{label:'Review & Delivery',color:'#3B82F6'},
+  teaming:{label:'Teaming',color:'#EC4899'},
+  intel:{label:'Intelligence',color:'#8B5CF6'},
+  launch:{label:'Launch & Post-Award',color:'#FFD700'},
+  admin:{label:'Administration',color:'#64748B'},
+};
+
+const DEMO_OPPS = [
+  {id:'opp1',title:'DHA EHR Modernization',agency:'DHA',value:45000000,pwin:68,stage:'Proposal',due:'2026-03-15',set_aside:'SDVOSB',status:'active'},
+  {id:'opp2',title:'VA Claims Processing AI',agency:'VA',value:28000000,pwin:72,stage:'Capture',due:'2026-04-30',set_aside:'SDVOSB',status:'active'},
+  {id:'opp3',title:'CMS Data Analytics Platform',agency:'CMS',value:18500000,pwin:55,stage:'Opportunity',due:'2026-06-01',set_aside:'8(a)',status:'active'},
+  {id:'opp4',title:'IHS Telehealth Expansion',agency:'IHS',value:12000000,pwin:45,stage:'Opportunity',due:'2026-07-15',set_aside:'SDVOSB',status:'pipeline'},
+  {id:'opp5',title:'MHS GENESIS Support',agency:'DHA',value:62000000,pwin:38,stage:'Pre-RFP',due:'2026-09-01',set_aside:'Full & Open',status:'pipeline'},
+];
+
+function fmtMoney(v){if(v>=1e9)return'$'+Math.round(v/1e9)+'B';if(v>=1e6)return'$'+Math.round(v/1e6)+'M';if(v>=1e3)return'$'+Math.round(v/1e3)+'K';return'$'+v}
+function fmtDate(d){if(!d)return'—';return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+
+function App(){
+  const [opps,setOpps]=useState([]);
+  const [dbStatus,setDbStatus]=useState('checking');
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{loadData()},[]);
+
+  async function loadData(){
+    try{
+      if(!sbClient) throw new Error('No DB');
+      const {data,error}=await sbClient.from('opportunities').select('*').order('created_at',{ascending:false});
+      if(error) throw error;
+      if(data?.length>0){setOpps(data);setDbStatus('live')}
+      else{setOpps(DEMO_OPPS);setDbStatus('demo')}
+    }catch{setOpps(DEMO_OPPS);setDbStatus('demo')}
+    finally{setLoading(false)}
+  }
+
+  const pipeline=useMemo(()=>{
+    const total=opps.reduce((a,o)=>a+(o.value||0),0);
+    const weighted=opps.reduce((a,o)=>a+((o.value||0)*(o.pwin||0)/100),0);
+    const active=opps.filter(o=>o.status==='active'||o.stage==='Proposal'||o.stage==='Capture').length;
+    const avgPwin=opps.length?Math.round(opps.reduce((a,o)=>a+(o.pwin||0),0)/opps.length):0;
+    return{total,weighted,active,count:opps.length,avgPwin};
+  },[opps]);
+
+  const pwinColor=(p)=>p>=70?'#00BDAE':p>=50?'#F59E0B':p<35?'#EF4444':'#3B82F6';
+  const stageColor=(s)=>({Proposal:'#00BDAE',Capture:'#F59E0B',Opportunity:'#3B82F6','Pre-RFP':'#A855F7'}[s]||'#64748B');
+
+  if(loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',color:'#64748B'}}>Loading MissionPulse...</div>;
+
+  return(
+    <div style={{maxWidth:1200,margin:'0 auto',padding:'24px 20px 80px'}}>
+      {/* Header */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24,flexWrap:'wrap',gap:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div className="shield-pulse">
+            <svg width="36" height="42" viewBox="0 0 80 92" fill="none">
+              <path d="M40 4L8 20V44C8 66 22 82 40 88C58 82 72 66 72 44V20L40 4Z" stroke="#00E5FA" strokeWidth="2.5" fill="rgba(0,229,250,.06)"/>
+              <polyline points="28,46 34,46 37,38 40,54 43,42 46,46 52,46" stroke="#00E5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <h1 style={{fontSize:24,fontWeight:800}}>Mission Command Center</h1>
+            <p style={{fontSize:12,color:'#94A3B8'}}>MissionPulse v12.0 — {MODULE_REGISTRY.length} Modules Active</p>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{width:8,height:8,borderRadius:'50%',background:dbStatus==='live'?'#00BDAE':'#F59E0B'}}></span>
+          <span style={{fontSize:12,color:dbStatus==='live'?'#00BDAE':'#F59E0B'}}>{dbStatus==='live'?'Supabase Live':'Demo Data'}</span>
+        </div>
+      </div>
+
+      {/* Pipeline Stats */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12,marginBottom:28}}>
+        {[
+          {label:'Pipeline Value',val:fmtMoney(pipeline.total),color:'#00E5FA'},
+          {label:'Weighted Value',val:fmtMoney(pipeline.weighted),color:'#00BDAE'},
+          {label:'Opportunities',val:pipeline.count,color:'#A855F7'},
+          {label:'Active Pursuits',val:pipeline.active,color:'#F59E0B'},
+          {label:'Avg Win Prob',val:`${pipeline.avgPwin}%`,color:pwinColor(pipeline.avgPwin)},
+        ].map((s,i)=>(
+          <div key={i} className="glass glow animate-fadeIn" style={{padding:16,borderRadius:14,textAlign:'center',animationDelay:`${i*0.05}s`,opacity:0}}>
+            <div style={{fontSize:24,fontWeight:800,color:s.color}}>{s.val}</div>
+            <div style={{fontSize:11,color:'#94A3B8',marginTop:4}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Active Opportunities */}
+      <h2 style={{fontSize:16,fontWeight:700,marginBottom:12,display:'flex',alignItems:'center',gap:8}}>
+        <span style={{fontSize:18}}>🎯</span> Active Pipeline
+        <a href="missionpulse-m1-enhanced.html" style={{fontSize:12,color:'#00E5FA',marginLeft:'auto',textDecoration:'none',fontWeight:500}}>View All →</a>
+      </h2>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:12,marginBottom:32}}>
+        {opps.slice(0,4).map((o,i)=>(
+          <div key={o.id} className="opp-card glass animate-fadeIn" style={{padding:16,borderRadius:12,borderLeft:`3px solid ${stageColor(o.stage)}`,animationDelay:`${i*0.06}s`,opacity:0}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:700}}>{o.title}</div>
+                <div style={{fontSize:11,color:'#64748B'}}>{o.agency} · {o.set_aside}</div>
+              </div>
+              <span style={{padding:'3px 8px',borderRadius:5,fontSize:10,fontWeight:600,background:`${stageColor(o.stage)}18`,color:stageColor(o.stage)}}>{o.stage}</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+              <div><div style={{fontSize:16,fontWeight:800,color:'#00E5FA'}}>{fmtMoney(o.value)}</div><div style={{fontSize:9,color:'#64748B'}}>VALUE</div></div>
+              <div><div style={{fontSize:16,fontWeight:800,color:pwinColor(o.pwin)}}>{o.pwin}%</div><div style={{fontSize:9,color:'#64748B'}}>WIN PROB</div></div>
+              <div><div style={{fontSize:12,fontWeight:600,color:'#94A3B8'}}>{fmtDate(o.due)}</div><div style={{fontSize:9,color:'#64748B'}}>DUE</div></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Module Quick Access */}
+      <h2 style={{fontSize:16,fontWeight:700,marginBottom:12}}>⚡ Quick Access</h2>
+      {Object.entries(GROUP_META).filter(([gid])=>MODULE_REGISTRY.some(m=>m.group===gid)).map(([gid,meta])=>{
+        const mods=MODULE_REGISTRY.filter(m=>m.group===gid);
+        return(
+          <div key={gid} style={{marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:700,color:meta.color,marginBottom:8,textTransform:'uppercase',letterSpacing:1}}>{meta.label}</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+              {mods.map((m,i)=>(
+                <a key={m.id} href={m.file} className="module-card glass animate-fadeIn" style={{padding:14,borderRadius:12,textDecoration:'none',display:'flex',alignItems:'center',gap:10,animationDelay:`${i*0.03}s`,opacity:0}}>
+                  <span style={{fontSize:22,flexShrink:0}}>{m.icon}</span>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'#FFFFFF',display:'flex',alignItems:'center',gap:4}}>
+                      {m.name}
+                      {m.cui&&<span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,background:'rgba(245,158,11,.15)',color:'#F59E0B'}}>CUI</span>}
+                    </div>
+                    <div style={{fontSize:10,color:'#64748B',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.desc}</div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      <footer style={{position:'fixed',bottom:0,left:0,right:0,textAlign:'center',padding:'10px 16px',background:'linear-gradient(transparent,rgba(0,5,15,.95))',zIndex:30}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:11,color:'#64748B'}}>⚠️ AI GENERATED — REQUIRES HUMAN REVIEW</span>
+          <span style={{fontSize:11,color:'#475569'}}>|</span>
+          <span style={{fontSize:11,color:'#475569'}}>MissionPulse v12.0 — Mission Meets Tech</span>
+          <span style={{fontSize:11,color:'#475569'}}>|</span>
+          <span style={{fontSize:11,color:'#475569'}}>CMMC 2.0 L2 Compliant</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>,document.getElementById('root'));
+</script>
+  <script src="mp-trial-banner.js"></script>`n</body>
+</html>
+
+

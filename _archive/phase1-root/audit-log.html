@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit Log | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="mp-responsive.css">
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="mp-polish.js"></script>
+  <link rel="icon" type="image/png" href="MMT_icon_32px.png">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'deep-navy': '#00050F',
+            'cyber-cyan': '#00E5FA',
+            'slate-dark': '#0a1628'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: linear-gradient(135deg, #00050F 0%, #0a1628 50%, #00050F 100%); }
+    .glow-border { box-shadow: 0 0 20px rgba(0, 229, 250, 0.15); }
+    .log-row:hover { background: rgba(0, 229, 250, 0.03); }
+  </style>
+  <script src="mp-rbac.js"></script>
+</head>
+<body class="min-h-screen text-white">
+  <header class="border-b border-slate-800/50 bg-deep-navy/80 backdrop-blur-sm sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="text-lg font-bold text-white">Audit Log</span>
+          <span class="text-xs text-slate-500 block">System Activity &amp; Compliance Trail &mdash; AU-3 / AU-9</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <span id="dataSource" class="text-xs px-2 py-1 rounded bg-slate-800 text-slate-500">Loading...</span>
+        <a href="dashboard.html" class="text-sm text-slate-400 hover:text-cyber-cyan transition-colors">&larr; Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <div id="authCheck" class="text-center py-12">
+      <div class="animate-pulse text-slate-500">Authenticating...</div>
+    </div>
+    <div id="mainContent" class="hidden">
+      <!-- Stats -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-slate-900/60 border border-slate-800/50 rounded-xl p-4">
+          <p class="text-xs text-slate-500 uppercase tracking-wide">Total Events</p>
+          <p class="text-2xl font-bold text-white mt-1" id="statTotal">0</p>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/50 rounded-xl p-4">
+          <p class="text-xs text-slate-500 uppercase tracking-wide">Today</p>
+          <p class="text-2xl font-bold text-cyber-cyan mt-1" id="statToday">0</p>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/50 rounded-xl p-4">
+          <p class="text-xs text-slate-500 uppercase tracking-wide">Unique Users</p>
+          <p class="text-2xl font-bold text-violet-400 mt-1" id="statUsers">0</p>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/50 rounded-xl p-4">
+          <p class="text-xs text-slate-500 uppercase tracking-wide">Actions (7d)</p>
+          <p class="text-2xl font-bold text-emerald-400 mt-1" id="stat7d">0</p>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="flex flex-wrap gap-3 mb-6">
+        <input id="searchInput" type="text" placeholder="Search actions, users, tables..." class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white flex-1 min-w-[200px]">
+        <select id="filterAction" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+          <option value="">All Actions</option>
+          <option value="INSERT">Create</option>
+          <option value="UPDATE">Update</option>
+          <option value="DELETE">Delete</option>
+          <option value="LOGIN">Login</option>
+          <option value="LOGOUT">Logout</option>
+        </select>
+        <select id="filterTable" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+          <option value="">All Tables</option>
+        </select>
+      </div>
+
+      <!-- Log Table -->
+      <div class="bg-slate-900/60 border border-slate-800/50 rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-800/50">
+                <th class="text-left text-xs text-slate-500 uppercase tracking-wide px-4 py-3">Timestamp</th>
+                <th class="text-left text-xs text-slate-500 uppercase tracking-wide px-4 py-3">User</th>
+                <th class="text-left text-xs text-slate-500 uppercase tracking-wide px-4 py-3">Action</th>
+                <th class="text-left text-xs text-slate-500 uppercase tracking-wide px-4 py-3">Table</th>
+                <th class="text-left text-xs text-slate-500 uppercase tracking-wide px-4 py-3">Record</th>
+                <th class="text-left text-xs text-slate-500 uppercase tracking-wide px-4 py-3">Details</th>
+              </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="hidden text-center py-12">
+          <p class="text-slate-500">No audit events matching your filters.</p>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex items-center justify-between mt-4">
+        <span id="pageInfo" class="text-xs text-slate-500"></span>
+        <div class="flex gap-2">
+          <button onclick="prevPage()" id="btnPrev" class="px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white disabled:opacity-30" disabled>Prev</button>
+          <button onclick="nextPage()" id="btnNext" class="px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white disabled:opacity-30">Next</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Detail Drawer -->
+  <div id="detailDrawer" class="hidden fixed inset-0 bg-black/70 z-50 flex justify-end">
+    <div class="bg-slate-900 border-l border-slate-700 w-full max-w-lg overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-bold text-white">Audit Event Detail</h3>
+        <button onclick="closeDrawer()" class="text-slate-400 hover:text-white text-xl">&times;</button>
+      </div>
+      <div class="space-y-4">
+        <div><p class="text-xs text-slate-500">Timestamp</p><p class="text-white text-sm" id="dTimestamp"></p></div>
+        <div><p class="text-xs text-slate-500">User</p><p class="text-white text-sm" id="dUser"></p></div>
+        <div><p class="text-xs text-slate-500">Role</p><p class="text-white text-sm" id="dRole"></p></div>
+        <div><p class="text-xs text-slate-500">Action</p><p class="text-white text-sm" id="dAction"></p></div>
+        <div><p class="text-xs text-slate-500">Table / Record</p><p class="text-white text-sm" id="dTable"></p></div>
+        <div><p class="text-xs text-slate-500">IP Address</p><p class="text-white text-sm" id="dIP"></p></div>
+        <div>
+          <p class="text-xs text-slate-500 mb-1">Old Values</p>
+          <pre id="dOld" class="bg-slate-800/60 border border-slate-700 rounded-lg p-3 text-xs text-red-300 max-h-40 overflow-auto whitespace-pre-wrap"></pre>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 mb-1">New Values</p>
+          <pre id="dNew" class="bg-slate-800/60 border border-slate-700 rounded-lg p-3 text-xs text-emerald-300 max-h-40 overflow-auto whitespace-pre-wrap"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-800/30 mt-12 py-4 text-center">
+    <p class="text-xs text-slate-600">AI GENERATED &mdash; REQUIRES HUMAN REVIEW &bull; MissionPulse &copy; Mission Meets Tech</p>
+  </footer>
+
+<script>
+const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NDYsImV4cCI6MjA1MzQxMDQ0Nn0.KmJnSsVJdxFRMPOxFYBxOQZbV5m_s2G8Yn52QLbmCPg';
+var sbClient;
+try { sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e) { console.warn('Supabase init failed'); }
+
+const now = new Date();
+const DEMO_LOGS = [
+  { id: 'demo-1', user_email: 'mary@missionmeetstech.com', user_role: 'CEO', action: 'UPDATE', table_name: 'opportunities', record_id: 'opp-001', old_values: { status: 'Pursuing', win_probability: 45 }, new_values: { status: 'Proposal', win_probability: 62 }, ip_address: '10.0.1.42', created_at: new Date(now - 600000).toISOString() },
+  { id: 'demo-2', user_email: 'mary@missionmeetstech.com', user_role: 'CEO', action: 'INSERT', table_name: 'capture_events', record_id: 'evt-012', old_values: null, new_values: { title: 'DHA CIO Briefing', event_type: 'meeting' }, ip_address: '10.0.1.42', created_at: new Date(now - 1800000).toISOString() },
+  { id: 'demo-3', user_email: 'j.smith@mmt.com', user_role: 'Proposal Manager', action: 'UPDATE', table_name: 'hitl_queue', record_id: 'hitl-003', old_values: { status: 'pending' }, new_values: { status: 'approved' }, ip_address: '10.0.2.15', created_at: new Date(now - 3600000).toISOString() },
+  { id: 'demo-4', user_email: 'a.chen@mmt.com', user_role: 'Solutions Architect', action: 'INSERT', table_name: 'documents', record_id: 'doc-087', old_values: null, new_values: { title: 'Tech Volume v3.2', section: 'L.5' }, ip_address: '10.0.3.8', created_at: new Date(now - 7200000).toISOString() },
+  { id: 'demo-5', user_email: 'mary@missionmeetstech.com', user_role: 'CEO', action: 'DELETE', table_name: 'competitors', record_id: 'comp-004', old_values: { name: 'AcmeFed LLC', threat_level: 'Low' }, new_values: null, ip_address: '10.0.1.42', created_at: new Date(now - 14400000).toISOString() },
+  { id: 'demo-6', user_email: 'b.patel@mmt.com', user_role: 'Contracts', action: 'UPDATE', table_name: 'contract_clauses', record_id: 'cl-019', old_values: { status: 'draft' }, new_values: { status: 'reviewed' }, ip_address: '10.0.2.22', created_at: new Date(now - 21600000).toISOString() },
+  { id: 'demo-7', user_email: 'j.smith@mmt.com', user_role: 'Proposal Manager', action: 'LOGIN', table_name: 'auth', record_id: null, old_values: null, new_values: { method: 'password' }, ip_address: '10.0.2.15', created_at: new Date(now - 28800000).toISOString() },
+  { id: 'demo-8', user_email: 'mary@missionmeetstech.com', user_role: 'CEO', action: 'UPDATE', table_name: 'pricing_items', record_id: 'pri-042', old_values: { rate: 135.00 }, new_values: { rate: 142.50 }, ip_address: '10.0.1.42', created_at: new Date(now - 43200000).toISOString() },
+];
+
+let logs = [...DEMO_LOGS];
+let page = 0;
+const PAGE_SIZE = 25;
+
+async function init() {
+  let user = null;
+  try { if (sbClient) { const { data } = await sbClient.auth.getUser(); user = data?.user; } } catch(e) {}
+
+  document.getElementById('authCheck').classList.add('hidden');
+  document.getElementById('mainContent').classList.remove('hidden');
+
+  if (user) { await loadFromSupabase(); }
+  else { setDS('Demo Data', 'text-amber-400'); }
+
+  ['searchInput'].forEach(id => document.getElementById(id).addEventListener('input', () => { page = 0; renderLogs(); }));
+  ['filterAction','filterTable'].forEach(id => document.getElementById(id).addEventListener('change', () => { page = 0; renderLogs(); }));
+  populateTableFilter();
+  renderLogs();
+}
+
+function setDS(label, cls) {
+  const el = document.getElementById('dataSource');
+  el.textContent = label;
+  el.className = 'text-xs px-2 py-1 rounded bg-slate-800 ' + cls;
+}
+
+async function loadFromSupabase() {
+  try {
+    const { data, error } = await sbClient.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(500);
+    if (!error && data && data.length > 0) {
+      logs = data;
+      setDS('Live — Supabase', 'text-emerald-400');
+    } else { setDS('Demo Data', 'text-amber-400'); }
+  } catch(e) { setDS('Demo Data', 'text-amber-400'); }
+}
+
+function populateTableFilter() {
+  const tables = [...new Set(logs.map(l => l.table_name).filter(Boolean))].sort();
+  const sel = document.getElementById('filterTable');
+  tables.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); });
+}
+
+const ACTION_BADGE = {
+  INSERT: 'bg-emerald-500/20 text-emerald-300',
+  UPDATE: 'bg-blue-500/20 text-blue-300',
+  DELETE: 'bg-red-500/20 text-red-300',
+  LOGIN: 'bg-violet-500/20 text-violet-300',
+  LOGOUT: 'bg-slate-700/50 text-slate-400'
+};
+
+function renderLogs() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const aF = document.getElementById('filterAction').value;
+  const tF = document.getElementById('filterTable').value;
+
+  let filtered = [...logs];
+  if (aF) filtered = filtered.filter(l => l.action === aF);
+  if (tF) filtered = filtered.filter(l => l.table_name === tF);
+  if (search) filtered = filtered.filter(l =>
+    (l.user_email || '').toLowerCase().includes(search) ||
+    (l.action || '').toLowerCase().includes(search) ||
+    (l.table_name || '').toLowerCase().includes(search) ||
+    (l.record_id || '').toLowerCase().includes(search)
+  );
+
+  // Stats
+  const today = new Date(); today.setHours(0,0,0,0);
+  const week = new Date(today.getTime() - 7 * 86400000);
+  document.getElementById('statTotal').textContent = logs.length;
+  document.getElementById('statToday').textContent = logs.filter(l => new Date(l.created_at) >= today).length;
+  document.getElementById('statUsers').textContent = new Set(logs.map(l => l.user_email).filter(Boolean)).size;
+  document.getElementById('stat7d').textContent = logs.filter(l => new Date(l.created_at) >= week).length;
+
+  const total = filtered.length;
+  const start = page * PAGE_SIZE;
+  const paged = filtered.slice(start, start + PAGE_SIZE);
+
+  const body = document.getElementById('logBody');
+  const empty = document.getElementById('emptyState');
+  if (paged.length === 0) { body.innerHTML = ''; empty.classList.remove('hidden'); } else { empty.classList.add('hidden'); }
+
+  body.innerHTML = paged.map(l => {
+    const ts = new Date(l.created_at);
+    const badge = ACTION_BADGE[l.action] || ACTION_BADGE.UPDATE;
+    return `<tr class="log-row border-b border-slate-800/30 cursor-pointer" onclick="showDrawer('${l.id}')">
+      <td class="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">${ts.toLocaleDateString('en-US',{month:'short',day:'numeric'})} ${ts.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</td>
+      <td class="px-4 py-3 text-xs text-white whitespace-nowrap">${l.user_email || l.user_id || '-'}</td>
+      <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded-full ${badge} font-medium">${l.action}</span></td>
+      <td class="px-4 py-3 text-xs text-slate-300">${l.table_name || '-'}</td>
+      <td class="px-4 py-3 text-xs text-slate-500 font-mono">${l.record_id ? l.record_id.substring(0, 8) + '...' : '-'}</td>
+      <td class="px-4 py-3 text-xs text-slate-500">${summarizeChanges(l)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('pageInfo').textContent = total > 0 ? `${start+1}-${Math.min(start+PAGE_SIZE, total)} of ${total}` : '';
+  document.getElementById('btnPrev').disabled = page === 0;
+  document.getElementById('btnNext').disabled = start + PAGE_SIZE >= total;
+}
+
+function summarizeChanges(l) {
+  if (l.new_values && typeof l.new_values === 'object') {
+    const keys = Object.keys(l.new_values).slice(0, 3);
+    return keys.map(k => k).join(', ') + (Object.keys(l.new_values).length > 3 ? '...' : '');
+  }
+  return '-';
+}
+
+function prevPage() { if (page > 0) { page--; renderLogs(); } }
+function nextPage() { page++; renderLogs(); }
+
+function showDrawer(id) {
+  const l = logs.find(x => x.id === id);
+  if (!l) return;
+  const ts = new Date(l.created_at);
+  document.getElementById('dTimestamp').textContent = ts.toLocaleString();
+  document.getElementById('dUser').textContent = l.user_email || l.user_id || '-';
+  document.getElementById('dRole').textContent = l.user_role || '-';
+  document.getElementById('dAction').textContent = l.action;
+  document.getElementById('dTable').textContent = (l.table_name || '-') + (l.record_id ? ' / ' + l.record_id : '');
+  document.getElementById('dIP').textContent = l.ip_address || '-';
+  document.getElementById('dOld').textContent = l.old_values ? JSON.stringify(l.old_values, null, 2) : '(none)';
+  document.getElementById('dNew').textContent = l.new_values ? JSON.stringify(l.new_values, null, 2) : '(none)';
+  document.getElementById('detailDrawer').classList.remove('hidden');
+}
+
+function closeDrawer() { document.getElementById('detailDrawer').classList.add('hidden'); }
+
+init();
+</script>
+  <script src="mp-trial-banner.js"></script>`n</body>
+</html>
+
+

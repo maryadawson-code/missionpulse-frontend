@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RFP Shredder — MissionPulse</title>
+<link rel="icon" type="image/png" sizes="32x32" href="MMT_icon_32px.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="mp-responsive.css">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="mp-polish.js"></script>
+<script src="mp-rbac.js"></script>
+<script src="mp-exports.js"></script>
+<style>
+body{background:#00050F;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.glow-border{border:1px solid rgba(0,229,250,0.2);box-shadow:0 0 15px rgba(0,229,250,0.03)}
+.status-badge{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-overlay.show{display:flex}
+</style>
+</head>
+<body class="text-slate-300 min-h-screen">
+<div class="max-w-7xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center gap-3">
+        <a href="dashboard.html" class="text-slate-500 hover:text-cyan-400 text-sm">← Dashboard</a>
+        <h1 class="text-2xl font-bold text-white">RFP Shredder</h1>
+      </div>
+      <p class="text-slate-500 text-sm mt-1">Break down RFP requirements and track response status</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="dataBadge" class="text-xs px-2 py-1 rounded font-mono"></span>
+      <button onclick="openAddModal()" class="bg-cyan-500 hover:bg-cyan-400 text-[#00050F] px-4 py-2 rounded-lg text-sm font-semibold mp-edit">+ Add Requirement</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+    <div class="bg-[#0A1628] border border-slate-800 rounded-lg p-3 text-center"><div class="text-xl font-bold text-white" id="statTotal">0</div><div class="text-xs text-slate-500">Total</div></div>
+    <div class="bg-[#0A1628] border border-slate-800 rounded-lg p-3 text-center"><div class="text-xl font-bold text-slate-400" id="statIdentified">0</div><div class="text-xs text-slate-500">Identified</div></div>
+    <div class="bg-[#0A1628] border border-slate-800 rounded-lg p-3 text-center"><div class="text-xl font-bold text-blue-400" id="statDrafting">0</div><div class="text-xs text-slate-500">Drafting</div></div>
+    <div class="bg-[#0A1628] border border-slate-800 rounded-lg p-3 text-center"><div class="text-xl font-bold text-amber-400" id="statReview">0</div><div class="text-xs text-slate-500">Review</div></div>
+    <div class="bg-[#0A1628] border border-slate-800 rounded-lg p-3 text-center"><div class="text-xl font-bold text-green-400" id="statComplete">0</div><div class="text-xs text-slate-500">Complete</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex gap-3 mb-4 flex-wrap">
+    <select id="filterStatus" onchange="renderTable()" class="bg-[#0A1628] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+      <option value="">All Status</option>
+      <option value="identified">Identified</option>
+      <option value="drafting">Drafting</option>
+      <option value="review">Review</option>
+      <option value="complete">Complete</option>
+    </select>
+    <select id="filterType" onchange="renderTable()" class="bg-[#0A1628] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+      <option value="">All Types</option>
+      <option value="mandatory">Mandatory</option>
+      <option value="evaluation">Evaluation</option>
+      <option value="informational">Informational</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="glow-border rounded-xl overflow-hidden">
+    <table class="w-full">
+      <thead>
+        <tr class="bg-[#0A1628] text-left text-xs text-slate-400 uppercase tracking-wider">
+          <th class="px-4 py-3">Req #</th>
+          <th class="px-4 py-3">Section</th>
+          <th class="px-4 py-3">Requirement</th>
+          <th class="px-4 py-3">Type</th>
+          <th class="px-4 py-3">Proposal Section</th>
+          <th class="px-4 py-3">Status</th>
+          <th class="px-4 py-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody" class="divide-y divide-slate-800"></tbody>
+    </table>
+    <div id="emptyState" class="hidden text-center py-12 text-slate-500">
+      <div class="text-3xl mb-2">📄</div>
+      <p>No RFP requirements yet.</p>
+      <button onclick="openAddModal()" class="text-cyan-400 hover:text-cyan-300 text-sm mt-2">Add your first requirement →</button>
+    </div>
+  </div>
+  <div class="text-center mt-8 text-xs text-slate-600">MISSION MEETS TECH · AI GENERATED — REQUIRES HUMAN REVIEW</div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="bg-[#0A1628] border border-slate-700 rounded-xl p-6 w-full max-w-lg mx-4">
+    <h3 class="text-lg font-bold text-white mb-4" id="modalTitle">Add Requirement</h3>
+    <input type="hidden" id="editId">
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-slate-400 mb-1">Requirement #</label><input id="fReqNum" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="L-001"></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Section</label><input id="fSection" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="Section L.5"></div>
+      </div>
+      <div><label class="block text-xs text-slate-400 mb-1">Requirement Text</label><textarea id="fReqText" rows="3" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="The contractor shall..."></textarea></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-slate-400 mb-1">Type</label>
+          <select id="fType" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            <option value="mandatory">Mandatory</option><option value="evaluation">Evaluation</option><option value="informational">Informational</option>
+          </select>
+        </div>
+        <div><label class="block text-xs text-slate-400 mb-1">Status</label>
+          <select id="fStatus" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+            <option value="identified">Identified</option><option value="drafting">Drafting</option><option value="review">Review</option><option value="complete">Complete</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-slate-400 mb-1">Maps to Proposal Section</label><input id="fPropSection" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="Vol I, 3.2"></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Compliance Approach</label><input id="fApproach" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="Full / Partial / Alt"></div>
+      </div>
+      <div><label class="block text-xs text-slate-400 mb-1">Notes</label><textarea id="fNotes" rows="2" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="Optional notes..."></textarea></div>
+    </div>
+    <div class="flex gap-3 mt-5">
+      <button onclick="closeModal()" class="flex-1 py-2 rounded-lg text-sm border border-slate-600 text-slate-400 hover:border-slate-400">Cancel</button>
+      <button onclick="saveItem()" class="flex-1 py-2 rounded-lg text-sm font-semibold bg-cyan-500 text-[#00050F] hover:bg-cyan-400">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NDIsImV4cCI6MjA1MzQxMDQ0Mn0.gMzJAb3GkUNJBnfoDSpWPbKDnJBATkTNwdB2D1kMiFo';
+var sbClient;try{sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON)}catch(e){}
+
+let items=[],companyId=null,isLive=false;
+
+const DEMO_DATA=[
+  {id:'d1',requirement_number:'L-001',section:'Section L.5',requirement_text:'Contractor shall provide cloud hosting in FedRAMP High environment',requirement_type:'mandatory',proposal_section:'Vol I, 3.1',compliance_approach:'Full',status:'complete',notes:''},
+  {id:'d2',requirement_number:'L-002',section:'Section L.5',requirement_text:'Transition plan within 60 days of contract award',requirement_type:'mandatory',proposal_section:'Vol I, 5.0',compliance_approach:'Full',status:'drafting',notes:''},
+  {id:'d3',requirement_number:'M-001',section:'Section M.3',requirement_text:'Past performance: 3 references, similar size/scope, within 5 years',requirement_type:'evaluation',proposal_section:'Vol III',compliance_approach:'Full',status:'identified',notes:'Need 1 more ref'},
+  {id:'d4',requirement_number:'L-003',section:'Section L.7',requirement_text:'CMMC Level 2 certification or POA&M within 180 days',requirement_type:'mandatory',proposal_section:'Vol I, 6.0',compliance_approach:'Partial',status:'review',notes:''},
+];
+
+const statusColors={identified:'bg-slate-700 text-slate-300',drafting:'bg-blue-900 text-blue-300',review:'bg-amber-900 text-amber-300',complete:'bg-green-900 text-green-300'};
+const typeColors={mandatory:'text-red-400',evaluation:'text-amber-400',informational:'text-slate-400'};
+
+(async()=>{
+  if(!sbClient){useDemoMode();return}
+  const{data:{session}}=await sbClient.auth.getSession();
+  if(!session){useDemoMode();return}
+  const{data:profile}=await sbClient.from('profiles').select('company_id').eq('id',session.user.id).single();
+  if(!profile?.company_id){useDemoMode();return}
+  companyId=profile.company_id;
+  await loadFromSupabase();
+})();
+
+async function loadFromSupabase(){
+  const{data,error}=await sbClient.from('rfp_requirements').select('*').order('created_at',{ascending:true});
+  if(error){useDemoMode();return}
+  items=data;isLive=true;
+  document.getElementById('dataBadge').textContent='Live — Supabase';
+  document.getElementById('dataBadge').className='text-xs px-2 py-1 rounded font-mono bg-green-900 text-green-300';
+  renderTable();
+}
+
+function useDemoMode(){
+  items=DEMO_DATA;isLive=false;
+  document.getElementById('dataBadge').textContent='Demo Mode';
+  document.getElementById('dataBadge').className='text-xs px-2 py-1 rounded font-mono bg-amber-900 text-amber-300';
+  renderTable();
+}
+
+function updateStats(){
+  document.getElementById('statTotal').textContent=items.length;
+  document.getElementById('statIdentified').textContent=items.filter(i=>i.status==='identified').length;
+  document.getElementById('statDrafting').textContent=items.filter(i=>i.status==='drafting').length;
+  document.getElementById('statReview').textContent=items.filter(i=>i.status==='review').length;
+  document.getElementById('statComplete').textContent=items.filter(i=>i.status==='complete').length;
+}
+
+function renderTable(){
+  updateStats();
+  const fs=document.getElementById('filterStatus').value;
+  const ft=document.getElementById('filterType').value;
+  let filtered=items;
+  if(fs)filtered=filtered.filter(i=>i.status===fs);
+  if(ft)filtered=filtered.filter(i=>i.requirement_type===ft);
+  const tbody=document.getElementById('tableBody');
+  if(filtered.length===0){tbody.innerHTML='';document.getElementById('emptyState').classList.remove('hidden');return}
+  document.getElementById('emptyState').classList.add('hidden');
+  tbody.innerHTML=filtered.map(i=>`
+    <tr class="hover:bg-[#0A1628] transition-colors">
+      <td class="px-4 py-3 text-sm font-mono text-cyan-400">${i.requirement_number||'—'}</td>
+      <td class="px-4 py-3 text-sm">${i.section||'—'}</td>
+      <td class="px-4 py-3 text-sm text-white max-w-xs truncate">${i.requirement_text}</td>
+      <td class="px-4 py-3 text-sm ${typeColors[i.requirement_type]||''} font-semibold capitalize">${i.requirement_type||'—'}</td>
+      <td class="px-4 py-3 text-sm font-mono">${i.proposal_section||'—'}</td>
+      <td class="px-4 py-3"><span class="status-badge ${statusColors[i.status]||''}">${(i.status||'').replace('_',' ')}</span></td>
+      <td class="px-4 py-3 text-right">
+        <button onclick="editItem('${i.id}')" class="text-slate-500 hover:text-cyan-400 text-xs mr-2">Edit</button>
+        <button onclick="deleteItem('${i.id}')" class="text-slate-500 hover:text-red-400 text-xs">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openAddModal(){
+  document.getElementById('modalTitle').textContent='Add Requirement';
+  document.getElementById('editId').value='';
+  ['fReqNum','fSection','fReqText','fPropSection','fApproach','fNotes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fType').value='mandatory';
+  document.getElementById('fStatus').value='identified';
+  document.getElementById('modal').classList.add('show');
+}
+
+function editItem(id){
+  const item=items.find(i=>i.id===id);if(!item)return;
+  document.getElementById('modalTitle').textContent='Edit Requirement';
+  document.getElementById('editId').value=id;
+  document.getElementById('fReqNum').value=item.requirement_number||'';
+  document.getElementById('fSection').value=item.section||'';
+  document.getElementById('fReqText').value=item.requirement_text||'';
+  document.getElementById('fType').value=item.requirement_type||'mandatory';
+  document.getElementById('fStatus').value=item.status||'identified';
+  document.getElementById('fPropSection').value=item.proposal_section||'';
+  document.getElementById('fApproach').value=item.compliance_approach||'';
+  document.getElementById('fNotes').value=item.notes||'';
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+
+async function saveItem(){
+  const id=document.getElementById('editId').value;
+  const row={
+    requirement_number:document.getElementById('fReqNum').value.trim(),
+    section:document.getElementById('fSection').value.trim(),
+    requirement_text:document.getElementById('fReqText').value.trim(),
+    requirement_type:document.getElementById('fType').value,
+    status:document.getElementById('fStatus').value,
+    proposal_section:document.getElementById('fPropSection').value.trim(),
+    compliance_approach:document.getElementById('fApproach').value.trim(),
+    notes:document.getElementById('fNotes').value.trim(),
+  };
+  if(!row.requirement_text){alert('Requirement text is required');return}
+  if(isLive){
+    row.company_id=companyId;row.updated_at=new Date().toISOString();
+    if(id){await sbClient.from('rfp_requirements').update(row).eq('id',id)}
+    else{await sbClient.from('rfp_requirements').insert(row)}
+    await loadFromSupabase();
+  }else{
+    if(id){const idx=items.findIndex(i=>i.id===id);if(idx>=0)items[idx]={...items[idx],...row}}
+    else{items.unshift({id:'d'+Date.now(),...row})}
+    renderTable();
+  }
+  closeModal();
+}
+
+async function deleteItem(id){
+  if(!confirm('Delete this requirement?'))return;
+  if(isLive){await sbClient.from('rfp_requirements').delete().eq('id',id);await loadFromSupabase()}
+  else{items=items.filter(i=>i.id!==id);renderTable()}
+}
+</script>
+<div id="mp-export-bar" style="position:fixed;bottom:16px;right:16px;z-index:40;background:#0A1628;border:1px solid rgba(0,229,250,0.2);border-radius:10px;padding:8px 12px;"></div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    MP_EXPORT.addExportBar('mp-export-bar', {
+      moduleId: 'documents',
+      onCSV: function() {
+        var rows = (window._mpData || []).map(function(r) { return [r.section_number||'', r.section_title||'', r.requirement_text||'', r.response_status||'', r.assigned_to||'']; });
+        MP_EXPORT.toCSV('documents-' + MP_EXPORT.dateStamp() + '.csv', ['Section #','Title','Requirement','Status','Assigned To'], rows, 'documents');
+      }
+    });
+  }, 1500);
+});
+</script>
+  <script src="mp-trial-banner.js"></script>`n</body>
+</html>
+
+
+
+

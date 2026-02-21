@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Section Writer — MissionPulse</title>
+<link rel="icon" type="image/png" sizes="32x32" href="MMT_icon_32px.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="mp-responsive.css">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="mp-polish.js"></script>
+<script src="mp-rbac.js"></script>
+<script src="mp-exports.js"></script>
+<style>
+body{background:#00050F;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.glow-border{border:1px solid rgba(0,229,250,0.2);box-shadow:0 0 15px rgba(0,229,250,0.03)}
+.status-badge{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-overlay.show{display:flex}
+.section-card{background:#0A1628;border:1px solid #1E293B;border-radius:12px;padding:16px;cursor:pointer;transition:all 0.15s}
+.section-card:hover{border-color:rgba(0,229,250,0.3)}
+.section-card.active{border-color:#00E5FA;box-shadow:0 0 15px rgba(0,229,250,0.1)}
+.editor-area{background:#0A1628;border:1px solid #1E293B;border-radius:12px;min-height:400px;color:#F8FAFC;font-size:14px;line-height:1.7;padding:24px;resize:vertical}
+.editor-area:focus{outline:none;border-color:#00E5FA}
+.color-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+</style>
+</head>
+<body class="text-slate-300 min-h-screen">
+<div class="max-w-7xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center gap-3">
+        <a href="dashboard.html" class="text-slate-500 hover:text-cyan-400 text-sm">← Dashboard</a>
+        <h1 class="text-2xl font-bold text-white">Section Writer</h1>
+      </div>
+      <p class="text-slate-500 text-sm mt-1">Draft, edit, and track proposal sections</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="dataBadge" class="text-xs px-2 py-1 rounded font-mono"></span>
+      <button onclick="openAddModal()" class="bg-cyan-500 hover:bg-cyan-400 text-[#00050F] px-4 py-2 rounded-lg text-sm font-semibold mp-edit">+ Add Section</button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6">
+    <!-- Section List (Left Panel) -->
+    <div class="col-span-12 lg:col-span-4">
+      <!-- Stats -->
+      <div class="grid grid-cols-3 gap-2 mb-4">
+        <div class="bg-[#0A1628] border border-slate-800 rounded-lg p-2 text-center"><div class="text-lg font-bold text-white" id="statTotal">0</div><div class="text-[10px] text-slate-500">Sections</div></div>
+        <div class="bg-[#0A1628] border border-slate-800 rounded-lg p-2 text-center"><div class="text-lg font-bold text-green-400" id="statComplete">0</div><div class="text-[10px] text-slate-500">Complete</div></div>
+        <div class="bg-[#0A1628] border border-slate-800 rounded-lg p-2 text-center"><div class="text-lg font-bold text-amber-400" id="statPages">0</div><div class="text-[10px] text-slate-500">Pages</div></div>
+      </div>
+      <div id="sectionList" class="space-y-2 max-h-[600px] overflow-y-auto"></div>
+      <div id="emptyState" class="hidden text-center py-8 text-slate-500">
+        <div class="text-3xl mb-2">✍️</div>
+        <p class="text-sm">No sections yet.</p>
+        <button onclick="openAddModal()" class="text-cyan-400 hover:text-cyan-300 text-sm mt-2">Add your first section →</button>
+      </div>
+    </div>
+
+    <!-- Editor (Right Panel) -->
+    <div class="col-span-12 lg:col-span-8">
+      <div id="editorPanel" class="hidden">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-lg font-bold text-white" id="editorTitle">Section</h2>
+            <div class="text-xs text-slate-500" id="editorMeta"></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="editorStatus" onchange="updateSectionStatus()" class="bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white">
+              <option value="not_started">Not Started</option>
+              <option value="drafting">Drafting</option>
+              <option value="review">Review</option>
+              <option value="final">Final</option>
+              <option value="submitted">Submitted</option>
+            </select>
+            <button onclick="saveContent()" class="bg-cyan-500 hover:bg-cyan-400 text-[#00050F] px-4 py-1.5 rounded-lg text-xs font-semibold mp-edit">Save</button>
+            <button onclick="editSection(currentSectionId)" class="text-slate-500 hover:text-cyan-400 text-xs">Edit</button>
+            <button onclick="deleteItem(currentSectionId)" class="text-slate-500 hover:text-red-400 text-xs">Delete</button>
+          </div>
+        </div>
+        <textarea class="editor-area w-full" id="editorContent" placeholder="Start writing your proposal section here..."></textarea>
+        <div class="flex items-center justify-between mt-2">
+          <div class="text-xs text-slate-600" id="wordCount">0 words</div>
+          <div class="text-xs text-slate-600" id="lastSaved"></div>
+        </div>
+      </div>
+      <div id="editorEmpty" class="text-center py-24 text-slate-600">
+        <div class="text-4xl mb-3">📝</div>
+        <p>Select a section to start writing</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center mt-8 text-xs text-slate-600">MISSION MEETS TECH · AI GENERATED — REQUIRES HUMAN REVIEW</div>
+</div>
+
+<!-- Add/Edit Section Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="bg-[#0A1628] border border-slate-700 rounded-xl p-6 w-full max-w-lg mx-4">
+    <h3 class="text-lg font-bold text-white mb-4" id="modalTitle">Add Section</h3>
+    <input type="hidden" id="editId">
+    <div class="space-y-3">
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="block text-xs text-slate-400 mb-1">Volume</label><input id="fVolume" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="Vol I"></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Section #</label><input id="fSecNum" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="3.2.1"></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Page Limit</label><input id="fPageLimit" type="number" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="10"></div>
+      </div>
+      <div><label class="block text-xs text-slate-400 mb-1">Section Title</label><input id="fTitle" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="Technical Approach"></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Status</label>
+        <select id="fStatus" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+          <option value="not_started">Not Started</option><option value="drafting">Drafting</option><option value="review">Review</option><option value="final">Final</option><option value="submitted">Submitted</option>
+        </select>
+      </div>
+      <div><label class="block text-xs text-slate-400 mb-1">Notes</label><textarea id="fNotes" rows="2" class="w-full bg-[#1E293B] border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" placeholder="Assignment notes..."></textarea></div>
+    </div>
+    <div class="flex gap-3 mt-5">
+      <button onclick="closeModal()" class="flex-1 py-2 rounded-lg text-sm border border-slate-600 text-slate-400 hover:border-slate-400">Cancel</button>
+      <button onclick="saveSection()" class="flex-1 py-2 rounded-lg text-sm font-semibold bg-cyan-500 text-[#00050F] hover:bg-cyan-400">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://djuviwarqdvlbgcfuupa.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NDIsImV4cCI6MjA1MzQxMDQ0Mn0.gMzJAb3GkUNJBnfoDSpWPbKDnJBATkTNwdB2D1kMiFo';
+var sbClient;try{sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON)}catch(e){}
+
+let items=[],companyId=null,isLive=false,currentSectionId=null;
+
+const DEMO_DATA=[
+  {id:'d1',volume:'Vol I',section_number:'1.0',section_title:'Executive Summary',page_limit:2,current_pages:1,status:'drafting',content:'The Mission Meets Tech team brings deep expertise in Military Health System modernization, having supported DHA through multiple technology transitions over the past decade.\n\nOur approach leverages proven cloud-native architectures deployed in FedRAMP High environments, combined with an agile methodology specifically adapted for DoD healthcare programs.',notes:''},
+  {id:'d2',volume:'Vol I',section_number:'3.0',section_title:'Technical Approach',page_limit:15,current_pages:0,status:'not_started',content:'',notes:'Needs input from SA team'},
+  {id:'d3',volume:'Vol I',section_number:'4.0',section_title:'Management Approach',page_limit:10,current_pages:4,status:'review',content:'Our management framework implements a hybrid Agile-Waterfall methodology specifically designed for DoD healthcare IT programs. The Program Manager maintains direct communication with the COR through weekly status reports and monthly program reviews.',notes:''},
+  {id:'d4',volume:'Vol II',section_number:'1.0',section_title:'Past Performance',page_limit:5,current_pages:3,status:'final',content:'Reference 1: Defense Health Agency — MHS Genesis Support\nContract: W81K04-20-F-0042\nValue: $12.4M\nPeriod: 2020-2024\n\nMission Meets Tech provided cloud migration and managed services for DHA\'s electronic health record modernization program.',notes:'All 3 references confirmed'},
+];
+
+const statusColors={not_started:'bg-slate-700 text-slate-300',drafting:'bg-blue-900 text-blue-300',review:'bg-amber-900 text-amber-300',final:'bg-green-900 text-green-300',submitted:'bg-purple-900 text-purple-300'};
+
+(async()=>{
+  if(!sbClient){useDemoMode();return}
+  const{data:{session}}=await sbClient.auth.getSession();
+  if(!session){useDemoMode();return}
+  const{data:profile}=await sbClient.from('profiles').select('company_id').eq('id',session.user.id).single();
+  if(!profile?.company_id){useDemoMode();return}
+  companyId=profile.company_id;
+  await loadFromSupabase();
+})();
+
+async function loadFromSupabase(){
+  const{data,error}=await sbClient.from('proposal_sections').select('*').order('sort_order',{ascending:true});
+  if(error){useDemoMode();return}
+  items=data;isLive=true;
+  document.getElementById('dataBadge').textContent='Live — Supabase';
+  document.getElementById('dataBadge').className='text-xs px-2 py-1 rounded font-mono bg-green-900 text-green-300';
+  renderList();
+}
+
+function useDemoMode(){
+  items=DEMO_DATA;isLive=false;
+  document.getElementById('dataBadge').textContent='Demo Mode';
+  document.getElementById('dataBadge').className='text-xs px-2 py-1 rounded font-mono bg-amber-900 text-amber-300';
+  renderList();
+}
+
+function renderList(){
+  document.getElementById('statTotal').textContent=items.length;
+  document.getElementById('statComplete').textContent=items.filter(i=>i.status==='final'||i.status==='submitted').length;
+  document.getElementById('statPages').textContent=items.reduce((s,i)=>s+(i.current_pages||0),0)+'/'+items.reduce((s,i)=>s+(i.page_limit||0),0);
+  const list=document.getElementById('sectionList');
+  if(items.length===0){list.innerHTML='';document.getElementById('emptyState').classList.remove('hidden');return}
+  document.getElementById('emptyState').classList.add('hidden');
+  list.innerHTML=items.map(i=>`
+    <div class="section-card ${currentSectionId===i.id?'active':''}" onclick="selectSection('${i.id}')">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-xs font-mono text-cyan-400">${i.volume||''} ${i.section_number||''}</span>
+        <span class="status-badge ${statusColors[i.status]||''}">${(i.status||'').replace('_',' ')}</span>
+      </div>
+      <div class="text-sm font-semibold text-white">${i.section_title}</div>
+      <div class="text-xs text-slate-500 mt-1">${i.current_pages||0}/${i.page_limit||'∞'} pages · ${(i.content||'').split(/\s+/).filter(Boolean).length} words</div>
+    </div>
+  `).join('');
+}
+
+function selectSection(id){
+  currentSectionId=id;
+  const item=items.find(i=>i.id===id);if(!item)return;
+  document.getElementById('editorPanel').classList.remove('hidden');
+  document.getElementById('editorEmpty').classList.add('hidden');
+  document.getElementById('editorTitle').textContent=`${item.volume||''} ${item.section_number||''} — ${item.section_title}`;
+  document.getElementById('editorMeta').textContent=`${item.current_pages||0}/${item.page_limit||'∞'} pages`;
+  document.getElementById('editorStatus').value=item.status||'not_started';
+  document.getElementById('editorContent').value=item.content||'';
+  updateWordCount();
+  renderList();
+}
+
+function updateWordCount(){
+  const text=document.getElementById('editorContent').value;
+  const words=text.split(/\s+/).filter(Boolean).length;
+  document.getElementById('wordCount').textContent=words+' words';
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const editor=document.getElementById('editorContent');
+  if(editor)editor.addEventListener('input',updateWordCount);
+});
+
+async function saveContent(){
+  if(!currentSectionId)return;
+  const content=document.getElementById('editorContent').value;
+  const words=content.split(/\s+/).filter(Boolean).length;
+  const estPages=Math.ceil(words/250);
+
+  if(isLive){
+    await sbClient.from('proposal_sections').update({content,current_pages:estPages,updated_at:new Date().toISOString()}).eq('id',currentSectionId);
+    await loadFromSupabase();
+  }else{
+    const idx=items.findIndex(i=>i.id===currentSectionId);
+    if(idx>=0){items[idx].content=content;items[idx].current_pages=estPages}
+    renderList();
+  }
+  document.getElementById('lastSaved').textContent='Saved '+new Date().toLocaleTimeString();
+  selectSection(currentSectionId);
+}
+
+async function updateSectionStatus(){
+  if(!currentSectionId)return;
+  const status=document.getElementById('editorStatus').value;
+  if(isLive){
+    await sbClient.from('proposal_sections').update({status,updated_at:new Date().toISOString()}).eq('id',currentSectionId);
+    await loadFromSupabase();
+  }else{
+    const idx=items.findIndex(i=>i.id===currentSectionId);
+    if(idx>=0)items[idx].status=status;
+    renderList();
+  }
+}
+
+function openAddModal(){
+  document.getElementById('modalTitle').textContent='Add Section';
+  document.getElementById('editId').value='';
+  ['fVolume','fSecNum','fPageLimit','fTitle','fNotes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fStatus').value='not_started';
+  document.getElementById('modal').classList.add('show');
+}
+
+function editSection(id){
+  const item=items.find(i=>i.id===id);if(!item)return;
+  document.getElementById('modalTitle').textContent='Edit Section';
+  document.getElementById('editId').value=id;
+  document.getElementById('fVolume').value=item.volume||'';
+  document.getElementById('fSecNum').value=item.section_number||'';
+  document.getElementById('fPageLimit').value=item.page_limit||'';
+  document.getElementById('fTitle').value=item.section_title||'';
+  document.getElementById('fStatus').value=item.status||'not_started';
+  document.getElementById('fNotes').value=item.notes||'';
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+
+async function saveSection(){
+  const id=document.getElementById('editId').value;
+  const row={
+    volume:document.getElementById('fVolume').value.trim(),
+    section_number:document.getElementById('fSecNum').value.trim(),
+    section_title:document.getElementById('fTitle').value.trim(),
+    page_limit:parseInt(document.getElementById('fPageLimit').value)||null,
+    status:document.getElementById('fStatus').value,
+    notes:document.getElementById('fNotes').value.trim(),
+  };
+  if(!row.section_title){alert('Section title is required');return}
+  if(isLive){
+    row.company_id=companyId;row.updated_at=new Date().toISOString();
+    if(id){await sbClient.from('proposal_sections').update(row).eq('id',id)}
+    else{row.sort_order=items.length+1;await sbClient.from('proposal_sections').insert(row)}
+    await loadFromSupabase();
+  }else{
+    if(id){const idx=items.findIndex(i=>i.id===id);if(idx>=0)items[idx]={...items[idx],...row}}
+    else{items.push({id:'d'+Date.now(),content:'',...row})}
+    renderList();
+  }
+  closeModal();
+}
+
+async function deleteItem(id){
+  if(!confirm('Delete this section?'))return;
+  if(isLive){await sbClient.from('proposal_sections').delete().eq('id',id);await loadFromSupabase()}
+  else{items=items.filter(i=>i.id!==id);renderList()}
+  if(currentSectionId===id){
+    currentSectionId=null;
+    document.getElementById('editorPanel').classList.add('hidden');
+    document.getElementById('editorEmpty').classList.remove('hidden');
+  }
+}
+</script>
+<div id="mp-export-bar" style="position:fixed;bottom:16px;right:16px;z-index:40;background:#0A1628;border:1px solid rgba(0,229,250,0.2);border-radius:10px;padding:8px 12px;"></div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    MP_EXPORT.addExportBar('mp-export-bar', {
+      moduleId: 'proposals',
+      onCSV: function() {
+        var rows = (window._mpData || []).map(function(r) { return [r.section_number||'', r.title||'', r.status||'', r.assigned_to||'', (r.content||'').substring(0,200)]; });
+        MP_EXPORT.toCSV('proposals-' + MP_EXPORT.dateStamp() + '.csv', ['Section #','Title','Status','Assigned To','Content Preview'], rows, 'proposals');
+      },
+      onDOCX: function() {
+        var data = window._mpData || [];
+        MP_EXPORT.toDOCX('proposals-' + MP_EXPORT.dateStamp() + '.doc', { title: 'Proposal Sections', type: 'sections', moduleId: 'proposals', sections: data.map(function(r) { return { heading: (r.section_number||'') + ' ' + (r.title||'Untitled'), body: r.content||'' }; }) });
+      }
+    });
+  }, 1500);
+});
+</script>
+  <script src="mp-trial-banner.js"></script>`n</body>
+</html>
+
+
+
+

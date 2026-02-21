@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MissionPulse — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="mp-responsive.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #00050F; color: #E2E8F0; min-height: 100vh; }
+    .nav-icon { width: 18px; height: 18px; display: inline-block; }
+    .nav-icon svg { width: 100%; height: 100%; }
+    .sidebar-link { transition: all 0.15s ease; }
+    .sidebar-link:hover { background: rgba(0,229,250,0.08); }
+    .sidebar-link.active { background: rgba(0,229,250,0.12); border-left: 3px solid #00E5FA; }
+    .module-card { transition: all 0.2s ease; border: 1px solid rgba(255,255,255,0.06); }
+    .module-card:hover { border-color: rgba(0,229,250,0.3); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,229,250,0.08); }
+    .badge-cui { background: #991B1B; color: #FCA5A5; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; letter-spacing: 0.5px; }
+    .badge-private { background: #92400E; color: #FCD34D; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; letter-spacing: 0.5px; }
+    .badge-live { background: #065F46; color: #6EE7B7; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; letter-spacing: 0.5px; }
+    .badge-demo { background: #1E3A5F; color: #93C5FD; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; letter-spacing: 0.5px; }
+    .stat-card { background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.06); }
+    @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(0,229,250,0.2); } 50% { box-shadow: 0 0 12px 4px rgba(0,229,250,0.1); } }
+    .pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+    .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  </style>
+</head>
+<body>
+
+<!-- ═══ LOADING STATE ═══ -->
+<div id="loading-screen" style="display:flex;align-items:center;justify-content:center;height:100vh;background:#00050F;">
+  <div style="text-align:center;">
+    <div style="width:48px;height:48px;border:3px solid rgba(0,229,250,0.2);border-top-color:#00E5FA;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>
+    <p style="color:#64748B;font-size:14px;">Loading MissionPulse...</p>
+  </div>
+  <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<!-- ═══ MAIN APP (hidden until auth + RBAC init) ═══ -->
+<div id="app-shell" style="display:none;" class="flex min-h-screen">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside id="sidebar" class="w-60 bg-[#000A1A] border-r border-white/5 flex flex-col fixed h-full z-40">
+    
+    <!-- Logo -->
+    <div class="px-4 py-5 border-b border-white/5">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00E5FA] to-[#0066FF] flex items-center justify-center">
+          <span class="text-white font-bold text-sm">MP</span>
+        </div>
+        <div>
+          <div class="text-sm font-bold text-white">MissionPulse</div>
+          <div class="text-[10px] text-[#64748B] tracking-wide" id="role-badge">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav sections (populated by RBAC) -->
+    <nav class="flex-1 overflow-y-auto py-3 px-2" id="sidebar-nav">
+      <!-- Populated dynamically -->
+    </nav>
+
+    <!-- User footer -->
+    <div class="border-t border-white/5 p-3">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 rounded-full bg-[#1E293B] flex items-center justify-center text-xs font-medium text-[#00E5FA]" id="user-avatar">--</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium text-white truncate" id="user-name">Loading...</div>
+          <div class="text-[10px] text-[#64748B]" id="user-role-label">--</div>
+        </div>
+      </div>
+      <button onclick="handleLogout()" class="w-full text-left px-2 py-1.5 rounded text-xs text-[#64748B] hover:text-red-400 hover:bg-red-400/5 transition flex items-center gap-2">
+        <span class="nav-icon" id="logout-icon"></span>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <main class="flex-1 ml-60 p-6">
+    
+    <!-- Top Bar -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+        <p class="text-sm text-[#64748B] mt-1" id="greeting">Welcome back</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="data-badge"></span>
+        <span class="text-xs text-[#475569]" id="last-updated"></span>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-4 gap-4 mb-8" id="stats-row">
+      <!-- Populated dynamically based on role -->
+    </div>
+
+    <!-- Module Grid -->
+    <div class="mb-6">
+      <h2 class="text-sm font-semibold text-[#94A3B8] uppercase tracking-wider mb-4">Your Modules</h2>
+      <div class="grid grid-cols-3 gap-4" id="module-grid">
+        <!-- Populated dynamically based on RBAC -->
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="mt-8">
+      <h2 class="text-sm font-semibold text-[#94A3B8] uppercase tracking-wider mb-4">Recent Activity</h2>
+      <div class="bg-[#000A1A] rounded-xl border border-white/5 p-4" id="activity-feed">
+        <p class="text-sm text-[#475569]">Loading activity...</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-8 pt-4 border-t border-white/5 text-center">
+      <p class="text-[10px] text-[#334155]">AI GENERATED — REQUIRES HUMAN REVIEW | MissionPulse v2.0 | &copy; 2026 Mission Meets Tech</p>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══ SCRIPTS ═══ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ── Supabase Init (var to avoid duplicate declarations with supabase-client.js) ──
+  var sbClient = supabase.createClient(
+    'https://djuviwarqdvlbgcfuupa.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NDIsImV4cCI6MjA1MzQxMDQ0Mn0.gMzJAb3GkUNJBnfoDSpWPbKDnJBATkTNwdB2D1kMiFo'
+  );
+</script>
+<script src="mp-polish.js"></script>
+<script src="mp-rbac.js"></script>
+<script src="mp-trial-banner.js"></script>
+<script>
+
+  // ═══════════════════════════════════════════════════════
+  // MODULE METADATA — descriptions + status for dashboard cards
+  // ═══════════════════════════════════════════════════════
+  const MODULE_META = {
+    dashboard:      { title: 'Dashboard',      desc: 'Portfolio overview & KPIs',         color: '#00E5FA', status: 'live' },
+    pipeline:       { title: 'Pipeline',        desc: 'Opportunity tracking & pWin',       color: '#00D29F', status: 'live' },
+    proposals:      { title: 'Section Writer',  desc: 'AI-assisted proposal drafting',     color: '#8B5CF6', status: 'live' },
+    compliance:     { title: 'Compliance',       desc: 'Requirements matrix & tracker',     color: '#3B82F6', status: 'live' },
+    workflow_board: { title: 'Workflow Board',   desc: 'Swimlane task management',          color: '#06B6D4', status: 'live' },
+    documents:      { title: 'RFP Shredder',    desc: 'Document parsing & extraction',     color: '#A855F7', status: 'live' },
+    strategy:       { title: 'War Room',        desc: 'Win strategy & gate reviews',       color: '#F59E0B', status: 'live' },
+    blackhat:       { title: 'Black Hat',       desc: 'Competitive analysis (restricted)', color: '#EF4444', status: 'live' },
+    pricing:        { title: 'BOE Builder',     desc: 'Basis of Estimate & pricing',       color: '#EC4899', status: 'live' },
+    analytics:      { title: 'Analytics',       desc: 'Win rate & trend analysis',         color: '#10B981', status: 'coming' },
+    ai_chat:        { title: 'AI Assistant',    desc: '8 specialized proposal agents',     color: '#00E5FA', status: 'live' },
+    admin:          { title: 'Admin',           desc: 'Users, roles & settings',           color: '#64748B', status: 'coming' },
+    integrations:   { title: 'Integrations',    desc: 'AskSage, HubSpot, SAM.gov',        color: '#8B5CF6', status: 'coming' },
+    audit_log:      { title: 'Audit Log',       desc: 'Compliance trail & activity log',   color: '#475569', status: 'coming' },
+  };
+
+  // ═══════════════════════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════════════════════
+  (async function() {
+    try {
+      const state = await MP_RBAC.init();
+      if (!state) return; // Redirected to login
+
+      // Hide loading, show app
+      document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('app-shell').style.display = 'flex';
+
+      // Populate UI
+      renderRoleBadge(state);
+      renderSidebar(state);
+      renderUserFooter();
+      renderStats(state);
+      renderModuleGrid(state);
+      renderActivity();
+      renderGreeting();
+
+      // CUI banner if needed
+      MP_RBAC.renderCUIBanner();
+
+    } catch (err) {
+      console.error('[Dashboard] Init failed:', err);
+      document.getElementById('loading-screen').innerHTML = `
+        <div style="text-align:center;color:#EF4444;">
+          <p style="font-size:16px;font-weight:600;margin-bottom:8px;">Connection Error</p>
+          <p style="font-size:13px;color:#64748B;">Could not connect to MissionPulse. <a href="login.html" style="color:#00E5FA;">Try logging in again.</a></p>
+        </div>`;
+    }
+  })();
+
+  // ═══════════════════════════════════════════════════════
+  // RENDER FUNCTIONS
+  // ═══════════════════════════════════════════════════════
+
+  function renderRoleBadge(state) {
+    const roleLabels = {
+      executive: 'Executive / Admin',
+      operations: 'Operations / COO',
+      capture_manager: 'Capture Manager',
+      proposal_manager: 'Proposal Manager',
+      volume_lead: 'Volume Lead',
+      pricing_manager: 'Pricing / Cost',
+      contracts: 'Contracts / Compliance',
+      hr_staffing: 'HR / Staffing',
+      author: 'Author / SME',
+      partner: 'Teaming Partner',
+      subcontractor: 'Subcontractor',
+      consultant: 'Consultant / SME',
+    };
+    document.getElementById('role-badge').textContent = roleLabels[state.configRole] || state.role;
+  }
+
+  function renderSidebar(state) {
+    const nav = MP_RBAC.getNavItems();
+    const container = document.getElementById('sidebar-nav');
+    let html = '';
+
+    const renderSection = (items, label) => {
+      if (items.length === 0) return '';
+      let s = label ? `<div class="text-[9px] font-semibold text-[#334155] uppercase tracking-widest px-3 mt-4 mb-1">${label}</div>` : '';
+      items.forEach(item => {
+        const meta = MODULE_META[item.id] || {};
+        const badgeHtml = item.badge === 'CUI' ? '<span class="badge-cui ml-auto">CUI</span>' :
+                          item.badge === 'Private' ? '<span class="badge-private ml-auto">PRIVATE</span>' : '';
+        const isActive = item.id === 'dashboard' ? ' active' : '';
+        s += `
+          <a href="${item.route}" class="sidebar-link flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[#CBD5E1] hover:text-white${isActive}" title="${meta.desc || ''}">
+            <span class="nav-icon" style="color:${meta.color || '#64748B'}">${MP_RBAC.getIcon(item.icon)}</span>
+            <span>${item.label}</span>
+            ${badgeHtml}
+          </a>`;
+      });
+      return s;
+    };
+
+    html += renderSection(nav.primary, '');
+    html += renderSection(nav.secondary, 'Intelligence');
+    html += renderSection(nav.admin, 'System');
+
+    container.innerHTML = html;
+
+    // Set logout icon
+    document.getElementById('logout-icon').innerHTML = MP_RBAC.getIcon('log-out');
+  }
+
+  function renderUserFooter() {
+    const name = window.MP_USER_NAME || 'User';
+    const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    document.getElementById('user-avatar').textContent = initials || '--';
+    document.getElementById('user-name').textContent = name;
+
+    const roleLabels = { CEO: 'CEO', COO: 'COO', CAP: 'Capture Mgr', PM: 'Proposal Mgr', FIN: 'Pricing Lead', CON: 'Contracts', SA: 'Author' };
+    document.getElementById('user-role-label').textContent = roleLabels[window.MP_ROLE] || window.MP_ROLE;
+  }
+
+  function renderGreeting() {
+    const hour = new Date().getHours();
+    const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const name = (window.MP_USER_NAME || '').split(' ')[0];
+    document.getElementById('greeting').textContent = `${timeGreeting}${name ? ', ' + name : ''}. Here's your portfolio status.`;
+    document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  async function renderStats(state) {
+    const container = document.getElementById('stats-row');
+    
+    // Try live data, fall back to demo
+    let opps = [];
+    let isLive = false;
+    try {
+      const { data, error } = await sbClient.from('opportunities').select('*');
+      if (!error && data && data.length > 0) {
+        opps = data;
+        isLive = true;
+      }
+    } catch (e) { /* fallback */ }
+
+    if (!isLive) {
+      opps = [
+        { title: 'DHA EHR Modernization', value: 85000000, status: 'Proposal', pwin: 72 },
+        { title: 'VA Claims Processing AI', value: 42000000, status: 'Capture', pwin: 55 },
+        { title: 'CMS Data Analytics', value: 28000000, status: 'Pipeline', pwin: 40 },
+        { title: 'IHS Telehealth Platform', value: 65000000, status: 'Gate Review', pwin: 68 },
+        { title: 'DISA Zero Trust', value: 120000000, status: 'Pipeline', pwin: 30 },
+      ];
+    }
+
+    document.getElementById('data-badge').innerHTML = isLive
+      ? '<span class="badge-live">LIVE</span>'
+      : '<span class="badge-demo">DEMO DATA</span>';
+
+    const totalValue = opps.reduce((s, o) => s + (o.ceiling || o.value || 0), 0);
+    const avgPwin = opps.length ? Math.round(opps.reduce((s, o) => s + (o.pwin || 0), 0) / opps.length) : 0;
+    const activeCount = opps.filter(o => ['pink_team','blue_team','red_team','gold_team','capture','gate_1'].includes(o.stage || o.status)).length;
+
+    const stats = [
+      { label: 'Pipeline Value', value: '$' + (totalValue / 1000000).toFixed(0) + 'M', color: '#00E5FA' },
+      { label: 'Active Opportunities', value: opps.length.toString(), color: '#00D29F' },
+      { label: 'In Proposal', value: activeCount.toString(), color: '#8B5CF6' },
+      { label: 'Avg Win Probability', value: avgPwin + '%', color: avgPwin >= 60 ? '#00D29F' : avgPwin >= 40 ? '#F59E0B' : '#EF4444' },
+    ];
+
+    // Show margin stat only for exec/ops roles
+    if (['executive', 'operations'].includes(state.configRole)) {
+      // stats could be extended with margin data here
+    }
+
+    container.innerHTML = stats.map(s => `
+      <div class="stat-card rounded-xl p-4">
+        <div class="text-[11px] text-[#64748B] uppercase tracking-wider mb-1">${s.label}</div>
+        <div class="text-2xl font-bold" style="color:${s.color}">${s.value}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderModuleGrid(state) {
+    const container = document.getElementById('module-grid');
+    const nav = MP_RBAC.getNavItemsFlat().filter(item => item.id !== 'dashboard');
+
+    container.innerHTML = nav.map(item => {
+      const meta = MODULE_META[item.id] || {};
+      const readOnly = MP_RBAC.isReadOnly(item.id);
+      const statusBadge = meta.status === 'coming'
+        ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-[#1E293B] text-[#475569] font-medium">COMING SOON</span>'
+        : readOnly
+          ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-[#1E293B] text-[#94A3B8] font-medium">VIEW ONLY</span>'
+          : '';
+      const badgeHtml = item.badge === 'CUI' ? '<span class="badge-cui">CUI</span>' :
+                        item.badge === 'Private' ? '<span class="badge-private">PRIVATE</span>' : '';
+      const isClickable = meta.status !== 'coming';
+      const href = isClickable ? item.route : '#';
+      const cursor = isClickable ? 'cursor-pointer' : 'cursor-not-allowed opacity-50';
+
+      return `
+        <a href="${href}" class="module-card rounded-xl p-5 bg-[#000A1A] block ${cursor}" ${!isClickable ? 'onclick="return false"' : ''}>
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:${meta.color || '#1E293B'}20;color:${meta.color || '#64748B'}">
+              <span class="nav-icon" style="width:22px;height:22px;">${MP_RBAC.getIcon(item.icon)}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              ${badgeHtml}
+              ${statusBadge}
+            </div>
+          </div>
+          <div class="text-sm font-semibold text-white mb-1">${meta.title || item.label}</div>
+          <div class="text-xs text-[#64748B] leading-relaxed">${meta.desc || ''}</div>
+        </a>`;
+    }).join('');
+  }
+
+  async function renderActivity() {
+    const container = document.getElementById('activity-feed');
+    
+    // Try to load from audit_logs or capture_events
+    let events = [];
+    try {
+      const { data, error } = await sbClient
+        .from('capture_events')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (!error && data) events = data;
+    } catch (e) { /* fallback */ }
+
+    if (events.length === 0) {
+      // Demo fallback
+      events = [
+        { event_type: 'opportunity_updated', description: 'DHA EHR Modernization moved to Proposal phase', created_at: new Date(Date.now() - 3600000).toISOString() },
+        { event_type: 'compliance_check', description: 'Iron Dome scan completed — 94% compliant', created_at: new Date(Date.now() - 7200000).toISOString() },
+        { event_type: 'ai_review', description: 'AI Writer drafted Executive Summary (Section L)', created_at: new Date(Date.now() - 14400000).toISOString() },
+        { event_type: 'gate_review', description: 'Blue Team review scheduled for VA Claims Processing', created_at: new Date(Date.now() - 28800000).toISOString() },
+      ];
+    }
+
+    const typeColors = {
+      opportunity_updated: '#00D29F',
+      compliance_check: '#3B82F6',
+      ai_review: '#8B5CF6',
+      gate_review: '#F59E0B',
+    };
+
+    container.innerHTML = events.map(e => {
+      const color = typeColors[e.event_type] || '#64748B';
+      const time = e.created_at ? timeAgo(new Date(e.created_at)) : '';
+      return `
+        <div class="flex items-start gap-3 py-2.5 border-b border-white/5 last:border-0">
+          <div class="w-2 h-2 rounded-full mt-1.5 shrink-0" style="background:${color}"></div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs text-[#CBD5E1]">${e.description || e.event_type}</div>
+          </div>
+          <div class="text-[10px] text-[#475569] shrink-0">${time}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Helpers ─────────────────────────────────────────
+
+  function timeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    return Math.floor(seconds / 86400) + 'd ago';
+  }
+
+  async function handleLogout() {
+    await sbClient.auth.signOut();
+    window.location.href = 'login.html';
+  }
+
+</script>
+</body>
+</html>
+
+

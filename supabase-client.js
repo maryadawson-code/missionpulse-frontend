@@ -2,7 +2,7 @@
  * MissionPulse Supabase Client Module
  * Sprint 47: Unified client with CRUD operations and real-time subscriptions
  * 
- * CREDENTIALS VERIFIED: https://qdrtpnpnhkxvfmvfziop.supabase.co
+ * CREDENTIALS VERIFIED: https://djuviwarqdvlbgcfuupa.supabase.co
  * 
  * Provides MissionPulse namespace with:
  * - getOpportunities() - Fetch all opportunities
@@ -22,8 +22,8 @@
   // ============================================================
   // SUPABASE CONFIGURATION - VERIFIED PRODUCTION CREDENTIALS
   // ============================================================
-  const SUPABASE_URL = 'https://qdrtpnpnhkxvfmvfziop.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnRwbnBuaGt4dmZtdmZ6aW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1NjcyNTAsImV4cCI6MjA1MzE0MzI1MH0.GRTFxRV7WV67P9sYaIVRwKxVEDALfkWjmUxs4ADB1zs';
+  const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzQ0NDIsImV4cCI6MjA1MzQxMDQ0Mn0.gMzJAb3GkUNJBnfoDSpWPbKDnJBATkTNwdB2D1kMiFo';
 
   // Initialize Supabase client
   let supabaseClient = null;
@@ -89,44 +89,46 @@
   // FIELD MAPPING: snake_case (DB) <-> camelCase (Frontend)
   // ============================================================
   const fieldMapping = {
-    // DB -> Frontend
+    // DB -> Frontend (matches actual Supabase schema)
     toFrontend: {
       id: 'id',
-      name: 'name',
+      title: 'name',
+      nickname: 'nickname',
       agency: 'agency',
-      contract_value: 'contractValue',
+      ceiling: 'contractValue',
       priority: 'priority',
-      shipley_phase: 'shipleyPhase',
-      win_probability: 'winProbability',
-      due_date: 'dueDate',
+      stage: 'shipleyPhase',
+      pwin: 'winProbability',
       solicitation_number: 'solicitationNumber',
       created_at: 'createdAt',
       updated_at: 'updatedAt',
-      description: 'description',
-      contract_type: 'contractType',
       set_aside: 'setAside',
-      naics_code: 'naicsCode',
-      primary_contact: 'primaryContact',
-      company_id: 'companyId'
+      contract_vehicle: 'contractVehicle',
+      role: 'role',
+      company_id: 'companyId',
+      // Legacy aliases for backward compat
+      name: 'name',
+      contract_value: 'contractValue',
+      shipley_phase: 'shipleyPhase',
+      win_probability: 'winProbability'
     },
-    // Frontend -> DB
+    // Frontend -> DB (maps to actual Supabase columns)
     toDatabase: {
       id: 'id',
-      name: 'name',
+      name: 'title',
       agency: 'agency',
-      contractValue: 'contract_value',
+      contractValue: 'ceiling',
       priority: 'priority',
-      shipleyPhase: 'shipley_phase',
-      winProbability: 'win_probability',
-      dueDate: 'due_date',
+      shipleyPhase: 'stage',
+      winProbability: 'pwin',
       solicitationNumber: 'solicitation_number',
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       description: 'description',
-      contractType: 'contract_type',
       setAside: 'set_aside',
-      naicsCode: 'naics_code',
-      primaryContact: 'primary_contact',
+      contractVehicle: 'contract_vehicle',
+      nickname: 'nickname',
+      role: 'role',
       companyId: 'company_id'
     }
   };
@@ -175,14 +177,16 @@
 
   // Shipley phase display mapping
   const SHIPLEY_PHASES = {
-    'gate_1': { name: 'Gate 1', color: '#94a3b8', order: 1 },
-    'blue_team': { name: 'Blue Team', color: '#60a5fa', order: 2 },
-    'pink_team': { name: 'Pink Team', color: '#f472b6', order: 3 },
-    'red_team': { name: 'Red Team', color: '#ef4444', order: 4 },
-    'gold_team': { name: 'Gold Team', color: '#fbbf24', order: 5 },
-    'submitted': { name: 'Submitted', color: '#22c55e', order: 6 },
-    'awarded': { name: 'Awarded', color: '#8b5cf6', order: 7 },
-    'lost': { name: 'Lost', color: '#64748b', order: 8 }
+    'identified': { name: 'Identified', color: '#a78bfa', order: 0 },
+    'capture': { name: 'Capture', color: '#38bdf8', order: 1 },
+    'gate_1': { name: 'Gate 1', color: '#94a3b8', order: 2 },
+    'blue_team': { name: 'Blue Team', color: '#60a5fa', order: 3 },
+    'pink_team': { name: 'Pink Team', color: '#f472b6', order: 4 },
+    'red_team': { name: 'Red Team', color: '#ef4444', order: 5 },
+    'gold_team': { name: 'Gold Team', color: '#fbbf24', order: 6 },
+    'submitted': { name: 'Submitted', color: '#22c55e', order: 7 },
+    'awarded': { name: 'Awarded', color: '#8b5cf6', order: 8 },
+    'lost': { name: 'Lost', color: '#64748b', order: 9 }
   };
 
   function mapShipleyPhaseToDisplay(phase) {
@@ -307,7 +311,7 @@
     try {
       const { data, error } = await client
         .from('opportunities')
-        .select('contract_value, win_probability, due_date, shipley_phase');
+        .select('ceiling, pwin, created_at, stage');
 
       if (error) throw error;
 
@@ -317,13 +321,13 @@
 
       const stats = {
         totalCount: data.length,
-        totalValue: data.reduce((sum, opp) => sum + (opp.contract_value || 0), 0),
+        totalValue: data.reduce((sum, opp) => sum + (opp.ceiling || 0), 0),
         avgPwin: data.length > 0 
-          ? Math.round(data.reduce((sum, opp) => sum + (opp.win_probability || 0), 0) / data.length)
+          ? Math.round(data.reduce((sum, opp) => sum + (opp.pwin || 0), 0) / data.length)
           : 0,
         dueThisMonth: data.filter(opp => {
-          if (!opp.due_date) return false;
-          const dueDate = new Date(opp.due_date);
+          if (!opp.created_at) return false;
+          const dueDate = new Date(opp.created_at);
           return dueDate >= now && dueDate <= monthEnd;
         }).length,
         byPhase: {}
@@ -331,12 +335,12 @@
 
       // Group by phase
       data.forEach(opp => {
-        const phase = opp.shipley_phase || 'gate_1';
+        const phase = opp.stage || 'gate_1';
         if (!stats.byPhase[phase]) {
           stats.byPhase[phase] = { count: 0, value: 0 };
         }
         stats.byPhase[phase].count++;
-        stats.byPhase[phase].value += opp.contract_value || 0;
+        stats.byPhase[phase].value += opp.ceiling || 0;
       });
 
       return { data: stats, error: null };

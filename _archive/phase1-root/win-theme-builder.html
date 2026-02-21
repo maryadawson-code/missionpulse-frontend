@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Win Theme Builder | MissionPulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="mp-rbac.js"></script>
+  <style>
+    body { background: #00050F; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+    .card { background: #0d1f3c; border: 1px solid #1e3a5f; border-radius: 12px; }
+    .btn-primary { background: #00E5FA; color: #00050F; font-weight: 600; }
+    .btn-primary:hover { background: #00c4d6; }
+    .priority-1 { border-left: 4px solid #ef4444; }
+    .priority-2 { border-left: 4px solid #f97316; }
+    .priority-3 { border-left: 4px solid #facc15; }
+    .priority-4 { border-left: 4px solid #22d3ee; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    const SUPABASE_URL = 'https://djuviwarqdvlbgcfuupa.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdXZpd2FycWR2bGJnY2Z1dXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4MzUyMjQsImV4cCI6MjA1MzQxMTIyNH0.pBPL9l2zL7LLd_A5I--hPBzw5YwG3ajPMtbYsqsxIgQ';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const DEMO_THEMES = [
+      { id: 'demo-1', theme: 'Proven MHS Modernization Partner', discriminator: '56 MTF deployments with zero downtime transitions', evidence: 'MHS GENESIS EHR rollout across Pacific Region — completed 3 months ahead of schedule with 99.7% uptime', priority: 1 },
+      { id: 'demo-2', theme: 'FedRAMP High AI Integration', discriminator: 'Only SDVOSB with AskSage + Advana integration experience', evidence: 'Built CUI-compliant AI pipeline processing 50K+ documents monthly for DHA', priority: 1 },
+      { id: 'demo-3', theme: 'Cost-Effective Agile Delivery', discriminator: '30% lower cost through automated proposal workflows', evidence: 'MissionPulse platform reduced proposal cycle time from 520 to 340 hours across 12 pursuits', priority: 2 },
+      { id: 'demo-4', theme: 'Cleared Workforce Ready Day One', discriminator: '100% Secret-cleared technical staff with DHA badge access', evidence: '45-person team with active DHA CAC access and ATCTS compliance', priority: 3 },
+    ];
+
+    function App() {
+      const [themes, setThemes] = useState([]);
+      const [opps, setOpps] = useState([]);
+      const [selectedOpp, setSelectedOpp] = useState('all');
+      const [connected, setConnected] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [showForm, setShowForm] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const [form, setForm] = useState({ theme: '', discriminator: '', evidence: '', priority: 1 });
+
+      const loadData = useCallback(async () => {
+        setLoading(true);
+        try {
+          const { data: oppData } = await sb.from('opportunities').select('id, title, agency');
+          if (oppData) setOpps(oppData);
+
+          let query = sb.from('win_themes').select('*').order('priority');
+          if (selectedOpp !== 'all') query = query.eq('opportunity_id', selectedOpp);
+          const { data, error } = await query;
+          if (error) throw error;
+          setThemes(data || []);
+          setConnected(true);
+        } catch (e) {
+          console.warn('Demo mode:', e.message);
+          setThemes(DEMO_THEMES);
+          setConnected(false);
+        }
+        setLoading(false);
+      }, [selectedOpp]);
+
+      useEffect(() => { loadData(); }, [loadData]);
+
+      const handleSave = async () => {
+        const payload = { ...form, priority: parseInt(form.priority) || 1 };
+        if (selectedOpp !== 'all') payload.opportunity_id = selectedOpp;
+        try {
+          if (editing) {
+            await sb.from('win_themes').update(payload).eq('id', editing);
+          } else {
+            await sb.from('win_themes').insert([payload]);
+          }
+          setShowForm(false); setEditing(null);
+          setForm({ theme: '', discriminator: '', evidence: '', priority: 1 });
+          loadData();
+        } catch (e) { alert('Save failed: ' + e.message); }
+      };
+
+      const handleEdit = (t) => {
+        setForm({ theme: t.theme, discriminator: t.discriminator || '', evidence: t.evidence || '', priority: t.priority || 1 });
+        setEditing(t.id); setShowForm(true);
+      };
+
+      const handleDelete = async (id) => {
+        if (!confirm('Delete this win theme?')) return;
+        try { await sb.from('win_themes').delete().eq('id', id); loadData(); }
+        catch (e) { alert('Delete failed: ' + e.message); }
+      };
+
+      const priorityLabel = (p) => ['','P-1 Critical','P-2 High','P-3 Medium','P-4 Low'][p] || 'P-' + p;
+      const priorityClass = (p) => ['','priority-1','priority-2','priority-3','priority-4'][p] || '';
+
+      return (
+        <div className="min-h-screen p-6 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-white font-bold">WT</div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Win Theme Builder</h1>
+                <p className="text-sm text-slate-400">Discriminators, evidence & ghost-proof themes</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                {connected ? '● Connected' : '● Demo Mode'}
+              </div>
+              <a href="dashboard-v2.html" className="text-slate-400 hover:text-white text-sm">← Dashboard</a>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-6">
+            <select value={selectedOpp} onChange={e => setSelectedOpp(e.target.value)} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+              <option value="all">All Opportunities</option>
+              {opps.map(o => <option key={o.id} value={o.id}>{o.title} ({o.agency})</option>)}
+            </select>
+            <button onClick={() => { setEditing(null); setForm({ theme: '', discriminator: '', evidence: '', priority: 1 }); setShowForm(true); }} className="btn-primary px-4 py-2 rounded-lg text-sm">+ Add Theme</button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Total Themes', value: themes.length, color: 'cyan' },
+              { label: 'P-1 Critical', value: themes.filter(t => t.priority === 1).length, color: 'red' },
+              { label: 'With Evidence', value: themes.filter(t => t.evidence).length, color: 'emerald' },
+              { label: 'With Discriminator', value: themes.filter(t => t.discriminator).length, color: 'amber' },
+            ].map((s, i) => (
+              <div key={i} className="card p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">{s.label}</p>
+                <p className={`text-2xl font-bold text-${s.color}-400 mt-1`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Form Modal */}
+          {showForm && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowForm(false)}>
+              <div className="card p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                <h2 className="text-lg font-bold text-white mb-4">{editing ? 'Edit' : 'Add'} Win Theme</h2>
+                <div className="space-y-3">
+                  <input placeholder="Win Theme Statement *" value={form.theme} onChange={e => setForm({...form, theme: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                  <input placeholder="Competitive Discriminator" value={form.discriminator} onChange={e => setForm({...form, discriminator: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                  <textarea placeholder="Supporting Evidence (specific, measurable)" rows={3} value={form.evidence} onChange={e => setForm({...form, evidence: e.target.value})} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white" />
+                  <select value={form.priority} onChange={e => setForm({...form, priority: parseInt(e.target.value)})} className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value={1}>P-1 Critical</option>
+                    <option value={2}>P-2 High</option>
+                    <option value={3}>P-3 Medium</option>
+                    <option value={4}>P-4 Low</option>
+                  </select>
+                </div>
+                <div className="flex justify-end gap-3 mt-4">
+                  <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400">Cancel</button>
+                  <button onClick={handleSave} disabled={!form.theme} className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-40">Save</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Theme Cards */}
+          {loading ? (
+            <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="card h-32 animate-pulse" />)}</div>
+          ) : themes.length === 0 ? (
+            <div className="card p-12 text-center"><p className="text-slate-400">No win themes defined yet.</p></div>
+          ) : (
+            <div className="space-y-4">
+              {themes.map(t => (
+                <div key={t.id} className={`card p-5 ${priorityClass(t.priority)} hover:border-cyan-500/30 transition-colors`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-white font-semibold">{t.theme}</h3>
+                        <span className="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">{priorityLabel(t.priority)}</span>
+                      </div>
+                      {t.discriminator && (
+                        <div className="mb-2">
+                          <span className="text-xs text-cyan-400 font-medium uppercase tracking-wider">Discriminator: </span>
+                          <span className="text-sm text-slate-300">{t.discriminator}</span>
+                        </div>
+                      )}
+                      {t.evidence && (
+                        <div>
+                          <span className="text-xs text-emerald-400 font-medium uppercase tracking-wider">Evidence: </span>
+                          <span className="text-sm text-slate-300">{t.evidence}</span>
+                        </div>
+                      )}
+                    </div>
+                    {connected && (
+                      <div className="flex gap-2 ml-4">
+                        <button onClick={() => handleEdit(t)} className="text-xs text-cyan-400 hover:text-cyan-300">Edit</button>
+                        <button onClick={() => handleDelete(t.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-8 text-center text-xs text-slate-600 border-t border-slate-800 pt-4">
+            AI GENERATED - REQUIRES HUMAN REVIEW | MissionPulse &copy; 2026 Mission Meets Tech
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+  <script src="mp-trial-banner.js"></script>
+</body>
+</html>
