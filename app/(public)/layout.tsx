@@ -7,7 +7,7 @@ import { Zap, Menu, X } from 'lucide-react'
 
 const NAV_LINKS = [
   { href: '/#features', label: 'Features' },
-  { href: '/pricing', label: 'Pricing' },
+  { href: '/plans', label: 'Pricing' },
   { href: '/8a-toolkit', label: '8(a) Toolkit' },
 ]
 
@@ -129,7 +129,7 @@ export default function PublicLayout({
               <Link href="/#features" className="hover:text-gray-300">
                 Features
               </Link>
-              <Link href="/pricing" className="hover:text-gray-300">
+              <Link href="/plans" className="hover:text-gray-300">
                 Pricing
               </Link>
               <Link href="/8a-toolkit" className="hover:text-gray-300">

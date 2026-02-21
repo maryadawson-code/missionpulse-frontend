@@ -8,7 +8,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/api/auth/callback', '/api/health', '/pricing', '/8a-toolkit', '/api/newsletter']
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/api/auth/callback', '/api/health', '/plans', '/8a-toolkit', '/api/newsletter']
 
 // Simple in-memory rate limiter for auth endpoints
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
