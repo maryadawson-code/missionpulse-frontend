@@ -50,8 +50,8 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     details: { entity_type: 'profile', entity_id: user.id },
   })
 
-  revalidatePath('/dashboard/settings')
-  revalidatePath('/dashboard')
+  revalidatePath('/settings')
+  revalidatePath('/')
   return { success: true }
 }
 

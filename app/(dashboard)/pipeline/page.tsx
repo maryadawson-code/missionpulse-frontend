@@ -54,7 +54,7 @@ export default async function PipelinePage() {
         </div>
         {canEdit && (
           <Link
-            href="/dashboard/pipeline/new"
+            href="/pipeline/new"
             className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -94,7 +94,7 @@ export default async function PipelinePage() {
           </p>
           {canEdit && (
             <Link
-              href="/dashboard/pipeline/new"
+              href="/pipeline/new"
               className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90"
             >
               New Opportunity
@@ -145,7 +145,7 @@ export default async function PipelinePage() {
                     {/* Title — links to War Room */}
                     <td className="px-4 py-3">
                       <Link
-                        href={`/dashboard/pipeline/${opp.id}`}
+                        href={`/pipeline/${opp.id}`}
                         className="font-medium text-gray-200 transition-colors hover:text-[#00E5FA]"
                       >
                         {opp.title}

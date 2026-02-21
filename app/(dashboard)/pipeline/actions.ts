@@ -79,9 +79,9 @@ export async function actionCreateOpportunity(
     details: { entity_type: 'opportunity', entity_id: data.id, title: insertData.title },
   })
 
-  revalidatePath('/dashboard')
-  revalidatePath('/dashboard/pipeline')
-  redirect(`/dashboard/pipeline/${data.id}`)
+  revalidatePath('/')
+  revalidatePath('/pipeline')
+  redirect(`/pipeline/${data.id}`)
 }
 
 // ─── Update Opportunity ─────────────────────────────────────────
@@ -144,9 +144,9 @@ export async function actionUpdateOpportunity(
     details: { entity_type: 'opportunity', entity_id: opportunityId, title: updateData.title },
   })
 
-  revalidatePath('/dashboard')
-  revalidatePath('/dashboard/pipeline')
-  revalidatePath(`/dashboard/pipeline/${opportunityId}`)
+  revalidatePath('/')
+  revalidatePath('/pipeline')
+  revalidatePath(`/pipeline/${opportunityId}`)
 
   return { success: true }
 }
@@ -195,7 +195,7 @@ export async function actionDeleteOpportunity(
     details: { entity_type: 'opportunity', entity_id: opportunityId, title: existing?.title ?? 'Unknown' },
   })
 
-  revalidatePath('/dashboard')
-  revalidatePath('/dashboard/pipeline')
-  redirect('/dashboard/pipeline')
+  revalidatePath('/')
+  revalidatePath('/pipeline')
+  redirect('/pipeline')
 }

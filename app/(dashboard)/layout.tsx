@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getRolePermissions } from '@/lib/rbac/config'
+import { getRecentActivity } from '@/lib/actions/audit'
 import Sidebar from '@/components/layout/Sidebar'
 import DashboardHeader from '@/components/layout/DashboardHeader'
 import type { ModulePermission } from '@/lib/types'
@@ -40,6 +41,15 @@ export default async function DashboardLayout({
   // This function is expected from Sprint 2's lib/rbac/config.ts.
   const permissions: Record<string, ModulePermission> = getRolePermissions(userRole)
 
+  // ─── Recent Activity for Notifications ────────────────────
+  const { data: recentActivity } = await getRecentActivity(5)
+  const notifications = recentActivity.map((a) => ({
+    id: a.id,
+    action: a.action,
+    user_name: a.user_name,
+    timestamp: a.timestamp,
+  }))
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
       {/* Sidebar — RBAC-filtered navigation */}
@@ -51,7 +61,7 @@ export default async function DashboardLayout({
 
       {/* Main content area */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <DashboardHeader userEmail={user.email ?? null} />
+        <DashboardHeader userEmail={user.email ?? null} notifications={notifications} />
 
         <main className="flex-1 overflow-y-auto p-6">
           {children}

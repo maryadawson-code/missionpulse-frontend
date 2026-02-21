@@ -17,7 +17,7 @@ export default async function StrategyPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'strategy', 'shouldRender')) {
-    redirect('/dashboard')
+    redirect('/')
   }
 
   return (

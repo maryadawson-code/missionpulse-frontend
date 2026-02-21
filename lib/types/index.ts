@@ -87,6 +87,7 @@ export type RBACModule =
   | 'admin'
   | 'integrations'
   | 'audit_log'
+  | 'personnel'
 
 export interface ModulePermission {
   shouldRender: boolean

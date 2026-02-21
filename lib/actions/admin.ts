@@ -65,6 +65,6 @@ export async function updateUserRole(
     details: { entity_type: 'profile', entity_id: targetUserId, new_role: newRole },
   })
 
-  revalidatePath('/dashboard/admin')
+  revalidatePath('/admin')
   return { success: true }
 }

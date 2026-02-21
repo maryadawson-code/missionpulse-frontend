@@ -25,7 +25,7 @@ export default async function AdminPage() {
 
   // Invisible RBAC — redirect if not admin
   if (!hasPermission(resolved, 'admin', 'canView')) {
-    redirect('/dashboard')
+    redirect('/')
   }
 
   // Fetch all users (admin has elevated access via RLS)

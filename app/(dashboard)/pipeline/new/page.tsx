@@ -105,7 +105,7 @@ export default function NewOpportunityPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
-          href="/dashboard/pipeline"
+          href="/pipeline"
           className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
           aria-label="Back to pipeline"
         >
@@ -202,7 +202,7 @@ export default function NewOpportunityPage() {
         {/* ─── Actions ─────────────────────────────────────────── */}
         <div className="flex items-center justify-end gap-3">
           <Link
-            href="/dashboard/pipeline"
+            href="/pipeline"
             className="rounded-lg px-4 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
           >
             Cancel

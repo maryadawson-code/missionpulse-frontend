@@ -18,7 +18,7 @@ export default async function BlackhatPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'blackhat', 'shouldRender')) {
-    redirect('/dashboard')
+    redirect('/')
   }
 
   return (

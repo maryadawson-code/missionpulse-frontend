@@ -17,7 +17,7 @@ export default async function AIPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'ai_chat', 'shouldRender')) {
-    redirect('/dashboard')
+    redirect('/')
   }
 
   return (

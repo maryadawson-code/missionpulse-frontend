@@ -17,7 +17,7 @@ export default async function AuditPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'audit_log', 'shouldRender')) {
-    redirect('/dashboard')
+    redirect('/')
   }
 
   return (

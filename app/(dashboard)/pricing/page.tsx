@@ -18,7 +18,7 @@ export default async function PricingPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'pricing', 'shouldRender')) {
-    redirect('/dashboard')
+    redirect('/')
   }
 
   return (

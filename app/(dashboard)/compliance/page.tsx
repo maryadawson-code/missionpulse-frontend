@@ -17,7 +17,7 @@ export default async function CompliancePage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'compliance', 'shouldRender')) {
-    redirect('/dashboard')
+    redirect('/')
   }
 
   return (
