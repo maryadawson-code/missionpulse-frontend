@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { formatCurrencyCompact, formatPwin, phaseColor } from '@/lib/utils/formatters'
 import type { Opportunity } from '@/lib/types'
 import Link from 'next/link'
+import { getRecentActivity } from '@/lib/actions/audit'
+import { ActivityFeed } from '@/components/modules/ActivityFeed'
 
 // ─── KPI Card Component ─────────────────────────────────────────
 function KPICard({
@@ -114,6 +116,9 @@ export default async function DashboardPage() {
     .order('due_date', { ascending: true })
 
   const opps: Opportunity[] = opportunities ?? []
+
+  // Fetch recent activity for feed
+  const { data: activityItems } = await getRecentActivity(10)
 
   // ─── Compute KPIs ───────────────────────────────────────────
   const totalOpps = opps.length
@@ -231,6 +236,16 @@ export default async function DashboardPage() {
               View all {upcoming.length} deadlines →
             </Link>
           )}
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          Recent Activity
+        </h2>
+        <div className="mt-4">
+          <ActivityFeed items={activityItems} />
         </div>
       </div>
 
