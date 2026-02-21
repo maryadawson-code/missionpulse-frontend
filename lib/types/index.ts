@@ -22,6 +22,9 @@ export type ComplianceRequirementInsert = Database['public']['Tables']['complian
 export type ComplianceRequirementUpdate = Database['public']['Tables']['compliance_requirements']['Update']
 
 export type ComplianceItem = Database['public']['Tables']['compliance_items']['Row']
+
+export type PlaybookEntry = Database['public']['Tables']['playbook_entries']['Row']
+export type PlaybookEntryInsert = Database['public']['Tables']['playbook_entries']['Insert']
 export type OpportunityComment = Database['public']['Tables']['opportunity_comments']['Row']
 export type OpportunityCommentInsert = Database['public']['Tables']['opportunity_comments']['Insert']
 
