@@ -5,15 +5,9 @@
 export {
   // Types
   type ConfigRoleId,
-  type DbRole,
   type ModuleId,
   type ModulePermission,
   type RoleConfig,
-  type RoleType,
-  type UIComplexityLevel,
-  type AIAgentPermissions,
-  type GateAuthority,
-  type SecurityConfig,
   type NavItem,
   // Functions
   resolveRole,

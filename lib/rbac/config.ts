@@ -1,22 +1,12 @@
 // filepath: lib/rbac/config.ts
-import rbacJson from './roles_permissions_config.json'
+// ─── RBAC Configuration Loader ──────────────────────────────────
+// Source of truth: roles_permissions_config.json v9.5
+// Exports every type and function that hooks.ts + RBACGate.tsx need.
 
-/**
- * RBAC configuration from roles_permissions_config.json (v9.5).
- *
- * This is the client-side (UI) RBAC source. Server-side access
- * control is enforced by RLS helper functions in Supabase.
- * These two layers MUST agree.
- */
-const rbacConfig = rbacJson as typeof rbacJson
+import rbacConfig from '@/roles_permissions_config.json'
 
-export default rbacConfig
+// ─── Types ──────────────────────────────────────────────────────
 
-// ---------------------------------------------------------------------------
-// Canonical types derived from the JSON config
-// ---------------------------------------------------------------------------
-
-/** All 12 role identifiers from roles_permissions_config.json v9.5 */
 export type ConfigRoleId =
   | 'executive'
   | 'operations'
@@ -31,7 +21,6 @@ export type ConfigRoleId =
   | 'subcontractor'
   | 'consultant'
 
-/** All 14 module identifiers from roles_permissions_config.json v9.5 */
 export type ModuleId =
   | 'dashboard'
   | 'pipeline'
@@ -48,223 +37,143 @@ export type ModuleId =
   | 'integrations'
   | 'audit_log'
 
-/** Permission triple for a single role×module intersection */
 export interface ModulePermission {
   shouldRender: boolean
   canView: boolean
   canEdit: boolean
-  /** Scope restriction for external roles (e.g. "assigned_opportunities_only") */
   scopeRestriction?: string
 }
 
-/** Navigation item from the config's navigationConfig */
 export interface NavItem {
-  id: ModuleId
+  module: ModuleId
   label: string
-  icon: string
-  route: string
-  badge?: string
+  href: string
+  iconPath: string
 }
 
-/** Fail-closed default — renders nothing, sees nothing, edits nothing */
-const DENIED: ModulePermission = {
-  shouldRender: false,
-  canView: false,
-  canEdit: false,
-}
-
-/** Default fallback role when DB role is null or unrecognised */
-const DEFAULT_ROLE: ConfigRoleId = 'partner'
-
-/** Set of valid config role IDs for fast lookup */
-const VALID_ROLES = new Set<string>([
-  'executive',
-  'operations',
-  'capture_manager',
-  'proposal_manager',
-  'volume_lead',
-  'pricing_manager',
-  'contracts',
-  'hr_staffing',
-  'author',
-  'partner',
-  'subcontractor',
-  'consultant',
-])
-
-/** Internal role types — external roles get CUI watermarking */
-const EXTERNAL_ROLES = new Set<string>(['partner', 'subcontractor', 'consultant'])
-
-// ---------------------------------------------------------------------------
-// Role resolution
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve a raw DB role string to a canonical ConfigRoleId.
- * Returns DEFAULT_ROLE ('partner') if null or unrecognised — fail closed.
- */
-export function resolveRole(dbRole: string | null): ConfigRoleId {
-  if (dbRole && VALID_ROLES.has(dbRole)) {
-    return dbRole as ConfigRoleId
-  }
-  return DEFAULT_ROLE
-}
-
-/**
- * Check if a raw DB role is an internal (non-external) role.
- * Returns false if null or unrecognised — fail closed.
- */
-export function isInternalRole(dbRole: string | null): boolean {
-  if (!dbRole || !VALID_ROLES.has(dbRole)) return false
-  return !EXTERNAL_ROLES.has(dbRole)
-}
-
-// ---------------------------------------------------------------------------
-// Role config lookup
-// ---------------------------------------------------------------------------
-
-interface RoleConfigSummary {
+export interface RoleConfig {
+  id: string
   displayName: string
   type: string
   uiComplexityLevel: string
+  modules: Record<string, ModulePermission>
+  [key: string]: unknown
 }
 
-const FALLBACK_CONFIG: RoleConfigSummary = {
-  displayName: 'Partner',
-  type: 'external',
-  uiComplexityLevel: 'simplified',
+interface RBACConfig {
+  version: string
+  roles: Record<string, RoleConfig>
+  [key: string]: unknown
 }
 
-/**
- * Get display metadata for a resolved ConfigRoleId.
- */
-export function getRoleConfig(role: ConfigRoleId): RoleConfigSummary {
-  const roleConfig = rbacConfig.roles[role as keyof typeof rbacConfig.roles]
-  if (!roleConfig) return FALLBACK_CONFIG
+// ─── Config singleton ───────────────────────────────────────────
 
+const config = rbacConfig as unknown as RBACConfig
+
+const ALL_MODULES: ModuleId[] = [
+  'dashboard', 'pipeline', 'proposals', 'pricing', 'strategy',
+  'blackhat', 'compliance', 'workflow_board', 'ai_chat',
+  'documents', 'analytics', 'admin', 'integrations', 'audit_log',
+]
+
+const DENY_ALL: ModulePermission = { shouldRender: false, canView: false, canEdit: false }
+
+// ─── Nav items (matching Sidebar.tsx) ───────────────────────────
+
+const NAV_ITEMS: NavItem[] = [
+  { module: 'dashboard', label: 'Dashboard', href: '/dashboard', iconPath: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4' },
+  { module: 'pipeline', label: 'Pipeline', href: '/dashboard/pipeline', iconPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { module: 'proposals', label: 'Proposals', href: '/dashboard/proposals', iconPath: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+  { module: 'pricing', label: 'Pricing', href: '/dashboard/pricing', iconPath: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { module: 'strategy', label: 'Strategy', href: '/dashboard/strategy', iconPath: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z' },
+  { module: 'blackhat', label: 'Black Hat', href: '/dashboard/blackhat', iconPath: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
+  { module: 'compliance', label: 'Compliance', href: '/dashboard/compliance', iconPath: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+  { module: 'workflow_board', label: 'Workflow', href: '/dashboard/workflow', iconPath: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
+  { module: 'documents', label: 'Documents', href: '/dashboard/documents', iconPath: 'M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z' },
+  { module: 'ai_chat', label: 'AI Assistant', href: '/dashboard/ai', iconPath: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z' },
+  { module: 'analytics', label: 'Analytics', href: '/dashboard/analytics', iconPath: 'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+  { module: 'admin', label: 'Admin', href: '/dashboard/admin', iconPath: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
+  { module: 'audit_log', label: 'Audit Log', href: '/dashboard/audit', iconPath: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+]
+
+// ─── Functions ──────────────────────────────────────────────────
+
+/** Map any DB role string to a valid ConfigRoleId. Defaults to 'partner' (most restrictive). */
+export function resolveRole(dbRole: string | null | undefined): ConfigRoleId {
+  if (!dbRole) return 'partner'
+  const normalized = dbRole.toLowerCase().replace(/[\s-]/g, '_')
+  if (config.roles[normalized]) return normalized as ConfigRoleId
+  // Legacy mappings from Phase 1
+  const legacyMap: Record<string, ConfigRoleId> = {
+    ceo: 'executive', admin: 'executive', coo: 'operations',
+    cap: 'capture_manager', pm: 'proposal_manager',
+    sa: 'volume_lead', fin: 'pricing_manager',
+    con: 'contracts', del: 'hr_staffing', qa: 'author',
+  }
+  return legacyMap[normalized] ?? 'partner'
+}
+
+/** Get permission triple for a specific role + module. */
+export function getModulePermission(role: string, module: ModuleId): ModulePermission {
+  const resolved = resolveRole(role)
+  const roleConfig = config.roles[resolved]
+  if (!roleConfig) return DENY_ALL
+  return roleConfig.modules[module] ?? DENY_ALL
+}
+
+/** Get all module permissions for a role. */
+export function getRolePermissions(role: string): Record<string, ModulePermission> {
+  const resolved = resolveRole(role)
+  const roleConfig = config.roles[resolved]
+  if (!roleConfig) {
+    const empty: Record<string, ModulePermission> = {}
+    for (const m of ALL_MODULES) empty[m] = DENY_ALL
+    return empty
+  }
+  return roleConfig.modules
+}
+
+/** Get full role config object. */
+export function getRoleConfig(role: string): RoleConfig | null {
+  const resolved = resolveRole(role)
+  return config.roles[resolved] ?? null
+}
+
+/** Get nav items filtered by shouldRender for a given role. */
+export function getVisibleNav(role: string): { primary: NavItem[]; secondary: NavItem[]; admin: NavItem[] } {
+  const perms = getRolePermissions(role)
+  const visible = NAV_ITEMS.filter((item) => perms[item.module]?.shouldRender === true)
+  const adminModules: ModuleId[] = ["admin", "audit_log", "integrations"]
+  const secondaryModules: ModuleId[] = ["analytics", "documents", "ai_chat"]
   return {
-    displayName: (roleConfig as Record<string, unknown>).displayName as string ?? FALLBACK_CONFIG.displayName,
-    type: (roleConfig as Record<string, unknown>).type as string ?? FALLBACK_CONFIG.type,
-    uiComplexityLevel: (roleConfig as Record<string, unknown>).uiComplexityLevel as string ?? FALLBACK_CONFIG.uiComplexityLevel,
+    primary: visible.filter((i) => !adminModules.includes(i.module) && !secondaryModules.includes(i.module)),
+    secondary: visible.filter((i) => secondaryModules.includes(i.module)),
+    admin: visible.filter((i) => adminModules.includes(i.module)),
   }
 }
-
-// ---------------------------------------------------------------------------
-// Permission lookups
-// ---------------------------------------------------------------------------
-
-/**
- * Get the full permission triple for a role×module pair.
- * Accepts null dbRole — resolves to default role first.
- * Returns DENIED if the role or module is unknown (fail closed).
- */
-export function getModulePermission(
-  dbRole: string | null,
-  moduleId: ModuleId
-): ModulePermission {
-  const resolved = resolveRole(dbRole)
-  const roleConfig = rbacConfig.roles[resolved as keyof typeof rbacConfig.roles]
-  if (!roleConfig || !('modules' in roleConfig)) return DENIED
-
-  const modules = roleConfig.modules as Record<
-    string,
-    { shouldRender?: boolean; canView?: boolean; canEdit?: boolean }
-  >
-  const mod = modules[moduleId]
-  if (!mod) return DENIED
-
-  const perm: ModulePermission = {
-    shouldRender: mod.shouldRender === true,
-    canView: mod.canView === true,
-    canEdit: mod.canEdit === true,
-  }
-
-  // Attach scope restriction for external roles
-  if (EXTERNAL_ROLES.has(resolved) && 'scopeRestriction' in roleConfig) {
-    const restriction = (roleConfig as Record<string, unknown>).scopeRestriction
-    if (typeof restriction === 'string') {
-      perm.scopeRestriction = restriction
-    }
-  }
-
-  return perm
+/** Check if a role is internal (vs external: partner, subcontractor, consultant). */
+export function isInternalRole(role: string): boolean {
+  const roleConfig = getRoleConfig(role)
+  return roleConfig?.type === 'internal'
 }
 
-/**
- * Check if a role can render a specific module.
- * Returns false if the role or module is unknown (fail closed).
- */
-export function canRenderModule(role: string, module: string): boolean {
-  const roleConfig = rbacConfig.roles[role as keyof typeof rbacConfig.roles]
-  if (!roleConfig || !('modules' in roleConfig)) return false
-
-  const modules = roleConfig.modules as Record<
-    string,
-    { shouldRender?: boolean }
-  >
-  return modules[module]?.shouldRender === true
+/** Check a specific permission. */
+export function hasPermission(
+  role: string,
+  module: ModuleId,
+  permission: 'shouldRender' | 'canView' | 'canEdit'
+): boolean {
+  return getModulePermission(role, module)[permission] === true
 }
 
-/**
- * Check if a role can edit within a module.
- * Returns false if uncertain (fail closed).
- */
-export function canEditModule(role: string, module: string): boolean {
-  const roleConfig = rbacConfig.roles[role as keyof typeof rbacConfig.roles]
-  if (!roleConfig || !('modules' in roleConfig)) return false
-
-  const modules = roleConfig.modules as Record<
-    string,
-    { shouldRender?: boolean; canEdit?: boolean }
-  >
-  const mod = modules[module]
-  return mod?.shouldRender === true && mod?.canEdit === true
+/** Get display name for a role. */
+export function getRoleDisplayName(role: string): string {
+  const roleConfig = getRoleConfig(role)
+  return roleConfig?.displayName ?? role.replace(/_/g, ' ')
 }
 
-/**
- * Get all allowed modules for a role.
- */
-export function getAllowedModules(role: string): string[] {
-  const roleConfig = rbacConfig.roles[role as keyof typeof rbacConfig.roles]
-  if (!roleConfig || !('modules' in roleConfig)) return []
-
-  const modules = roleConfig.modules as Record<
-    string,
-    { shouldRender?: boolean }
-  >
-  return Object.entries(modules)
-    .filter(([, config]) => config.shouldRender === true)
-    .map(([key]) => key)
-}
-
-// ---------------------------------------------------------------------------
-// Navigation filtering
-// ---------------------------------------------------------------------------
-
-const navConfig = rbacConfig.navigationConfig as {
-  primaryNav: NavItem[]
-  secondaryNav: NavItem[]
-  adminNav: NavItem[]
-}
-
-/**
- * Get visible nav items for a role, filtered by shouldRender.
- * Accepts null dbRole — resolves to default role first.
- */
-export function getVisibleNav(dbRole: string | null): {
-  primary: NavItem[]
-  secondary: NavItem[]
-  admin: NavItem[]
-} {
-  const resolved = resolveRole(dbRole)
-
-  function filterNav(items: NavItem[]): NavItem[] {
-    return items.filter((item) => canRenderModule(resolved, item.id))
-  }
-
-  return {
-    primary: filterNav(navConfig.primaryNav),
-    secondary: filterNav(navConfig.secondaryNav),
-    admin: filterNav(navConfig.adminNav),
-  }
+/** Get UI complexity level for a role. */
+export function getUIComplexityLevel(role: string): string {
+  const roleConfig = getRoleConfig(role)
+  return roleConfig?.uiComplexityLevel ?? 'simplified'
 }
