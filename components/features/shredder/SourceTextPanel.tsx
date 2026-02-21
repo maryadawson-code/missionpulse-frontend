@@ -5,7 +5,7 @@ import { Search } from 'lucide-react'
 
 interface SourceTextPanelProps {
   sourceText: string
-  onTextSelect: (text: string) => void
+  onTextSelect: (_text: string) => void
 }
 
 export function SourceTextPanel({
@@ -24,10 +24,7 @@ export function SourceTextPanel({
 
   // Highlight SHALL/MUST/WILL patterns and search terms
   const highlightedText = useCallback(() => {
-    let text = sourceText
-
-    // Split into lines for display
-    const lines = text.split('\n')
+    const lines = sourceText.split('\n')
 
     return lines.map((line, i) => {
       const isRequirementLine = /\b(SHALL|MUST|WILL|REQUIRED|MANDATORY)\b/i.test(line)

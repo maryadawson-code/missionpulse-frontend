@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useTransition } from 'react'
-import { Plus, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { addToast } from '@/components/ui/Toast'
@@ -42,7 +42,7 @@ interface RequirementsExtractorProps {
 
 export function RequirementsExtractor({
   opportunityId,
-  documentId,
+  documentId: _documentId,
   sourceText,
   existingRequirements,
   teamMembers,

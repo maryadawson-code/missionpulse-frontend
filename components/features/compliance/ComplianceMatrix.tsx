@@ -1,11 +1,10 @@
 'use client'
 
-import { useCallback, useTransition } from 'react'
+import { useTransition } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Download, Loader2 } from 'lucide-react'
 
 import { DataTable } from '@/components/ui/DataTable'
-import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Button } from '@/components/ui/button'
 import {
   Select,

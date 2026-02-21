@@ -41,11 +41,11 @@ interface RequirementsListProps {
   teamMembers: TeamMember[]
   opportunityId: string
   selectedIds: Set<string>
-  onSelectedIdsChange: (ids: Set<string>) => void
-  onDelete: (req: Requirement) => void
-  onBulkPriority: (priority: string) => void
-  onBulkAssign: (assignee: string) => void
-  onBulkSection: (section: string) => void
+  onSelectedIdsChange: (_ids: Set<string>) => void
+  onDelete: (_req: Requirement) => void
+  onBulkPriority: (_priority: string) => void
+  onBulkAssign: (_assignee: string) => void
+  onBulkSection: (_section: string) => void
 }
 
 export function RequirementsList({
