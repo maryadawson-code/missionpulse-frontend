@@ -90,6 +90,6 @@ export const config = {
      * - public files (images, etc.)
      * - Phase 1 HTML files (*.html)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|html|js|css)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/debug|.*\\.(?:svg|png|jpg|jpeg|gif|webp|html|js|css)$).*)',
   ],
 }
