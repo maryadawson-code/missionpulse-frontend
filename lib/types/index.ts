@@ -13,6 +13,15 @@ export type ProfileInsert = Database['public']['Tables']['profiles']['Insert']
 export type Company = Database['public']['Tables']['companies']['Row']
 
 export type OpportunityAssignment = Database['public']['Tables']['opportunity_assignments']['Row']
+
+export type RfpDocument = Database['public']['Tables']['rfp_documents']['Row']
+export type RfpDocumentInsert = Database['public']['Tables']['rfp_documents']['Insert']
+
+export type ComplianceRequirement = Database['public']['Tables']['compliance_requirements']['Row']
+export type ComplianceRequirementInsert = Database['public']['Tables']['compliance_requirements']['Insert']
+export type ComplianceRequirementUpdate = Database['public']['Tables']['compliance_requirements']['Update']
+
+export type ComplianceItem = Database['public']['Tables']['compliance_items']['Row']
 export type OpportunityComment = Database['public']['Tables']['opportunity_comments']['Row']
 export type OpportunityCommentInsert = Database['public']['Tables']['opportunity_comments']['Insert']
 
