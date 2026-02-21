@@ -1,6 +1,6 @@
 /**
  * AI Request/Response Pipeline — single entry point for all AI operations.
- * classify → select model → execute → log → return typed response.
+ * token-gate → classify → select model → execute → debit → log → return typed response.
  */
 'use server'
 
@@ -12,10 +12,11 @@ import { selectModel } from './model-selector'
 import { queryAskSage } from './asksage-client'
 import { logTokenUsage } from './logger'
 import { getCachedResponse, setCachedResponse } from '@/lib/cache/semantic-cache'
+import { checkTokenGate, recordTokenUsage } from '@/lib/billing/token-gate'
 
 /**
  * Unified AI request function. All AI calls go through this.
- * Handles classification, model selection, execution, logging.
+ * Handles token gate, classification, model selection, execution, debit, logging.
  * Returns graceful fallback if AI fails (feature works without AI).
  */
 export async function aiRequest(
@@ -31,6 +32,33 @@ export async function aiRequest(
 
   if (!user) {
     throw new AIError('AUTH_ERROR', 'Not authenticated')
+  }
+
+  // Resolve company_id for token gate
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .eq('id', user.id)
+    .single()
+
+  const companyId = profile?.company_id
+
+  // Token Gate: Pre-flight check
+  if (companyId) {
+    const gate = await checkTokenGate(companyId, options.opportunityId)
+    if (!gate.allowed) {
+      return {
+        content: gate.message ?? 'Monthly AI token limit reached.',
+        model_used: 'none',
+        engine: 'asksage',
+        confidence: 'low',
+        citations: [],
+        tokens_in: 0,
+        tokens_out: 0,
+        latency_ms: Date.now() - startTime,
+        classification: 'UNCLASSIFIED',
+      }
+    }
   }
 
   try {
@@ -111,7 +139,15 @@ export async function aiRequest(
       },
     })
 
-    // Step 7: Return typed response
+    // Step 7: Token Gate — Post-response debit
+    if (companyId) {
+      await recordTokenUsage(
+        companyId,
+        response.tokens_used.input + response.tokens_used.output
+      )
+    }
+
+    // Step 8: Return typed response
     return {
       content: response.response,
       model_used: response.model,

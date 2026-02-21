@@ -160,7 +160,7 @@ export async function creditPurchasedTokens(
 /**
  * Get the threshold level based on current consumption.
  */
-export function getThresholdLevel(balance: TokenBalance): ThresholdLevel {
+export async function getThresholdLevel(balance: TokenBalance): Promise<ThresholdLevel> {
   const percent = balance.usage_percent
 
   if (percent >= 120) return 'hard_block'
