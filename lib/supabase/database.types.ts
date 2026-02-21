@@ -10761,6 +10761,36 @@ export type Database = {
           },
         ]
       }
+      newsletter_subscribers: {
+        Row: {
+          id: string
+          email: string
+          source: string
+          subscribed_at: string
+          unsubscribed_at: string | null
+          ip_address: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          source?: string
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          source?: string
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       token_ledger: {
         Row: {
           id: string
