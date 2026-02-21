@@ -11,7 +11,7 @@ export interface ToastMessage {
 
 interface ToastProps {
   toast: ToastMessage
-  onDismiss: (id: string) => void
+  onDismiss: (_id: string) => void
 }
 
 function Toast({ toast, onDismiss }: ToastProps) {
@@ -44,7 +44,7 @@ function Toast({ toast, onDismiss }: ToastProps) {
 }
 
 // Global toast state hook
-let toastListeners: Array<(toasts: ToastMessage[]) => void> = []
+let toastListeners: Array<(_toasts: ToastMessage[]) => void> = []
 let toastState: ToastMessage[] = []
 
 export function addToast(type: ToastMessage['type'], message: string) {
