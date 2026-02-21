@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
 const HELP_SECTIONS = [
