@@ -1,0 +1,188 @@
+'use client'
+
+import { Shield, Building2, TrendingUp, Users, Calendar, DollarSign } from 'lucide-react'
+
+// ─── Types ───────────────────────────────────────────────────
+
+interface Competitor {
+  name: string
+  isIncumbent: boolean
+  winProbability: number | null
+  source: string
+}
+
+interface AgencyIntel {
+  agencyName: string
+  budgetForecast: number | null
+  fiscalYear: string | null
+  acquisitionTimeline: string | null
+  incumbentContractor: string | null
+  recompeteDate: string | null
+}
+
+interface GovWinIntelProps {
+  govwinId: string | null
+  competitors: Competitor[]
+  agencyIntel: AgencyIntel | null
+  lastUpdated: string | null
+}
+
+// ─── Component ───────────────────────────────────────────────
+
+export function GovWinIntel({
+  govwinId,
+  competitors,
+  agencyIntel,
+  lastUpdated,
+}: GovWinIntelProps) {
+  if (!govwinId) {
+    return (
+      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 text-center">
+        <Building2 className="h-8 w-8 mx-auto text-gray-700 mb-2" />
+        <p className="text-xs text-gray-500">
+          No GovWin IQ data available. Link this opportunity to a GovWin ID or
+          import from the GovWin integration page.
+        </p>
+      </div>
+    )
+  }
+
+  function formatCurrency(value: number | null): string {
+    if (value === null) return '—'
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value)
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded flex items-center justify-center text-[10px] font-bold text-white bg-gradient-to-br from-blue-600 to-purple-600">
+            GW
+          </div>
+          <h3 className="text-sm font-semibold text-white">GovWin IQ Intelligence</h3>
+        </div>
+        {lastUpdated && (
+          <span className="text-[10px] text-gray-500">
+            Updated:{' '}
+            {new Date(lastUpdated).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+        )}
+      </div>
+
+      {/* Competitor Tracking */}
+      {competitors.length > 0 && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50">
+          <div className="border-b border-gray-800 px-4 py-2.5 flex items-center gap-2">
+            <Shield className="h-3.5 w-3.5 text-[#00E5FA]" />
+            <h4 className="text-xs font-semibold text-white">Known Competitors</h4>
+            <span className="ml-auto text-[10px] text-gray-500">{competitors.length} identified</span>
+          </div>
+          <div className="divide-y divide-gray-800/50">
+            {competitors.map((comp, i) => (
+              <div key={i} className="flex items-center justify-between px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <Users className="h-3 w-3 text-gray-600" />
+                  <span className="text-xs text-white">{comp.name}</span>
+                  {comp.isIncumbent && (
+                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-400">
+                      INCUMBENT
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {comp.winProbability !== null && (
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3 text-gray-600" />
+                      <span className="text-[10px] text-gray-400">
+                        {comp.winProbability}% est.
+                      </span>
+                    </div>
+                  )}
+                  <span className="text-[10px] text-gray-600">{comp.source}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Agency Intel */}
+      {agencyIntel && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-3.5 w-3.5 text-[#00E5FA]" />
+            <h4 className="text-xs font-semibold text-white">
+              Agency Intelligence — {agencyIntel.agencyName}
+            </h4>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {agencyIntel.budgetForecast !== null && (
+              <div>
+                <p className="text-[10px] text-gray-500 mb-0.5 flex items-center gap-1">
+                  <DollarSign className="h-2.5 w-2.5" />
+                  Budget Forecast
+                </p>
+                <p className="text-xs font-medium text-white">
+                  {formatCurrency(agencyIntel.budgetForecast)}
+                </p>
+                {agencyIntel.fiscalYear && (
+                  <p className="text-[10px] text-gray-600">FY{agencyIntel.fiscalYear}</p>
+                )}
+              </div>
+            )}
+
+            {agencyIntel.acquisitionTimeline && (
+              <div>
+                <p className="text-[10px] text-gray-500 mb-0.5 flex items-center gap-1">
+                  <Calendar className="h-2.5 w-2.5" />
+                  Acquisition Timeline
+                </p>
+                <p className="text-xs font-medium text-white">
+                  {agencyIntel.acquisitionTimeline}
+                </p>
+              </div>
+            )}
+
+            {agencyIntel.incumbentContractor && (
+              <div>
+                <p className="text-[10px] text-gray-500 mb-0.5 flex items-center gap-1">
+                  <Users className="h-2.5 w-2.5" />
+                  Incumbent
+                </p>
+                <p className="text-xs font-medium text-white">
+                  {agencyIntel.incumbentContractor}
+                </p>
+                {agencyIntel.recompeteDate && (
+                  <p className="text-[10px] text-gray-600">
+                    Recompete: {new Date(agencyIntel.recompeteDate).toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {competitors.length === 0 && !agencyIntel && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 text-center">
+          <p className="text-xs text-gray-500">
+            GovWin ID linked but no intelligence data synced yet.
+            Run a sync from the GovWin integration page.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
