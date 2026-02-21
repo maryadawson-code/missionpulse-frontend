@@ -19,7 +19,7 @@ export interface ClassificationResult {
 
 // ─── Models ──────────────────────────────────────────────────
 
-export type AIEngine = 'asksage' | 'direct'
+export type AIEngine = 'asksage' | 'anthropic' | 'openai' | 'direct'
 
 export type TaskType =
   | 'chat'

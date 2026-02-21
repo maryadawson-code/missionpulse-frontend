@@ -9,7 +9,7 @@ import type { AIRequestOptions, AIResponse } from './types'
 import { AIError } from './types'
 import { classifyRequest } from './classification-router'
 import { selectModel } from './model-selector'
-import { queryAskSage } from './asksage-client'
+import { routedQuery } from './router'
 import { logTokenUsage } from './logger'
 import { getCachedResponse, setCachedResponse } from '@/lib/cache/semantic-cache'
 import { checkTokenGate, recordTokenUsage } from '@/lib/billing/token-gate'
@@ -99,40 +99,44 @@ export async function aiRequest(
       }
     }
 
-    // Step 4: Execute via AskSage (cache miss)
-    const response = await queryAskSage({
-      model: modelSelection.primary.model,
-      prompt: options.prompt,
-      system_prompt: options.systemPrompt,
-      max_tokens: options.maxTokens ?? modelSelection.primary.maxTokens,
-      temperature: options.temperature ?? modelSelection.primary.temperature,
-      context: options.context,
-    })
+    // Step 4: Execute via provider router (classification-aware failover)
+    const response = await routedQuery(
+      {
+        model: modelSelection.primary.model,
+        prompt: options.prompt,
+        systemPrompt: options.systemPrompt,
+        maxTokens: options.maxTokens ?? modelSelection.primary.maxTokens,
+        temperature: options.temperature ?? modelSelection.primary.temperature,
+        context: options.context,
+      },
+      classification.level
+    )
 
     const latencyMs = Date.now() - startTime
-    const confidence = inferConfidence(response.response)
+    const confidence = inferConfidence(response.content)
 
     // Step 5: Store in cache
     await setCachedResponse(cacheInput, {
-      content: response.response,
+      content: response.content,
       model_used: response.model,
       confidence,
     })
 
     // Step 6: Log usage
     const costEstimate =
-      ((response.tokens_used.input + response.tokens_used.output) / 1000) *
+      ((response.tokensUsed.input + response.tokensUsed.output) / 1000) *
       modelSelection.primary.estimatedCostPer1k
 
     await logTokenUsage({
       agent_id: options.taskType,
-      input_tokens: response.tokens_used.input,
-      output_tokens: response.tokens_used.output,
+      input_tokens: response.tokensUsed.input,
+      output_tokens: response.tokensUsed.output,
       estimated_cost_usd: costEstimate,
       user_id: user.id,
       opportunity_id: options.opportunityId,
       metadata: {
         model: response.model,
+        provider: response.provider,
         classification: classification.level,
         latency_ms: latencyMs,
         cache_hit: false,
@@ -143,19 +147,19 @@ export async function aiRequest(
     if (companyId) {
       await recordTokenUsage(
         companyId,
-        response.tokens_used.input + response.tokens_used.output
+        response.tokensUsed.input + response.tokensUsed.output
       )
     }
 
     // Step 8: Return typed response
     return {
-      content: response.response,
+      content: response.content,
       model_used: response.model,
       engine: modelSelection.primary.engine,
       confidence,
       citations: [],
-      tokens_in: response.tokens_used.input,
-      tokens_out: response.tokens_used.output,
+      tokens_in: response.tokensUsed.input,
+      tokens_out: response.tokensUsed.output,
       latency_ms: latencyMs,
       classification: classification.level,
     }
