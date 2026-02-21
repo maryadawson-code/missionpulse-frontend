@@ -1,0 +1,206 @@
+// filepath: app/(dashboard)/strategy/page.tsx
+
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function statusBadge(status: string | null): string {
+  switch (status) {
+    case 'approved':
+      return 'bg-emerald-500/20 text-emerald-300'
+    case 'pending':
+    case 'draft':
+      return 'bg-amber-500/20 text-amber-300'
+    case 'rejected':
+      return 'bg-red-500/20 text-red-300'
+    default:
+      return 'bg-gray-500/20 text-gray-300'
+  }
+}
+
+function priorityBadge(priority: number | null): string {
+  const p = priority ?? 3
+  if (p <= 1) return 'text-red-400'
+  if (p <= 2) return 'text-amber-400'
+  return 'text-gray-400'
+}
+
+export default async function StrategyPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'strategy', 'shouldRender')) {
+    redirect('/')
+  }
+
+  // Fetch win themes
+  const { data: themes, error: themesError } = await supabase
+    .from('win_themes')
+    .select('id, theme_text, theme_type, priority, status, evaluation_factor, ghost_competitor, ghost_statement, created_at')
+    .order('priority', { ascending: true })
+    .limit(50)
+
+  // Fetch discriminators
+  const { data: discriminators, error: discError } = await supabase
+    .from('discriminators')
+    .select('id, discriminator_text, discriminator_type, status, vs_competitor, quantified_value, evidence_source, created_at')
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  const themeList = themes ?? []
+  const discList = discriminators ?? []
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white">Strategy</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Define win themes, competitive positioning, and capture strategies for upcoming pursuits.
+        </p>
+      </div>
+
+      {(themesError || discError) && (
+        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+          Failed to load strategy data: {themesError?.message ?? discError?.message}
+        </div>
+      )}
+
+      {/* Win Themes */}
+      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <h2 className="text-sm font-semibold text-white">Win Themes</h2>
+          <p className="text-xs text-gray-500 mt-1">Core messaging themes that differentiate your solution</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-800 bg-gray-900/80">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Priority</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Theme</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Type</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Eval Factor</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Ghost</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800/50">
+              {themeList.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                    No win themes defined yet. Themes will appear here as capture strategy develops.
+                  </td>
+                </tr>
+              ) : (
+                themeList.map((theme) => (
+                  <tr key={theme.id} className="transition-colors hover:bg-gray-800/30">
+                    <td className={`whitespace-nowrap px-4 py-3 text-sm font-mono font-bold ${priorityBadge(theme.priority)}`}>
+                      #{theme.priority ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-200 max-w-xs">
+                      {theme.theme_text}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                      {(theme.theme_type ?? 'general').replace(/_/g, ' ')}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                      {theme.evaluation_factor ?? '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadge(theme.status)}`}>
+                        {(theme.status ?? 'draft').replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[140px] truncate" title={theme.ghost_statement ?? ''}>
+                      {theme.ghost_competitor ?? '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                      {formatDate(theme.created_at)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Discriminators */}
+      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <h2 className="text-sm font-semibold text-white">Discriminators</h2>
+          <p className="text-xs text-gray-500 mt-1">Unique strengths that set you apart from competitors</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-800 bg-gray-900/80">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Discriminator</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Type</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">vs. Competitor</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Quantified Value</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Evidence</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800/50">
+              {discList.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                    No discriminators defined yet. Add competitive differentiators to strengthen win strategy.
+                  </td>
+                </tr>
+              ) : (
+                discList.map((disc) => (
+                  <tr key={disc.id} className="transition-colors hover:bg-gray-800/30">
+                    <td className="px-4 py-3 text-sm text-gray-200 max-w-xs">
+                      {disc.discriminator_text}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                      {(disc.discriminator_type ?? 'general').replace(/_/g, ' ')}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadge(disc.status)}`}>
+                        {(disc.status ?? 'draft').replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                      {disc.vs_competitor ?? '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                      {disc.quantified_value ?? '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500 max-w-[120px] truncate" title={disc.evidence_source ?? ''}>
+                      {disc.evidence_source ?? '—'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-600">
+        Showing {themeList.length} win theme{themeList.length !== 1 ? 's' : ''} and {discList.length} discriminator{discList.length !== 1 ? 's' : ''}.
+      </p>
+    </div>
+  )
+}

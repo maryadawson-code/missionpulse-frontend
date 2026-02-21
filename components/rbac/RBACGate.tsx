@@ -33,6 +33,9 @@ export function RBACGate({
   // Fail closed while loading — render nothing (or explicit fallback)
   if (loading) return <>{fallback}</>
 
+  // Fail closed if no role resolved — render nothing
+  if (!dbRole) return null
+
   const perm: ModulePermission = getModulePermission(dbRole, moduleId)
 
   // Permission ladder: edit > view > render

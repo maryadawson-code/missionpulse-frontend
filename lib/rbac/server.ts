@@ -81,8 +81,8 @@ export async function getCurrentRole(): Promise<ServerRoleInfo> {
     userId: user.id,
     dbRole,
     role: resolved,
-    displayName: config.displayName,
-    isInternal: config.type === 'internal',
+    displayName: config?.displayName ?? resolved.replace(/_/g, ' '),
+    isInternal: config?.type === 'internal',
   }
 }
 
@@ -117,7 +117,7 @@ export async function requireModuleAccess(
 
   if (!allowed) {
     // Invisible RBAC: redirect to dashboard, not an error page
-    redirect('/dashboard')
+    redirect('/')
   }
 
   return roleInfo

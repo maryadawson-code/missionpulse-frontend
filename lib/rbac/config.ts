@@ -1,13 +1,26 @@
 // filepath: lib/rbac/config.ts
-// T-4: RBAC Config — Single source of truth for role permissions
-// Source: roles_permissions_config.json v9.5
-// DO NOT manually edit permission maps. Update the JSON, regenerate this file.
+// ─── RBAC Configuration Loader ──────────────────────────────────
+// Source of truth: roles_permissions_config.json v9.5
+// Exports every type and function that hooks.ts + RBACGate.tsx need.
 
-// ---------------------------------------------------------------------------
-// 1. Types
-// ---------------------------------------------------------------------------
+import rbacConfig from '@/roles_permissions_config.json'
 
-/** Module IDs that match keys in roles_permissions_config.json → role.modules */
+// ─── Types ──────────────────────────────────────────────────────
+
+export type ConfigRoleId =
+  | 'executive'
+  | 'operations'
+  | 'capture_manager'
+  | 'proposal_manager'
+  | 'volume_lead'
+  | 'pricing_manager'
+  | 'contracts'
+  | 'hr_staffing'
+  | 'author'
+  | 'partner'
+  | 'subcontractor'
+  | 'consultant'
+
 export type ModuleId =
   | 'dashboard'
   | 'pipeline'
@@ -25,661 +38,144 @@ export type ModuleId =
   | 'audit_log'
   | 'personnel'
 
-/** Config role IDs — the 12 canonical roles from roles_permissions_config.json */
-export type ConfigRoleId =
-  | 'executive'
-  | 'operations'
-  | 'capture_manager'
-  | 'proposal_manager'
-  | 'volume_lead'
-  | 'pricing_manager'
-  | 'contracts'
-  | 'hr_staffing'
-  | 'author'
-  | 'partner'
-  | 'subcontractor'
-  | 'consultant'
-
-/** DB role strings that exist in profiles.role (legacy + config) */
-export type DbRole =
-  | ConfigRoleId
-  | 'CEO'
-  | 'COO'
-  | 'CAP'
-  | 'PM'
-  | 'SA'
-  | 'FIN'
-  | 'CON'
-  | 'DEL'
-  | 'QA'
-  | 'admin'
-  | 'teaming_partner'
-  | 'viewer'
-  | 'Partner'
-
-export type RoleType = 'internal' | 'external'
-
-export type UIComplexityLevel = 'simplified' | 'standard' | 'advanced' | 'admin'
-
 export interface ModulePermission {
   shouldRender: boolean
   canView: boolean
   canEdit: boolean
-  scopeRestriction?: 'assigned_sections_only' | 'own_tasks_only' | 'assigned_documents_only'
+  scopeRestriction?: string
 }
 
-export interface AIAgentPermissions {
-  allowedAgents: string[]
-  canTriggerBlackHat: boolean
-  canViewReasoningCards: boolean
-  canOverrideAIDecisions: boolean
-}
-
-export interface GateAuthority {
-  canApprove: string[]
-  canTriggerReview: boolean
-  canOverrideGate: boolean
-}
-
-export interface SecurityConfig {
-  forceCUIWatermark: boolean
-  classificationCeiling: string
-  canViewAllClassifications: boolean
-  canExportCUI: boolean
-  sessionTimeout: number
+export interface NavItem {
+  module: ModuleId
+  label: string
+  href: string
+  iconPath: string
 }
 
 export interface RoleConfig {
-  id: ConfigRoleId
+  id: string
   displayName: string
-  shipleyFunction: string
-  type: RoleType
-  uiComplexityLevel: UIComplexityLevel
-  autoRevokeOnSubmit?: boolean
+  type: string
+  uiComplexityLevel: string
   modules: Record<string, ModulePermission>
-  aiAgents: AIAgentPermissions
-  gateAuthority: GateAuthority
-  security: SecurityConfig
+  [key: string]: unknown
 }
 
-// ---------------------------------------------------------------------------
-// 2. DB Role → Config Role Alias Map
-// ---------------------------------------------------------------------------
-// The profiles.role column has legacy short codes (CEO, COO, etc.).
-// The config uses descriptive IDs (executive, operations, etc.).
-// This map normalises any DB string to a ConfigRoleId.
-
-const ROLE_ALIAS_MAP: Record<string, ConfigRoleId> = {
-  // Direct matches (config ID === DB value)
-  executive: 'executive',
-  operations: 'operations',
-  capture_manager: 'capture_manager',
-  proposal_manager: 'proposal_manager',
-  volume_lead: 'volume_lead',
-  pricing_manager: 'pricing_manager',
-  contracts: 'contracts',
-  hr_staffing: 'hr_staffing',
-  author: 'author',
-  partner: 'partner',
-  subcontractor: 'subcontractor',
-  consultant: 'consultant',
-
-  // Legacy short codes → config IDs
-  CEO: 'executive',
-  COO: 'operations',
-  CAP: 'capture_manager',
-  PM: 'proposal_manager',
-  SA: 'volume_lead',
-  FIN: 'pricing_manager',
-  CON: 'contracts',
-  DEL: 'hr_staffing',
-  QA: 'contracts', // QA reviews compliance; contracts is closest fit
-  admin: 'executive', // admin maps to full access
-  teaming_partner: 'partner',
-  Partner: 'partner',
-  viewer: 'consultant', // read-only, time-limited — consultant is closest
+interface RBACConfig {
+  version: string
+  roles: Record<string, RoleConfig>
+  [key: string]: unknown
 }
 
-/** Resolve any DB role string to a canonical ConfigRoleId. Falls back to 'consultant' (minimum access). */
+// ─── Config singleton ───────────────────────────────────────────
+
+const config = rbacConfig as unknown as RBACConfig
+
+const ALL_MODULES: ModuleId[] = [
+  'dashboard', 'pipeline', 'proposals', 'pricing', 'strategy',
+  'blackhat', 'compliance', 'workflow_board', 'ai_chat',
+  'documents', 'analytics', 'admin', 'integrations', 'audit_log', 'personnel',
+]
+
+const DENY_ALL: ModulePermission = { shouldRender: false, canView: false, canEdit: false }
+
+// ─── Nav items (matching Sidebar.tsx) ───────────────────────────
+
+const NAV_ITEMS: NavItem[] = [
+  { module: 'dashboard', label: 'Dashboard', href: '/', iconPath: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4' },
+  { module: 'pipeline', label: 'Pipeline', href: '/pipeline', iconPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { module: 'proposals', label: 'Proposals', href: '/proposals', iconPath: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+  { module: 'pricing', label: 'Pricing', href: '/pricing', iconPath: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { module: 'strategy', label: 'Strategy', href: '/strategy', iconPath: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z' },
+  { module: 'blackhat', label: 'Black Hat', href: '/blackhat', iconPath: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
+  { module: 'compliance', label: 'Compliance', href: '/compliance', iconPath: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+  { module: 'personnel', label: 'Personnel', href: '/personnel', iconPath: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z' },
+  { module: 'workflow_board', label: 'Workflow', href: '/workflow', iconPath: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
+  { module: 'documents', label: 'Documents', href: '/documents', iconPath: 'M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z' },
+  { module: 'ai_chat', label: 'AI Assistant', href: '/ai', iconPath: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z' },
+  { module: 'analytics', label: 'Analytics', href: '/analytics', iconPath: 'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+  { module: 'admin', label: 'Admin', href: '/admin', iconPath: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
+  { module: 'audit_log', label: 'Audit Log', href: '/audit', iconPath: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+]
+
+// ─── Functions ──────────────────────────────────────────────────
+
+/** Map any DB role string to a valid ConfigRoleId. Defaults to 'partner' (most restrictive). */
 export function resolveRole(dbRole: string | null | undefined): ConfigRoleId {
-  if (!dbRole) return 'consultant'
-  return ROLE_ALIAS_MAP[dbRole] ?? 'consultant'
-}
-
-// ---------------------------------------------------------------------------
-// 3. Permissions Config (derived from roles_permissions_config.json v9.5)
-// ---------------------------------------------------------------------------
-
-const ROLE_CONFIGS: Record<ConfigRoleId, RoleConfig> = {
-  executive: {
-    id: 'executive',
-    displayName: 'Executive / Admin',
-    shipleyFunction: 'Executive Sponsor',
-    type: 'internal',
-    uiComplexityLevel: 'admin',
-    modules: {
-      dashboard: { shouldRender: true, canView: true, canEdit: false },
-      pipeline: { shouldRender: true, canView: true, canEdit: true },
-      proposals: { shouldRender: true, canView: true, canEdit: true },
-      pricing: { shouldRender: true, canView: true, canEdit: false },
-      strategy: { shouldRender: true, canView: true, canEdit: true },
-      blackhat: { shouldRender: true, canView: true, canEdit: true },
-      compliance: { shouldRender: true, canView: true, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: true },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: true, canView: true, canEdit: false },
-      admin: { shouldRender: true, canView: true, canEdit: true },
-      integrations: { shouldRender: true, canView: true, canEdit: true },
-      audit_log: { shouldRender: true, canView: true, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['capture', 'strategy', 'blackhat', 'writer', 'compliance', 'pricing', 'contracts', 'orals'],
-      canTriggerBlackHat: true,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: true,
-    },
-    gateAuthority: { canApprove: ['gate1', 'gold', 'submit'], canTriggerReview: true, canOverrideGate: true },
-    security: {
-      forceCUIWatermark: false,
-      classificationCeiling: 'CUI//SP-CTI//SP-PROPIN',
-      canViewAllClassifications: true,
-      canExportCUI: true,
-      sessionTimeout: 28800,
-    },
-  },
-  operations: {
-    id: 'operations',
-    displayName: 'Operations / COO',
-    shipleyFunction: 'Capture Executive',
-    type: 'internal',
-    uiComplexityLevel: 'advanced',
-    modules: {
-      dashboard: { shouldRender: true, canView: true, canEdit: false },
-      pipeline: { shouldRender: true, canView: true, canEdit: true },
-      proposals: { shouldRender: true, canView: true, canEdit: true },
-      pricing: { shouldRender: true, canView: true, canEdit: true },
-      strategy: { shouldRender: true, canView: true, canEdit: true },
-      blackhat: { shouldRender: true, canView: true, canEdit: true },
-      compliance: { shouldRender: true, canView: true, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: true },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: true, canView: true, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: true, canView: true, canEdit: false },
-      audit_log: { shouldRender: true, canView: true, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['capture', 'strategy', 'blackhat', 'writer', 'compliance', 'pricing'],
-      canTriggerBlackHat: true,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: true,
-    },
-    gateAuthority: { canApprove: ['gate1', 'blue', 'red'], canTriggerReview: true, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: false,
-      classificationCeiling: 'CUI//SP-CTI//SP-PROPIN',
-      canViewAllClassifications: true,
-      canExportCUI: true,
-      sessionTimeout: 28800,
-    },
-  },
-  capture_manager: {
-    id: 'capture_manager',
-    displayName: 'Capture Manager',
-    shipleyFunction: 'Capture Manager',
-    type: 'internal',
-    uiComplexityLevel: 'advanced',
-    modules: {
-      dashboard: { shouldRender: true, canView: true, canEdit: false },
-      pipeline: { shouldRender: true, canView: true, canEdit: true },
-      proposals: { shouldRender: true, canView: true, canEdit: true },
-      pricing: { shouldRender: false, canView: false, canEdit: false },
-      strategy: { shouldRender: true, canView: true, canEdit: true },
-      blackhat: { shouldRender: true, canView: true, canEdit: true },
-      compliance: { shouldRender: true, canView: true, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: true },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: true, canView: true, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['capture', 'strategy', 'blackhat', 'writer', 'compliance'],
-      canTriggerBlackHat: true,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: ['gate1', 'blue'], canTriggerReview: true, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: false,
-      classificationCeiling: 'CUI//SP-CTI',
-      canViewAllClassifications: false,
-      canExportCUI: true,
-      sessionTimeout: 14400,
-    },
-  },
-  proposal_manager: {
-    id: 'proposal_manager',
-    displayName: 'Proposal Manager',
-    shipleyFunction: 'Proposal Manager',
-    type: 'internal',
-    uiComplexityLevel: 'advanced',
-    modules: {
-      dashboard: { shouldRender: true, canView: true, canEdit: false },
-      pipeline: { shouldRender: true, canView: true, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: true },
-      pricing: { shouldRender: true, canView: true, canEdit: false },
-      strategy: { shouldRender: true, canView: true, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: true, canView: true, canEdit: true },
-      workflow_board: { shouldRender: true, canView: true, canEdit: true },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: true, canView: true, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['writer', 'compliance', 'pricing'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: true, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: false,
-      classificationCeiling: 'CUI//SP-PROPIN',
-      canViewAllClassifications: false,
-      canExportCUI: true,
-      sessionTimeout: 14400,
-    },
-  },
-  volume_lead: {
-    id: 'volume_lead',
-    displayName: 'Volume Lead',
-    shipleyFunction: 'Volume Lead',
-    type: 'internal',
-    uiComplexityLevel: 'standard',
-    modules: {
-      dashboard: { shouldRender: true, canView: true, canEdit: false },
-      pipeline: { shouldRender: false, canView: false, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: true },
-      pricing: { shouldRender: false, canView: false, canEdit: false },
-      strategy: { shouldRender: true, canView: true, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: true, canView: true, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: true },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: false, canView: false, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['writer', 'compliance'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: false, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: false,
-      classificationCeiling: 'CUI//SP-CTI',
-      canViewAllClassifications: false,
-      canExportCUI: true,
-      sessionTimeout: 14400,
-    },
-  },
-  pricing_manager: {
-    id: 'pricing_manager',
-    displayName: 'Pricing / Cost Volume Lead',
-    shipleyFunction: 'Pricing Manager',
-    type: 'internal',
-    uiComplexityLevel: 'standard',
-    modules: {
-      dashboard: { shouldRender: true, canView: true, canEdit: false },
-      pipeline: { shouldRender: false, canView: false, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: false },
-      pricing: { shouldRender: true, canView: true, canEdit: true },
-      strategy: { shouldRender: false, canView: false, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: true, canView: true, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: true },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: false, canView: false, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['pricing', 'compliance'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: false, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: true,
-      classificationCeiling: 'CUI//SP-PROPIN',
-      canViewAllClassifications: false,
-      canExportCUI: true,
-      sessionTimeout: 14400,
-    },
-  },
-  contracts: {
-    id: 'contracts',
-    displayName: 'Contracts / Compliance',
-    shipleyFunction: 'Contracts Manager',
-    type: 'internal',
-    uiComplexityLevel: 'standard',
-    modules: {
-      dashboard: { shouldRender: true, canView: true, canEdit: false },
-      pipeline: { shouldRender: false, canView: false, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: false },
-      pricing: { shouldRender: false, canView: false, canEdit: false },
-      strategy: { shouldRender: false, canView: false, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: true, canView: true, canEdit: true },
-      workflow_board: { shouldRender: true, canView: true, canEdit: false },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: false, canView: false, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['compliance', 'contracts'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: false, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: false,
-      classificationCeiling: 'CUI//SP-PROCURE',
-      canViewAllClassifications: false,
-      canExportCUI: true,
-      sessionTimeout: 14400,
-    },
-  },
-  hr_staffing: {
-    id: 'hr_staffing',
-    displayName: 'HR / Staffing',
-    shipleyFunction: 'Resource Manager',
-    type: 'internal',
-    uiComplexityLevel: 'simplified',
-    modules: {
-      dashboard: { shouldRender: true, canView: true, canEdit: false },
-      pipeline: { shouldRender: false, canView: false, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: false },
-      pricing: { shouldRender: false, canView: false, canEdit: false },
-      strategy: { shouldRender: false, canView: false, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: false, canView: false, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: false },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: false, canView: false, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-      personnel: { shouldRender: true, canView: true, canEdit: true },
-    },
-    aiAgents: {
-      allowedAgents: ['writer'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: false,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: false, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: true,
-      classificationCeiling: 'CUI//SP-PRVCY',
-      canViewAllClassifications: false,
-      canExportCUI: false,
-      sessionTimeout: 7200,
-    },
-  },
-  author: {
-    id: 'author',
-    displayName: 'Author / SME',
-    shipleyFunction: 'Section Author',
-    type: 'internal',
-    uiComplexityLevel: 'simplified',
-    modules: {
-      dashboard: { shouldRender: false, canView: false, canEdit: false },
-      pipeline: { shouldRender: false, canView: false, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: true },
-      pricing: { shouldRender: false, canView: false, canEdit: false },
-      strategy: { shouldRender: false, canView: false, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: true, canView: true, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: true },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true },
-      analytics: { shouldRender: false, canView: false, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['writer', 'compliance'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: false, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: false,
-      classificationCeiling: 'CUI//SP-CTI',
-      canViewAllClassifications: false,
-      canExportCUI: true,
-      sessionTimeout: 14400,
-    },
-  },
-  partner: {
-    id: 'partner',
-    displayName: 'Teaming Partner',
-    shipleyFunction: 'Teaming Partner',
-    type: 'external',
-    uiComplexityLevel: 'simplified',
-    autoRevokeOnSubmit: true,
-    modules: {
-      dashboard: { shouldRender: false, canView: false, canEdit: false },
-      pipeline: { shouldRender: false, canView: false, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: true, scopeRestriction: 'assigned_sections_only' },
-      pricing: { shouldRender: false, canView: false, canEdit: false },
-      strategy: { shouldRender: false, canView: false, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: false, canView: false, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: false, scopeRestriction: 'own_tasks_only' },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true, scopeRestriction: 'assigned_documents_only' },
-      analytics: { shouldRender: false, canView: false, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['writer'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: false,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: false, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: true,
-      classificationCeiling: 'PUBLIC',
-      canViewAllClassifications: false,
-      canExportCUI: false,
-      sessionTimeout: 3600,
-    },
-  },
-  subcontractor: {
-    id: 'subcontractor',
-    displayName: 'Subcontractor',
-    shipleyFunction: 'Subcontractor',
-    type: 'external',
-    uiComplexityLevel: 'simplified',
-    autoRevokeOnSubmit: true,
-    modules: {
-      dashboard: { shouldRender: false, canView: false, canEdit: false },
-      pipeline: { shouldRender: false, canView: false, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: true, scopeRestriction: 'assigned_sections_only' },
-      pricing: { shouldRender: false, canView: false, canEdit: false },
-      strategy: { shouldRender: false, canView: false, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: false, canView: false, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: false, scopeRestriction: 'own_tasks_only' },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: true, scopeRestriction: 'assigned_documents_only' },
-      analytics: { shouldRender: false, canView: false, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['writer'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: false,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: false, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: true,
-      classificationCeiling: 'PUBLIC',
-      canViewAllClassifications: false,
-      canExportCUI: false,
-      sessionTimeout: 3600,
-    },
-  },
-  consultant: {
-    id: 'consultant',
-    displayName: 'Consultant / SME',
-    shipleyFunction: 'Subject Matter Expert',
-    type: 'external',
-    uiComplexityLevel: 'simplified',
-    autoRevokeOnSubmit: true,
-    modules: {
-      dashboard: { shouldRender: false, canView: false, canEdit: false },
-      pipeline: { shouldRender: false, canView: false, canEdit: false },
-      proposals: { shouldRender: true, canView: true, canEdit: false },
-      pricing: { shouldRender: false, canView: false, canEdit: false },
-      strategy: { shouldRender: true, canView: true, canEdit: false },
-      blackhat: { shouldRender: false, canView: false, canEdit: false },
-      compliance: { shouldRender: true, canView: true, canEdit: false },
-      workflow_board: { shouldRender: true, canView: true, canEdit: false },
-      ai_chat: { shouldRender: true, canView: true, canEdit: true },
-      documents: { shouldRender: true, canView: true, canEdit: false },
-      analytics: { shouldRender: false, canView: false, canEdit: false },
-      admin: { shouldRender: false, canView: false, canEdit: false },
-      integrations: { shouldRender: false, canView: false, canEdit: false },
-      audit_log: { shouldRender: false, canView: false, canEdit: false },
-    },
-    aiAgents: {
-      allowedAgents: ['writer', 'capture'],
-      canTriggerBlackHat: false,
-      canViewReasoningCards: true,
-      canOverrideAIDecisions: false,
-    },
-    gateAuthority: { canApprove: [], canTriggerReview: false, canOverrideGate: false },
-    security: {
-      forceCUIWatermark: true,
-      classificationCeiling: 'CUI//SP-CTI',
-      canViewAllClassifications: false,
-      canExportCUI: false,
-      sessionTimeout: 3600,
-    },
-  },
-}
-
-// ---------------------------------------------------------------------------
-// 4. Accessors
-// ---------------------------------------------------------------------------
-
-/** Get full role config for a resolved ConfigRoleId */
-export function getRoleConfig(roleId: ConfigRoleId): RoleConfig {
-  return ROLE_CONFIGS[roleId]
-}
-
-/** Get module permission for a given DB role + module */
-export function getModulePermission(
-  dbRole: string | null | undefined,
-  moduleId: ModuleId
-): ModulePermission {
-  const configRole = resolveRole(dbRole)
-  const config = ROLE_CONFIGS[configRole]
-  const mod = config.modules[moduleId]
-  // Fail closed: if module not defined for this role, deny everything
-  return mod ?? { shouldRender: false, canView: false, canEdit: false }
-}
-
-/** Check if a DB role is internal */
-export function isInternalRole(dbRole: string | null | undefined): boolean {
-  const config = getRoleConfig(resolveRole(dbRole))
-  return config.type === 'internal'
-}
-
-/** Get UI complexity level for a DB role */
-export function getUIComplexityLevel(dbRole: string | null | undefined): UIComplexityLevel {
-  return getRoleConfig(resolveRole(dbRole)).uiComplexityLevel
-}
-
-/** Get the nav items this role should see (from navigationConfig) */
-export interface NavItem {
-  id: ModuleId
-  label: string
-  icon: string
-  route: string
-  badge?: string
-}
-
-const PRIMARY_NAV: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', route: '/dashboard' },
-  { id: 'pipeline', label: 'Pipeline', icon: 'TrendingUp', route: '/pipeline' },
-  { id: 'proposals', label: 'Proposals', icon: 'FileText', route: '/proposals' },
-  { id: 'workflow_board', label: 'Workflow', icon: 'Kanban', route: '/workflow' },
-  { id: 'ai_chat', label: 'AI Assistant', icon: 'MessageSquare', route: '/chat' },
-  { id: 'documents', label: 'Documents', icon: 'FolderOpen', route: '/documents' },
-]
-
-const SECONDARY_NAV: NavItem[] = [
-  { id: 'strategy', label: 'Strategy', icon: 'Target', route: '/strategy' },
-  { id: 'blackhat', label: 'Black Hat', icon: 'Swords', route: '/blackhat', badge: 'Private' },
-  { id: 'pricing', label: 'Pricing', icon: 'DollarSign', route: '/pricing', badge: 'CUI' },
-  { id: 'compliance', label: 'Compliance', icon: 'Scale', route: '/compliance' },
-  { id: 'analytics', label: 'Analytics', icon: 'BarChart3', route: '/analytics' },
-]
-
-const ADMIN_NAV: NavItem[] = [
-  { id: 'admin', label: 'Admin', icon: 'Settings', route: '/admin' },
-  { id: 'integrations', label: 'Integrations', icon: 'Link', route: '/integrations' },
-  { id: 'audit_log', label: 'Audit Log', icon: 'History', route: '/audit' },
-]
-
-/** Returns only the nav items this role's shouldRender === true. Invisible RBAC. */
-export function getVisibleNav(dbRole: string | null | undefined): {
-  primary: NavItem[]
-  secondary: NavItem[]
-  admin: NavItem[]
-} {
-  const configRole = resolveRole(dbRole)
-  const config = ROLE_CONFIGS[configRole]
-
-  const filter = (items: NavItem[]) =>
-    items.filter((item) => config.modules[item.id]?.shouldRender === true)
-
-  return {
-    primary: filter(PRIMARY_NAV),
-    secondary: filter(SECONDARY_NAV),
-    admin: filter(ADMIN_NAV),
+  if (!dbRole) return 'partner'
+  const normalized = dbRole.toLowerCase().replace(/[\s-]/g, '_')
+  if (config.roles[normalized]) return normalized as ConfigRoleId
+  // Legacy mappings from Phase 1
+  const legacyMap: Record<string, ConfigRoleId> = {
+    ceo: 'executive', admin: 'executive', coo: 'operations',
+    cap: 'capture_manager', pm: 'proposal_manager',
+    sa: 'volume_lead', fin: 'pricing_manager',
+    con: 'contracts', del: 'hr_staffing', qa: 'author',
   }
+  return legacyMap[normalized] ?? 'partner'
+}
+
+/** Get permission triple for a specific role + module. */
+export function getModulePermission(role: string, module: ModuleId): ModulePermission {
+  const resolved = resolveRole(role)
+  const roleConfig = config.roles[resolved]
+  if (!roleConfig) return DENY_ALL
+  return roleConfig.modules[module] ?? DENY_ALL
+}
+
+/** Get all module permissions for a role. */
+export function getRolePermissions(role: string): Record<string, ModulePermission> {
+  const resolved = resolveRole(role)
+  const roleConfig = config.roles[resolved]
+  if (!roleConfig) {
+    const empty: Record<string, ModulePermission> = {}
+    for (const m of ALL_MODULES) empty[m] = DENY_ALL
+    return empty
+  }
+  return roleConfig.modules
+}
+
+/** Get full role config object. */
+export function getRoleConfig(role: string): RoleConfig | null {
+  const resolved = resolveRole(role)
+  return config.roles[resolved] ?? null
+}
+
+/** Get nav items filtered by shouldRender for a given role. */
+export function getVisibleNav(role: string): { primary: NavItem[]; secondary: NavItem[]; admin: NavItem[] } {
+  const perms = getRolePermissions(role)
+  const visible = NAV_ITEMS.filter((item) => perms[item.module]?.shouldRender === true)
+  const adminModules: ModuleId[] = ["admin", "audit_log", "integrations"]
+  const secondaryModules: ModuleId[] = ["analytics", "documents", "ai_chat"]
+  return {
+    primary: visible.filter((i) => !adminModules.includes(i.module) && !secondaryModules.includes(i.module)),
+    secondary: visible.filter((i) => secondaryModules.includes(i.module)),
+    admin: visible.filter((i) => adminModules.includes(i.module)),
+  }
+}
+/** Check if a role is internal (vs external: partner, subcontractor, consultant). */
+export function isInternalRole(role: string): boolean {
+  const roleConfig = getRoleConfig(role)
+  return roleConfig?.type === 'internal'
+}
+
+/** Check a specific permission. */
+export function hasPermission(
+  role: string,
+  module: ModuleId,
+  permission: 'shouldRender' | 'canView' | 'canEdit'
+): boolean {
+  return getModulePermission(role, module)[permission] === true
+}
+
+/** Get display name for a role. */
+export function getRoleDisplayName(role: string): string {
+  const roleConfig = getRoleConfig(role)
+  return roleConfig?.displayName ?? role.replace(/_/g, ' ')
+}
+
+/** Get UI complexity level for a role. */
+export function getUIComplexityLevel(role: string): string {
+  const roleConfig = getRoleConfig(role)
+  return roleConfig?.uiComplexityLevel ?? 'simplified'
 }

@@ -83,9 +83,9 @@ export function useRole(): UseRoleReturn {
   return {
     dbRole,
     role: resolved,
-    displayName: config.displayName,
+    displayName: config?.displayName ?? "Unknown",
     loading,
-    isInternal: isInternalRole(dbRole),
+    isInternal: isInternalRole(dbRole ?? "partner"),
   }
 }
 
@@ -118,7 +118,7 @@ export function useModuleAccess(moduleId: ModuleId): UseModuleAccessReturn {
     }
   }
 
-  const perm: ModulePermission = getModulePermission(dbRole, moduleId)
+  const perm: ModulePermission = getModulePermission(dbRole ?? "partner", moduleId)
 
   return {
     shouldRender: perm.shouldRender,
@@ -147,7 +147,7 @@ export function useVisibleNav(): UseVisibleNavReturn {
   }
 
   return {
-    ...getVisibleNav(dbRole),
+    ...getVisibleNav(dbRole ?? "partner"),
     loading: false,
   }
 }
