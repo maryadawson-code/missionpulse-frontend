@@ -19,6 +19,10 @@ export const metadata: Metadata = {
     title: 'MissionPulse 8(a) Toolkit — Win More Set-Aside Contracts',
     description:
       'Built for 8(a) firms: AI-powered compliance, proposal generation, and pipeline management. Starter plan under $1,500/year.',
+    url: 'https://missionpulse.io/8a-toolkit',
+  },
+  alternates: {
+    canonical: 'https://missionpulse.io/8a-toolkit',
   },
 }
 

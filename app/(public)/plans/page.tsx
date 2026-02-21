@@ -9,6 +9,10 @@ export const metadata: Metadata = {
     title: 'MissionPulse Pricing — Plans Starting at $149/mo',
     description:
       'Three tiers for every GovCon firm. Starter, Professional, and Enterprise. 17% annual discount. Below federal micro-purchase threshold.',
+    url: 'https://missionpulse.io/plans',
+  },
+  alternates: {
+    canonical: 'https://missionpulse.io/plans',
   },
 }
 
