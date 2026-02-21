@@ -63,7 +63,7 @@ export async function updatePassword(
 ): Promise<ActionResult> {
   const supabase = await createClient()
 
-  const password = formData.get('password') as string
+  const password = formData.get('new_password') as string
   if (!password || password.length < 8) {
     return { success: false, error: 'Password must be at least 8 characters' }
   }

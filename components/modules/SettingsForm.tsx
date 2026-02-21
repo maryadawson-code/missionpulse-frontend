@@ -1,7 +1,7 @@
 // filepath: components/modules/SettingsForm.tsx
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
 import { updateProfile, updatePassword } from '@/lib/actions/settings'
 import { addToast } from '@/components/ui/Toast'
 
@@ -20,7 +20,7 @@ interface SettingsFormProps {
 export function SettingsForm({ profile }: SettingsFormProps) {
   const [isPending, startTransition] = useTransition()
   const [passwordPending, startPasswordTransition] = useTransition()
-  const [showPasswordForm, setShowPasswordForm] = useState(false)
+
 
   const inputClass =
     'w-full rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-sm text-gray-200 placeholder-gray-500 outline-none transition-colors focus:border-[#00E5FA]/50 focus:ring-1 focus:ring-[#00E5FA]/25 disabled:opacity-50'
@@ -38,7 +38,7 @@ export function SettingsForm({ profile }: SettingsFormProps) {
   }
 
   function handlePasswordSubmit(formData: FormData) {
-    const password = formData.get('password') as string
+    const password = formData.get('new_password') as string
     const confirmPassword = formData.get('confirm_password') as string
 
     if (password.length < 8) {
@@ -54,7 +54,6 @@ export function SettingsForm({ profile }: SettingsFormProps) {
       const result = await updatePassword(formData)
       if (result.success) {
         addToast('success', 'Password updated')
-        setShowPasswordForm(false)
       } else {
         addToast('error', result.error ?? 'Failed to update password')
       }
@@ -175,76 +174,53 @@ export function SettingsForm({ profile }: SettingsFormProps) {
       </form>
 
       {/* Password Section */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-white">Password</h3>
-            <p className="mt-1 text-xs text-gray-500">
-              Update your account password
-            </p>
-          </div>
-          {!showPasswordForm && (
-            <button
-              onClick={() => setShowPasswordForm(true)}
-              className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-            >
-              Change Password
-            </button>
-          )}
-        </div>
+      <form action={handlePasswordSubmit}>
+        <fieldset className="space-y-4 rounded-xl border border-gray-800 bg-gray-900/50 p-6">
+          <legend className="text-sm font-semibold text-white px-2">
+            Change Password
+          </legend>
 
-        {showPasswordForm && (
-          <form action={handlePasswordSubmit} className="mt-4 space-y-4">
-            <div>
-              <label htmlFor="password" className={labelClass}>
-                New Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                minLength={8}
-                placeholder="Minimum 8 characters"
-                className={inputClass}
-                disabled={passwordPending}
-              />
-            </div>
-            <div>
-              <label htmlFor="confirm_password" className={labelClass}>
-                Confirm Password
-              </label>
-              <input
-                id="confirm_password"
-                name="confirm_password"
-                type="password"
-                required
-                minLength={8}
-                placeholder="Confirm new password"
-                className={inputClass}
-                disabled={passwordPending}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={passwordPending}
-                className="rounded-lg bg-[#00E5FA] px-6 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90 disabled:opacity-50"
-              >
-                {passwordPending ? 'Updating...' : 'Update Password'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowPasswordForm(false)}
-                disabled={passwordPending}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-400 transition-colors hover:text-gray-200 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
+          <div>
+            <label htmlFor="new_password" className={labelClass}>
+              New Password
+            </label>
+            <input
+              id="new_password"
+              name="new_password"
+              type="password"
+              required
+              minLength={8}
+              placeholder="Minimum 8 characters"
+              className={inputClass}
+              disabled={passwordPending}
+            />
+          </div>
+          <div>
+            <label htmlFor="confirm_password" className={labelClass}>
+              Confirm Password
+            </label>
+            <input
+              id="confirm_password"
+              name="confirm_password"
+              type="password"
+              required
+              minLength={8}
+              placeholder="Confirm new password"
+              className={inputClass}
+              disabled={passwordPending}
+            />
+          </div>
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={passwordPending}
+              className="rounded-lg bg-[#00E5FA] px-6 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90 disabled:opacity-50"
+            >
+              {passwordPending ? 'Updating...' : 'Update Password'}
+            </button>
+          </div>
+        </fieldset>
+      </form>
 
       {/* Account Info */}
       <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
