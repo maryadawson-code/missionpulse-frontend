@@ -1,18 +1,13 @@
 // filepath: app/(dashboard)/layout.tsx
+
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { DashboardShell } from '@/components/dashboard/DashboardShell'
-import { ToastContainer } from '@/components/ui/Toast'
-import rbacConfig from '@/lib/rbac/config'
+import { getRolePermissions } from '@/lib/rbac/config'
+import Sidebar from '@/components/layout/Sidebar'
+import DashboardHeader from '@/components/layout/DashboardHeader'
+import type { ModulePermission } from '@/lib/types'
 
-/**
- * Dashboard layout — Server Component.
- *
- * 1. Verifies auth (redirect to /login if no session)
- * 2. Fetches user profile for role
- * 3. Computes allowed modules from RBAC config
- * 4. Passes to DashboardShell (client) for sidebar/topbar rendering
- */
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -20,6 +15,7 @@ export default async function DashboardLayout({
 }) {
   const supabase = await createClient()
 
+  // ─── Auth Gate ──────────────────────────────────────────────
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -28,53 +24,39 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // Fetch profile
+  // ─── Profile + Role Resolution ──────────────────────────────
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, email, role, avatar_url')
+    .select('id, full_name, email, role, avatar_url, company_id')
     .eq('id', user.id)
     .single()
 
-  const userRole = profile?.role ?? 'viewer'
-  const userName = profile?.full_name ?? null
-  const userEmail = profile?.email ?? user.email ?? ''
-  const avatarUrl = profile?.avatar_url ?? null
+  // Default to 'partner' (most restrictive) if no profile or role found
+  const userRole = profile?.role ?? 'partner'
 
-  // Compute allowed modules from RBAC config
-  const roleConfig = rbacConfig.roles[userRole as keyof typeof rbacConfig.roles]
-  let allowedModules: string[] = []
-
-  if (roleConfig && 'modules' in roleConfig) {
-    const modules = roleConfig.modules as Record<
-      string,
-      { shouldRender?: boolean }
-    >
-    allowedModules = Object.entries(modules)
-      .filter(([, config]) => config.shouldRender === true)
-      .map(([key]) => key)
-  }
-
-  // Fallback: if no role config found, show minimum nav
-  if (allowedModules.length === 0) {
-    allowedModules = ['dashboard', 'settings']
-  }
-
-  // All roles get settings access
-  if (!allowedModules.includes('settings')) {
-    allowedModules.push('settings')
-  }
+  // ─── RBAC Permission Resolution ─────────────────────────────
+  // getRolePermissions reads roles_permissions_config.json and returns
+  // the module permissions for the given role.
+  // This function is expected from Sprint 2's lib/rbac/config.ts.
+  const permissions: Record<string, ModulePermission> = getRolePermissions(userRole)
 
   return (
-    <>
-      <DashboardShell
-        allowedModules={allowedModules}
-        userName={userName}
-        userEmail={userEmail}
-        avatarUrl={avatarUrl}
-      >
-        {children}
-      </DashboardShell>
-      <ToastContainer />
-    </>
+    <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
+      {/* Sidebar — RBAC-filtered navigation */}
+      <Sidebar
+        permissions={permissions}
+        userDisplayName={profile?.full_name ?? user.email ?? null}
+        userRole={userRole}
+      />
+
+      {/* Main content area */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <DashboardHeader userEmail={user.email ?? null} />
+
+        <main className="flex-1 overflow-y-auto p-6">
+          {children}
+        </main>
+      </div>
+    </div>
   )
 }

@@ -30,6 +30,7 @@ interface PipelineTableProps {
     | 'due_date'
     | 'owner_id'
     | 'priority'
+    | 'solicitation_number'
   >[]
 }
 

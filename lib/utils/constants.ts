@@ -29,6 +29,20 @@ export const SHIPLEY_PHASE_CONFIG = [
 ] as const
 
 /**
+ * Active pipeline stages for the Kanban board.
+ * These are the Shipley gates where opportunities are actively worked.
+ * Terminal states (Won, Lost, No-Bid) are excluded.
+ */
+export const ACTIVE_STAGES = [
+  { name: 'Gate 1', label: 'Long-Range Pursuit' },
+  { name: 'Gate 2', label: 'Opportunity Assessment' },
+  { name: 'Gate 3', label: 'Capture Planning' },
+  { name: 'Gate 4', label: 'Proposal Development' },
+  { name: 'Gate 5', label: 'Post-Submission' },
+  { name: 'Gate 6', label: 'Post-Award' },
+] as const
+
+/**
  * Format a number as compact USD currency.
  */
 export function formatCompactCurrency(value: number): string {

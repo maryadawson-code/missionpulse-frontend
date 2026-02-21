@@ -238,6 +238,52 @@ export async function updateOpportunity(
 }
 
 /**
+ * Update only the Shipley phase of an opportunity.
+ * Used by the Kanban board drag-and-drop.
+ */
+export async function updateOpportunityPhase(
+  id: string,
+  phase: string
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('opportunities')
+    .update({ phase, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) {
+    console.error('[opportunities:updatePhase]', error.message)
+    return { success: false, error: error.message }
+  }
+
+  await supabase.from('audit_logs').insert({
+    action: 'UPDATE',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
+    details: { field: 'phase', new_value: phase },
+  })
+
+  await supabase.from('activity_log').insert({
+    action: 'updated_opportunity_phase',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
+  })
+
+  revalidatePath('/pipeline')
+  revalidatePath(`/war-room/${id}`)
+  revalidatePath('/')
+  return { success: true, id }
+}
+
+/**
  * Delete an opportunity by ID. Hard delete (no soft delete).
  */
 export async function deleteOpportunity(id: string): Promise<ActionResult> {

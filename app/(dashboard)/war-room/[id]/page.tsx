@@ -49,21 +49,58 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
   ]
   const canAccessSensitive = sensitiveRoles.includes(userRole)
 
-  // Fetch team assignments
-  // Schema: id, assignee_name, assignee_email, opportunity_id, role, created_at
+  // Fetch team assignments (schema: id, role, assignee_email, assignee_name)
   const { data: rawAssignments } = await supabase
     .from('opportunity_assignments')
-    .select('id, role, assignee_name, assignee_email')
+    .select('id, role, assignee_email, assignee_name')
     .eq('opportunity_id', id)
 
-  const assignments = (rawAssignments ?? []).map((assignment) => ({
-    id: assignment.id,
-    role: assignment.role,
+  // Resolve profiles for assignments by email
+  const assignments: {
+    id: string
+    role: string | null
     profile: {
-      full_name: assignment.assignee_name,
-      email: assignment.assignee_email,
-    },
-  }))
+      id: string
+      full_name: string | null
+      email: string
+      role: string | null
+    } | null
+  }[] = []
+
+  for (const assignment of rawAssignments ?? []) {
+    let resolvedProfile: {
+      id: string
+      full_name: string | null
+      email: string
+      role: string | null
+    } | null = null
+
+    if (assignment.assignee_email) {
+      const { data: assignedProfile } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .eq('email', assignment.assignee_email)
+        .single()
+
+      resolvedProfile = assignedProfile
+    }
+
+    // Fallback: create display-only stub from assignment data
+    if (!resolvedProfile && assignment.assignee_email) {
+      resolvedProfile = {
+        id: '',
+        full_name: assignment.assignee_name,
+        email: assignment.assignee_email,
+        role: assignment.role,
+      }
+    }
+
+    assignments.push({
+      id: assignment.id,
+      role: assignment.role,
+      profile: resolvedProfile,
+    })
+  }
 
   // Status badge color
   function statusColor(status: string | null): string {

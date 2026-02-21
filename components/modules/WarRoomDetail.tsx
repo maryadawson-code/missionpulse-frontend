@@ -1,3 +1,4 @@
+// filepath: components/modules/WarRoomDetail.tsx
 'use client'
 
 /**
@@ -8,7 +9,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { updateOpportunity } from '@/lib/actions/opportunities'
+import { updateOpportunityPhase } from '@/lib/actions/opportunities'
 import type { Opportunity } from '@/lib/supabase/types'
 import { ACTIVE_STAGES } from '@/lib/utils/constants'
 
@@ -34,7 +35,7 @@ export default function WarRoomDetail({ opportunity }: Props) {
     if (currentPhaseIndex < 0 || currentPhaseIndex >= ACTIVE_STAGES.length - 1) return
     const nextPhase = ACTIVE_STAGES[currentPhaseIndex + 1].name
     setSaving(true)
-    await updateOpportunity(opp.id, { phase: nextPhase })
+    await updateOpportunityPhase(opp.id, nextPhase)
     setSaving(false)
     router.refresh()
   }
@@ -142,13 +143,13 @@ export default function WarRoomDetail({ opportunity }: Props) {
               label="Period of Performance"
               value={opp.pop_start ? `${opp.pop_start.slice(0,10)} – ${opp.pop_end?.slice(0,10) ?? 'TBD'}` : null}
             />
-            <DetailRow label="Place of Performance" value={null} />
-            <DetailRow label="Competition" value={null} />
+            <DetailRow label="Place of Performance" value={opp.place_of_performance} />
+            <DetailRow label="NAICS Code" value={opp.naics_code} />
             <DetailRow label="Incumbent" value={opp.incumbent} />
           </dl>
         </div>
 
-        {/* Right: Strategy Summary (placeholder — fields added in Sprint 3) */}
+        {/* Right: Strategy Summary */}
         <div className="rounded-xl border border-white/10 bg-[#000A1A] p-5">
           <h2 className="mb-4 text-sm font-semibold text-white">Capture Strategy</h2>
           <dl className="space-y-3">
