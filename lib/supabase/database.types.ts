@@ -1683,6 +1683,69 @@ export type Database = {
         }
         Relationships: []
       }
+      company_subscriptions: {
+        Row: {
+          id: string
+          company_id: string
+          plan_id: string
+          status: string
+          billing_interval: string
+          current_period_start: string
+          current_period_end: string
+          stripe_subscription_id: string | null
+          stripe_customer_id: string | null
+          auto_overage_enabled: boolean
+          metadata: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          plan_id: string
+          status?: string
+          billing_interval?: string
+          current_period_start?: string
+          current_period_end?: string
+          stripe_subscription_id?: string | null
+          stripe_customer_id?: string | null
+          auto_overage_enabled?: boolean
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          plan_id?: string
+          status?: string
+          billing_interval?: string
+          current_period_start?: string
+          current_period_end?: string
+          stripe_subscription_id?: string | null
+          stripe_customer_id?: string | null
+          auto_overage_enabled?: boolean
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_onboarding: {
         Row: {
           company_id: string | null
@@ -10021,6 +10084,63 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_plans: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          monthly_price: number
+          annual_price: number
+          monthly_token_limit: number
+          overage_rate_per_mtok: number
+          max_users: number
+          max_opportunities: number
+          features: Json
+          stripe_monthly_price_id: string | null
+          stripe_annual_price_id: string | null
+          display_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          monthly_price?: number
+          annual_price?: number
+          monthly_token_limit?: number
+          overage_rate_per_mtok?: number
+          max_users?: number
+          max_opportunities?: number
+          features?: Json
+          stripe_monthly_price_id?: string | null
+          stripe_annual_price_id?: string | null
+          display_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          monthly_price?: number
+          annual_price?: number
+          monthly_token_limit?: number
+          overage_rate_per_mtok?: number
+          max_users?: number
+          max_opportunities?: number
+          features?: Json
+          stripe_monthly_price_id?: string | null
+          stripe_annual_price_id?: string | null
+          display_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       task_comments: {
         Row: {
           author_id: string | null
@@ -10622,6 +10742,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tenant_audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      token_ledger: {
+        Row: {
+          id: string
+          company_id: string
+          period_start: string
+          period_end: string
+          tokens_allocated: number
+          tokens_consumed: number
+          tokens_purchased: number
+          overage_tokens_used: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          period_start: string
+          period_end: string
+          tokens_allocated?: number
+          tokens_consumed?: number
+          tokens_purchased?: number
+          overage_tokens_used?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          period_start?: string
+          period_end?: string
+          tokens_allocated?: number
+          tokens_consumed?: number
+          tokens_purchased?: number
+          overage_tokens_used?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_ledger_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
