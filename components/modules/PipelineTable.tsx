@@ -32,6 +32,7 @@ interface PipelineTableProps {
     | 'priority'
     | 'solicitation_number'
   >[]
+  initialSearch?: string
 }
 
 function formatCurrency(value: number | null): string {
@@ -72,14 +73,14 @@ const SortIcon = ({ active, direction }: { active: boolean; direction: SortDirec
   </span>
 )
 
-export function PipelineTable({ opportunities }: PipelineTableProps) {
+export function PipelineTable({ opportunities, initialSearch = '' }: PipelineTableProps) {
   const [sortField, setSortField] = useState<SortField>('due_date')
   const [sortDir, setSortDir] = useState<SortDirection>('asc')
   const [filters, setFilters] = useState<PipelineFilters>({
     phase: null,
     status: null,
     setAside: null,
-    search: '',
+    search: initialSearch,
   })
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()

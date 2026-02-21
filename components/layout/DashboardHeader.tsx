@@ -1,6 +1,7 @@
 // filepath: components/layout/DashboardHeader.tsx
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { NotificationsDropdown, type NotificationItem } from './NotificationsDropdown'
@@ -12,6 +13,7 @@ interface DashboardHeaderProps {
 
 export default function DashboardHeader({ userEmail, notifications = [] }: DashboardHeaderProps) {
   const router = useRouter()
+  const [searchQuery, setSearchQuery] = useState('')
 
   async function handleSignOut() {
     const supabase = createBrowserClient(
@@ -23,10 +25,18 @@ export default function DashboardHeader({ userEmail, notifications = [] }: Dashb
     router.refresh()
   }
 
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    const q = searchQuery.trim()
+    if (q) {
+      router.push(`/pipeline?q=${encodeURIComponent(q)}`)
+    }
+  }
+
   return (
     <header className="flex h-16 items-center justify-between border-b border-gray-800 bg-[#00050F] px-6">
       {/* Search */}
-      <div className="relative w-full max-w-md">
+      <form onSubmit={handleSearch} className="relative w-full max-w-md">
         <svg
           className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
           fill="none"
@@ -43,9 +53,11 @@ export default function DashboardHeader({ userEmail, notifications = [] }: Dashb
         <input
           type="text"
           placeholder="Search opportunities, proposals..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full rounded-lg border border-gray-700 bg-gray-900/50 py-2 pl-10 pr-4 text-sm text-gray-200 placeholder-gray-500 outline-none transition-colors focus:border-[#00E5FA]/50 focus:ring-1 focus:ring-[#00E5FA]/25"
         />
-      </div>
+      </form>
 
       {/* Right side actions */}
       <div className="flex items-center gap-4">
