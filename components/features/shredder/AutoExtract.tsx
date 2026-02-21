@@ -9,10 +9,8 @@ import {
   TrackChangesBlock,
   type TrackChangesSuggestion,
 } from '@/components/features/ai/TrackChangesBlock'
-import {
-  runComplianceExtraction,
-  parseExtractedRequirements,
-} from '@/lib/ai/agents/compliance'
+import { runComplianceExtraction } from '@/lib/ai/agents/compliance'
+import { parseExtractedRequirements } from '@/lib/ai/agents/parsers'
 import { createRequirement } from '@/app/(dashboard)/pipeline/[id]/shredder/requirements/actions'
 
 interface AutoExtractProps {

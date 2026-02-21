@@ -9,7 +9,8 @@ import {
   TrackChangesBlock,
   type TrackChangesSuggestion,
 } from '@/components/features/ai/TrackChangesBlock'
-import { runWriterAgent, parseWriterOutput } from '@/lib/ai/agents/writer'
+import { runWriterAgent } from '@/lib/ai/agents/writer'
+import { parseWriterOutput } from '@/lib/ai/agents/parsers'
 
 interface AIWriterPanelProps {
   sectionTitle: string

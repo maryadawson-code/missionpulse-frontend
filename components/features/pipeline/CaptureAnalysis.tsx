@@ -9,10 +9,8 @@ import {
   TrackChangesBlock,
   type TrackChangesSuggestion,
 } from '@/components/features/ai/TrackChangesBlock'
-import {
-  runCaptureAnalysis,
-  parseCaptureAnalysis,
-} from '@/lib/ai/agents/capture'
+import { runCaptureAnalysis } from '@/lib/ai/agents/capture'
+import { parseCaptureAnalysis } from '@/lib/ai/agents/parsers'
 
 interface CaptureAnalysisProps {
   opportunity: {
