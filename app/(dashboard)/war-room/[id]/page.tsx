@@ -185,14 +185,47 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
         ))}
       </div>
 
-      {/* Edit link */}
-      <div>
+      {/* Action Links */}
+      <div className="flex flex-wrap gap-2">
         <a
           href={`/pipeline/${id}/edit`}
           className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-slate hover:text-white hover:border-cyan/30 transition-colors"
         >
           ✏ Edit Opportunity
         </a>
+      </div>
+
+      {/* Sub-Page Navigation */}
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+          Proposal Workbench
+        </h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {[
+            { href: `/pipeline/${id}/shredder`, label: 'RFP Shredder', icon: '📄', desc: 'Extract requirements from RFP' },
+            { href: `/pipeline/${id}/compliance`, label: 'Compliance Matrix', icon: '🛡', desc: 'Track requirements status' },
+            { href: `/pipeline/${id}/contracts`, label: 'Contract Scanner', icon: '📋', desc: 'FAR/DFARS clause analysis' },
+            { href: `/pipeline/${id}/documents`, label: 'Documents', icon: '📁', desc: 'Proposal volume files' },
+            { href: `/pipeline/${id}/pricing`, label: 'Pricing', icon: '💰', desc: 'Cost model & LCATs' },
+            { href: `/pipeline/${id}/strategy`, label: 'Strategy', icon: '🎯', desc: 'Competitive analysis' },
+            { href: `/pipeline/${id}/team`, label: 'Team', icon: '👥', desc: 'Manage assignments' },
+            { href: `/pipeline/${id}/swimlane`, label: 'Swimlane', icon: '📊', desc: 'Section task board' },
+          ].map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="flex items-start gap-3 rounded-md border border-border bg-navy px-3 py-3 hover:border-cyan/40 hover:bg-elevated transition-colors group"
+            >
+              <span className="text-lg mt-0.5">{link.icon}</span>
+              <div>
+                <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+                  {link.label}
+                </p>
+                <p className="text-xs text-slate mt-0.5">{link.desc}</p>
+              </div>
+            </a>
+          ))}
+        </div>
       </div>
 
       {/* Tabs */}
