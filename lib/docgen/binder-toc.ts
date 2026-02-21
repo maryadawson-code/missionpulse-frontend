@@ -14,7 +14,6 @@ import {
   WidthType,
   ShadingType,
   Packer,
-  type ISectionOptions,
 } from 'docx'
 
 // ─── Types ───────────────────────────────────────────────────
