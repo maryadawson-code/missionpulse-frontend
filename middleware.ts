@@ -8,7 +8,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/api/auth/callback', '/api/debug']
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/api/auth/callback']
 
 export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
@@ -90,6 +90,6 @@ export const config = {
      * - public files (images, etc.)
      * - Phase 1 HTML files (*.html)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/debug|.*\\.(?:svg|png|jpg|jpeg|gif|webp|html|js|css)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|html|js|css)$).*)',
   ],
 }
