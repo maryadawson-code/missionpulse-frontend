@@ -66,7 +66,7 @@ interface SectionRow {
  */
 export async function detectMissingSections(
   opportunityId: string,
-  companyId: string
+  _companyId: string
 ): Promise<GapReport> {
   const supabase = await createClient()
 

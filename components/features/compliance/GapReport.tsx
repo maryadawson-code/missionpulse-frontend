@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, CheckCircle2, XCircle, FileQuestion, FileX, Link2Off } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, FileQuestion, FileX, Link2Off } from 'lucide-react'
 import type { GapReport as GapReportType, ComplianceGap } from '@/lib/ai/proactive/section-detector'
 
 // ─── Types ───────────────────────────────────────────────────
