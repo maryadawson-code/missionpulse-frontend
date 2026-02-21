@@ -11,6 +11,7 @@ import { classifyRequest } from './classification-router'
 import { selectModel } from './model-selector'
 import { queryAskSage } from './asksage-client'
 import { logTokenUsage } from './logger'
+import { getCachedResponse, setCachedResponse } from '@/lib/cache/semantic-cache'
 
 /**
  * Unified AI request function. All AI calls go through this.
@@ -45,7 +46,32 @@ export async function aiRequest(
       classification.level
     )
 
-    // Step 3: Execute via AskSage
+    // Step 3: Check cache
+    const cacheInput = {
+      prompt: options.prompt,
+      model: modelSelection.primary.model,
+      classification: classification.level,
+      taskType: options.taskType,
+      systemPrompt: options.systemPrompt,
+    }
+
+    const cached = await getCachedResponse(cacheInput)
+    if (cached) {
+      const latencyMs = Date.now() - startTime
+      return {
+        content: cached.content,
+        model_used: cached.model_used,
+        engine: modelSelection.primary.engine,
+        confidence: cached.confidence,
+        citations: [],
+        tokens_in: 0,
+        tokens_out: 0,
+        latency_ms: latencyMs,
+        classification: classification.level,
+      }
+    }
+
+    // Step 4: Execute via AskSage (cache miss)
     const response = await queryAskSage({
       model: modelSelection.primary.model,
       prompt: options.prompt,
@@ -56,8 +82,16 @@ export async function aiRequest(
     })
 
     const latencyMs = Date.now() - startTime
+    const confidence = inferConfidence(response.response)
 
-    // Step 4: Log usage
+    // Step 5: Store in cache
+    await setCachedResponse(cacheInput, {
+      content: response.response,
+      model_used: response.model,
+      confidence,
+    })
+
+    // Step 6: Log usage
     const costEstimate =
       ((response.tokens_used.input + response.tokens_used.output) / 1000) *
       modelSelection.primary.estimatedCostPer1k
@@ -73,15 +107,16 @@ export async function aiRequest(
         model: response.model,
         classification: classification.level,
         latency_ms: latencyMs,
+        cache_hit: false,
       },
     })
 
-    // Step 5: Return typed response
+    // Step 7: Return typed response
     return {
       content: response.response,
       model_used: response.model,
       engine: modelSelection.primary.engine,
-      confidence: inferConfidence(response.response),
+      confidence,
       citations: [],
       tokens_in: response.tokens_used.input,
       tokens_out: response.tokens_used.output,
