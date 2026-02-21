@@ -1,8 +1,8 @@
 # CURRENT_STATE.md — MissionPulse System Truth
 
-**Version:** 2.0  
-**Generated:** 2026-02-19  
-**Verified against:** Live `information_schema.columns` exports from `djuviwarqdvlbgcfuupa`  
+**Version:** 3.0
+**Last Updated:** 2026-02-21
+**Verified against:** Live `information_schema.columns` exports + build verification
 **Authority:** This is the single source of truth for "what exists right now."
 
 ---
@@ -11,18 +11,19 @@
 
 ### What Is Locked (Database Layer)
 
-The Supabase PostgreSQL database is the production-hardened layer. It is **not being rebuilt** — it is being **wired to a new frontend**.
+The Supabase PostgreSQL database is the production-hardened layer.
 
-- 200 tables, all with RLS enabled
-- 37 tables contain data (see GROUND_TRUTH_v2.md for full inventory)
+- 200+ tables, all with RLS enabled
+- 37+ tables contain data (see GROUND_TRUTH_v2.md for full inventory)
 - 25+ custom functions deployed (RBAC helpers, triggers, utilities)
 - `handle_new_user` trigger auto-creates profiles on signup
 - `audit_logs_immutable` trigger enforces NIST AU-9
-- pgvector installed with 6 embeddings stored
+- pgvector installed with embeddings stored
+- 3 new billing tables: `subscription_plans`, `company_subscriptions`, `token_ledger`
 
-### What Is Changing (Phase 2 — Next.js Migration)
+### What Is Built (Frontend — v1.0 through v1.2)
 
-The frontend migrates from standalone HTML files (React CDN + Tailwind CDN) to a Next.js 14 App Router application. The Python/FastAPI backend is replaced by Next.js server components and route handlers that query Supabase directly.
+Next.js 14 App Router application. All 16 v1.0 modules production-ready. v1.1 integrations and v1.2 collaboration features complete. 61 compiled routes. 8 AI agents operational.
 
 ### Environments
 
@@ -31,229 +32,168 @@ The frontend migrates from standalone HTML files (React CDN + Tailwind CDN) to a
 | Production | missionpulse.netlify.app | `main` | Netlify |
 | Staging | Preview deploys | `v2-development` | Netlify |
 | Database | djuviwarqdvlbgcfuupa.supabase.co | — | Supabase |
-| Legacy API | missionpulse-api.onrender.com | — | Render (deprecated) |
 
 ### Repository
 
-- **Single repo:** `missionpulse-frontend` at `C:\Users\MaryWomack\Desktop\missionpulse-frontend`
-- **No second repo.** `missionpulse-v1` does NOT exist on desktop.
-- **Branches:** `main` (production), `v2-development` (staging/dev)
+- **Single repo:** `missionpulse-frontend`
+- **Branches:** `main` (production), `v2-development` (staging/dev) — synced
+- **HEAD:** `5f6b8b7` on both branches
 
 ---
 
-## 2. Database Schema (Verified from Live Exports)
+## 2. Sprint Status
 
-### 2.1 `profiles` — Auth Pivot Table (13 columns, 3 rows)
+### v1.0 — Core Platform (S3–S18): ALL COMPLETE
+
+All 16 modules production-ready. 61 compiled routes. Build: CLEAR.
+
+| Sprint | Focus | Status |
+|--------|-------|--------|
+| S3 | Dashboard, Pipeline CRUD, War Room, Layout | COMPLETE |
+| S4 | Shared DataTable, FormModal, shadcn/ui | COMPLETE |
+| S5 | Opportunity Detail Tabs | COMPLETE |
+| S6 | Pipeline table migration to DataTable | COMPLETE |
+| S7 | Admin Panel + User Management | COMPLETE |
+| S8 | Proposal Swimlane + Section Editor | COMPLETE |
+| S9 | Compliance Matrix + Shredder | COMPLETE |
+| S10 | AI Agent Pipeline + AskSage | COMPLETE |
+| S11 | AI Chat + Solo Mode | COMPLETE |
+| S12 | Token Usage Dashboard + Analytics | COMPLETE |
+| S13 | HubSpot + SAM.gov Integrations | COMPLETE |
+| S14 | Notifications + Activity Feed | COMPLETE |
+| S15 | Settings + User Preferences | COMPLETE |
+| S16 | Document Management + Upload | COMPLETE |
+| S17 | Orals Prep + Post-Award | COMPLETE |
+| S18 | Launch Readiness + Strategy | COMPLETE |
+
+### v1.1 — Integrations & Performance (S19–S24): ALL COMPLETE
+
+| Sprint | Focus | Status |
+|--------|-------|--------|
+| S19 | Performance & Analytics Foundation (Redis, indexes) | COMPLETE |
+| S20 | Token Budget & Billing (Stripe, $149/$499/$2,500 pricing) | COMPLETE |
+| S21 | Advanced Doc Gen (PPTX/XLSX/DOCX binders) | COMPLETE |
+| S22 | Salesforce + GovWin IQ | COMPLETE |
+| S23 | M365 + Slack | COMPLETE |
+| S24 | Playbook v2 + Voice Profile | COMPLETE |
+
+**S20 Amendments Applied:**
+- A-1: Pricing $149/$499/$2,500 monthly (supersedes $99/$199/$299)
+- A-2: Annual billing with 17% discount
+- A-3: `annual_price` column on `subscription_plans`
+
+### v1.2 — Collaboration & Proactive AI (S25–S28): ALL COMPLETE
+
+| Sprint | Focus | Status |
+|--------|-------|--------|
+| S25 | USAspending + FPDS federal data | COMPLETE |
+| S26 | Google Workspace + DocuSign | COMPLETE |
+| S27 | Advanced RAG + Proactive AI + Fine-tuning | COMPLETE |
+| S28 | Real-time Collab + Commenting + Teams | COMPLETE |
+
+### GTM Extension (S-GTM-1 through S-GTM-3): NOT STARTED
+
+Defined in `ROADMAP_GTM_EXTENSION.md`. Parallel track — does not consume S19–S28 numbers.
+
+| Sprint | Focus | Status | Depends On |
+|--------|-------|--------|-----------|
+| S-GTM-1 | Multi-Model AI Abstraction | NOT STARTED | S19 (AI pipeline) |
+| S-GTM-2 | Paid Pilot Infrastructure | NOT STARTED | S20 (billing) |
+| S-GTM-3 | Public Marketing & Revenue Pages | NOT STARTED | None |
+
+---
+
+## 3. Database Schema (Key Tables)
+
+### 3.1 `profiles` — Auth Pivot Table (13 columns)
 
 Every RLS helper function queries this table. `handle_new_user` trigger inserts here on signup.
 
-| # | Column | Type | Nullable | Default | Notes |
-|---|--------|------|----------|---------|-------|
-| 1 | `id` | uuid | NO | — | PK, FK → `auth.users(id)` ON DELETE CASCADE |
-| 2 | `email` | varchar | NO | — | UNIQUE |
-| 3 | `full_name` | varchar | YES | — | From `raw_user_meta_data` or email prefix |
-| 4 | `role` | varchar | YES | `'Partner'` | **Column default is 'Partner'.** `handle_new_user` trigger overrides to 'CEO'. |
-| 5 | `company` | varchar | YES | — | Company name (text). See also `company_id`. |
-| 6 | `phone` | varchar | YES | — | |
-| 7 | `avatar_url` | text | YES | — | |
-| 8 | `preferences` | jsonb | YES | `'{}'` | User preference store |
-| 9 | `created_at` | timestamptz | YES | `now()` | |
-| 10 | `updated_at` | timestamptz | YES | `now()` | |
-| 11 | `company_id` | uuid | YES | — | FK → `companies(id)`. Coexists with `company` (varchar). |
-| 12 | `status` | text | YES | `'active'` | Account status |
-| 13 | `last_login` | timestamptz | YES | — | |
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK, FK → `auth.users(id)` |
+| `email` | varchar | UNIQUE |
+| `full_name` | varchar | |
+| `role` | varchar | Default 'Partner', trigger overrides to 'CEO' |
+| `company_id` | uuid | FK → `companies(id)` |
+| `status` | text | Default 'active' |
 
-**⚠ CRITICAL FINDINGS:**
+**No `mfa_enabled` column exists.** MFA functions reference it but it's not deployed.
 
-1. **No `mfa_enabled` column exists.** GROUND_TRUTH_v2.md listed `is_mfa_enabled()`, `requires_mfa()`, and `check_mfa_compliance()` as deployed functions. These functions either query a different table or are broken. **Must verify before referencing MFA in SSP claims.**
+### 3.2 `opportunities` — Pipeline Core (46 columns)
 
-2. **Dual company reference:** Both `company` (varchar — display name) and `company_id` (uuid — FK) exist. RLS functions use `get_my_company_id()` which queries `company_id`. The `company` varchar field is for display.
+| Concept | Use This | Ignore |
+|---------|----------|--------|
+| Title | `title` | NOT `name` |
+| Value | `ceiling` | NOT `contract_value` |
+| Win prob | `pwin` | NOT `win_probability` |
+| Phase | `phase` | NOT `shipley_phase`, `pipeline_stage` |
+| Owner | `owner_id` | NOT `created_by` |
 
-3. **Role default is 'Partner', not 'CEO'.** The `handle_new_user` trigger hardcodes `role = 'CEO'` which overrides the column default. If someone inserts into profiles directly (bypassing the trigger), they get 'Partner'.
+### 3.3 Billing Tables (Sprint 20 — NEW)
 
-**Valid roles (from RBAC helper functions):** executive, operations, capture_manager, volume_lead, author, admin, CEO, COO, CAP, PM, SA, FIN, CON, DEL, QA, subcontractor, teaming_partner, viewer, Partner
-
----
-
-### 2.2 `opportunities` — Pipeline Core (46 columns, 5 rows)
-
-**Verified from live `information_schema` export on 2026-02-19.**
-
-| # | Column | Type | Nullable | Default | Notes |
-|---|--------|------|----------|---------|-------|
-| 1 | `id` | uuid | NO | `gen_random_uuid()` | PK |
-| 2 | `title` | varchar | NO | — | Primary display name |
-| 3 | `nickname` | varchar | YES | — | Short name |
-| 4 | `description` | text | YES | — | |
-| 5 | `agency` | varchar | YES | — | Contracting agency |
-| 6 | `sub_agency` | varchar | YES | — | |
-| 7 | `contract_vehicle` | varchar | YES | — | IDIQ, BPA, etc. |
-| 8 | `naics_code` | varchar | YES | — | |
-| 9 | `set_aside` | varchar | YES | — | SDVOSB, 8(a), etc. |
-| 10 | `ceiling` | numeric | YES | — | Contract dollar value |
-| 11 | `period_of_performance` | varchar | YES | — | PoP description |
-| 12 | `due_date` | timestamptz | YES | — | Proposal due date |
-| 13 | `phase` | varchar | YES | `'Gate 1'` | Shipley gate (Gate 1–6) |
-| 14 | `status` | varchar | YES | `'Active'` | Active, Won, Lost, No-Bid |
-| 15 | `priority` | varchar | YES | `'Medium'` | Low, Medium, High, Critical |
-| 16 | `pwin` | integer | YES | `50` | Win probability (0–100) |
-| 17 | `go_no_go` | varchar | YES | — | Go/No-Go decision |
-| 18 | `incumbent` | varchar | YES | — | Current contract holder |
-| 19 | `solicitation_number` | varchar | YES | — | |
-| 20 | `sam_url` | text | YES | — | SAM.gov listing URL |
-| 21 | `notes` | text | YES | — | |
-| 22 | `owner_id` | uuid | YES | — | FK → `profiles(id)` — opportunity owner |
-| 23 | `created_at` | timestamptz | YES | `now()` | |
-| 24 | `updated_at` | timestamptz | YES | `now()` | |
-| 25 | `hubspot_deal_id` | text | YES | — | HubSpot CRM link |
-| 26 | `hubspot_synced_at` | timestamptz | YES | — | Last HubSpot sync |
-| 27 | `deal_source` | text | YES | `'manual'` | manual, hubspot, sam_gov |
-| 28 | `pipeline_stage` | text | YES | `'qualification'` | ⚠ DUPLICATE — prefer `phase` |
-| 29 | `close_date` | date | YES | — | Expected close |
-| 30 | `contact_email` | text | YES | — | Primary contact email |
-| 31 | `contact_name` | text | YES | — | Primary contact name |
-| 32 | `sam_opportunity_id` | text | YES | — | SAM.gov ID |
-| 33 | `govwin_id` | text | YES | — | GovWin tracking ID |
-| 34 | `place_of_performance` | text | YES | — | |
-| 35 | `is_recompete` | boolean | YES | `false` | |
-| 36 | `bd_investment` | numeric | YES | `0` | B&P spend tracking ($) |
-| 37 | `tags` | ARRAY | YES | — | Text array |
-| 38 | `custom_properties` | jsonb | YES | `'{}'` | User-facing metadata |
-| 39 | `company_id` | uuid | YES | — | FK → `companies(id)` |
-| 40 | `win_probability` | integer | YES | `50` | ⚠ DUPLICATE of `pwin` |
-| 41 | `shipley_phase` | text | YES | — | ⚠ DUPLICATE of `phase` |
-| 42 | `submission_date` | timestamptz | YES | — | |
-| 43 | `award_date` | timestamptz | YES | — | |
-| 44 | `pop_start` | timestamptz | YES | — | Period of performance start |
-| 45 | `pop_end` | timestamptz | YES | — | Period of performance end |
-| 46 | `metadata` | jsonb | YES | `'{}'` | System metadata |
-
-**⚠ DUPLICATE COLUMN STANDARDIZATION:**
-
-| Concept | Use This | Ignore These | Rationale |
-|---------|----------|-------------|-----------|
-| Win probability | `pwin` (col 16) | `win_probability` (col 40) | Shorter, same default, more readable |
-| Pipeline stage | `phase` (col 13, default 'Gate 1') | `shipley_phase` (col 41), `pipeline_stage` (col 28) | Has default value, maps to Shipley gates |
-| Lifecycle status | `status` (col 14, default 'Active') | — | Active/Won/Lost/No-Bid |
-| Metadata | `custom_properties` (col 38) | `metadata` (col 46) | User-facing vs system |
-
-**Phase 1 JS → Actual DB Column Mapping:**
-
-| supabase-client.js used | Actual column | Match? |
-|------------------------|---------------|--------|
-| `name` | `title` | ❌ WRONG |
-| `contractValue` / `contract_value` | `ceiling` | ❌ WRONG |
-| `winProbability` / `win_probability` | `pwin` (preferred) | ⚠ DUPLICATE EXISTS |
-| `shipleyPhase` / `shipley_phase` | `phase` (preferred) | ⚠ DUPLICATE EXISTS |
-| `dueDate` / `due_date` | `due_date` | ✅ CORRECT |
-| `primaryContact` | `contact_name` + `contact_email` | ❌ SPLIT |
+| Table | Purpose |
+|-------|---------|
+| `subscription_plans` | Plan definitions: name, slug, monthly_price, annual_price, token limits, features |
+| `company_subscriptions` | Per-company: plan_id, status, billing_interval, Stripe IDs |
+| `token_ledger` | Per-period: allocated, consumed, purchased, overage tokens |
 
 ---
 
-### 2.3 Other Tables (Not Yet Verified)
+## 4. Required Truth Files
 
-| Table | Rows | Verified? | Notes |
-|-------|------|-----------|-------|
-| `companies` | 1 | ❌ | Run info_schema query to verify |
-| `roles` | 11 | ❌ | |
-| `pipeline_stages` | 10 | ❌ | |
-| `activity_log` | 8 | ❌ | |
-| `audit_logs` | 2 | ❌ | Immutability trigger verified |
-| `labor_categories` | 35 | ❌ | CUI // SP-PROPIN |
-| `competitors` | 3 | ❌ | CUI // OPSEC |
+| File | Purpose | Status |
+|------|---------|--------|
+| `database.types.ts` | Generated DB types | PRESENT (3 billing types manually added) |
+| `roles_permissions_config.json` | RBAC matrix | PRESENT (v9.5) |
+| `GROUND_TRUTH_v2.md` | Database reality audit | PRESENT |
+| `PHASE_2_RULES.md` | Framework rules | PRESENT |
+| `ROADMAP_v1.1_v1.2.md` | v1.1/v1.2 sprint plan | PRESENT |
+| `ROADMAP_GTM_EXTENSION.md` | GTM parallel track | PRESENT |
 
-To verify any table:
-```sql
-SELECT column_name, data_type, is_nullable, column_default
-FROM information_schema.columns
-WHERE table_schema = 'public' AND table_name = 'TABLE_NAME_HERE'
-ORDER BY ordinal_position;
+---
+
+## 5. Known Tech Debt
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| `mfa_enabled` column missing from profiles | HIGH | OPEN — add column or remove SSP claims |
+| `handle_new_user` defaults to CEO | HIGH | OPEN — change to 'viewer' before multi-user |
+| 3 types manually added to `database.types.ts` | MEDIUM | OPEN — run SQL migration then `supabase gen types` to regenerate |
+| `pwin` + `win_probability` duplicate columns | MEDIUM | Mitigated — code uses `pwin` only |
+| `phase` + `shipley_phase` + `pipeline_stage` triplicates | MEDIUM | Mitigated — code uses `phase` only |
+| `hubspot_field_mapping` + `hubspot_field_mappings` duplicate tables | LOW | Consolidation pending |
+| 6 lint warnings (unused vars in Sprint 28 realtime code) | LOW | Non-blocking |
+| GTM Amendments A-1/A-2/A-3 already applied to S20 code | INFO | Amendments are implemented |
+
+---
+
+## 6. Health Check (2026-02-21)
+
+```
+Build:            PASS (0 errors)
+Type Safety:      PASS (0 errors, 0 as any)
+Lint:             PASS (6 warnings)
+Route Audit:      PASS (61 routes)
+Schema Covenant:  PASS (0 flags)
+Security Scan:    PASS (0 flags)
+Overall:          CLEAR
 ```
 
 ---
 
-## 3. Supabase Auth Flow
+## 7. Next Steps
 
-### Providers
+**Option A — S-GTM-1 (Multi-Model AI Abstraction):**
+Decouple from AskSage. Provider-agnostic interface. CUI-aware routing.
 
-- **Email/password:** YES — signups open, email confirmation disabled
-- **Social, Phone, SSO:** NO
+**Option B — S-GTM-2 (Paid Pilot Infrastructure):**
+30-day pilots, engagement scoring, conversion tracking. Depends on S20 (done).
 
-### Signup → Profile Creation
-
-1. `supabase.auth.signUp({ email, password })` → row in `auth.users`
-2. `handle_new_user` trigger → row in `profiles` with `role = 'CEO'`
-3. Column default is `'Partner'` but trigger overrides to `'CEO'`
-4. **⚠ Change trigger to `'viewer'` before multi-user launch**
-
-### Session Management
-
-**Does not exist.** No `signIn()`, no cookies, no refresh. Phase 2 implements `@supabase/ssr`.
-
-### Role Derivation
-
-`profiles.role` queried by all RLS functions via `auth.uid()`. Not in JWT claims.
+**Option C — S-GTM-3 (Public Marketing Pages):**
+Public pricing page, 8(a) toolkit landing, newsletter. No dependencies.
 
 ---
 
-## 4. RLS & Helper Functions
-
-### Core Functions (Verified Deployed)
-
-| Function | Checks `profiles.role` IN |
-|----------|--------------------------|
-| `is_admin()` | executive, operations, admin, CEO, COO |
-| `is_internal_user()` | 15 internal roles |
-| `can_access_sensitive()` | executive, operations, admin, CEO, COO, FIN |
-| `get_user_role()` | Returns role, defaults to 'viewer' |
-| `get_my_company_id()` | Returns `company_id` from profiles |
-| `is_authenticated()` | `auth.uid() IS NOT NULL` |
-
-### MFA Functions (⚠ LIKELY BROKEN)
-
-| Function | Expects | Reality |
-|----------|---------|---------|
-| `is_mfa_enabled()` | `profiles.mfa_enabled` column | **Column does not exist** |
-| `requires_mfa()` | Hardcoded role check | Roles exist, no enforcement |
-| `check_mfa_compliance()` | Combines above | **Broken** |
-
-**Action:** Either add `ALTER TABLE profiles ADD COLUMN mfa_enabled BOOLEAN DEFAULT false;` or remove MFA references from SSP.
-
----
-
-## 5. Known Schema Debt
-
-| Issue | Severity | Recommended Action |
-|-------|----------|-------------------|
-| `mfa_enabled` column missing | **HIGH** | Add to profiles OR remove MFA SSP claims |
-| `handle_new_user` defaults to CEO | **HIGH** | Change to 'viewer' before multi-user |
-| `pwin` + `win_probability` duplicates | MEDIUM | Use `pwin` in Next.js. Ignore `win_probability`. |
-| `phase` + `shipley_phase` + `pipeline_stage` triplicates | MEDIUM | Use `phase` for gates, `status` for lifecycle |
-| `company` (varchar) + `company_id` (uuid) on profiles | LOW | `company_id` for FK/RLS. `company` for display. |
-| `hubspot_field_mapping` + `hubspot_field_mappings` | LOW | Consolidate later |
-| 163 empty tables | LOW | Populate as modules wire up |
-
----
-
-## 6. Evidence Map
-
-| Claim | Source | Status |
-|-------|--------|--------|
-| `profiles` has 13 columns, no `mfa_enabled` | Live info_schema export 2/19 | ✅ VERIFIED |
-| `profiles.role` defaults to `'Partner'` | Live export | ✅ VERIFIED |
-| `opportunities` has 46 columns | Live info_schema export 2/19 | ✅ VERIFIED |
-| `ceiling` is dollar field (not `value`) | Live export | ✅ VERIFIED |
-| `owner_id` is profile FK (not `created_by`) | Live export | ✅ VERIFIED |
-| `pwin` AND `win_probability` both exist | Live export | ✅ VERIFIED |
-| 200 tables with RLS, 37 with data | GROUND_TRUTH_v2.md | ✅ VERIFIED |
-| `handle_new_user` trigger deployed | GROUND_TRUTH_v2.md | ✅ VERIFIED |
-| `audit_logs_immutable` trigger | GROUND_TRUTH_v2.md | ✅ VERIFIED |
-| All 6 core RBAC functions | GROUND_TRUTH_v2.md | ✅ VERIFIED |
-| Supabase instance ID | supabase-client.js line 23 | ✅ VERIFIED |
-| `companies` columns | GROUND_TRUTH inference | ⚠ UNVERIFIED |
-| MFA functions query `profiles.mfa_enabled` | GROUND_TRUTH_v2.md claim | ❌ COLUMN MISSING |
-
----
-
-*Mission Meets Tech — Mission. Technology. Transformation.*  
-*AI GENERATED — REQUIRES HUMAN REVIEW*
+*Mission Meets Tech — Mission. Technology. Transformation.*
+*Last verified: 2026-02-21*

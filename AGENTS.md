@@ -41,6 +41,10 @@ app/
 │   ├── page.tsx      # Dashboard home
 │   ├── pipeline/     # Opportunity pipeline
 │   └── war-room/     # War room detail views
+├── (public)/         # Unauthenticated marketing pages
+│   ├── layout.tsx    # Public layout (MMT branding, no sidebar)
+│   ├── pricing/      # Three-tier pricing page
+│   └── 8a-toolkit/   # 8(a) landing page
 ├── layout.tsx        # Root layout (fonts, metadata)
 └── page.tsx          # Landing/redirect
 
@@ -73,6 +77,14 @@ middleware.ts          # Session refresh + auth redirect
 - `GROUND_TRUTH_v2.md` → Live database audit (200 tables, 37 with data, all RLS functions)
 - `roles_permissions_config.json` → Canonical RBAC matrix (12 roles × 14 modules)
 - `database.types.ts` → Generated DB types (sole schema authority)
+- `ROADMAP_GTM_EXTENSION.md` → GTM & Revenue Architecture (parallel track S-GTM-1 to S-GTM-3)
+  - Pricing: $149/$499/$2,500 monthly. Annual = 17% discount. All annual < $15K micro-purchase threshold.
+  - AI: Multi-provider abstraction (AskSage primary, Claude/OpenAI fallback). CUI → FedRAMP only.
+  - Pilots: 30-day at 50% annual, credited on conversion. Engagement scoring 0-100.
+  - Public routes: app/(public)/ for pricing, 8(a) toolkit, newsletter signup.
+- `FORGE_GTM_CONTEXT_PROMPT.md` → Context injection for GTM/billing sessions
+- `PROJECT_INTEGRATION_INSTRUCTIONS.md` → GTM extension installation guide
+- `AGENT_HANDOFF_SPEC_v1.md` → 2-agent commercialization handoff schema
 
 ## Rules
 
@@ -116,6 +128,11 @@ middleware.ts          # Session refresh + auth redirect
 - Mac Terminal: give commands ONE AT A TIME in separate code blocks. Do NOT chain with semicolons — copy/paste causes concatenation errors.
 - Git: Always use Terminal for git commands, not GitHub Desktop GUI.
 - Always `git checkout v2-development` before making changes.
+- Pricing is $149/$499/$2,500 per month (NOT $99/$199/$299 from the original Product Spec). Apply when seeding subscription_plans.
+- `annual_price` column required on subscription_plans — was not in original T-20.1 spec.
+- AI gateway calls go through lib/ai/pipeline.ts → aiRequest(). Token gate pre-flight and post-debit integrated there.
+- Public routes at app/(public)/ have NO auth middleware. Do not import Supabase auth in public pages.
+- newsletter_subscribers table uses service-role insert only (public API route, not client-side).
 
 ## Conventions
 
