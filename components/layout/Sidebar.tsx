@@ -101,6 +101,12 @@ const NAV_ITEMS: NavItem[] = [
     href: '/audit',
     iconPath: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
   },
+  {
+    module: 'integrations',
+    label: 'Integrations',
+    href: '/integrations',
+    iconPath: 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 00-6.364-6.364L4.5 8.257m9 4.5l1.757-1.757',
+  },
 ]
 
 // ─── Props ──────────────────────────────────────────────────────
