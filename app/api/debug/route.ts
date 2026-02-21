@@ -4,10 +4,14 @@ import { NextResponse } from 'next/server'
 export async function GET() {
   const checks: Record<string, string> = {}
 
-  // 1. Check env vars
-  checks.supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'MISSING'
-  checks.supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'SET (length: ' + process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length + ')' : 'MISSING'
+  // 1. Check all possible env var names
+  checks.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'MISSING'
+  checks.NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'SET' : 'MISSING'
+  checks.SUPABASE_URL = process.env.SUPABASE_URL ? 'SET' : 'MISSING'
+  checks.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ? 'SET' : 'MISSING'
   checks.nodeVersion = process.version
+  // List ALL env var keys (names only, not values) for debugging
+  checks.allEnvKeys = Object.keys(process.env).filter(k => k.includes('SUPA') || k.includes('NEXT_PUBLIC')).join(', ') || 'NONE FOUND'
 
   // 2. Try importing cookies
   try {
