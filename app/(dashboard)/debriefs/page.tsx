@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { CreateDebriefForm } from './CreateDebriefForm'
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
@@ -53,12 +54,15 @@ export default async function DebriefsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Win/Loss Debriefs</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Capture lessons learned from proposal outcomes to improve future win
-          rates.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Win/Loss Debriefs</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Capture lessons learned from proposal outcomes to improve future win
+            rates.
+          </p>
+        </div>
+        <CreateDebriefForm />
       </div>
 
       {items.length === 0 ? (

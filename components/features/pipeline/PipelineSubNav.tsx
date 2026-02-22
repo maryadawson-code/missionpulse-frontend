@@ -29,6 +29,7 @@ export function PipelineSubNav({ opportunityId }: { opportunityId: string }) {
     { href: `${basePath}/team`, label: 'Team', module: 'pipeline', permission: 'canView' },
     { href: `${basePath}/launch`, label: 'Launch', module: 'proposals', permission: 'shouldRender' },
     { href: `${basePath}/orals`, label: 'Orals', module: 'proposals', permission: 'shouldRender' },
+    { href: `${basePath}/intel`, label: 'Intel', module: 'pipeline', permission: 'canView' },
   ]
 
   const visibleItems = items.filter(
