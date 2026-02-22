@@ -5,10 +5,11 @@ import { LaunchControl } from '@/components/features/launch/LaunchControl'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function LaunchPage({ params }: Props) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -31,7 +32,7 @@ export default async function LaunchPage({ params }: Props) {
   const { data: opportunity } = await supabase
     .from('opportunities')
     .select('id, title, agency, status, pwin, due_date')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!opportunity) redirect('/pipeline')
@@ -40,7 +41,7 @@ export default async function LaunchPage({ params }: Props) {
   const { data: requirements } = await supabase
     .from('compliance_requirements')
     .select('id, status')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
 
   const totalReqs = requirements?.length ?? 0
   const verifiedReqs = requirements?.filter((r) => r.status === 'verified' || r.status === 'addressed').length ?? 0
@@ -50,26 +51,26 @@ export default async function LaunchPage({ params }: Props) {
   const { data: gateDecisions } = await supabase
     .from('gate_reviews')
     .select('id, gate_name, gate_number, decision, pwin_at_gate, conditions, created_at')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
     .order('gate_number', { ascending: true })
 
   // Team members count
   const { count: teamCount } = await supabase
     .from('opportunity_assignments')
     .select('id', { count: 'exact', head: true })
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
 
   // Documents count
   const { count: docCount } = await supabase
     .from('documents')
     .select('id', { count: 'exact', head: true })
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
 
   // Proposal sections stats for binder checklist
   const { data: sectionData } = await supabase
     .from('proposal_sections')
     .select('status')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
 
   const totalSections = sectionData?.length ?? 0
   const finalSections = sectionData?.filter((s) => s.status === 'final').length ?? 0
@@ -79,7 +80,7 @@ export default async function LaunchPage({ params }: Props) {
       <Breadcrumb
         items={[
           { label: 'Pipeline', href: '/pipeline' },
-          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: opportunity.title, href: `/pipeline/${id}` },
           { label: 'Launch' },
         ]}
       />

@@ -5,10 +5,11 @@ import { PostAwardPanel } from '@/components/features/post-award/PostAwardPanel'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function PostAwardPage({ params }: Props) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -29,7 +30,7 @@ export default async function PostAwardPage({ params }: Props) {
   const { data: opportunity } = await supabase
     .from('opportunities')
     .select('id, title, agency, status')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!opportunity) redirect('/pipeline')
@@ -37,13 +38,13 @@ export default async function PostAwardPage({ params }: Props) {
   const { data: debriefs } = await supabase
     .from('debriefs')
     .select('id, outcome, strengths, weaknesses, evaluator_feedback, notes, debrief_date')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
     .order('debrief_date', { ascending: false })
 
   const { data: lessons } = await supabase
     .from('lessons_learned')
     .select('id, title, description, category, recommendation')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
     .order('created_at', { ascending: false })
 
   return (
@@ -51,7 +52,7 @@ export default async function PostAwardPage({ params }: Props) {
       <Breadcrumb
         items={[
           { label: 'Pipeline', href: '/pipeline' },
-          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: opportunity.title, href: `/pipeline/${id}` },
           { label: 'Post-Award' },
         ]}
       />

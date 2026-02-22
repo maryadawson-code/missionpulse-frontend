@@ -5,10 +5,11 @@ import { OralsPrep } from '@/components/features/orals/OralsPrep'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function OralsPage({ params }: Props) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -29,7 +30,7 @@ export default async function OralsPage({ params }: Props) {
   const { data: opportunity } = await supabase
     .from('opportunities')
     .select('id, title, agency, description')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!opportunity) redirect('/pipeline')
@@ -38,14 +39,14 @@ export default async function OralsPage({ params }: Props) {
   const { data: requirements } = await supabase
     .from('compliance_requirements')
     .select('requirement')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
     .limit(20)
 
   // Fetch saved questions from question bank
   const { data: savedQuestions } = await supabase
     .from('orals_questions')
     .select('id, question, suggested_answer, category, difficulty, times_asked, avg_score')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
     .order('category', { ascending: true })
     .limit(50)
 
@@ -56,7 +57,7 @@ export default async function OralsPage({ params }: Props) {
       <Breadcrumb
         items={[
           { label: 'Pipeline', href: '/pipeline' },
-          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: opportunity.title, href: `/pipeline/${id}` },
           { label: 'Orals' },
         ]}
       />

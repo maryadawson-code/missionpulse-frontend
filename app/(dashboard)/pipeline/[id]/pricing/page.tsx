@@ -7,10 +7,11 @@ import { PricingAI } from '@/components/features/pricing/PricingAI'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function OpportunityPricingPage({ params }: Props) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -31,7 +32,7 @@ export default async function OpportunityPricingPage({ params }: Props) {
   const { data: opportunity } = await supabase
     .from('opportunities')
     .select('id, title, agency, description, naics_code, set_aside, ceiling')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!opportunity) redirect('/pipeline')
@@ -40,7 +41,7 @@ export default async function OpportunityPricingPage({ params }: Props) {
   const { data: costVolumes } = await supabase
     .from('cost_volumes')
     .select('id, volume_name, status, contract_type, base_period_months, fringe_rate, overhead_rate, ga_rate, wrap_rate, fee_percent, direct_labor_total, total_proposed, cost_labor_categories(id, labor_category, level, headcount, hourly_rate, loaded_rate, annual_hours, total_hours, total_cost, sort_order)')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
     .order('created_at', { ascending: true })
 
   // Fetch ODCs (Other Direct Costs)
@@ -59,7 +60,7 @@ export default async function OpportunityPricingPage({ params }: Props) {
   const { data: requirements } = await supabase
     .from('compliance_requirements')
     .select('requirement')
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
     .limit(20)
 
   return (
@@ -94,7 +95,7 @@ export default async function OpportunityPricingPage({ params }: Props) {
       <Breadcrumb
         items={[
           { label: 'Pipeline', href: '/pipeline' },
-          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: opportunity.title, href: `/pipeline/${id}` },
           { label: 'Pricing' },
         ]}
       />

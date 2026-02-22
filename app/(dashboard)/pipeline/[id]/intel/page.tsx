@@ -30,9 +30,9 @@ function confidenceStyle(level: string | null): string {
 export default async function IntelPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const { id } = params
+  const { id } = await params
   const supabase = await createClient()
 
   const {

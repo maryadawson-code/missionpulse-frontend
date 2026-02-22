@@ -5,9 +5,9 @@ import { Breadcrumb } from '@/components/layout/Breadcrumb'
 export default async function MatrixDetailPage({
   params,
 }: {
-  params: { id: string; matrixId: string }
+  params: Promise<{ id: string; matrixId: string }>
 }) {
-  const { id, matrixId } = params
+  const { id, matrixId } = await params
   const supabase = await createClient()
 
   const {

@@ -8,10 +8,11 @@ import { StrategyAnalysis } from '@/components/features/pipeline/StrategyAnalysi
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function OpportunityStrategyPage({ params }: Props) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -36,7 +37,7 @@ export default async function OpportunityStrategyPage({ params }: Props) {
   const { data: opportunity } = await supabase
     .from('opportunities')
     .select('id, title, agency, description, set_aside, naics_code')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!opportunity) redirect('/pipeline')
@@ -46,7 +47,7 @@ export default async function OpportunityStrategyPage({ params }: Props) {
     .select(
       'id, name, threat_level, pwin_estimate, incumbent, strengths, weaknesses, likely_strategy, counter_strategy, ghost_themes'
     )
-    .eq('opportunity_id', params.id)
+    .eq('opportunity_id', id)
     .order('threat_level', { ascending: true })
 
   return (
@@ -81,7 +82,7 @@ export default async function OpportunityStrategyPage({ params }: Props) {
       <Breadcrumb
         items={[
           { label: 'Pipeline', href: '/pipeline' },
-          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: opportunity.title, href: `/pipeline/${id}` },
           { label: 'Strategy' },
         ]}
       />
