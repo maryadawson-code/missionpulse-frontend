@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { logNotification } from '@/lib/utils/notifications'
 import type { ActionResult } from '@/lib/types'
 
 export async function addTeamMember(
@@ -34,6 +35,32 @@ export async function addTeamMember(
       role: data.role,
     },
   })
+
+  // Notify assigned user if they have a profile
+  const { data: assigneeProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', data.assignee_email)
+    .single()
+
+  if (assigneeProfile?.id && assigneeProfile.id !== user.id) {
+    const { data: opp } = await supabase
+      .from('opportunities')
+      .select('title')
+      .eq('id', opportunityId)
+      .single()
+
+    await logNotification({
+      userId: assigneeProfile.id,
+      title: `Assigned to ${data.role}`,
+      message: `You were assigned as ${data.role} on "${opp?.title ?? 'an opportunity'}" by ${user.email}.`,
+      notificationType: 'assignment',
+      priority: 'normal',
+      linkUrl: `/pipeline/${opportunityId}/team`,
+      linkText: 'View Team',
+      opportunityId,
+    })
+  }
 
   revalidatePath(`/pipeline/${opportunityId}/team`)
   revalidatePath(`/war-room/${opportunityId}`)

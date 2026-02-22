@@ -3,6 +3,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { logNotification } from '@/lib/utils/notifications'
 import type { OpportunityInsert, OpportunityUpdate } from '@/lib/types/opportunities'
 
 interface ActionResult {
@@ -276,6 +277,26 @@ export async function updateOpportunityPhase(
     entity_id: id,
     user_id: user.id,
   })
+
+  // Notify opportunity owner on gate transitions
+  const { data: opp } = await supabase
+    .from('opportunities')
+    .select('owner_id, title')
+    .eq('id', id)
+    .single()
+
+  if (opp?.owner_id && opp.owner_id !== user.id) {
+    await logNotification({
+      userId: opp.owner_id,
+      title: `Opportunity moved to ${phase}`,
+      message: `"${opp.title}" was moved to ${phase} by ${user.email}.`,
+      notificationType: 'gate_approval',
+      priority: 'high',
+      linkUrl: `/pipeline/${id}`,
+      linkText: 'View Opportunity',
+      opportunityId: id,
+    })
+  }
 
   revalidatePath('/pipeline')
   revalidatePath(`/war-room/${id}`)

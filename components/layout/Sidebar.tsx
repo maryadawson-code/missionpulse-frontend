@@ -2,7 +2,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 import type { RBACModule, ModulePermission } from '@/lib/types'
 
 // ─── Nav Item Config ────────────────────────────────────────────
@@ -131,10 +132,12 @@ interface SidebarProps {
   permissions: Record<string, ModulePermission>
   userDisplayName: string | null
   userRole: string | null
+  unreadNotifications?: number
 }
 
-export default function Sidebar({ permissions, userDisplayName, userRole }: SidebarProps) {
+export default function Sidebar({ permissions, userDisplayName, userRole, unreadNotifications = 0 }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
 
   // Filter nav items: invisible RBAC — only render items where shouldRender=true
   const visibleItems = NAV_ITEMS.filter((item) => {
@@ -319,8 +322,37 @@ export default function Sidebar({ permissions, userDisplayName, userRole }: Side
         </ul>
       </nav>
 
-      {/* Settings link — always visible */}
-      <div className="border-t border-gray-800 px-3 py-2">
+      {/* Bottom links — Notifications + Settings */}
+      <div className="border-t border-gray-800 px-3 py-2 space-y-1">
+        <Link
+          href="/notifications"
+          className={`
+            group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
+            ${
+              pathname === '/notifications'
+                ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
+                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+            }
+          `}
+        >
+          <svg
+            className={`h-5 w-5 flex-shrink-0 ${
+              pathname === '/notifications' ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+            }`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+          </svg>
+          Notifications
+          {unreadNotifications > 0 && (
+            <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+              {unreadNotifications > 99 ? '99+' : unreadNotifications}
+            </span>
+          )}
+        </Link>
         <Link
           href="/settings"
           className={`
@@ -368,6 +400,23 @@ export default function Sidebar({ permissions, userDisplayName, userRole }: Side
               {userRole?.replace(/_/g, ' ') ?? 'No role'}
             </p>
           </div>
+          <button
+            onClick={async () => {
+              const supabase = createBrowserClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+              )
+              await supabase.auth.signOut()
+              router.push('/login')
+              router.refresh()
+            }}
+            className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-red-400"
+            title="Sign out"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+          </button>
         </div>
       </div>
     </aside>

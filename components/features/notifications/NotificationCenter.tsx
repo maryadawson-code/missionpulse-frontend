@@ -62,11 +62,19 @@ export function NotificationCenter({
 }: NotificationCenterProps) {
   const [isPending, startTransition] = useTransition()
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const [typeFilter, setTypeFilter] = useState<string | null>(null)
 
-  const filtered =
-    filter === 'unread'
-      ? notifications.filter((n) => !n.is_read)
-      : notifications
+  const TYPE_FILTERS = [
+    { key: 'gate_approval', label: 'Gate Approvals' },
+    { key: 'deadline', label: 'Deadlines' },
+    { key: 'assignment', label: 'Assignments' },
+    { key: 'ai_complete', label: 'AI' },
+    { key: 'section_status_change', label: 'Status Changes' },
+  ]
+
+  const filtered = notifications
+    .filter((n) => (filter === 'unread' ? !n.is_read : true))
+    .filter((n) => (typeFilter ? n.notification_type === typeFilter : true))
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
@@ -112,6 +120,16 @@ export function NotificationCenter({
           >
             Unread ({unreadCount})
           </button>
+          <span className="mx-1 text-gray-700">|</span>
+          {TYPE_FILTERS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTypeFilter(typeFilter === t.key ? null : t.key)}
+              className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${typeFilter === t.key ? `${typeBadge(t.key)}` : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
         {unreadCount > 0 && (
           <Button

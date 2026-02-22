@@ -69,6 +69,20 @@ export default async function DashboardLayout({
     // Non-critical — continue without notifications
   }
 
+  // ─── Unread Notification Count for Sidebar Badge ──────────
+  let unreadNotifications = 0
+  try {
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false)
+      .eq('is_dismissed', false)
+    unreadNotifications = count ?? 0
+  } catch {
+    // Non-critical
+  }
+
   const isExternal = !isInternalRole(userRole)
   const companyName = profile?.full_name ?? user.email ?? 'External User'
   const forceCUI = hasForceCUIWatermark(userRole)
@@ -102,6 +116,7 @@ export default async function DashboardLayout({
           permissions={permissions}
           userDisplayName={profile?.full_name ?? user.email ?? null}
           userRole={userRole}
+          unreadNotifications={unreadNotifications}
         />
 
         {/* Main content area */}
