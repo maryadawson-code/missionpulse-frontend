@@ -16,6 +16,8 @@ import type { Database } from '@/lib/supabase/database.types'
 import Link from 'next/link'
 import { CaptureAnalysis } from '@/components/features/pipeline/CaptureAnalysis'
 import { AwardHistory } from '@/components/features/pipeline/AwardHistory'
+import { SpendingTrends } from '@/components/features/pipeline/SpendingTrends'
+import { GovWinIntel } from '@/components/features/pipeline/GovWinIntel'
 import { PipelineSubNav } from '@/components/features/pipeline/PipelineSubNav'
 import { DangerZone } from '@/components/features/pipeline/DangerZone'
 import { DeadlineCountdown } from '@/components/features/pipeline/DeadlineCountdown'
@@ -221,15 +223,27 @@ export default async function WarRoomPage({
             </div>
           )}
 
-          {/* Award History / Market Intelligence */}
+          {/* Market Intelligence */}
           <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
-              Award History
+              Market Intelligence
             </h2>
-            <AwardHistory
-              agency={opp.agency}
-              naicsCode={opp.naics_code}
-            />
+            <div className="space-y-6">
+              <AwardHistory
+                agency={opp.agency}
+                naicsCode={opp.naics_code}
+              />
+              <SpendingTrends
+                agency={opp.agency}
+                naicsCode={opp.naics_code}
+              />
+              <GovWinIntel
+                govwinId={opp.govwin_id}
+                competitors={[]}
+                agencyIntel={null}
+                lastUpdated={null}
+              />
+            </div>
           </div>
 
           {/* Details Grid — Inline Editable */}
