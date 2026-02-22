@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
 import { PwinGauge } from '@/components/modules/WarRoom/PwinGauge'
 import { WarRoomTabs } from '@/components/modules/WarRoom/WarRoomTabs'
+import { ColorTeamFeedback } from '@/components/features/proposals/ColorTeamFeedback'
 
 interface WarRoomPageProps {
   params: Promise<{ id: string }>
@@ -112,6 +113,29 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
       profile: resolvedProfile,
     })
   }
+
+  // Fetch color team reviews for this opportunity
+  const { data: colorReviews } = await supabase
+    .from('color_team_reviews')
+    .select('id, review_name, review_type, status, overall_rating, lead_reviewer_name, scheduled_date')
+    .eq('opportunity_id', id)
+    .order('scheduled_date', { ascending: true })
+
+  const reviewIds = (colorReviews ?? []).map((r) => r.id)
+  let colorFindings: { id: string; review_id: string | null; description: string; severity: string | null; finding_type: string | null; reviewer_name: string | null; status: string | null; recommendation: string | null; page_number: number | null; created_at: string | null }[] = []
+  if (reviewIds.length > 0) {
+    const { data } = await supabase
+      .from('color_team_findings')
+      .select('id, review_id, description, severity, finding_type, reviewer_name, status, recommendation, page_number, created_at')
+      .in('review_id', reviewIds)
+      .order('created_at', { ascending: true })
+    colorFindings = data ?? []
+  }
+
+  const reviewsWithFindings = (colorReviews ?? []).map((r) => ({
+    ...r,
+    findings: colorFindings.filter((f) => f.review_id === r.id),
+  }))
 
   // Status badge color
   function statusColor(status: string | null): string {
@@ -272,6 +296,16 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
           ))}
         </div>
       </div>
+
+      {/* Color Team Reviews */}
+      {reviewsWithFindings.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+            Color Team Reviews
+          </h3>
+          <ColorTeamFeedback reviews={reviewsWithFindings} />
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="rounded-lg border border-border bg-surface p-6">

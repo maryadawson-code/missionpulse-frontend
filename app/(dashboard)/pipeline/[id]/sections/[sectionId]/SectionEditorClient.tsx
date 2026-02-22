@@ -9,6 +9,8 @@ import { AIWriterPanel } from '@/components/features/proposals/AIWriterPanel'
 import { CommentPanel } from '@/components/features/proposals/CommentPanel'
 import { SectionLockControl } from '@/components/features/proposals/SectionLock'
 import { SectionVersionHistory } from '@/components/features/proposals/SectionVersionHistory'
+import { SectionMetrics } from '@/components/features/proposals/SectionMetrics'
+import { PresenceIndicator } from '@/components/layout/PresenceIndicator'
 import { updateSectionContent } from './actions'
 import { saveSectionVersion } from '@/app/(dashboard)/proposals/actions'
 
@@ -21,6 +23,8 @@ interface SectionEditorClientProps {
   rfpContext: string
   userId: string
   userName: string
+  pageLimit?: number | null
+  currentPages?: number | null
 }
 
 export function SectionEditorClient({
@@ -32,6 +36,8 @@ export function SectionEditorClient({
   rfpContext,
   userId,
   userName,
+  pageLimit = null,
+  currentPages = null,
 }: SectionEditorClientProps) {
   const [content, setContent] = useState(initialContent)
   const [isSaving, startSave] = useTransition()
@@ -60,7 +66,18 @@ export function SectionEditorClient({
   }, [])
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div className="space-y-4">
+      {/* Presence Bar */}
+      <div className="flex justify-end">
+        <PresenceIndicator
+          opportunityId={opportunityId}
+          userId={userId}
+          userName={userName}
+          avatarUrl={null}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* Left Column: Content Editor + AI Writer */}
       <div className="lg:col-span-2 space-y-6">
         {/* Content Editor */}
@@ -110,8 +127,15 @@ export function SectionEditorClient({
         </div>
       </div>
 
-      {/* Right Column: Lock + Comments + Requirements */}
+      {/* Right Column: Metrics + Lock + Comments + Requirements */}
       <div className="space-y-6">
+        {/* Section Metrics */}
+        <SectionMetrics
+          content={content}
+          currentPages={currentPages}
+          pageLimit={pageLimit}
+        />
+
         {/* Section Lock */}
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -172,6 +196,7 @@ export function SectionEditorClient({
           )}
         </div>
       </div>
+    </div>
     </div>
   )
 }

@@ -9,6 +9,7 @@ interface ProposalSection {
   volume: string | null
   due_date: string | null
   writer_id: string | null
+  reviewer_id?: string | null
 }
 
 interface TeamMember {
@@ -49,6 +50,11 @@ export function SectionCard({ section, teamMembers, opportunityId }: SectionCard
   const owner = teamMembers.find(
     (m) => m.assignee_email === section.writer_id || m.assignee_name === section.writer_id
   )
+  const reviewer = section.reviewer_id
+    ? teamMembers.find(
+        (m) => m.assignee_email === section.reviewer_id || m.assignee_name === section.reviewer_id
+      )
+    : null
 
   return (
     <Link
@@ -68,11 +74,18 @@ export function SectionCard({ section, teamMembers, opportunityId }: SectionCard
       </div>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        {owner ? (
-          <span className="truncate">{owner.assignee_name}</span>
-        ) : (
-          <span className="italic">Unassigned</span>
-        )}
+        <div className="flex items-center gap-1.5 truncate">
+          {owner ? (
+            <span className="truncate" title="Writer">{owner.assignee_name}</span>
+          ) : (
+            <span className="italic">Unassigned</span>
+          )}
+          {reviewer && (
+            <span className="text-[10px] text-muted-foreground/60 truncate" title="Reviewer">
+              / {reviewer.assignee_name}
+            </span>
+          )}
+        </div>
         {section.due_date && <span>{formatDate(section.due_date)}</span>}
       </div>
     </Link>

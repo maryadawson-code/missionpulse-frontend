@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
+import { revokeExternalAccess } from '@/lib/actions/external-access'
 
 export async function approveReviewItem(
   itemId: string,
@@ -275,6 +276,9 @@ export async function assembleBinder(
     .from('proposal_outlines')
     .update({ status: 'submitted', updated_at: new Date().toISOString() })
     .eq('opportunity_id', opportunityId)
+
+  // Auto-revoke external partner/subcontractor access on submission
+  await revokeExternalAccess(opportunityId)
 
   // Audit log
   await supabase.from('audit_logs').insert({

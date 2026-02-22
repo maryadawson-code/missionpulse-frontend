@@ -30,7 +30,7 @@ export default async function SectionEditorPage({ params }: SectionEditorPagePro
   // Fetch section
   const { data: section, error: sectionError } = await supabase
     .from('proposal_sections')
-    .select('id, section_title, volume, status, content, writer_id, reviewer_id')
+    .select('id, section_title, volume, status, content, writer_id, reviewer_id, page_limit, current_pages')
     .eq('id', sectionId)
     .single()
 
@@ -143,6 +143,8 @@ export default async function SectionEditorPage({ params }: SectionEditorPagePro
         rfpContext={rfpContext}
         userId={user.id}
         userName={userName}
+        pageLimit={section.page_limit}
+        currentPages={section.current_pages}
       />
     </div>
   )
