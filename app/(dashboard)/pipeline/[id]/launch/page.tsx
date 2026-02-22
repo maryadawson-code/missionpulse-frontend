@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { resolveRole, hasPermission, getGateAuthority } from '@/lib/rbac/config'
 import { LaunchControl } from '@/components/features/launch/LaunchControl'
 
 interface Props {
@@ -24,6 +24,8 @@ export default async function LaunchPage({ params }: Props) {
   if (!hasPermission(role, 'proposals', 'shouldRender')) {
     return null
   }
+
+  const gateAuthority = getGateAuthority(role)
 
   const { data: opportunity } = await supabase
     .from('opportunities')
@@ -74,6 +76,7 @@ export default async function LaunchPage({ params }: Props) {
       </div>
 
       <LaunchControl
+        gateAuthority={gateAuthority}
         opportunity={{
           id: opportunity.id,
           title: opportunity.title,

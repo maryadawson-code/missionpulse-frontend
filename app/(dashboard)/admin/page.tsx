@@ -13,6 +13,7 @@ const ADMIN_LINKS = [
   { href: '/admin/ai-usage', label: 'AI Usage', desc: 'Token usage and cost tracking', icon: '📊' },
   { href: '/admin/fine-tune', label: 'Fine-Tuning', desc: 'Model fine-tuning configuration', icon: '🎛' },
   { href: '/admin/pilots', label: 'Pilot Programs', desc: 'Manage pilot deployments', icon: '🚀' },
+  { href: '/admin/system-health', label: 'System Health', desc: 'DB, Auth, and AI service status', icon: '🩺' },
 ]
 
 export default async function AdminPage() {

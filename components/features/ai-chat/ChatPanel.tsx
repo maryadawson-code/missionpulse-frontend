@@ -25,16 +25,38 @@ interface ExistingMessage {
   content: string
 }
 
+interface OpportunityOption {
+  id: string
+  title: string
+  agency: string | null
+}
+
+const AGENT_LABELS: Record<string, string> = {
+  general: 'General Assistant',
+  capture: 'Capture Agent',
+  writer: 'Writer Agent',
+  compliance: 'Compliance Agent',
+  pricing: 'Pricing Agent',
+  strategy: 'Strategy Agent',
+  blackhat: 'Black Hat Agent',
+  contracts: 'Contracts Agent',
+  orals: 'Orals Coach',
+}
+
 interface ChatPanelProps {
   existingMessages: ExistingMessage[]
   existingSessionId: string | null
   opportunityContext?: string
+  opportunities?: OpportunityOption[]
+  allowedAgents?: string[]
 }
 
 export function ChatPanel({
   existingMessages,
   existingSessionId,
   opportunityContext,
+  opportunities = [],
+  allowedAgents = [],
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(
     existingMessages.map((m) => ({
@@ -47,6 +69,8 @@ export function ChatPanel({
   const [sessionId, setSessionId] = useState<string | null>(
     existingSessionId
   )
+  const [selectedOpp, setSelectedOpp] = useState<string>('')
+  const [selectedAgent, setSelectedAgent] = useState<string>('general')
   const [isPending, startTransition] = useTransition()
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -56,6 +80,15 @@ export function ChatPanel({
       behavior: 'smooth',
     })
   }, [messages])
+
+  // Build opportunity context from selection
+  const activeContext = (() => {
+    if (opportunityContext) return opportunityContext
+    if (!selectedOpp) return undefined
+    const opp = opportunities.find((o) => o.id === selectedOpp)
+    if (!opp) return undefined
+    return `Opportunity: ${opp.title}${opp.agency ? ` | Agency: ${opp.agency}` : ''} | ID: ${opp.id}`
+  })()
 
   const handleSend = useCallback(() => {
     if (!input.trim() || isPending) return
@@ -76,7 +109,7 @@ export function ChatPanel({
 
       // Create session if needed
       if (!currentSessionId) {
-        const sessionResult = await createChatSession()
+        const sessionResult = await createChatSession(selectedOpp || undefined)
         if (!sessionResult.success || !sessionResult.sessionId) {
           addToast('error', sessionResult.error ?? 'Failed to create session')
           return
@@ -88,7 +121,7 @@ export function ChatPanel({
       const result = await sendChatMessage(
         currentSessionId,
         userMessage,
-        opportunityContext
+        activeContext
       )
 
       if (result.success && result.response) {
@@ -104,7 +137,7 @@ export function ChatPanel({
         addToast('error', result.error ?? 'Failed to get response')
       }
     })
-  }, [input, isPending, sessionId, opportunityContext, startTransition])
+  }, [input, isPending, sessionId, activeContext, selectedOpp, opportunities, startTransition])
 
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card h-[calc(100vh-200px)] min-h-[500px]">
@@ -118,6 +151,44 @@ export function ChatPanel({
           Powered by AskSage
         </span>
       </div>
+
+      {/* Context Picker */}
+      {(opportunities.length > 0 || allowedAgents.length > 0) && (
+        <div className="flex items-center gap-3 border-b border-border px-4 py-2">
+          {opportunities.length > 0 && (
+            <select
+              value={selectedOpp}
+              onChange={(e) => {
+                setSelectedOpp(e.target.value)
+                // Reset session when context changes
+                setSessionId(null)
+              }}
+              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">No opportunity context</option>
+              {opportunities.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.title}{o.agency ? ` (${o.agency})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          {allowedAgents.length > 0 && (
+            <select
+              value={selectedAgent}
+              onChange={(e) => setSelectedAgent(e.target.value)}
+              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="general">General Assistant</option>
+              {allowedAgents.map((agent) => (
+                <option key={agent} value={agent}>
+                  {AGENT_LABELS[agent] ?? agent}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div

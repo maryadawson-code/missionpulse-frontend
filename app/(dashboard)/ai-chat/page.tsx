@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
 import { ChatPanel } from '@/components/features/ai-chat/ChatPanel'
 
 export default async function AIChatPage() {
@@ -44,6 +44,16 @@ export default async function AIChatPage() {
     existingMessages = messages ?? []
   }
 
+  // Fetch opportunities for context picker
+  const { data: opportunities } = await supabase
+    .from('opportunities')
+    .select('id, title, agency')
+    .order('updated_at', { ascending: false })
+    .limit(50)
+
+  // Resolve allowed agents for this role
+  const allowedAgents = getAllowedAgents(role)
+
   return (
     <div className="space-y-4">
       <div>
@@ -57,6 +67,12 @@ export default async function AIChatPage() {
       <ChatPanel
         existingMessages={existingMessages}
         existingSessionId={latestSessionId}
+        opportunities={(opportunities ?? []).map((o) => ({
+          id: o.id,
+          title: o.title,
+          agency: o.agency,
+        }))}
+        allowedAgents={allowedAgents}
       />
     </div>
   )

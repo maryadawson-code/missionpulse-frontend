@@ -203,3 +203,33 @@ export function getClassificationCeiling(role: string): string {
   const security = roleConfig.security as { classificationCeiling?: string } | undefined
   return security?.classificationCeiling ?? 'PUBLIC'
 }
+
+/** Get gate authority for a role (which gates they can approve, trigger review, override). */
+export interface GateAuthority {
+  canApprove: string[]
+  canTriggerReview: boolean
+  canOverrideGate: boolean
+}
+
+export function getGateAuthority(role: string): GateAuthority {
+  const roleConfig = getRoleConfig(role)
+  if (!roleConfig) return { canApprove: [], canTriggerReview: false, canOverrideGate: false }
+  const ga = roleConfig.gateAuthority as {
+    canApprove?: string[]
+    canTriggerReview?: boolean
+    canOverrideGate?: boolean
+  } | undefined
+  return {
+    canApprove: ga?.canApprove ?? [],
+    canTriggerReview: ga?.canTriggerReview ?? false,
+    canOverrideGate: ga?.canOverrideGate ?? false,
+  }
+}
+
+/** Get session timeout in seconds for a role. */
+export function getSessionTimeout(role: string): number {
+  const roleConfig = getRoleConfig(role)
+  if (!roleConfig) return 3600
+  const security = roleConfig.security as { sessionTimeout?: number } | undefined
+  return security?.sessionTimeout ?? 28800
+}

@@ -8,6 +8,7 @@ import {
   hasForceCUIWatermark,
   getClassificationCeiling,
   getRoleDisplayName,
+  getSessionTimeout,
 } from '@/lib/rbac/config'
 import Sidebar from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
@@ -15,6 +16,7 @@ import DashboardHeader from '@/components/layout/DashboardHeader'
 import { PartnerWatermark } from '@/components/layout/PartnerWatermark'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
 import { RoleProvider } from '@/lib/rbac/RoleContext'
+import { SessionTimeoutGuard } from '@/components/layout/SessionTimeoutGuard'
 import type { ModulePermission } from '@/lib/types'
 
 
@@ -97,6 +99,7 @@ export default async function DashboardLayout({
   const companyName = profile?.full_name ?? user.email ?? 'External User'
   const forceCUI = hasForceCUIWatermark(userRole)
   const classificationCeiling = getClassificationCeiling(userRole)
+  const sessionTimeout = getSessionTimeout(userRole)
 
   // Determine CUI marking type for global banner
   const cuiMarking: 'SP-PROPIN' | 'SP-PRVCY' | null = forceCUI
@@ -117,6 +120,7 @@ export default async function DashboardLayout({
 
   return (
     <RoleProvider value={roleContextValue}>
+      <SessionTimeoutGuard timeoutSeconds={sessionTimeout} />
       <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
         {/* Watermark overlay for external roles or CUI-forced roles */}
         {(isExternal || forceCUI) && <PartnerWatermark companyName={companyName} />}

@@ -17,6 +17,8 @@ import Link from 'next/link'
 import { CaptureAnalysis } from '@/components/features/pipeline/CaptureAnalysis'
 import { PipelineSubNav } from '@/components/features/pipeline/PipelineSubNav'
 import { DangerZone } from '@/components/features/pipeline/DangerZone'
+import { DeadlineCountdown } from '@/components/features/pipeline/DeadlineCountdown'
+import { VolumeProgress } from '@/components/features/pipeline/VolumeProgress'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 type OpportunityRow = Database['public']['Tables']['opportunities']['Row']
@@ -95,11 +97,14 @@ export default async function WarRoomPage({
 
   const commentList: CommentRow[] = comments ?? []
 
-  // ─── Compute days until due ───────────────────────────────
+  // ─── Fetch Proposal Sections for Volume Progress ──────────
+  const { data: proposalSections } = await supabase
+    .from('proposal_sections')
+    .select('volume, status')
+    .eq('opportunity_id', id)
+
+  // ─── Compute due date ──────────────────────────────────────
   const dueDate = opp.due_date ?? opp.submission_date
-  const daysUntil = dueDate
-    ? Math.ceil((new Date(dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null
 
   return (
     <div className="space-y-6">
@@ -126,14 +131,8 @@ export default async function WarRoomPage({
                 {opp.phase}
               </span>
             )}
-            {daysUntil !== null && (
-              <span
-                className={`text-xs font-medium ${
-                  daysUntil <= 7 ? 'text-red-400' : daysUntil <= 30 ? 'text-amber-400' : 'text-gray-400'
-                }`}
-              >
-                {daysUntil <= 0 ? 'Overdue' : `${daysUntil} days until due`}
-              </span>
+            {dueDate && (
+              <DeadlineCountdown targetDate={dueDate} />
             )}
           </div>
         </div>
@@ -170,6 +169,16 @@ export default async function WarRoomPage({
           <p className="mt-1 text-lg font-bold text-white">{opp.set_aside ?? '—'}</p>
         </div>
       </div>
+
+      {/* ─── Volume Progress Bars ─────────────────────────────── */}
+      {(proposalSections ?? []).length > 0 && (
+        <VolumeProgress
+          sections={(proposalSections ?? []).map((s) => ({
+            volume: s.volume,
+            status: s.status,
+          }))}
+        />
+      )}
 
       {/* ─── Sub-Navigation ──────────────────────────────────── */}
       <PipelineSubNav opportunityId={id} />

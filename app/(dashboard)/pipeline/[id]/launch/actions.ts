@@ -2,6 +2,16 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { resolveRole, getGateAuthority } from '@/lib/rbac/config'
+
+const GATE_AUTHORITY_MAP: Record<number, string> = {
+  1: 'gate1',
+  2: 'blue',
+  3: 'blue',
+  4: 'red',
+  5: 'gold',
+  6: 'submit',
+}
 
 export async function recordGateDecision(formData: FormData) {
   const supabase = await createClient()
@@ -18,9 +28,17 @@ export async function recordGateDecision(formData: FormData) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('company_id')
+    .select('company_id, role')
     .eq('id', user.id)
     .single()
+
+  // Server-side gate authority enforcement
+  const role = resolveRole(profile?.role)
+  const authority = getGateAuthority(role)
+  const requiredAuthority = GATE_AUTHORITY_MAP[gateNumber]
+  if (requiredAuthority && !authority.canApprove.includes(requiredAuthority)) {
+    return { success: false, error: 'You do not have permission to approve this gate' }
+  }
 
   // Get current pWin
   const { data: opp } = await supabase

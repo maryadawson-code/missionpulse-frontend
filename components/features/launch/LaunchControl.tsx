@@ -30,6 +30,12 @@ interface GateDecision {
   createdAt: string
 }
 
+interface GateAuthority {
+  canApprove: string[]
+  canTriggerReview: boolean
+  canOverrideGate: boolean
+}
+
 interface LaunchControlProps {
   opportunity: {
     id: string
@@ -46,6 +52,7 @@ interface LaunchControlProps {
   gateDecisions: GateDecision[]
   teamCount: number
   docCount: number
+  gateAuthority?: GateAuthority
 }
 
 function decisionIcon(decision: string) {
@@ -83,16 +90,36 @@ const SHIPLEY_GATES = [
   { number: 6, name: 'Submit/No-Submit' },
 ]
 
+// Map gate numbers to authority names
+const GATE_AUTHORITY_MAP: Record<number, string> = {
+  1: 'gate1',
+  2: 'blue',
+  3: 'blue',
+  4: 'red',
+  5: 'gold',
+  6: 'submit',
+}
+
 export function LaunchControl({
   opportunity,
   complianceStats,
   gateDecisions,
   teamCount,
   docCount,
+  gateAuthority,
 }: LaunchControlProps) {
   const [isPending, startTransition] = useTransition()
   const [showGateForm, setShowGateForm] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
+
+  // Filter gates by user's gate authority
+  const approvedGates = gateAuthority
+    ? SHIPLEY_GATES.filter((g) => {
+        const authorityName = GATE_AUTHORITY_MAP[g.number]
+        return authorityName && gateAuthority.canApprove.includes(authorityName)
+      })
+    : SHIPLEY_GATES
+  const canApproveAny = approvedGates.length > 0
 
   const daysUntilDue = opportunity.dueDate
     ? Math.ceil(
@@ -238,16 +265,18 @@ export function LaunchControl({
           <h3 className="text-sm font-semibold text-foreground">
             Shipley Gate Reviews
           </h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowGateForm(!showGateForm)}
-          >
-            Record Gate Decision
-          </Button>
+          {canApproveAny && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGateForm(!showGateForm)}
+            >
+              Record Gate Decision
+            </Button>
+          )}
         </div>
 
-        {showGateForm && (
+        {showGateForm && canApproveAny && (
           <form
             action={handleGateDecision}
             className="border-b border-border px-5 py-4 space-y-3"
@@ -261,7 +290,7 @@ export function LaunchControl({
                   name="gateNumber"
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
                 >
-                  {SHIPLEY_GATES.map((g) => (
+                  {approvedGates.map((g) => (
                     <option key={g.number} value={g.number}>
                       Gate {g.number}: {g.name}
                     </option>
