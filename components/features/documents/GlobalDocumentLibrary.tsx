@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, Fragment } from 'react'
 import {
   FileText,
   Upload,
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { addToast } from '@/components/ui/Toast'
 import { uploadCompanyDocument } from '@/app/(dashboard)/documents/actions'
+import { VersionTimeline } from '@/components/features/documents/VersionTimeline'
 
 const COMPANY_CATEGORIES = [
   'Templates',
@@ -48,10 +49,23 @@ interface Document {
   updated_at: string | null
 }
 
+interface DocumentVersionInfo {
+  id: string
+  version_number: number
+  version_label: string | null
+  changes_summary: string | null
+  created_by: string | null
+  created_at: string | null
+  file_url: string | null
+  file_size: number | null
+  is_milestone: boolean | null
+}
+
 interface GlobalDocumentLibraryProps {
   documents: Document[]
   opportunityMap: Record<string, string>
   canEdit?: boolean
+  versionsMap?: Record<string, DocumentVersionInfo[]>
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -89,11 +103,13 @@ export function GlobalDocumentLibrary({
   documents,
   opportunityMap,
   canEdit = true,
+  versionsMap = {},
 }: GlobalDocumentLibraryProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [category, setCategory] = useState<string>('Templates')
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('All')
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const filtered = documents.filter((d) => {
@@ -247,57 +263,82 @@ export function GlobalDocumentLibrary({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map((doc) => (
-                  <tr
-                    key={doc.id}
-                    className="transition-colors hover:bg-card/50"
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 flex-shrink-0 text-primary" />
-                        <span className="text-sm font-medium text-foreground truncate max-w-[260px]">
-                          {doc.document_name}
-                        </span>
-                        {doc.is_locked && (
-                          <Lock className="h-3 w-3 text-amber-400" />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {(doc.document_type ?? 'document').replace(/_/g, ' ')}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${statusStyle(
-                          doc.status
-                        )}`}
+                {filtered.map((doc) => {
+                  const versions = versionsMap[doc.id] ?? []
+                  const isSelected = selectedDocId === doc.id
+                  return (
+                    <Fragment key={doc.id}>
+                      <tr
+                        className="cursor-pointer transition-colors hover:bg-card/50"
+                        onClick={() =>
+                          setSelectedDocId(isSelected ? null : doc.id)
+                        }
                       >
-                        {(doc.status ?? 'draft').replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {doc.opportunity_id ? (
-                        <div className="flex items-center gap-1">
-                          <Building2 className="h-3 w-3" />
-                          <span className="truncate max-w-[140px]">
-                            {opportunityMap[doc.opportunity_id] ?? 'Unknown'}
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 flex-shrink-0 text-primary" />
+                            <span className="text-sm font-medium text-foreground truncate max-w-[260px]">
+                              {doc.document_name}
+                            </span>
+                            {doc.is_locked && (
+                              <Lock className="h-3 w-3 text-amber-400" />
+                            )}
+                            {versions.length > 1 && (
+                              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                                {versions.length} ver
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                          {(doc.document_type ?? 'document').replace(/_/g, ' ')}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${statusStyle(
+                              doc.status
+                            )}`}
+                          >
+                            {(doc.status ?? 'draft').replace(/_/g, ' ')}
                           </span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Company</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                          {doc.opportunity_id ? (
+                            <div className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              <span className="truncate max-w-[140px]">
+                                {opportunityMap[doc.opportunity_id] ?? 'Unknown'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              Company
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                          v{doc.current_version ?? 1}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">
+                          {formatFileSize(doc.file_size)}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                          {formatDate(doc.updated_at)}
+                        </td>
+                      </tr>
+                      {isSelected && versions.length > 0 && (
+                        <tr>
+                          <td colSpan={7} className="bg-muted/5 px-6 py-4">
+                            <VersionTimeline
+                              versions={versions}
+                              documentName={doc.document_name}
+                            />
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      v{doc.current_version ?? 1}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">
-                      {formatFileSize(doc.file_size)}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {formatDate(doc.updated_at)}
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>

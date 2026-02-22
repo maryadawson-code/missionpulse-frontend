@@ -9,6 +9,16 @@ import Link from 'next/link'
 import { getRecentActivity } from '@/lib/actions/audit'
 import { ActivityFeed } from '@/components/modules/ActivityFeed'
 import { TeamWorkloadHeatmap } from '@/components/features/dashboard/TeamWorkloadHeatmap'
+import { DashboardCustomizer } from '@/components/features/dashboard/DashboardCustomizer'
+
+const WIDGET_DEFS = [
+  { widget_type: 'kpi_cards', title: 'KPI Cards' },
+  { widget_type: 'quick_start', title: 'Quick Start' },
+  { widget_type: 'pipeline_phases', title: 'Pipeline by Phase' },
+  { widget_type: 'upcoming_deadlines', title: 'Upcoming Deadlines' },
+  { widget_type: 'team_workload', title: 'Team Workload' },
+  { widget_type: 'recent_activity', title: 'Recent Activity' },
+]
 
 // ─── KPI Card Component ─────────────────────────────────────────
 function KPICard({
@@ -125,6 +135,22 @@ export default async function DashboardPage() {
       redirect('/proposals')
     }
   }
+
+  // Fetch widget visibility preferences
+  const { data: widgetRows } = await supabase
+    .from('dashboard_widgets')
+    .select('widget_type, is_visible')
+    .eq('user_id', user?.id ?? '')
+
+  const widgetVisibility = new Map<string, boolean>()
+  for (const w of widgetRows ?? []) {
+    widgetVisibility.set(w.widget_type, w.is_visible ?? true)
+  }
+  const isVisible = (type: string) => widgetVisibility.get(type) ?? true
+  const widgetConfigs = WIDGET_DEFS.map((d) => ({
+    ...d,
+    is_visible: isVisible(d.widget_type),
+  }))
 
   // Fetch all opportunities for the user's company (RLS enforces tenant isolation)
   const { data: opportunities, error } = await supabase
@@ -247,19 +273,22 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">Pipeline overview and key metrics</p>
         </div>
-        <Link
-          href="/pipeline/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          New Opportunity
-        </Link>
+        <div className="flex items-center gap-3">
+          <DashboardCustomizer widgets={widgetConfigs} />
+          <Link
+            href="/pipeline/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            New Opportunity
+          </Link>
+        </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {isVisible('kpi_cards') && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KPICard
           label="Total Opportunities"
           value={totalOpps.toString()}
@@ -290,10 +319,10 @@ export default async function DashboardPage() {
           subtext="Within 90 days"
           iconPath="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
         />
-      </div>
+      </div>}
 
       {/* Quick Start Modules */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+      {isVisible('quick_start') && <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
           Quick Start
         </h2>
@@ -320,57 +349,61 @@ export default async function DashboardPage() {
             </Link>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Two-column lower section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Pipeline by Phase */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-            Pipeline by Phase
-          </h2>
-          <div className="mt-4 divide-y divide-gray-800">
-            {phases.length > 0 ? (
-              phases.map(([phase, count]) => (
-                <PhaseSummary key={phase} phase={phase} count={count} total={totalOpps} />
-              ))
-            ) : (
-              <p className="py-4 text-center text-sm text-gray-500">
-                No opportunities in pipeline
-              </p>
-            )}
+        {isVisible('pipeline_phases') && (
+          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+              Pipeline by Phase
+            </h2>
+            <div className="mt-4 divide-y divide-gray-800">
+              {phases.length > 0 ? (
+                phases.map(([phase, count]) => (
+                  <PhaseSummary key={phase} phase={phase} count={count} total={totalOpps} />
+                ))
+              ) : (
+                <p className="py-4 text-center text-sm text-gray-500">
+                  No opportunities in pipeline
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Upcoming Deadlines */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-            Upcoming Deadlines
-          </h2>
-          <div className="mt-4 space-y-1">
-            {upcoming.length > 0 ? (
-              upcoming.slice(0, 8).map((opp) => (
-                <DeadlineRow key={opp.id} opp={opp} />
-              ))
-            ) : (
-              <p className="py-4 text-center text-sm text-gray-500">
-                No deadlines in the next 90 days
-              </p>
+        {isVisible('upcoming_deadlines') && (
+          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+              Upcoming Deadlines
+            </h2>
+            <div className="mt-4 space-y-1">
+              {upcoming.length > 0 ? (
+                upcoming.slice(0, 8).map((opp) => (
+                  <DeadlineRow key={opp.id} opp={opp} />
+                ))
+              ) : (
+                <p className="py-4 text-center text-sm text-gray-500">
+                  No deadlines in the next 90 days
+                </p>
+              )}
+            </div>
+            {upcoming.length > 8 && (
+              <Link
+                href="/pipeline"
+                className="mt-3 block text-center text-xs font-medium text-[#00E5FA] hover:underline"
+              >
+                View all {upcoming.length} deadlines →
+              </Link>
             )}
           </div>
-          {upcoming.length > 8 && (
-            <Link
-              href="/pipeline"
-              className="mt-3 block text-center text-xs font-medium text-[#00E5FA] hover:underline"
-            >
-              View all {upcoming.length} deadlines →
-            </Link>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Team Workload Heatmap */}
-      {teamMembers.length > 0 && (
+      {isVisible('team_workload') && teamMembers.length > 0 && (
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
             Team Workload
@@ -382,14 +415,16 @@ export default async function DashboardPage() {
       )}
 
       {/* Recent Activity */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-          Recent Activity
-        </h2>
-        <div className="mt-4">
-          <ActivityFeed items={activityItems} />
+      {isVisible('recent_activity') && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+            Recent Activity
+          </h2>
+          <div className="mt-4">
+            <ActivityFeed items={activityItems} />
+          </div>
         </div>
-      </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">

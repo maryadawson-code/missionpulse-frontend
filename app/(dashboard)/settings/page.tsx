@@ -35,7 +35,7 @@ export default async function SettingsPage() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Link
           href="/settings/billing"
           className="flex items-start gap-3 rounded-lg border border-border bg-surface px-4 py-4 hover:border-cyan/40 hover:bg-elevated transition-colors group"
@@ -46,6 +46,18 @@ export default async function SettingsPage() {
               Billing &amp; Subscription
             </p>
             <p className="text-xs text-slate mt-0.5">Manage your plan, tokens, and payment</p>
+          </div>
+        </Link>
+        <Link
+          href="/settings/notifications"
+          className="flex items-start gap-3 rounded-lg border border-border bg-surface px-4 py-4 hover:border-cyan/40 hover:bg-elevated transition-colors group"
+        >
+          <span className="text-lg mt-0.5">🔔</span>
+          <div>
+            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+              Notifications
+            </p>
+            <p className="text-xs text-slate mt-0.5">Control email, in-app, and push alerts</p>
           </div>
         </Link>
         <Link

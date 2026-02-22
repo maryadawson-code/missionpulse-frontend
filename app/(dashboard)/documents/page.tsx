@@ -4,6 +4,18 @@ import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { GlobalDocumentLibrary } from '@/components/features/documents/GlobalDocumentLibrary'
 import { TemplateLibrary } from '@/components/features/documents/TemplateLibrary'
 
+interface DocumentVersionInfo {
+  id: string
+  version_number: number
+  version_label: string | null
+  changes_summary: string | null
+  created_by: string | null
+  created_at: string | null
+  file_url: string | null
+  file_size: number | null
+  is_milestone: boolean | null
+}
+
 export default async function DocumentsPage() {
   const supabase = await createClient()
   const {
@@ -65,6 +77,26 @@ export default async function DocumentsPage() {
     tags: Array.isArray(t.tags) ? t.tags as string[] : null,
   }))
 
+  // Fetch version history for all documents
+  const docIds = (documents ?? []).map((d) => d.id)
+  const versionsMap: Record<string, DocumentVersionInfo[]> = {}
+  if (docIds.length > 0) {
+    const { data: versions } = await supabase
+      .from('document_versions')
+      .select(
+        'id, document_id, version_number, version_label, changes_summary, created_by, created_at, file_url, file_size, is_milestone'
+      )
+      .in('document_id', docIds)
+      .order('version_number', { ascending: false })
+      .limit(500)
+
+    for (const v of versions ?? []) {
+      if (!v.document_id) continue
+      if (!versionsMap[v.document_id]) versionsMap[v.document_id] = []
+      versionsMap[v.document_id].push(v)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -78,6 +110,7 @@ export default async function DocumentsPage() {
         documents={documents ?? []}
         opportunityMap={oppMap}
         canEdit={canEdit}
+        versionsMap={versionsMap}
       />
 
       {/* Template Library */}
