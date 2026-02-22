@@ -2,7 +2,7 @@
 
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getRolePermissions } from '@/lib/rbac/config'
+import { getRolePermissions, resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
 import {
   formatCurrency,
   formatPwin,
@@ -15,6 +15,7 @@ import {
 import type { Database } from '@/lib/supabase/database.types'
 import Link from 'next/link'
 import { CaptureAnalysis } from '@/components/features/pipeline/CaptureAnalysis'
+import { PipelineSubNav } from '@/components/features/pipeline/PipelineSubNav'
 
 type OpportunityRow = Database['public']['Tables']['opportunities']['Row']
 type AssignmentRow = Database['public']['Tables']['opportunity_assignments']['Row']
@@ -45,6 +46,7 @@ export default async function WarRoomPage({
   } = await supabase.auth.getUser()
 
   let canEdit = false
+  let showCaptureAgent = false
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -52,8 +54,12 @@ export default async function WarRoomPage({
       .eq('id', user.id)
       .single()
 
+    const role = resolveRole(profile?.role)
+    if (!hasPermission(role, 'pipeline', 'canView')) return null
+
     const perms = getRolePermissions(profile?.role ?? 'partner')
     canEdit = perms.pipeline?.canEdit === true
+    showCaptureAgent = getAllowedAgents(role).includes('capture')
   }
 
   // ─── Fetch Opportunity ────────────────────────────────────
@@ -169,6 +175,9 @@ export default async function WarRoomPage({
         </div>
       </div>
 
+      {/* ─── Sub-Navigation ──────────────────────────────────── */}
+      <PipelineSubNav opportunityId={id} />
+
       {/* ─── Two Column Detail ───────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left: Opportunity Details */}
@@ -185,23 +194,25 @@ export default async function WarRoomPage({
             </div>
           )}
 
-          {/* AI Capture Analysis */}
-          <div id="capture" className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
-              Capture Analysis
-            </h2>
-            <CaptureAnalysis
-              opportunity={{
-                id: opp.id,
-                title: opp.title ?? '',
-                agency: opp.agency,
-                ceiling: opp.ceiling ? Number(opp.ceiling) : null,
-                description: opp.description,
-                naics_code: opp.naics_code,
-                set_aside: opp.set_aside,
-              }}
-            />
-          </div>
+          {/* AI Capture Analysis — only for roles with 'capture' agent */}
+          {showCaptureAgent && (
+            <div id="capture" className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                Capture Analysis
+              </h2>
+              <CaptureAnalysis
+                opportunity={{
+                  id: opp.id,
+                  title: opp.title ?? '',
+                  agency: opp.agency,
+                  ceiling: opp.ceiling ? Number(opp.ceiling) : null,
+                  description: opp.description,
+                  naics_code: opp.naics_code,
+                  set_aside: opp.set_aside,
+                }}
+              />
+            </div>
+          )}
 
           {/* Details Grid */}
           <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">

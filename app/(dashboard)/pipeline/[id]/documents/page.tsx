@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { DocumentLibrary } from '@/components/features/documents/DocumentLibrary'
 
 interface DocumentsPageProps {
@@ -14,6 +15,15 @@ export default async function DocumentsPage({ params }: DocumentsPageProps) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) notFound()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'documents', 'shouldRender')) return null
 
   const { data: opportunity, error: oppError } = await supabase
     .from('opportunities')

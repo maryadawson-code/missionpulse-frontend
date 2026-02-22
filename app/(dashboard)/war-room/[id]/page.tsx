@@ -1,6 +1,7 @@
 // filepath: app/(dashboard)/war-room/[id]/page.tsx
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
 import { PwinGauge } from '@/components/modules/WarRoom/PwinGauge'
 import { WarRoomTabs } from '@/components/modules/WarRoom/WarRoomTabs'
 
@@ -32,11 +33,14 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
   // Fetch user profile for RBAC
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, email')
     .eq('id', user.id)
     .single()
 
   const userRole = profile?.role ?? 'viewer'
+  const role = resolveRole(userRole)
+  if (!hasPermission(role, 'pipeline', 'canView')) return null
+  const allowedAgents = getAllowedAgents(role)
 
   // Sensitive access check — matches can_access_sensitive() DB function
   const sensitiveRoles = [
@@ -54,6 +58,13 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
     .from('opportunity_assignments')
     .select('id, role, assignee_email, assignee_name')
     .eq('opportunity_id', id)
+
+  // Ownership/assignment gate — user must own OR be assigned OR have sensitive role
+  const isOwner = opportunity.owner_id === user.id
+  const isAssigned = (rawAssignments ?? []).some(
+    (a) => a.assignee_email === (profile?.email ?? user.email)
+  )
+  if (!isOwner && !isAssigned && !canAccessSensitive) return null
 
   // Resolve profiles for assignments by email
   const assignments: {
@@ -231,20 +242,20 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
         </div>
       </div>
 
-      {/* AI Agents */}
+      {/* AI Agents — filtered by role's allowedAgents */}
       <div className="rounded-lg border border-border bg-surface p-4">
         <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
           AI Agents
         </h3>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3">
           {[
-            { href: `/pipeline/${id}#capture`, label: 'Capture Analysis', icon: '✨', desc: 'pWin scoring & win themes' },
-            { href: `/pipeline/${id}/strategy`, label: 'Strategy Generator', icon: '🎯', desc: 'Discriminators & Section M' },
-            { href: `/pipeline/${id}/contracts`, label: 'Clause Analyzer', icon: '⚖️', desc: 'FAR/DFARS risk assessment' },
-            { href: `/pipeline/${id}/orals`, label: 'Orals Coach', icon: '🎤', desc: 'Evaluator Q&A generation' },
-            { href: `/pipeline/${id}/pricing`, label: 'Pricing AI', icon: '🧮', desc: 'BOE & price-to-win' },
-            { href: `/ai-chat`, label: 'AI Chat', icon: '💬', desc: 'Ask questions about this opp' },
-          ].map((link) => (
+            { href: `/pipeline/${id}#capture`, label: 'Capture Analysis', icon: '✨', desc: 'pWin scoring & win themes', agent: 'capture' },
+            { href: `/pipeline/${id}/strategy`, label: 'Strategy Generator', icon: '🎯', desc: 'Discriminators & Section M', agent: 'strategy' },
+            { href: `/pipeline/${id}/contracts`, label: 'Clause Analyzer', icon: '⚖️', desc: 'FAR/DFARS risk assessment', agent: 'contracts' },
+            { href: `/pipeline/${id}/orals`, label: 'Orals Coach', icon: '🎤', desc: 'Evaluator Q&A generation', agent: 'orals' },
+            { href: `/pipeline/${id}/pricing`, label: 'Pricing AI', icon: '🧮', desc: 'BOE & price-to-win', agent: 'pricing' },
+            { href: `/ai-chat`, label: 'AI Chat', icon: '💬', desc: 'Ask questions about this opp', agent: 'chat' },
+          ].filter((link) => link.agent === 'chat' || allowedAgents.includes(link.agent)).map((link) => (
             <a
               key={link.href}
               href={link.href}

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { RfpUploader } from '@/components/features/shredder/RfpUploader'
 import { RfpDocumentList } from '@/components/features/shredder/RfpDocumentList'
 
@@ -15,6 +16,15 @@ export default async function ShredderPage({ params }: ShredderPageProps) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) notFound()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'compliance', 'shouldRender')) return null
 
   // Verify opportunity exists (RLS-enforced)
   const { data: opportunity, error: oppError } = await supabase

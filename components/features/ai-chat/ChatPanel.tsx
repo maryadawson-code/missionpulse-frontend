@@ -5,6 +5,7 @@ import { Send, Loader2, Bot, User, Sparkles } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { addToast } from '@/components/ui/Toast'
+import { ConfidenceBadge } from '@/components/features/ai/ConfidenceBadge'
 import {
   sendChatMessage,
   createChatSession,
@@ -15,6 +16,7 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   model?: string
+  confidence?: 'high' | 'medium' | 'low'
 }
 
 interface ExistingMessage {
@@ -95,6 +97,7 @@ export function ChatPanel({
           role: 'assistant',
           content: result.response,
           model: result.model,
+          confidence: result.confidence,
         }
         setMessages((prev) => [...prev, assistantMsg])
       } else {
@@ -159,10 +162,15 @@ export function ChatPanel({
               <div className="text-sm whitespace-pre-wrap leading-relaxed">
                 {msg.content}
               </div>
-              {msg.role === 'assistant' && msg.model && (
-                <p className="mt-2 text-[10px] text-muted-foreground">
-                  Answered by {msg.model} via AskSage
-                </p>
+              {msg.role === 'assistant' && (
+                <div className="mt-2 flex items-center gap-2">
+                  {msg.confidence && <ConfidenceBadge level={msg.confidence} />}
+                  {msg.model && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {msg.model} via AskSage
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
@@ -186,6 +194,13 @@ export function ChatPanel({
             </div>
           </div>
         )}
+      </div>
+
+      {/* AI disclaimer */}
+      <div className="border-t border-border px-4 py-1.5">
+        <p className="text-[10px] text-muted-foreground">
+          AI GENERATED — REQUIRES HUMAN REVIEW. All data handled via AskSage (FedRAMP).
+        </p>
       </div>
 
       {/* Input */}

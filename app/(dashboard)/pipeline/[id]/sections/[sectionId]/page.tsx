@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { SectionEditorClient } from './SectionEditorClient'
 
 interface SectionEditorPageProps {
@@ -19,9 +20,12 @@ export default async function SectionEditorPage({ params }: SectionEditorPagePro
   // Fetch user profile for lock/comment identity
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, full_name, email')
+    .select('id, full_name, email, role')
     .eq('id', user.id)
     .single()
+
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'proposals', 'shouldRender')) return null
 
   // Fetch section
   const { data: section, error: sectionError } = await supabase

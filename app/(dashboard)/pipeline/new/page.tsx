@@ -3,6 +3,7 @@
 
 import { actionCreateOpportunity } from '../actions'
 import Link from 'next/link'
+import { usePermissions } from '@/lib/rbac/RoleContext'
 
 // ─── Form Field Component ───────────────────────────────────────
 function Field({
@@ -96,6 +97,9 @@ const SET_ASIDE_OPTIONS = [
 
 // ─── Page Component ─────────────────────────────────────────────
 export default function NewOpportunityPage() {
+  const { permissions } = usePermissions()
+  if (!permissions.pipeline?.canEdit) return null
+
   async function handleSubmit(formData: FormData): Promise<void> {
     await actionCreateOpportunity(formData)
   }

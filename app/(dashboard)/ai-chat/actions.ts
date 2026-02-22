@@ -7,6 +7,7 @@ interface ChatResult {
   success: boolean
   response?: string
   model?: string
+  confidence?: 'high' | 'medium' | 'low'
   error?: string
 }
 
@@ -61,6 +62,7 @@ export async function sendChatMessage(
     success: true,
     response: aiResponse.content,
     model: aiResponse.model_used,
+    confidence: aiResponse.confidence as 'high' | 'medium' | 'low',
   }
 }
 
