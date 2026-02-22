@@ -17,6 +17,8 @@ import { PartnerWatermark } from '@/components/layout/PartnerWatermark'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
 import { RoleProvider } from '@/lib/rbac/RoleContext'
 import { SessionTimeoutGuard } from '@/components/layout/SessionTimeoutGuard'
+import { GlobalSearch } from '@/components/layout/GlobalSearch'
+import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
 import type { ModulePermission } from '@/lib/types'
 
 
@@ -121,6 +123,8 @@ export default async function DashboardLayout({
   return (
     <RoleProvider value={roleContextValue}>
       <SessionTimeoutGuard timeoutSeconds={sessionTimeout} />
+      <GlobalSearch />
+      <KeyboardShortcuts />
       <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
         {/* Watermark overlay for external roles or CUI-forced roles */}
         {(isExternal || forceCUI) && <PartnerWatermark companyName={companyName} />}

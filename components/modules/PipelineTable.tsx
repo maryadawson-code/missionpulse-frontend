@@ -4,6 +4,7 @@
 import { useState, useMemo, useTransition } from 'react'
 import { deleteOpportunity } from '@/lib/actions/opportunities'
 import { addToast } from '@/components/ui/Toast'
+import { exportToCSV } from '@/lib/utils/export'
 import {
   SHIPLEY_PHASES,
   OPPORTUNITY_STATUSES,
@@ -240,6 +241,28 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
             </option>
           ))}
         </select>
+        <button
+          onClick={() =>
+            exportToCSV(
+              filtered,
+              [
+                { header: 'Title', accessor: (o) => o.title },
+                { header: 'Agency', accessor: (o) => o.agency },
+                { header: 'Ceiling', accessor: (o) => o.ceiling ? Number(o.ceiling) : null },
+                { header: 'pWin', accessor: (o) => o.pwin },
+                { header: 'Phase', accessor: (o) => o.phase },
+                { header: 'Status', accessor: (o) => o.status },
+                { header: 'Set-Aside', accessor: (o) => o.set_aside },
+                { header: 'Due Date', accessor: (o) => o.due_date },
+                { header: 'Solicitation #', accessor: (o) => o.solicitation_number },
+              ],
+              `pipeline-export-${new Date().toISOString().slice(0, 10)}.csv`
+            )
+          }
+          className="rounded-md border border-border px-3 py-2 text-sm text-slate hover:text-white hover:border-cyan transition-colors"
+        >
+          Export CSV
+        </button>
         {canEdit && (
           <a
             href="/pipeline/new"

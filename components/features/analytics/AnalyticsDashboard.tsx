@@ -5,6 +5,14 @@ import { WinRateChart } from './WinRateChart'
 import { StatusDonutChart } from './StatusDonutChart'
 import { TeamWorkload } from './TeamWorkload'
 import { ComplianceHeatmap } from './ComplianceHeatmap'
+import { TeamPerformance } from './TeamPerformance'
+
+interface TeamMember {
+  name: string
+  activeOpps: number
+  avgCycleTimeDays: number | null
+  winRate: number | null
+}
 
 interface AnalyticsDashboardProps {
   kpis: {
@@ -20,6 +28,8 @@ interface AnalyticsDashboardProps {
   statusBreakdown: { name: string; value: number }[]
   teamWorkload: { name: string; count: number }[]
   complianceHealth: { opportunity: string; score: number }[]
+  teamPerformance?: TeamMember[]
+  avgCycleTime?: number | null
 }
 
 function formatCurrency(value: number): string {
@@ -37,6 +47,8 @@ export function AnalyticsDashboard({
   statusBreakdown,
   teamWorkload,
   complianceHealth,
+  teamPerformance,
+  avgCycleTime,
 }: AnalyticsDashboardProps) {
   return (
     <div className="space-y-6">
@@ -116,12 +128,23 @@ export function AnalyticsDashboard({
         </div>
       </div>
 
-      {/* Row 3: Compliance Heatmap */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h2 className="mb-4 text-sm font-semibold text-foreground">
-          Compliance Health by Opportunity
-        </h2>
-        <ComplianceHeatmap data={complianceHealth} />
+      {/* Row 3: Compliance Heatmap + Team Performance */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-4 text-sm font-semibold text-foreground">
+            Compliance Health by Opportunity
+          </h2>
+          <ComplianceHeatmap data={complianceHealth} />
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-4 text-sm font-semibold text-foreground">
+            Team Performance
+          </h2>
+          <TeamPerformance
+            members={teamPerformance ?? []}
+            avgCycleTime={avgCycleTime ?? null}
+          />
+        </div>
       </div>
     </div>
   )

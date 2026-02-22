@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { GlobalDocumentLibrary } from '@/components/features/documents/GlobalDocumentLibrary'
+import { TemplateLibrary } from '@/components/features/documents/TemplateLibrary'
 
 export default async function DocumentsPage() {
   const supabase = await createClient()
@@ -51,6 +52,19 @@ export default async function DocumentsPage() {
     oppMap = Object.fromEntries((opps ?? []).map((o) => [o.id, o.title]))
   }
 
+  // Fetch document templates
+  const { data: templateRows } = await supabase
+    .from('document_templates')
+    .select('id, template_name, template_type, category, description, file_url, version, tags, updated_at')
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .limit(100)
+
+  const templates = (templateRows ?? []).map((t) => ({
+    ...t,
+    tags: Array.isArray(t.tags) ? t.tags as string[] : null,
+  }))
+
   return (
     <div className="space-y-6">
       <div>
@@ -65,6 +79,15 @@ export default async function DocumentsPage() {
         opportunityMap={oppMap}
         canEdit={canEdit}
       />
+
+      {/* Template Library */}
+      <div className="pt-4">
+        <h2 className="text-lg font-semibold text-foreground mb-4">Template Library</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Reusable document templates for proposal volumes, past performance, and capability statements.
+        </p>
+        <TemplateLibrary templates={templates} />
+      </div>
     </div>
   )
 }

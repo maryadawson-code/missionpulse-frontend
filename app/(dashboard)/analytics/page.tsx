@@ -160,6 +160,28 @@ export default async function AnalyticsPage() {
     .sort((a, b) => a.score - b.score)
     .slice(0, 10)
 
+  // Team performance — per-owner stats
+  const ownerWins = new Map<string, { wins: number; losses: number }>()
+  for (const opp of opps) {
+    if (!opp.owner_id) continue
+    const name = profileMap.get(opp.owner_id) ?? 'Unknown'
+    const existing = ownerWins.get(name) ?? { wins: 0, losses: 0 }
+    if (opp.status === 'Won') existing.wins++
+    if (opp.status === 'Lost') existing.losses++
+    ownerWins.set(name, existing)
+  }
+
+  const teamPerformance = Array.from(ownerMap.entries()).map(([name, count]) => {
+    const wl = ownerWins.get(name) ?? { wins: 0, losses: 0 }
+    const total = wl.wins + wl.losses
+    return {
+      name,
+      activeOpps: count,
+      avgCycleTimeDays: null as number | null,
+      winRate: total > 0 ? Math.round((wl.wins / total) * 100) : null,
+    }
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -198,6 +220,8 @@ export default async function AnalyticsPage() {
         statusBreakdown={statusBreakdown}
         teamWorkload={teamWorkload}
         complianceHealth={complianceHealth}
+        teamPerformance={teamPerformance}
+        avgCycleTime={null}
       />
     </div>
   )
