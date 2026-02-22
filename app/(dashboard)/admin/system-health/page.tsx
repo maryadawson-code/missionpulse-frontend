@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { SystemHealthDashboard } from '@/components/features/admin/SystemHealthDashboard'
+import { ProviderHealthCard } from '@/components/features/admin/ProviderHealthCard'
 
 export default async function SystemHealthPage() {
   const supabase = await createClient()
@@ -29,6 +30,7 @@ export default async function SystemHealthPage() {
           Monitor database, authentication, and AI service status.
         </p>
       </div>
+      <ProviderHealthCard />
       <SystemHealthDashboard />
     </div>
   )

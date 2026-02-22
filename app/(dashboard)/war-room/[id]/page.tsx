@@ -5,6 +5,7 @@ import { resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
 import { PwinGauge } from '@/components/modules/WarRoom/PwinGauge'
 import { WarRoomTabs } from '@/components/modules/WarRoom/WarRoomTabs'
 import { ColorTeamFeedback } from '@/components/features/proposals/ColorTeamFeedback'
+import { ActivityLog } from '@/components/features/shared/ActivityLog'
 
 interface WarRoomPageProps {
   params: Promise<{ id: string }>
@@ -420,6 +421,14 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
           )}
         </div>
       )}
+
+      {/* Recent Activity */}
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+          Recent Activity
+        </h3>
+        <ActivityLog entityId={id} realtime />
+      </div>
 
       {/* Tabs */}
       <div className="rounded-lg border border-border bg-surface p-6">
