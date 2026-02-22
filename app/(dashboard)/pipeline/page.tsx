@@ -1,7 +1,7 @@
 // filepath: app/(dashboard)/pipeline/page.tsx
 
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { resolveRole, hasPermission, isInternalRole } from '@/lib/rbac/config'
 import { PipelineTable } from '@/components/modules/PipelineTable'
 import { KanbanView } from './KanbanView'
 import { ViewToggle } from './ViewToggle'
@@ -20,21 +20,41 @@ export default async function PipelinePage({
     data: { user },
   } = await supabase.auth.getUser()
   let canEdit = false
+  let isExternal = false
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, email')
       .eq('id', user.id)
       .single()
     const role = resolveRole(profile?.role)
     canEdit = hasPermission(role, 'pipeline', 'canEdit')
+    isExternal = !isInternalRole(role)
   }
 
   // ─── Fetch Opportunities ────────────────────────────────────
-  const { data: opportunities, error } = await supabase
+  // External roles (partner, subcontractor, consultant) only see assigned opportunities
+  let assignedOppIds: string[] | null = null
+  if (isExternal && user) {
+    const { data: assignments } = await supabase
+      .from('opportunity_assignments')
+      .select('opportunity_id')
+      .eq('assignee_email', user.email ?? '')
+    assignedOppIds = (assignments ?? []).map((a) => a.opportunity_id).filter(Boolean)
+  }
+
+  let query = supabase
     .from('opportunities')
     .select('id, title, agency, ceiling, pwin, phase, status, due_date, submission_date, set_aside, owner_id, priority, solicitation_number')
     .order('updated_at', { ascending: false })
+
+  if (assignedOppIds !== null) {
+    query = assignedOppIds.length > 0
+      ? query.in('id', assignedOppIds)
+      : query.in('id', ['__none__'])  // No assignments → show nothing
+  }
+
+  const { data: opportunities, error } = await query
 
   const opps = (opportunities ?? []) as Opportunity[]
   const view = searchParams.view ?? 'table'

@@ -26,6 +26,7 @@ export default async function SwimlanePage({ params }: SwimlanePageProps) {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'proposals', 'shouldRender')) return null
+  const canEdit = hasPermission(role, 'proposals', 'canEdit')
 
   // Verify opportunity exists (RLS-enforced)
   const { data: opportunity, error: oppError } = await supabase
@@ -62,6 +63,7 @@ export default async function SwimlanePage({ params }: SwimlanePageProps) {
         opportunityId={id}
         sections={sections ?? []}
         teamMembers={teamMembers ?? []}
+        canEdit={canEdit}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { resolveRole, hasPermission, isInternalRole } from '@/lib/rbac/config'
 import { ReviewQueue } from '@/components/features/hitl/ReviewQueue'
 
 interface ReviewItem {
@@ -33,29 +33,57 @@ export default async function ProposalsPage() {
   }
   const canEdit = hasPermission(role, 'proposals', 'canEdit')
 
+  // External roles only see items from assigned opportunities
+  let assignedOppIds: string[] | null = null
+  if (!isInternalRole(role)) {
+    const { data: assignments } = await supabase
+      .from('opportunity_assignments')
+      .select('opportunity_id')
+      .eq('assignee_email', user.email ?? '')
+    assignedOppIds = (assignments ?? []).map((a) => a.opportunity_id).filter(Boolean)
+  }
+
   // Fetch compliance requirements needing review (status = 'Addressed' but not 'Verified')
-  const { data: compReqs } = await supabase
+  let compQuery = supabase
     .from('compliance_requirements')
     .select('id, reference, requirement, status, opportunity_id, updated_at')
     .eq('status', 'Addressed')
     .order('updated_at', { ascending: false })
     .limit(50)
+  if (assignedOppIds !== null && assignedOppIds.length > 0) {
+    compQuery = compQuery.in('opportunity_id', assignedOppIds)
+  } else if (assignedOppIds !== null) {
+    compQuery = compQuery.in('opportunity_id', ['__none__'])
+  }
+  const { data: compReqs } = await compQuery
 
   // Fetch contract clauses needing review
-  const { data: clauses } = await supabase
+  let clauseQuery = supabase
     .from('contract_clauses')
     .select('id, clause_number, clause_title, compliance_status, opportunity_id, updated_at')
     .eq('compliance_status', 'Review Needed')
     .order('updated_at', { ascending: false })
     .limit(50)
+  if (assignedOppIds !== null && assignedOppIds.length > 0) {
+    clauseQuery = clauseQuery.in('opportunity_id', assignedOppIds)
+  } else if (assignedOppIds !== null) {
+    clauseQuery = clauseQuery.in('opportunity_id', ['__none__'])
+  }
+  const { data: clauses } = await clauseQuery
 
   // Fetch documents needing review
-  const { data: docs } = await supabase
+  let docQuery = supabase
     .from('documents')
     .select('id, document_name, description, status, opportunity_id, updated_at')
     .eq('status', 'in_review')
     .order('updated_at', { ascending: false })
     .limit(50)
+  if (assignedOppIds !== null && assignedOppIds.length > 0) {
+    docQuery = docQuery.in('opportunity_id', assignedOppIds)
+  } else if (assignedOppIds !== null) {
+    docQuery = docQuery.in('opportunity_id', ['__none__'])
+  }
+  const { data: docs } = await docQuery
 
   // Get opportunity titles
   const allOppIds = Array.from(

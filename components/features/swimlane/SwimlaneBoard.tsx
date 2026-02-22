@@ -29,12 +29,13 @@ const SWIMLANE_COLUMNS = [
   { id: 'final', label: 'Final' },
 ] as const
 
+// Strict forward-only transitions. Rejection from any review → revision.
 const VALID_TRANSITIONS: Record<string, string[]> = {
   draft: ['pink_review'],
-  pink_review: ['revision', 'green_review'],
-  revision: ['pink_review', 'green_review', 'red_review'],
-  green_review: ['revision', 'red_review'],
-  red_review: ['revision', 'final'],
+  pink_review: ['revision'],           // Pink review → revision (author rework)
+  revision: ['green_review'],           // Revision → green review (next color team)
+  green_review: ['revision', 'red_review'], // Green pass → red; green fail → revision
+  red_review: ['revision', 'final'],    // Red pass → final; red fail → revision
   final: [],
 }
 
@@ -60,12 +61,14 @@ interface SwimlaneBoardProps {
   opportunityId: string
   sections: ProposalSection[]
   teamMembers: TeamMember[]
+  canEdit?: boolean
 }
 
 export function SwimlaneBoard({
   opportunityId,
   sections,
   teamMembers,
+  canEdit = true,
 }: SwimlaneBoardProps) {
   const [isPending, startTransition] = useTransition()
   const [volumeFilter, setVolumeFilter] = useState<string>('All')
@@ -82,6 +85,7 @@ export function SwimlaneBoard({
   }))
 
   function handleDragEnd(result: DropResult) {
+    if (!canEdit) return
     const { destination, draggableId } = result
     if (!destination) return
 
@@ -171,6 +175,7 @@ export function SwimlaneBoard({
                           key={section.id}
                           draggableId={section.id}
                           index={index}
+                          isDragDisabled={!canEdit}
                         >
                           {(dragProvided, dragSnapshot) => (
                             <div
