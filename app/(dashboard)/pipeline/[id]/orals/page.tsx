@@ -40,6 +40,16 @@ export default async function OralsPage({ params }: Props) {
     .eq('opportunity_id', params.id)
     .limit(20)
 
+  // Fetch saved questions from question bank
+  const { data: savedQuestions } = await supabase
+    .from('orals_questions')
+    .select('id, question, suggested_answer, category, difficulty, times_asked, avg_score')
+    .eq('opportunity_id', params.id)
+    .order('category', { ascending: true })
+    .limit(50)
+
+  const questions = savedQuestions ?? []
+
   return (
     <div className="space-y-6">
       <div>
@@ -59,6 +69,57 @@ export default async function OralsPage({ params }: Props) {
         }}
         requirements={(requirements ?? []).map((r) => r.requirement)}
       />
+
+      {/* Saved Question Bank for This Opportunity */}
+      {questions.length > 0 && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+            Saved Question Bank ({questions.length})
+          </h2>
+          <div className="divide-y divide-border rounded-lg border border-border">
+            {questions.map((q) => (
+              <div key={q.id} className="p-3 space-y-1">
+                <div className="flex items-start justify-between">
+                  <p className="text-sm font-medium text-white flex-1">
+                    {q.question}
+                  </p>
+                  <div className="ml-3 flex items-center gap-2">
+                    <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                      {q.category}
+                    </span>
+                    {q.difficulty && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          q.difficulty === 'hard'
+                            ? 'bg-red-500/15 text-red-300'
+                            : q.difficulty === 'medium'
+                              ? 'bg-amber-500/15 text-amber-300'
+                              : 'bg-emerald-500/15 text-emerald-300'
+                        }`}
+                      >
+                        {q.difficulty}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {q.suggested_answer && (
+                  <p className="text-xs text-gray-400 bg-gray-900/30 rounded p-2">
+                    {q.suggested_answer}
+                  </p>
+                )}
+                <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                  {q.times_asked != null && q.times_asked > 0 && (
+                    <span>Practiced {q.times_asked}x</span>
+                  )}
+                  {q.avg_score != null && (
+                    <span>Avg Score: {q.avg_score.toFixed(1)}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

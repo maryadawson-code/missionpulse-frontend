@@ -114,6 +114,13 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
     })
   }
 
+  // Fetch proposal volumes for progress tracking
+  const { data: volumes } = await supabase
+    .from('proposal_volumes')
+    .select('id, volume_name, volume_number, page_limit, current_pages, compliance_score, status')
+    .eq('opportunity_id', id)
+    .order('volume_number', { ascending: true })
+
   // Fetch color team reviews for this opportunity
   const { data: colorReviews } = await supabase
     .from('color_team_reviews')
@@ -247,6 +254,10 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
             { href: `/pipeline/${id}/swimlane`, label: 'Swimlane', icon: '📊', desc: 'Section task board' },
             { href: `/pipeline/${id}/launch`, label: 'Launch Checklist', icon: '🚀', desc: 'Pre-submission launch checklist' },
             { href: `/pipeline/${id}/orals`, label: 'Orals Prep', icon: '🎤', desc: 'Oral presentation prep' },
+            { href: `/pipeline/${id}/volumes`, label: 'Volumes', icon: '📚', desc: 'Volume page tracking' },
+            { href: `/pipeline/${id}/qa`, label: 'Q&A', icon: '❓', desc: 'RFP question responses' },
+            { href: `/pipeline/${id}/risks`, label: 'Risks', icon: '⚠️', desc: 'Risk register & mitigations' },
+            { href: `/pipeline/${id}/intel`, label: 'Intel', icon: '🔍', desc: 'Competitive intelligence' },
             { href: `/pipeline/${id}/post-award`, label: 'Post-Award', icon: '🏆', desc: 'Post-award transition' },
           ].map((link) => (
             <a
@@ -296,6 +307,66 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
           ))}
         </div>
       </div>
+
+      {/* Proposal Volumes Progress */}
+      {(volumes ?? []).length > 0 && (
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+            Proposal Volumes
+          </h3>
+          <div className="space-y-3">
+            {(volumes ?? []).map((vol) => {
+              const pct =
+                vol.page_limit && vol.page_limit > 0
+                  ? Math.min(
+                      100,
+                      Math.round(((vol.current_pages ?? 0) / vol.page_limit) * 100)
+                    )
+                  : 0
+              const barColor =
+                pct >= 95
+                  ? 'bg-red-500'
+                  : pct >= 75
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+              return (
+                <div key={vol.id} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">
+                        Vol {vol.volume_number}: {vol.volume_name}
+                      </span>
+                      {vol.status && (
+                        <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                          {vol.status}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                      {vol.compliance_score != null && (
+                        <span>
+                          Compliance: {Math.round(vol.compliance_score)}%
+                        </span>
+                      )}
+                      <span>
+                        {vol.current_pages ?? 0}/{vol.page_limit ?? '—'} pages
+                      </span>
+                    </div>
+                  </div>
+                  {vol.page_limit && vol.page_limit > 0 && (
+                    <div className="h-1.5 w-full rounded-full bg-gray-800">
+                      <div
+                        className={`h-1.5 rounded-full ${barColor} transition-all`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Color Team Reviews */}
       {reviewsWithFindings.length > 0 && (
