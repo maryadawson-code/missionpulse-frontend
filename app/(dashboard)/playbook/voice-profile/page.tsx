@@ -18,7 +18,7 @@ export default async function VoiceProfilePage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'documents', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   // Get existing voice profile from company features

@@ -29,7 +29,7 @@ export default async function OpportunityStrategyPage({ params }: Props) {
     !hasPermission(role, 'strategy', 'shouldRender') &&
     !hasPermission(role, 'blackhat', 'shouldRender')
   ) {
-    redirect('/dashboard')
+    return null
   }
 
   const { data: opportunity } = await supabase

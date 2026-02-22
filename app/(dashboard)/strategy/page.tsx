@@ -47,7 +47,7 @@ export default async function StrategyPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'strategy', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   // Fetch win themes

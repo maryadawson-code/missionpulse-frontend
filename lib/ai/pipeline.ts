@@ -13,6 +13,7 @@ import { routedQuery } from './router'
 import { logTokenUsage } from './logger'
 import { getCachedResponse, setCachedResponse } from '@/lib/cache/semantic-cache'
 import { checkTokenGate, recordTokenUsage } from '@/lib/billing/token-gate'
+import { resolveRole, getAllowedAgents } from '@/lib/rbac/config'
 
 /**
  * Unified AI request function. All AI calls go through this.
@@ -34,14 +35,29 @@ export async function aiRequest(
     throw new AIError('AUTH_ERROR', 'Not authenticated')
   }
 
-  // Resolve company_id for token gate
+  // Resolve profile for token gate + agent access
   const { data: profile } = await supabase
     .from('profiles')
-    .select('company_id')
+    .select('company_id, role')
     .eq('id', user.id)
     .single()
 
   const companyId = profile?.company_id
+
+  // Agent Access Gate: Enforce role-based allowedAgents
+  const agentType = options.taskType
+  // 'chat', 'summarize', 'classify' are utility tasks — not gated
+  const UNGATED_TASKS = ['chat', 'summarize', 'classify']
+  if (!UNGATED_TASKS.includes(agentType)) {
+    const role = resolveRole(profile?.role)
+    const allowed = getAllowedAgents(role)
+    if (!allowed.includes(agentType)) {
+      throw new AIError(
+        'AUTH_ERROR',
+        `Your role does not have access to the ${agentType} agent.`
+      )
+    }
+  }
 
   // Token Gate: Pre-flight check
   if (companyId) {

@@ -22,7 +22,7 @@ export default async function PostAwardPage({ params }: Props) {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'pipeline', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   const { data: opportunity } = await supabase

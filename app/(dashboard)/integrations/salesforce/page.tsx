@@ -18,7 +18,7 @@ export default async function SalesforcePage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'integrations', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   // Get Salesforce integration status

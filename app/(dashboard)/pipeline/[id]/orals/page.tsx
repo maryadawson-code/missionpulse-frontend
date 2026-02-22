@@ -22,7 +22,7 @@ export default async function OralsPage({ params }: Props) {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'proposals', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   const { data: opportunity } = await supabase

@@ -24,7 +24,7 @@ export default async function OpportunityPricingPage({ params }: Props) {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'pricing', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   const { data: opportunity } = await supabase

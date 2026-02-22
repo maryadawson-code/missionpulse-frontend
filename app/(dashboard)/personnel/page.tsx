@@ -50,7 +50,7 @@ export default async function PersonnelPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'personnel', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   const { data: personnel, error } = await supabase

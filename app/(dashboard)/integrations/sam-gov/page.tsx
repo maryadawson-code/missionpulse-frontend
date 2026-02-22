@@ -18,7 +18,7 @@ export default async function SamGovPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'integrations', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   return (

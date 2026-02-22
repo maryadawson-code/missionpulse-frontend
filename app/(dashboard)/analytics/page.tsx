@@ -19,7 +19,7 @@ export default async function AnalyticsPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'analytics', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   // Fetch opportunities for live metrics

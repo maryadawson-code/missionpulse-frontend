@@ -29,7 +29,7 @@ export default async function ProposalsPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'proposals', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
   const canEdit = hasPermission(role, 'proposals', 'canEdit')
 

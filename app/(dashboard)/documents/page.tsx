@@ -18,7 +18,7 @@ export default async function DocumentsPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'documents', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
   const canEdit = hasPermission(role, 'documents', 'canEdit')
 

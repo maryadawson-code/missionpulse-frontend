@@ -2,11 +2,19 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getRolePermissions, isInternalRole } from '@/lib/rbac/config'
+import {
+  getRolePermissions,
+  isInternalRole,
+  hasForceCUIWatermark,
+  getClassificationCeiling,
+  getRoleDisplayName,
+} from '@/lib/rbac/config'
 import { getRecentActivity } from '@/lib/actions/audit'
 import Sidebar from '@/components/layout/Sidebar'
 import DashboardHeader from '@/components/layout/DashboardHeader'
 import { PartnerWatermark } from '@/components/layout/PartnerWatermark'
+import { CUIBanner } from '@/components/rbac/CUIBanner'
+import { RoleProvider } from '@/lib/rbac/RoleContext'
 import type { ModulePermission } from '@/lib/types'
 
 
@@ -63,27 +71,50 @@ export default async function DashboardLayout({
 
   const isExternal = !isInternalRole(userRole)
   const companyName = profile?.full_name ?? user.email ?? 'External User'
+  const forceCUI = hasForceCUIWatermark(userRole)
+  const classificationCeiling = getClassificationCeiling(userRole)
+
+  // Determine CUI marking type for global banner
+  const cuiMarking: 'SP-PROPIN' | 'SP-PRVCY' | null = forceCUI
+    ? classificationCeiling.includes('PRVCY')
+      ? 'SP-PRVCY'
+      : 'SP-PROPIN'
+    : null
+
+  // RoleContext value — shared with all client children
+  const roleContextValue = {
+    role: userRole,
+    permissions,
+    displayName: getRoleDisplayName(userRole),
+    isExternal,
+    forceCUIWatermark: forceCUI,
+    classificationCeiling,
+  }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
-      {/* Watermark overlay for external roles */}
-      {isExternal && <PartnerWatermark companyName={companyName} />}
+    <RoleProvider value={roleContextValue}>
+      <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
+        {/* Watermark overlay for external roles or CUI-forced roles */}
+        {(isExternal || forceCUI) && <PartnerWatermark companyName={companyName} />}
 
-      {/* Sidebar — RBAC-filtered navigation */}
-      <Sidebar
-        permissions={permissions}
-        userDisplayName={profile?.full_name ?? user.email ?? null}
-        userRole={userRole}
-      />
+        {/* Sidebar — RBAC-filtered navigation */}
+        <Sidebar
+          permissions={permissions}
+          userDisplayName={profile?.full_name ?? user.email ?? null}
+          userRole={userRole}
+        />
 
-      {/* Main content area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <DashboardHeader userEmail={user.email ?? null} notifications={notifications} />
+        {/* Main content area */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <DashboardHeader userEmail={user.email ?? null} notifications={notifications} />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+          <main className="flex-1 overflow-y-auto p-6">
+            {/* Global CUI banner for forceCUIWatermark roles */}
+            {cuiMarking && <CUIBanner marking={cuiMarking} className="mb-4" />}
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </RoleProvider>
   )
 }

@@ -18,7 +18,7 @@ export default async function AIChatPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'ai_chat', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   // Load most recent session for this user

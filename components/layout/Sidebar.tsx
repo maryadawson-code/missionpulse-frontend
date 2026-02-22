@@ -115,6 +115,17 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
+// ─── Section Grouping ───────────────────────────────────────────
+const PRIMARY_MODULES = ['dashboard', 'pipeline', 'proposals', 'workflow_board', 'ai_chat', 'documents']
+const ADMIN_MODULES = ['admin', 'integrations', 'audit_log']
+// Everything else (strategy, blackhat, compliance, pricing, analytics, personnel, playbook) is secondary
+
+// ─── CUI / Sensitivity Badges ───────────────────────────────────
+const CUI_BADGES: Record<string, { label: string; color: string }> = {
+  pricing: { label: 'CUI', color: 'bg-amber-500/20 text-amber-400' },
+  blackhat: { label: 'Private', color: 'bg-red-500/20 text-red-400' },
+}
+
 // ─── Props ──────────────────────────────────────────────────────
 interface SidebarProps {
   permissions: Record<string, ModulePermission>
@@ -130,6 +141,18 @@ export default function Sidebar({ permissions, userDisplayName, userRole }: Side
     const perm = permissions[item.module]
     return perm?.shouldRender === true
   })
+
+  // Split into section groups
+  // Playbook shares the 'documents' module but belongs in secondary
+  const primary = visibleItems.filter(
+    (i) => PRIMARY_MODULES.includes(i.module) && i.href !== '/playbook'
+  )
+  const secondary = visibleItems.filter(
+    (i) =>
+      (!PRIMARY_MODULES.includes(i.module) && !ADMIN_MODULES.includes(i.module)) ||
+      i.href === '/playbook'
+  )
+  const admin = visibleItems.filter((i) => ADMIN_MODULES.includes(i.module))
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-gray-800 bg-[#00050F]">
@@ -158,13 +181,15 @@ export default function Sidebar({ permissions, userDisplayName, userRole }: Side
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
-          {visibleItems.map((item) => {
+          {/* Primary section */}
+          {primary.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== '/' && pathname.startsWith(item.href))
+            const badge = CUI_BADGES[item.module]
 
             return (
-              <li key={item.module}>
+              <li key={item.href}>
                 <Link
                   href={item.href}
                   className={`
@@ -188,6 +213,105 @@ export default function Sidebar({ permissions, userDisplayName, userRole }: Side
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
                   {item.label}
+                  {badge && (
+                    <span className={`ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium ${badge.color}`}>
+                      {badge.label}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            )
+          })}
+
+          {/* Secondary (Analysis) section */}
+          {secondary.length > 0 && (
+            <li className="px-3 py-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Analysis</span>
+            </li>
+          )}
+          {secondary.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== '/' && pathname.startsWith(item.href))
+            const badge = CUI_BADGES[item.module]
+
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`
+                    group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
+                    ${
+                      isActive
+                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
+                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                    }
+                  `}
+                >
+                  <svg
+                    className={`h-5 w-5 flex-shrink-0 ${
+                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
+                  </svg>
+                  {item.label}
+                  {badge && (
+                    <span className={`ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium ${badge.color}`}>
+                      {badge.label}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            )
+          })}
+
+          {/* Admin section */}
+          {admin.length > 0 && (
+            <li className="px-3 py-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Admin</span>
+            </li>
+          )}
+          {admin.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== '/' && pathname.startsWith(item.href))
+            const badge = CUI_BADGES[item.module]
+
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`
+                    group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
+                    ${
+                      isActive
+                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
+                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                    }
+                  `}
+                >
+                  <svg
+                    className={`h-5 w-5 flex-shrink-0 ${
+                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
+                  </svg>
+                  {item.label}
+                  {badge && (
+                    <span className={`ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium ${badge.color}`}>
+                      {badge.label}
+                    </span>
+                  )}
                 </Link>
               </li>
             )

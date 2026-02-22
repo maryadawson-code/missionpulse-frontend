@@ -18,7 +18,7 @@ export default async function SlackPage() {
 
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'integrations', 'shouldRender')) {
-    redirect('/dashboard')
+    return null
   }
 
   const { data: integration } = await supabase

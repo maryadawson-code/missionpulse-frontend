@@ -179,3 +179,27 @@ export function getUIComplexityLevel(role: string): string {
   const roleConfig = getRoleConfig(role)
   return roleConfig?.uiComplexityLevel ?? 'simplified'
 }
+
+/** Get allowed AI agents for a role. Returns empty array if role has no agents. */
+export function getAllowedAgents(role: string): string[] {
+  const roleConfig = getRoleConfig(role)
+  if (!roleConfig) return []
+  const aiAgents = roleConfig.aiAgents as { allowedAgents?: string[] } | undefined
+  return aiAgents?.allowedAgents ?? []
+}
+
+/** Check if a role has forceCUIWatermark enabled. */
+export function hasForceCUIWatermark(role: string): boolean {
+  const roleConfig = getRoleConfig(role)
+  if (!roleConfig) return false
+  const security = roleConfig.security as { forceCUIWatermark?: boolean } | undefined
+  return security?.forceCUIWatermark === true
+}
+
+/** Get classification ceiling for a role. */
+export function getClassificationCeiling(role: string): string {
+  const roleConfig = getRoleConfig(role)
+  if (!roleConfig) return 'PUBLIC'
+  const security = roleConfig.security as { classificationCeiling?: string } | undefined
+  return security?.classificationCeiling ?? 'PUBLIC'
+}
