@@ -9,8 +9,8 @@ import {
   getClassificationCeiling,
   getRoleDisplayName,
 } from '@/lib/rbac/config'
-import { getRecentActivity } from '@/lib/actions/audit'
 import Sidebar from '@/components/layout/Sidebar'
+import { MobileNav } from '@/components/layout/MobileNav'
 import DashboardHeader from '@/components/layout/DashboardHeader'
 import { PartnerWatermark } from '@/components/layout/PartnerWatermark'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
@@ -55,30 +55,40 @@ export default async function DashboardLayout({
     permissions.dashboard = { shouldRender: true, canView: true, canEdit: false }
   }
 
-  // ─── Recent Activity for Notifications ────────────────────
-  let notifications: { id: string; action: string; user_name: string | null; timestamp: string | null }[] = []
-  try {
-    const { data: recentActivity } = await getRecentActivity(5)
-    notifications = (recentActivity ?? []).map((a) => ({
-      id: a.id,
-      action: a.action,
-      user_name: a.user_name,
-      timestamp: a.timestamp,
-    }))
-  } catch {
-    // Non-critical — continue without notifications
-  }
-
-  // ─── Unread Notification Count for Sidebar Badge ──────────
+  // ─── User Notifications for Header Dropdown + Sidebar Badge ──
+  let headerNotifications: {
+    id: string
+    title: string
+    message: string | null
+    notification_type: string
+    priority: string | null
+    is_read: boolean
+    link_url: string | null
+    link_text: string | null
+    created_at: string | null
+  }[] = []
   let unreadNotifications = 0
   try {
-    const { count } = await supabase
+    const { data: notifRows } = await supabase
       .from('notifications')
-      .select('id', { count: 'exact', head: true })
+      .select('id, title, message, notification_type, priority, is_read, link_url, link_text, created_at')
       .eq('user_id', user.id)
-      .eq('is_read', false)
       .eq('is_dismissed', false)
-    unreadNotifications = count ?? 0
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    headerNotifications = (notifRows ?? []).map((n) => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      notification_type: n.notification_type,
+      priority: n.priority,
+      is_read: n.is_read ?? false,
+      link_url: n.link_url,
+      link_text: n.link_text,
+      created_at: n.created_at,
+    }))
+    unreadNotifications = headerNotifications.filter((n) => !n.is_read).length
   } catch {
     // Non-critical
   }
@@ -111,17 +121,29 @@ export default async function DashboardLayout({
         {/* Watermark overlay for external roles or CUI-forced roles */}
         {(isExternal || forceCUI) && <PartnerWatermark companyName={companyName} />}
 
-        {/* Sidebar — RBAC-filtered navigation */}
-        <Sidebar
-          permissions={permissions}
-          userDisplayName={profile?.full_name ?? user.email ?? null}
-          userRole={userRole}
-          unreadNotifications={unreadNotifications}
-        />
+        {/* Sidebar — desktop: always visible; mobile: hidden */}
+        <div className="hidden md:flex">
+          <Sidebar
+            permissions={permissions}
+            userDisplayName={profile?.full_name ?? user.email ?? null}
+            userRole={userRole}
+            unreadNotifications={unreadNotifications}
+          />
+        </div>
+
+        {/* Mobile nav drawer (hidden on desktop) */}
+        <MobileNav>
+          <Sidebar
+            permissions={permissions}
+            userDisplayName={profile?.full_name ?? user.email ?? null}
+            userRole={userRole}
+            unreadNotifications={unreadNotifications}
+          />
+        </MobileNav>
 
         {/* Main content area */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          <DashboardHeader userEmail={user.email ?? null} notifications={notifications} />
+          <DashboardHeader userEmail={user.email ?? null} notifications={headerNotifications} />
 
           <main className="flex-1 overflow-y-auto p-6">
             {/* Global CUI banner for forceCUIWatermark roles */}

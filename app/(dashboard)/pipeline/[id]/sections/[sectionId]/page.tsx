@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { SectionEditorClient } from './SectionEditorClient'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface SectionEditorPageProps {
   params: Promise<{ id: string; sectionId: string }>
@@ -110,32 +111,26 @@ export default async function SectionEditorPage({ params }: SectionEditorPagePro
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[
+        { label: 'Pipeline', href: '/pipeline' },
+        { label: opportunity.title, href: `/pipeline/${id}` },
+        { label: 'Swimlane', href: `/pipeline/${id}/swimlane` },
+        { label: section.section_title },
+      ]} />
+
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <Link
-            href={`/pipeline/${id}/swimlane`}
-            className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
-            aria-label="Back to swimlane"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-white">{section.section_title}</h1>
-            <div className="mt-1 flex items-center gap-2">
-              {section.volume && (
-                <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${volumeColor(section.volume)}`}>
-                  {section.volume}
-                </span>
-              )}
-              <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor(section.status)}`}>
-                {STATUS_LABELS[section.status ?? 'draft'] ?? section.status ?? 'Draft'}
-              </span>
-              <span className="text-xs text-gray-500">{opportunity.title}</span>
-            </div>
-          </div>
+      <div>
+        <h1 className="text-2xl font-bold text-white">{section.section_title}</h1>
+        <div className="mt-1 flex items-center gap-2">
+          {section.volume && (
+            <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${volumeColor(section.volume)}`}>
+              {section.volume}
+            </span>
+          )}
+          <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor(section.status)}`}>
+            {STATUS_LABELS[section.status ?? 'draft'] ?? section.status ?? 'Draft'}
+          </span>
+          <span className="text-xs text-gray-500">{opportunity.title}</span>
         </div>
       </div>
 

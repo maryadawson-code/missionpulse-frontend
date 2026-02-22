@@ -1,28 +1,45 @@
-// filepath: components/layout/NotificationsDropdown.tsx
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useTransition } from 'react'
 import Link from 'next/link'
+import { Check } from 'lucide-react'
+import {
+  markAsRead,
+} from '@/app/(dashboard)/notifications/actions'
 
 export interface NotificationItem {
   id: string
-  action: string
-  user_name: string | null
-  timestamp: string | null
+  title: string
+  message: string | null
+  notification_type: string
+  priority: string | null
+  is_read: boolean
+  link_url: string | null
+  link_text: string | null
+  created_at: string | null
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  create_opportunity: 'created an opportunity',
-  update_opportunity: 'updated an opportunity',
-  archive_opportunity: 'archived an opportunity',
-  delete_opportunity: 'deleted an opportunity',
-  update_profile: 'updated their profile',
-  update_user_role: 'changed a user role',
-  update_password: 'changed their password',
+const TYPE_LABELS: Record<string, string> = {
+  gate_approval: 'Gate',
+  deadline: 'Deadline',
+  assignment: 'Assigned',
+  ai_complete: 'AI',
+  section_status_change: 'Status',
 }
 
-function formatAction(action: string): string {
-  return ACTION_LABELS[action] ?? action.replace(/_/g, ' ')
+function typeBadgeClass(type: string): string {
+  switch (type) {
+    case 'gate_approval':
+      return 'bg-emerald-500/20 text-emerald-300'
+    case 'deadline':
+      return 'bg-red-500/20 text-red-300'
+    case 'assignment':
+      return 'bg-[#00E5FA]/20 text-[#00E5FA]'
+    case 'ai_complete':
+      return 'bg-purple-500/20 text-purple-300'
+    default:
+      return 'bg-gray-500/20 text-gray-300'
+  }
 }
 
 function timeAgo(timestamp: string | null): string {
@@ -43,7 +60,10 @@ interface NotificationsDropdownProps {
 
 export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
   const [open, setOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const ref = useRef<HTMLDivElement>(null)
+
+  const unreadCount = items.filter((n) => !n.is_read).length
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -54,6 +74,12 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  function handleMarkRead(id: string) {
+    startTransition(async () => {
+      await markAsRead(id)
+    })
+  }
 
   return (
     <div className="relative" ref={ref}>
@@ -70,9 +96,9 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
             d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
           />
         </svg>
-        {items.length > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#00E5FA] text-[10px] font-bold text-[#00050F]">
-            {items.length > 9 ? '9+' : items.length}
+        {unreadCount > 0 && (
+          <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
@@ -80,7 +106,9 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-900 shadow-xl">
           <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-200">Notifications</h3>
+            <h3 className="text-sm font-semibold text-gray-200">
+              Notifications{unreadCount > 0 ? ` (${unreadCount})` : ''}
+            </h3>
             <Link
               href="/notifications"
               className="text-xs text-[#00E5FA] hover:underline"
@@ -92,23 +120,51 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
           <div className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-gray-500">
-                No recent activity
+                No notifications
               </p>
             ) : (
               items.map((item) => (
                 <div
                   key={item.id}
-                  className="border-b border-gray-800/50 px-4 py-3 transition-colors last:border-0 hover:bg-gray-800/30"
+                  className={`border-b border-gray-800/50 px-4 py-3 transition-colors last:border-0 hover:bg-gray-800/30 ${!item.is_read ? 'border-l-2 border-l-[#00E5FA]' : ''}`}
                 >
-                  <p className="text-sm text-gray-300">
-                    <span className="font-medium text-gray-200">
-                      {item.user_name ?? 'Unknown'}
-                    </span>{' '}
-                    {formatAction(item.action)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    {timeAgo(item.timestamp)}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className={`text-sm truncate ${!item.is_read ? 'font-semibold text-gray-200' : 'text-gray-400'}`}>
+                          {item.title}
+                        </p>
+                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${typeBadgeClass(item.notification_type)}`}>
+                          {TYPE_LABELS[item.notification_type] ?? item.notification_type.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      {item.message && (
+                        <p className="text-xs text-gray-500 truncate">{item.message}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-gray-600">{timeAgo(item.created_at)}</span>
+                        {item.link_url && (
+                          <Link
+                            href={item.link_url}
+                            className="text-[10px] text-[#00E5FA] hover:underline"
+                            onClick={() => setOpen(false)}
+                          >
+                            {item.link_text ?? 'View'}
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                    {!item.is_read && (
+                      <button
+                        onClick={() => handleMarkRead(item.id)}
+                        disabled={isPending}
+                        className="shrink-0 rounded p-1 text-gray-500 hover:text-[#00E5FA]"
+                        title="Mark as read"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}

@@ -34,7 +34,7 @@ export default function DashboardHeader({ userEmail, notifications = [] }: Dashb
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-800 bg-[#00050F] px-6">
+    <header className="flex h-16 items-center justify-between border-b border-gray-800 bg-[#00050F] px-4 md:px-6">
       {/* Search */}
       <form onSubmit={handleSearch} className="relative w-full max-w-md">
         <svg
@@ -65,7 +65,7 @@ export default function DashboardHeader({ userEmail, notifications = [] }: Dashb
 
         {/* User email + sign out */}
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">{userEmail}</span>
+          <span className="hidden text-xs text-gray-500 sm:inline">{userEmail}</span>
           <button
             onClick={handleSignOut}
             type="button"

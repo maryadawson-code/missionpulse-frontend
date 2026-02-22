@@ -16,6 +16,8 @@ import type { Database } from '@/lib/supabase/database.types'
 import Link from 'next/link'
 import { CaptureAnalysis } from '@/components/features/pipeline/CaptureAnalysis'
 import { PipelineSubNav } from '@/components/features/pipeline/PipelineSubNav'
+import { DangerZone } from '@/components/features/pipeline/DangerZone'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 type OpportunityRow = Database['public']['Tables']['opportunities']['Row']
 type AssignmentRow = Database['public']['Tables']['opportunity_assignments']['Row']
@@ -101,44 +103,38 @@ export default async function WarRoomPage({
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[
+        { label: 'Pipeline', href: '/pipeline' },
+        { label: opp.title },
+      ]} />
+
       {/* ─── Header ──────────────────────────────────────────── */}
       <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <Link
-            href="/pipeline"
-            className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
-            aria-label="Back to pipeline"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{opp.title}</h1>
-              {opp.status && (
-                <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${statusColor(opp.status)}`}>
-                  {opp.status}
-                </span>
-              )}
-            </div>
-            <div className="mt-1 flex items-center gap-4 text-sm text-gray-500">
-              {opp.agency && <span>{opp.agency}</span>}
-              {opp.phase && (
-                <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${phaseColor(opp.phase)}`}>
-                  {opp.phase}
-                </span>
-              )}
-              {daysUntil !== null && (
-                <span
-                  className={`text-xs font-medium ${
-                    daysUntil <= 7 ? 'text-red-400' : daysUntil <= 30 ? 'text-amber-400' : 'text-gray-400'
-                  }`}
-                >
-                  {daysUntil <= 0 ? 'Overdue' : `${daysUntil} days until due`}
-                </span>
-              )}
-            </div>
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white">{opp.title}</h1>
+            {opp.status && (
+              <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${statusColor(opp.status)}`}>
+                {opp.status}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 flex items-center gap-4 text-sm text-gray-500">
+            {opp.agency && <span>{opp.agency}</span>}
+            {opp.phase && (
+              <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${phaseColor(opp.phase)}`}>
+                {opp.phase}
+              </span>
+            )}
+            {daysUntil !== null && (
+              <span
+                className={`text-xs font-medium ${
+                  daysUntil <= 7 ? 'text-red-400' : daysUntil <= 30 ? 'text-amber-400' : 'text-gray-400'
+                }`}
+              >
+                {daysUntil <= 0 ? 'Overdue' : `${daysUntil} days until due`}
+              </span>
+            )}
           </div>
         </div>
 
@@ -349,6 +345,11 @@ export default async function WarRoomPage({
             {opp.notes}
           </p>
         </div>
+      )}
+
+      {/* Danger Zone — only for users with edit permission */}
+      {canEdit && (
+        <DangerZone opportunityId={id} opportunityTitle={opp.title} />
       )}
     </div>
   )
