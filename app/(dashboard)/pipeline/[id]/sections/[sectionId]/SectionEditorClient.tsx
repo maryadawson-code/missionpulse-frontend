@@ -8,7 +8,9 @@ import { addToast } from '@/components/ui/Toast'
 import { AIWriterPanel } from '@/components/features/proposals/AIWriterPanel'
 import { CommentPanel } from '@/components/features/proposals/CommentPanel'
 import { SectionLockControl } from '@/components/features/proposals/SectionLock'
+import { SectionVersionHistory } from '@/components/features/proposals/SectionVersionHistory'
 import { updateSectionContent } from './actions'
+import { saveSectionVersion } from '@/app/(dashboard)/proposals/actions'
 
 interface SectionEditorClientProps {
   opportunityId: string
@@ -39,12 +41,18 @@ export function SectionEditorClient({
     startSave(async () => {
       const result = await updateSectionContent(sectionId, content, opportunityId)
       if (result.success) {
+        // Auto-snapshot version on save
+        await saveSectionVersion(sectionId, content, null, opportunityId)
         addToast('success', 'Content saved')
       } else {
         addToast('error', result.error ?? 'Failed to save')
       }
     })
   }, [sectionId, content, opportunityId])
+
+  const handleRestore = useCallback((restoredContent: string) => {
+    setContent(restoredContent)
+  }, [])
 
   const handleAcceptContent = useCallback((aiContent: string) => {
     setContent((prev) => (prev ? prev + '\n\n' + aiContent : aiContent))
@@ -131,6 +139,12 @@ export function SectionEditorClient({
             userName={userName}
           />
         </div>
+
+        {/* Version History */}
+        <SectionVersionHistory
+          sectionId={sectionId}
+          onRestore={handleRestore}
+        />
 
         {/* Linked Requirements */}
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">

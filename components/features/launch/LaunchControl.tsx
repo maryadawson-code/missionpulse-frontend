@@ -11,6 +11,8 @@ import {
   AlertTriangle,
   XCircle,
   Clock,
+  Package,
+  Download,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -19,6 +21,7 @@ import {
   recordGateDecision,
   updateOpportunityStatus,
 } from '@/app/(dashboard)/pipeline/[id]/launch/actions'
+import { assembleBinder } from '@/app/(dashboard)/proposals/actions'
 
 interface GateDecision {
   id: string
@@ -48,6 +51,10 @@ interface LaunchControlProps {
     total: number
     verified: number
     percentage: number
+  }
+  sectionStats?: {
+    total: number
+    final: number
   }
   gateDecisions: GateDecision[]
   teamCount: number
@@ -103,6 +110,7 @@ const GATE_AUTHORITY_MAP: Record<number, string> = {
 export function LaunchControl({
   opportunity,
   complianceStats,
+  sectionStats,
   gateDecisions,
   teamCount,
   docCount,
@@ -111,6 +119,7 @@ export function LaunchControl({
   const [isPending, startTransition] = useTransition()
   const [showGateForm, setShowGateForm] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
+  const [binderResult, setBinderResult] = useState<{ volume: string; title: string; wordCount: number }[] | null>(null)
 
   // Filter gates by user's gate authority
   const approvedGates = gateAuthority
@@ -381,6 +390,100 @@ export function LaunchControl({
             )
           })}
         </div>
+      </div>
+
+      {/* Pre-Submission Checklist & Binder Assembly */}
+      <div className="rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Pre-Submission Checklist
+          </h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              startTransition(async () => {
+                const result = await assembleBinder(opportunity.id)
+                if (result.success && result.binderData) {
+                  setBinderResult(result.binderData)
+                  addToast('success', `Binder assembled: ${result.binderData.length} sections`)
+                } else {
+                  addToast('error', result.error ?? 'Assembly failed')
+                }
+              })
+            }}
+            disabled={isPending}
+          >
+            {isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Package className="h-4 w-4" />
+            )}
+            Assemble Binder
+          </Button>
+        </div>
+        <div className="px-5 py-4 space-y-2">
+          <div className="flex items-center gap-2">
+            {complianceStats.percentage >= 100 ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-400" />
+            )}
+            <span className="text-sm text-foreground">
+              All SHALLs mapped to sections
+            </span>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {complianceStats.verified}/{complianceStats.total}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {sectionStats && sectionStats.total > 0 && sectionStats.final === sectionStats.total ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-400" />
+            )}
+            <span className="text-sm text-foreground">
+              All sections in &quot;final&quot; status
+            </span>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {sectionStats?.final ?? 0}/{sectionStats?.total ?? 0}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {gateDecisions.some((g) => g.gateNumber === 6 && g.decision === 'go') ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-400" />
+            )}
+            <span className="text-sm text-foreground">
+              Gate 6 (Submit/No-Submit) approved
+            </span>
+          </div>
+        </div>
+
+        {/* Binder Result */}
+        {binderResult && (
+          <div className="border-t border-border px-5 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Download className="h-4 w-4 text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-300">
+                Binder Assembled Successfully
+              </span>
+            </div>
+            <div className="space-y-1">
+              {binderResult.map((s, i) => (
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className="text-foreground">
+                    <span className="text-muted-foreground">{s.volume} /</span> {s.title}
+                  </span>
+                  <span className="text-muted-foreground">
+                    ~{s.wordCount.toLocaleString()} words
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Submit Action */}

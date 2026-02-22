@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission, isInternalRole } from '@/lib/rbac/config'
 import { ReviewQueue } from '@/components/features/hitl/ReviewQueue'
+import { ProposalOutlineList } from '@/components/features/proposals/ProposalOutlineList'
 
 interface ReviewItem {
   id: string
@@ -106,6 +107,26 @@ export default async function ProposalsPage() {
     oppMap = Object.fromEntries((opps ?? []).map((o) => [o.id, o.title]))
   }
 
+  // Fetch proposal outlines
+  const { data: outlines } = await supabase
+    .from('proposal_outlines')
+    .select('id, outline_name, volume_type, status, opportunity_id, created_at')
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  const outlineItems = (outlines ?? []).map((o) => ({
+    ...o,
+    opportunityTitle: o.opportunity_id ? oppMap[o.opportunity_id] ?? null : null,
+  }))
+
+  // Fetch opportunities for the create form
+  const { data: allOpps } = await supabase
+    .from('opportunities')
+    .select('id, title')
+    .in('status', ['Active', 'active', 'In Progress'])
+    .order('updated_at', { ascending: false })
+    .limit(50)
+
   // Merge into unified review items
   const items: ReviewItem[] = [
     ...(compReqs ?? []).map((r) => ({
@@ -148,12 +169,24 @@ export default async function ProposalsPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Review Queue</h1>
+        <h1 className="text-2xl font-bold text-white">Proposals</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Items pending human review. Approve, reject, or request changes.
+          Manage proposal outlines and review pending items.
         </p>
+      </div>
+
+      {/* Proposal Outlines Section */}
+      <ProposalOutlineList
+        outlines={outlineItems}
+        opportunities={(allOpps ?? []).map((o) => ({ id: o.id, title: o.title }))}
+        canEdit={canEdit}
+      />
+
+      {/* Review Queue Section */}
+      <div>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Review Queue</h2>
       </div>
 
       {/* Summary */}

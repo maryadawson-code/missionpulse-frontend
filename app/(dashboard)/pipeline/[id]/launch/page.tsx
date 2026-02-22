@@ -64,6 +64,15 @@ export default async function LaunchPage({ params }: Props) {
     .select('id', { count: 'exact', head: true })
     .eq('opportunity_id', params.id)
 
+  // Proposal sections stats for binder checklist
+  const { data: sectionData } = await supabase
+    .from('proposal_sections')
+    .select('status')
+    .eq('opportunity_id', params.id)
+
+  const totalSections = sectionData?.length ?? 0
+  const finalSections = sectionData?.filter((s) => s.status === 'final').length ?? 0
+
   return (
     <div className="space-y-6">
       <div>
@@ -88,6 +97,10 @@ export default async function LaunchPage({ params }: Props) {
           total: totalReqs,
           verified: verifiedReqs,
           percentage: compliancePct,
+        }}
+        sectionStats={{
+          total: totalSections,
+          final: finalSections,
         }}
         gateDecisions={(gateDecisions ?? []).map((g) => ({
           id: g.id,

@@ -46,6 +46,8 @@ export function AuditTrailViewer({ entries }: AuditTrailViewerProps) {
   const [filterAction, setFilterAction] = useState<string>('All')
   const [filterUser, setFilterUser] = useState<string>('All')
   const [searchTerm, setSearchTerm] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   // Derive unique actions and users for filters
   const actions = useMemo(
@@ -79,9 +81,13 @@ export function AuditTrailViewer({ entries }: AuditTrailViewerProps) {
         e.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (e.user_email ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (e.table_name ?? '').toLowerCase().includes(searchTerm.toLowerCase())
-      return matchesAction && matchesUser && matchesSearch
+      const matchesDateFrom =
+        !dateFrom || e.created_at >= dateFrom
+      const matchesDateTo =
+        !dateTo || e.created_at.slice(0, 10) <= dateTo
+      return matchesAction && matchesUser && matchesSearch && matchesDateFrom && matchesDateTo
     })
-  }, [entries, filterAction, filterUser, searchTerm])
+  }, [entries, filterAction, filterUser, searchTerm, dateFrom, dateTo])
 
   const handleExportCSV = () => {
     const headers = [
@@ -165,6 +171,21 @@ export function AuditTrailViewer({ entries }: AuditTrailViewerProps) {
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-1">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <span className="text-xs text-muted-foreground">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
         <span className="text-xs text-muted-foreground">
           {filtered.length} record{filtered.length !== 1 ? 's' : ''}
         </span>
