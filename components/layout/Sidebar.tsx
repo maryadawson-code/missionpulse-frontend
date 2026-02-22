@@ -119,6 +119,7 @@ const NAV_ITEMS: NavItem[] = [
 
 // ─── Section Grouping ───────────────────────────────────────────
 const PRIMARY_MODULES = ['dashboard', 'pipeline', 'proposals', 'workflow_board', 'ai_chat', 'documents']
+const RESOURCES_MODULES = ['_resources']
 const ADMIN_MODULES = ['admin', 'integrations', 'audit_log']
 // Everything else (strategy, blackhat, compliance, pricing, analytics, personnel, playbook) is secondary
 
@@ -303,6 +304,53 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                       {badge.label}
                     </span>
                   )}
+                </Link>
+              </li>
+            )
+          })}
+
+          {/* Resources section — visible if pipeline is visible */}
+          {permissions['pipeline']?.shouldRender && (
+            <li className="px-3 py-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Resources</span>
+            </li>
+          )}
+          {permissions['pipeline']?.shouldRender && [
+            { href: '/debriefs', label: 'Debriefs', iconPath: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+            { href: '/reports', label: 'Reports', iconPath: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+            { href: '/win-loss', label: 'Win/Loss', iconPath: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+            { href: '/capacity', label: 'Capacity', iconPath: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+            { href: '/subcontractors', label: 'Subcontractors', iconPath: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+            { href: '/partners', label: 'Partners', iconPath: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+            { href: '/past-performance', label: 'Past Perf.', iconPath: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z' },
+            { href: '/feedback', label: 'Feedback', iconPath: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z' },
+          ].map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`
+                    group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
+                    ${
+                      isActive
+                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
+                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                    }
+                  `}
+                >
+                  <svg
+                    className={`h-5 w-5 flex-shrink-0 ${
+                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
+                  </svg>
+                  {item.label}
                 </Link>
               </li>
             )

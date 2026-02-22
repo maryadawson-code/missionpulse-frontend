@@ -139,6 +139,16 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
     colorFindings = data ?? []
   }
 
+  // Fetch color team reviewers
+  let colorReviewers: { id: string; review_id: string | null; user_name: string; role: string | null; status: string | null; section_assigned: string | null; findings_submitted: number | null }[] = []
+  if (reviewIds.length > 0) {
+    const { data: reviewerData } = await supabase
+      .from('color_team_reviewers')
+      .select('id, review_id, user_name, role, status, section_assigned, findings_submitted')
+      .in('review_id', reviewIds)
+    colorReviewers = reviewerData ?? []
+  }
+
   const reviewsWithFindings = (colorReviews ?? []).map((r) => ({
     ...r,
     findings: colorFindings.filter((f) => f.review_id === r.id),
@@ -375,6 +385,39 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
             Color Team Reviews
           </h3>
           <ColorTeamFeedback reviews={reviewsWithFindings} />
+
+          {/* Reviewers Panel */}
+          {colorReviewers.length > 0 && (
+            <div className="mt-4 border-t border-gray-800 pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
+                Reviewers ({colorReviewers.length})
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {colorReviewers.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center gap-1.5 rounded-full border border-gray-800 bg-gray-900/50 px-2.5 py-1"
+                  >
+                    <span className="text-xs text-white">{r.user_name}</span>
+                    {r.role && (
+                      <span className="text-[10px] text-gray-500">{r.role}</span>
+                    )}
+                    {r.status && (
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          r.status === 'completed'
+                            ? 'bg-emerald-400'
+                            : r.status === 'in_progress'
+                              ? 'bg-amber-400'
+                              : 'bg-gray-500'
+                        }`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

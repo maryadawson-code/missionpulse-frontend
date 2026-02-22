@@ -51,6 +51,22 @@ export default async function GateReviewsPage({
 
   const items = reviews ?? []
 
+  // Fetch review comments for all gate reviews
+  const gateIds = items.map((r) => r.id)
+  let commentsMap: Record<string, { id: string; comment_text: string; comment_type: string | null; priority: number | null; section_ref: string | null; status: string | null; recommendation: string | null; response: string | null }[]> = {}
+  if (gateIds.length > 0) {
+    const { data: comments } = await supabase
+      .from('review_comments')
+      .select('id, review_id, comment_text, comment_type, priority, section_ref, status, recommendation, response')
+      .in('review_id', gateIds)
+      .order('priority', { ascending: false })
+    for (const c of comments ?? []) {
+      if (!c.review_id) continue
+      if (!commentsMap[c.review_id]) commentsMap[c.review_id] = []
+      commentsMap[c.review_id].push(c)
+    }
+  }
+
   const goCount = items.filter(
     (r) => r.decision === 'go' || r.decision === 'approved'
   ).length
@@ -177,6 +193,57 @@ export default async function GateReviewsPage({
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+
+                  {/* Review Comments */}
+                  {(commentsMap[review.id] ?? []).length > 0 && (
+                    <div className="border-t border-gray-800 pt-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                        Comments ({commentsMap[review.id].length})
+                      </p>
+                      <div className="space-y-1">
+                        {commentsMap[review.id].map((c) => (
+                          <div
+                            key={c.id}
+                            className="rounded px-2 py-1.5 text-xs bg-gray-800/30 space-y-0.5"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-gray-300 flex-1">{c.comment_text}</p>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {c.comment_type && (
+                                  <span className="rounded bg-gray-700 px-1 py-0.5 text-[10px] text-gray-400">
+                                    {c.comment_type}
+                                  </span>
+                                )}
+                                {c.status && (
+                                  <span
+                                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                                      c.status === 'resolved'
+                                        ? 'bg-emerald-500/15 text-emerald-300'
+                                        : c.status === 'open'
+                                          ? 'bg-red-500/15 text-red-300'
+                                          : 'bg-slate-500/15 text-slate-300'
+                                    }`}
+                                  >
+                                    {c.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {c.recommendation && (
+                              <p className="text-[10px] text-emerald-400/80">
+                                Rec: {c.recommendation}
+                              </p>
+                            )}
+                            {c.response && (
+                              <p className="text-[10px] text-blue-300/80">
+                                Response: {c.response}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

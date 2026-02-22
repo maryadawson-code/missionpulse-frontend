@@ -35,6 +35,7 @@ export function PipelineSubNav({ opportunityId }: { opportunityId: string }) {
     { href: `${basePath}/qa`, label: 'Q&A', module: 'proposals', permission: 'shouldRender' },
     { href: `${basePath}/amendments`, label: 'Amendments', module: 'compliance', permission: 'shouldRender' },
     { href: `${basePath}/gate-reviews`, label: 'Gates', module: 'pipeline', permission: 'canView' },
+    { href: `${basePath}/interview-prep`, label: 'Interviews', module: 'proposals', permission: 'shouldRender' },
   ]
 
   const visibleItems = items.filter(
