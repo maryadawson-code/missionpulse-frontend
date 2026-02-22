@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { AnalyticsDashboard } from '@/components/features/analytics/AnalyticsDashboard'
@@ -161,12 +162,26 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Analytics</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Pipeline metrics, win rate trends, and performance dashboards across
-          your portfolio.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Analytics</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Pipeline metrics, win rate trends, and performance dashboards across
+            your portfolio.
+          </p>
+        </div>
+        <Link
+          href="/analytics/ai-usage"
+          className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 hover:border-cyan/40 hover:bg-elevated transition-colors group shrink-0"
+        >
+          <span className="text-base">🤖</span>
+          <div>
+            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+              AI Usage Analytics
+            </p>
+            <p className="text-[11px] text-slate">Token consumption &amp; cost breakdown</p>
+          </div>
+        </Link>
       </div>
 
       <AnalyticsDashboard

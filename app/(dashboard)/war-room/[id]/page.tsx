@@ -210,6 +210,9 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
             { href: `/pipeline/${id}/strategy`, label: 'Strategy', icon: '🎯', desc: 'Competitive analysis' },
             { href: `/pipeline/${id}/team`, label: 'Team', icon: '👥', desc: 'Manage assignments' },
             { href: `/pipeline/${id}/swimlane`, label: 'Swimlane', icon: '📊', desc: 'Section task board' },
+            { href: `/pipeline/${id}/launch`, label: 'Launch Checklist', icon: '🚀', desc: 'Pre-submission launch checklist' },
+            { href: `/pipeline/${id}/orals`, label: 'Orals Prep', icon: '🎤', desc: 'Oral presentation prep' },
+            { href: `/pipeline/${id}/post-award`, label: 'Post-Award', icon: '🏆', desc: 'Post-award transition' },
           ].map((link) => (
             <a
               key={link.href}

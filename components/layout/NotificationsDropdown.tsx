@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 
 export interface NotificationItem {
   id: string
@@ -78,8 +79,15 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-900 shadow-xl">
-          <div className="border-b border-gray-800 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-200">Notifications</h3>
+            <Link
+              href="/notifications"
+              className="text-xs text-[#00E5FA] hover:underline"
+              onClick={() => setOpen(false)}
+            >
+              View All
+            </Link>
           </div>
           <div className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (

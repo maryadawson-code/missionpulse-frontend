@@ -36,15 +36,50 @@ const AVAILABLE_INTEGRATIONS = [
     provider: 'govwin',
     name: 'GovWin IQ',
     description: 'Import opportunity intelligence and competitive data',
-    href: null,
+    href: '/integrations/govwin',
     color: '#2e86c1',
   },
   {
     provider: 'teams',
-    name: 'Microsoft Teams',
-    description: 'Send notifications and updates to Teams channels',
-    href: null,
+    name: 'Microsoft 365',
+    description: 'Teams notifications, SharePoint docs, and Outlook sync',
+    href: '/integrations/m365',
     color: '#5b5fc7',
+  },
+  {
+    provider: 'salesforce',
+    name: 'Salesforce',
+    description: 'Sync opportunities and accounts with Salesforce CRM',
+    href: '/integrations/salesforce',
+    color: '#00a1e0',
+  },
+  {
+    provider: 'slack',
+    name: 'Slack',
+    description: 'Channel notifications and proposal update alerts',
+    href: '/integrations/slack',
+    color: '#4a154b',
+  },
+  {
+    provider: 'docusign',
+    name: 'DocuSign',
+    description: 'Electronic signatures and document workflow',
+    href: '/integrations/docusign',
+    color: '#ff4438',
+  },
+  {
+    provider: 'google',
+    name: 'Google Workspace',
+    description: 'Drive, Docs, and Calendar integration',
+    href: '/integrations/google',
+    color: '#4285f4',
+  },
+  {
+    provider: 'usaspending',
+    name: 'USAspending',
+    description: 'Federal award data and spending analytics',
+    href: '/integrations/usaspending',
+    color: '#112e51',
   },
 ]
 
@@ -128,27 +163,21 @@ export function IntegrationCards({ integrations }: IntegrationCardsProps) {
             )}
 
             <div className="flex gap-2">
-              {avail.href ? (
-                <Link href={avail.href}>
-                  <Button variant="outline" size="sm">
-                    {isConnected ? (
-                      <>
-                        <RefreshCw className="h-3 w-3" />
-                        Configure
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="h-3 w-3" />
-                        Connect
-                      </>
-                    )}
-                  </Button>
-                </Link>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
-                  Coming Soon
+              <Link href={avail.href}>
+                <Button variant="outline" size="sm">
+                  {isConnected ? (
+                    <>
+                      <RefreshCw className="h-3 w-3" />
+                      Configure
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="h-3 w-3" />
+                      Connect
+                    </>
+                  )}
                 </Button>
-              )}
+              </Link>
             </div>
           </div>
         )

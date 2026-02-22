@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { extractPdfText } from '@/lib/utils/pdf-parser'
+import { extractDocxText } from '@/lib/utils/docx-parser'
 import type { ActionResult } from '@/lib/types'
 
 export async function uploadAndParseRfp(
@@ -23,9 +24,14 @@ export async function uploadAndParseRfp(
     return { success: false, error: 'File exceeds maximum size of 50MB' }
   }
 
-  const allowedTypes = ['application/pdf']
+  const allowedTypes = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+    'text/plain',
+  ]
   if (!allowedTypes.includes(file.type)) {
-    return { success: false, error: 'Only PDF files are supported' }
+    return { success: false, error: 'Unsupported file type. Upload PDF, DOCX, DOC, or TXT files.' }
   }
 
   // Upload to Supabase Storage
@@ -44,13 +50,24 @@ export async function uploadAndParseRfp(
     return { success: false, error: `Upload failed: ${uploadError.message}` }
   }
 
-  // Extract text from PDF
+  // Extract text based on file type
   let extractedText = ''
   let uploadStatus = 'processed'
 
   try {
-    const parsed = await extractPdfText(buffer)
-    extractedText = parsed.text
+    if (file.type === 'application/pdf') {
+      const parsed = await extractPdfText(buffer)
+      extractedText = parsed.text
+    } else if (
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file.type === 'application/msword'
+    ) {
+      const parsed = await extractDocxText(buffer)
+      extractedText = parsed.text
+    } else {
+      // text/plain
+      extractedText = buffer.toString('utf-8')
+    }
   } catch (err) {
     uploadStatus = 'extraction_failed'
     extractedText = err instanceof Error ? err.message : 'Extraction failed'

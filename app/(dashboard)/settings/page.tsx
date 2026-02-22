@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { SettingsForm } from '@/components/modules/SettingsForm'
 
 export default async function SettingsPage() {
@@ -31,6 +32,34 @@ export default async function SettingsPage() {
         <p className="mt-1 text-sm text-gray-500">
           Manage your profile and account preferences
         </p>
+      </div>
+
+      {/* Quick Links */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Link
+          href="/settings/billing"
+          className="flex items-start gap-3 rounded-lg border border-border bg-surface px-4 py-4 hover:border-cyan/40 hover:bg-elevated transition-colors group"
+        >
+          <span className="text-lg mt-0.5">💳</span>
+          <div>
+            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+              Billing &amp; Subscription
+            </p>
+            <p className="text-xs text-slate mt-0.5">Manage your plan, tokens, and payment</p>
+          </div>
+        </Link>
+        <Link
+          href="/settings/import"
+          className="flex items-start gap-3 rounded-lg border border-border bg-surface px-4 py-4 hover:border-cyan/40 hover:bg-elevated transition-colors group"
+        >
+          <span className="text-lg mt-0.5">📥</span>
+          <div>
+            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+              Data Import
+            </p>
+            <p className="text-xs text-slate mt-0.5">Import opportunities from CSV or Excel</p>
+          </div>
+        </Link>
       </div>
 
       <SettingsForm
