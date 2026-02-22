@@ -1,7 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { IronDomeCards } from '@/components/features/compliance/IronDomeCards'
+
+export const metadata: Metadata = {
+  title: 'Iron Dome — MissionPulse',
+}
 import { OpportunityComplianceTable } from '@/components/features/compliance/OpportunityComplianceTable'
 import { ComplianceGaps } from '@/components/features/compliance/ComplianceGaps'
 

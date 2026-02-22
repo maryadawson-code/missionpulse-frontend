@@ -1,6 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
+
+export const metadata: Metadata = {
+  title: 'AI Chat — MissionPulse',
+}
 import { ChatPanel } from '@/components/features/ai-chat/ChatPanel'
 import { TokenBudgetBanner } from '@/components/features/ai/TokenBudgetBanner'
 

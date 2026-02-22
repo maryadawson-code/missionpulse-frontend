@@ -1,7 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { GlobalDocumentLibrary } from '@/components/features/documents/GlobalDocumentLibrary'
+
+export const metadata: Metadata = {
+  title: 'Documents — MissionPulse',
+}
 import { TemplateLibrary } from '@/components/features/documents/TemplateLibrary'
 
 interface DocumentVersionInfo {

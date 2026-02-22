@@ -1,8 +1,13 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { AnalyticsDashboard } from '@/components/features/analytics/AnalyticsDashboard'
+
+export const metadata: Metadata = {
+  title: 'Analytics — MissionPulse',
+}
 
 export default async function AnalyticsPage() {
   const supabase = await createClient()

@@ -1,8 +1,13 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission, isInternalRole } from '@/lib/rbac/config'
 import { ReviewQueue } from '@/components/features/hitl/ReviewQueue'
 import { ProposalOutlineList } from '@/components/features/proposals/ProposalOutlineList'
+
+export const metadata: Metadata = {
+  title: 'Proposals — MissionPulse',
+}
 
 interface ReviewItem {
   id: string

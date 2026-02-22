@@ -1,6 +1,11 @@
 // filepath: app/(dashboard)/page.tsx
 
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+
+export const metadata: Metadata = {
+  title: 'Dashboard — MissionPulse',
+}
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole } from '@/lib/rbac/config'
 import { formatCurrencyCompact, formatPwin, phaseColor } from '@/lib/utils/formatters'

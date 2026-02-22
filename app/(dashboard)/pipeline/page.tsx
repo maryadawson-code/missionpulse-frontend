@@ -1,6 +1,11 @@
 // filepath: app/(dashboard)/pipeline/page.tsx
 
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Pipeline — MissionPulse',
+}
 import { resolveRole, hasPermission, isInternalRole } from '@/lib/rbac/config'
 import { PipelineTable } from '@/components/modules/PipelineTable'
 import { KanbanView } from './KanbanView'

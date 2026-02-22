@@ -1,7 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'War Room — MissionPulse',
+}
 
 function statusColor(status: string | null): string {
   switch (status) {

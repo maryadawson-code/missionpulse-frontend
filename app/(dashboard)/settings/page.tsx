@@ -1,6 +1,11 @@
 // filepath: app/(dashboard)/settings/page.tsx
 
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Settings — MissionPulse',
+}
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { SettingsForm } from '@/components/modules/SettingsForm'
