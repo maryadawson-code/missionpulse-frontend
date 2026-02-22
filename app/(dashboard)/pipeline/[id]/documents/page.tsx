@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { DocumentLibrary } from '@/components/features/documents/DocumentLibrary'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface DocumentsPageProps {
   params: Promise<{ id: string }>
@@ -44,6 +45,13 @@ export default async function DocumentsPage({ params }: DocumentsPageProps) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${id}` },
+          { label: 'Documents' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">Documents</h1>
         <p className="mt-1 text-sm text-muted-foreground">

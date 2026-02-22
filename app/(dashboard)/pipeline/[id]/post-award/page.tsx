@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { PostAwardPanel } from '@/components/features/post-award/PostAwardPanel'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
   params: { id: string }
@@ -47,6 +48,13 @@ export default async function PostAwardPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: 'Post-Award' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">
           Post-Award — {opportunity.title}

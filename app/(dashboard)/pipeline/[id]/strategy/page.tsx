@@ -5,6 +5,7 @@ import { CUIBanner } from '@/components/rbac/CUIBanner'
 import { CompetitorManager } from '@/components/features/blackhat/CompetitorManager'
 import { BlackHatAI } from '@/components/features/blackhat/BlackHatAI'
 import { StrategyAnalysis } from '@/components/features/pipeline/StrategyAnalysis'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
   params: { id: string }
@@ -77,6 +78,13 @@ export default async function OpportunityStrategyPage({ params }: Props) {
         CUI//OPSEC
       </div>
 
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: 'Strategy' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">
           Black Hat Review — {opportunity.title}

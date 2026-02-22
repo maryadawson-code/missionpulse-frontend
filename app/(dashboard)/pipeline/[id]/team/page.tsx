@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { TeamList } from '@/components/features/team/TeamList'
 import { PersonnelAssignmentPanel } from '@/components/features/team/PersonnelAssignmentPanel'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface TeamPageProps {
   params: Promise<{ id: string }>
@@ -64,6 +65,13 @@ export default async function TeamPage({ params }: TeamPageProps) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${id}` },
+          { label: 'Team' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">Team</h1>
         <p className="mt-1 text-sm text-muted-foreground">

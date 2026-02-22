@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { OralsPrep } from '@/components/features/orals/OralsPrep'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
   params: { id: string }
@@ -52,6 +53,13 @@ export default async function OralsPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: 'Orals' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">Orals Preparation</h1>
         <p className="mt-1 text-sm text-gray-500">

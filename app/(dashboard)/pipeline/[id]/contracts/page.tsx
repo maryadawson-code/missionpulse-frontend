@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { ContractScanner } from '@/components/features/contracts/ContractScanner'
 import { AIClauseAnalysis } from '@/components/features/contracts/AIClauseAnalysis'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface ContractsPageProps {
   params: Promise<{ id: string }>
@@ -49,6 +50,13 @@ export default async function ContractsPage({ params }: ContractsPageProps) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${id}` },
+          { label: 'Contracts' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">Contract Scanner</h1>
         <p className="mt-1 text-sm text-muted-foreground">

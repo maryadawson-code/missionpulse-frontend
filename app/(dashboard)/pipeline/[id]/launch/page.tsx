@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission, getGateAuthority } from '@/lib/rbac/config'
 import { LaunchControl } from '@/components/features/launch/LaunchControl'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
   params: { id: string }
@@ -75,6 +76,13 @@ export default async function LaunchPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: 'Launch' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">
           Launch Control — {opportunity.title}

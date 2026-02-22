@@ -4,6 +4,7 @@ import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
 import { CostVolumeManager } from '@/components/features/pricing/CostVolumeManager'
 import { PricingAI } from '@/components/features/pricing/PricingAI'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface Props {
   params: { id: string }
@@ -90,6 +91,13 @@ export default async function OpportunityPricingPage({ params }: Props) {
         CUI//SP-PROPIN
       </div>
 
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${params.id}` },
+          { label: 'Pricing' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">
           Pricing — {opportunity.title}

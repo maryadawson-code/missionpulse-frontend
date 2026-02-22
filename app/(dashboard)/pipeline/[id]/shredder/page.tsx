@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { RfpUploader } from '@/components/features/shredder/RfpUploader'
 import { RfpDocumentList } from '@/components/features/shredder/RfpDocumentList'
+import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 interface ShredderPageProps {
   params: Promise<{ id: string }>
@@ -44,6 +45,13 @@ export default async function ShredderPage({ params }: ShredderPageProps) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb
+        items={[
+          { label: 'Pipeline', href: '/pipeline' },
+          { label: opportunity.title, href: `/pipeline/${id}` },
+          { label: 'RFP Shredder' },
+        ]}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">RFP Shredder</h1>
         <p className="mt-1 text-sm text-muted-foreground">
