@@ -18,7 +18,6 @@ import { CaptureAnalysis } from '@/components/features/pipeline/CaptureAnalysis'
 import { AwardHistory } from '@/components/features/pipeline/AwardHistory'
 import { SpendingTrends } from '@/components/features/pipeline/SpendingTrends'
 import { GovWinIntel } from '@/components/features/pipeline/GovWinIntel'
-import { PipelineSubNav } from '@/components/features/pipeline/PipelineSubNav'
 import { DangerZone } from '@/components/features/pipeline/DangerZone'
 import { DeadlineCountdown } from '@/components/features/pipeline/DeadlineCountdown'
 import { VolumeProgress } from '@/components/features/pipeline/VolumeProgress'
@@ -183,9 +182,6 @@ export default async function WarRoomPage({
           }))}
         />
       )}
-
-      {/* ─── Sub-Navigation ──────────────────────────────────── */}
-      <PipelineSubNav opportunityId={id} />
 
       {/* ─── Two Column Detail ───────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
