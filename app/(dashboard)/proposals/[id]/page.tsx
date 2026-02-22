@@ -66,6 +66,43 @@ export default async function ProposalDetailPage({ params }: Props) {
     sections = data ?? []
   }
 
+  // Fetch key personnel for staffing requirements
+  const { data: keyPersonnel } = await supabase
+    .from('key_personnel')
+    .select('id, first_name, last_name, labor_category, clearance_level, availability_status')
+    .limit(100)
+
+  // Fetch opportunity assignments to determine filled positions
+  const { data: oppAssignments } = await supabase
+    .from('opportunity_assignments')
+    .select('assignee_name, role')
+    .eq('opportunity_id', outline.opportunity_id ?? '')
+
+  // Build staffing requirements from labor categories in key_personnel
+  const lcatSet = new Map<string, { assigned: string | null; clearance: string | null }>()
+  for (const kp of keyPersonnel ?? []) {
+    const lcat = kp.labor_category ?? 'General'
+    if (!lcatSet.has(lcat)) {
+      lcatSet.set(lcat, { assigned: null, clearance: kp.clearance_level })
+    }
+  }
+
+  // Map assignments to labor categories
+  const assignedNames = new Set((oppAssignments ?? []).map((a) => a.assignee_name))
+  const staffingRequirements = Array.from(lcatSet.entries()).map(([lcat, info], idx) => {
+    const matchedPerson = (keyPersonnel ?? []).find(
+      (kp) => kp.labor_category === lcat && assignedNames.has(`${kp.first_name} ${kp.last_name}`)
+    )
+    return {
+      id: `staff-${idx}`,
+      laborCategory: lcat,
+      level: null as string | null,
+      clearanceRequired: info.clearance,
+      assigned: matchedPerson ? `${matchedPerson.first_name} ${matchedPerson.last_name}` : null,
+      status: (matchedPerson ? 'filled' : 'unfilled') as 'filled' | 'unfilled' | 'pending',
+    }
+  })
+
   const STATUS_COLORS: Record<string, string> = {
     draft: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
     in_progress: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -126,6 +163,7 @@ export default async function ProposalDetailPage({ params }: Props) {
             })),
         }))}
         canEdit={canEdit}
+        staffingRequirements={staffingRequirements}
       />
     </div>
   )

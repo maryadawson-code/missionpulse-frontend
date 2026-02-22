@@ -44,6 +44,19 @@ export default async function PricingPage() {
     .order('level', { ascending: true })
     .limit(200)
 
+  // Fetch BOE entries (company-wide)
+  const { data: boeEntries } = await supabase
+    .from('opportunity_boe')
+    .select('id, wbs_number, task_description, labor_category_id, period, total_hours, rate_used, extended_cost, assumptions')
+    .order('wbs_number', { ascending: true })
+    .limit(200)
+
+  // Build LCAT lookup map (id → family + level_name)
+  const lcatMap: Record<string, string> = {}
+  for (const lc of lcats ?? []) {
+    lcatMap[lc.id] = `${lc.family} ${lc.level_name ?? ''}`.trim()
+  }
+
   // Aggregate ceiling for price-to-win reference
   const { data: ceilingAgg } = await supabase
     .from('opportunities')
@@ -75,6 +88,8 @@ export default async function PricingPage() {
         models={models ?? []}
         items={items ?? []}
         lcats={lcats ?? []}
+        boeEntries={boeEntries ?? []}
+        lcatMap={lcatMap}
         pipelineCeiling={totalCeiling}
       />
     </div>

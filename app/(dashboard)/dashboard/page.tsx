@@ -1,6 +1,8 @@
 // filepath: app/(dashboard)/page.tsx
 
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole } from '@/lib/rbac/config'
 import { formatCurrencyCompact, formatPwin, phaseColor } from '@/lib/utils/formatters'
 import type { Opportunity } from '@/lib/types'
 import Link from 'next/link'
@@ -109,6 +111,20 @@ function DeadlineRow({ opp }: { opp: Opportunity }) {
 // ─── Dashboard Page ─────────────────────────────────────────────
 export default async function DashboardPage() {
   const supabase = createClient()
+
+  // Author role redirect — authors land on their workflow page
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    const role = resolveRole(profile?.role)
+    if (role === 'author') {
+      redirect('/proposals')
+    }
+  }
 
   // Fetch all opportunities for the user's company (RLS enforces tenant isolation)
   const { data: opportunities, error } = await supabase

@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { addToast } from '@/components/ui/Toast'
 import { createVolumeSection } from '@/app/(dashboard)/proposals/actions'
+import { StaffingRequirementsTab } from '@/components/features/proposals/StaffingRequirementsTab'
 
 interface SectionItem {
   id: string
@@ -32,11 +33,21 @@ interface VolumeItem {
   sections: SectionItem[]
 }
 
+interface StaffingRequirement {
+  id: string
+  laborCategory: string
+  level: string | null
+  clearanceRequired: string | null
+  assigned: string | null
+  status: 'filled' | 'unfilled' | 'pending'
+}
+
 interface ProposalDetailClientProps {
   outlineId: string
   opportunityId: string
   volumes: VolumeItem[]
   canEdit: boolean
+  staffingRequirements?: StaffingRequirement[]
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -53,12 +64,17 @@ const VOLUME_COLORS: Record<string, string> = {
   Cost: 'border-emerald-500/40',
 }
 
+const TABS = ['Volumes', 'Staffing'] as const
+type Tab = (typeof TABS)[number]
+
 export function ProposalDetailClient({
   outlineId: _outlineId,
   opportunityId: _opportunityId,
   volumes,
   canEdit,
+  staffingRequirements = [],
 }: ProposalDetailClientProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('Volumes')
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(volumes.map((v) => [v.id, true]))
   )
@@ -96,20 +112,41 @@ export function ProposalDetailClient({
     })
   }
 
-  if (volumes.length === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-8 text-center">
-        <FileText className="mx-auto h-10 w-10 text-muted-foreground" />
-        <p className="mt-2 text-sm text-muted-foreground">
-          No volumes configured for this proposal. Add volumes via the database or admin panel.
-        </p>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
-      {volumes.map((volume) => {
+      {/* Tab Bar */}
+      <div className="flex gap-1 border-b border-border">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === tab
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Staffing Tab */}
+      {activeTab === 'Staffing' && (
+        <StaffingRequirementsTab requirements={staffingRequirements} />
+      )}
+
+      {/* Volumes Tab */}
+      {activeTab === 'Volumes' && volumes.length === 0 && (
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <FileText className="mx-auto h-10 w-10 text-muted-foreground" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            No volumes configured for this proposal. Add volumes via the database or admin panel.
+          </p>
+        </div>
+      )}
+
+      {activeTab === 'Volumes' && volumes.map((volume) => {
         const borderColor = VOLUME_COLORS[volume.title] ?? 'border-gray-500/40'
         const isExpanded = expanded[volume.id] ?? false
         const totalPages = volume.sections.reduce(

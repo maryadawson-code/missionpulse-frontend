@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { LCATGrid } from '@/components/features/pricing/LCATGrid'
 import { PriceToWinAnalysis } from '@/components/features/pricing/PriceToWinAnalysis'
+import { BOETable } from '@/components/features/pricing/BOETable'
 
 interface PricingModel {
   id: string
@@ -40,10 +41,24 @@ interface LaborCategory {
   years_experience: number | null
 }
 
+interface BOEEntry {
+  id: string
+  wbs_number: string | null
+  task_description: string | null
+  labor_category_id: string | null
+  period: string | null
+  total_hours: number | null
+  rate_used: number | null
+  extended_cost: number | null
+  assumptions: string | null
+}
+
 interface PricingPageClientProps {
   models: PricingModel[]
   items: PricingItem[]
   lcats: LaborCategory[]
+  boeEntries: BOEEntry[]
+  lcatMap: Record<string, string>
   pipelineCeiling: number
 }
 
@@ -81,13 +96,15 @@ function statusColor(status: string | null): string {
   }
 }
 
-const TABS = ['Models', 'LCAT', 'Price-to-Win'] as const
+const TABS = ['Models', 'BOE', 'LCAT', 'Price-to-Win'] as const
 type Tab = (typeof TABS)[number]
 
 export function PricingPageClient({
   models,
   items,
   lcats,
+  boeEntries,
+  lcatMap,
   pipelineCeiling,
 }: PricingPageClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('Models')
@@ -221,6 +238,17 @@ export function PricingPageClient({
             {models.length} pricing model{models.length !== 1 ? 's' : ''}, {items.length} line item{items.length !== 1 ? 's' : ''}. Pricing data is classified CUI//SP-PROPIN.
           </p>
         </>
+      )}
+
+      {/* BOE Tab */}
+      {activeTab === 'BOE' && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+          <h2 className="text-sm font-semibold text-white mb-1">Basis of Estimate</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Hours per labor category per period with rate assumptions and extended costs.
+          </p>
+          <BOETable entries={boeEntries} lcatMap={lcatMap} />
+        </div>
       )}
 
       {/* LCAT Tab */}
