@@ -6,6 +6,7 @@ import type { Opportunity } from '@/lib/types'
 import Link from 'next/link'
 import { getRecentActivity } from '@/lib/actions/audit'
 import { ActivityFeed } from '@/components/modules/ActivityFeed'
+import { TeamWorkloadHeatmap } from '@/components/features/dashboard/TeamWorkloadHeatmap'
 
 // ─── KPI Card Component ─────────────────────────────────────────
 function KPICard({
@@ -133,13 +134,60 @@ export default async function DashboardPage() {
     { count: clausesNeedReview },
     { count: docsInReview },
     { count: unreadNotifications },
+    { count: complianceTotal },
+    { count: complianceCompliant },
   ] = await Promise.all([
     supabase.from('proposal_sections').select('id', { count: 'exact', head: true }).in('status', ['pink_review', 'green_review', 'red_review']),
     supabase.from('compliance_requirements').select('id', { count: 'exact', head: true }).eq('status', 'Addressed'),
     supabase.from('contract_clauses').select('id', { count: 'exact', head: true }).eq('compliance_status', 'Review Needed'),
     supabase.from('documents').select('id', { count: 'exact', head: true }).eq('status', 'in_review'),
     supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('is_read', false).eq('is_dismissed', false),
+    supabase.from('opportunity_compliance').select('id', { count: 'exact', head: true }),
+    supabase.from('opportunity_compliance').select('id', { count: 'exact', head: true }).eq('status', 'compliant'),
   ])
+
+  const complianceHealthPct =
+    (complianceTotal ?? 0) > 0
+      ? Math.round(((complianceCompliant ?? 0) / (complianceTotal ?? 1)) * 100)
+      : 0
+
+  // Team workload data (for operations dashboard)
+  const { data: assignments } = await supabase
+    .from('opportunity_assignments')
+    .select('assignee_name, opportunity_id')
+
+  const { data: allSections } = await supabase
+    .from('proposal_sections')
+    .select('writer_id, status')
+
+  const assignmentMap = new Map<string, Set<string>>()
+  for (const a of assignments ?? []) {
+    const existing = assignmentMap.get(a.assignee_name) ?? new Set()
+    existing.add(a.opportunity_id)
+    assignmentMap.set(a.assignee_name, existing)
+  }
+
+  const sectionsByWriter = new Map<string, { inProgress: number; total: number }>()
+  for (const s of allSections ?? []) {
+    const writer = s.writer_id ?? '__unassigned__'
+    const existing = sectionsByWriter.get(writer) ?? { inProgress: 0, total: 0 }
+    existing.total++
+    if (s.status === 'in_progress' || s.status === 'draft') existing.inProgress++
+    sectionsByWriter.set(writer, existing)
+  }
+
+  const teamMembers = Array.from(assignmentMap.entries())
+    .map(([name, oppIds]) => {
+      const writerData = sectionsByWriter.get(name) ?? { inProgress: 0, total: 0 }
+      return {
+        name,
+        assignedOpps: oppIds.size,
+        sectionsInProgress: writerData.inProgress,
+        sectionsTotal: writerData.total,
+      }
+    })
+    .sort((a, b) => b.assignedOpps - a.assignedOpps)
+    .slice(0, 10)
 
   const moduleShortcuts = [
     { label: 'Swimlane', href: '/pipeline', count: sectionsInReview ?? 0, desc: 'sections in review', iconPath: 'M4 6h16M4 10h16M4 14h16M4 18h16', color: 'text-[#00E5FA]' },
@@ -195,7 +243,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KPICard
           label="Total Opportunities"
           value={totalOpps.toString()}
@@ -207,6 +255,12 @@ export default async function DashboardPage() {
           value={formatCurrencyCompact(totalCeiling)}
           subtext="Total ceiling across all opps"
           iconPath="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+        <KPICard
+          label="Compliance Health"
+          value={`${complianceHealthPct}%`}
+          subtext={`${complianceCompliant ?? 0} of ${complianceTotal ?? 0} compliant`}
+          iconPath="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
         />
         <KPICard
           label="Avg Win Probability"
@@ -298,6 +352,18 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Team Workload Heatmap */}
+      {teamMembers.length > 0 && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+            Team Workload
+          </h2>
+          <div className="mt-4">
+            <TeamWorkloadHeatmap members={teamMembers} />
+          </div>
+        </div>
+      )}
 
       {/* Recent Activity */}
       <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">

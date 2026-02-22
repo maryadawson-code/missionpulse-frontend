@@ -67,6 +67,20 @@ export default async function StrategyPage() {
   const themeList = themes ?? []
   const discList = discriminators ?? []
 
+  // Build Section M evaluation criteria alignment
+  const evalFactors = new Map<string, { themes: string[]; count: number }>()
+  for (const theme of themeList) {
+    const factor = theme.evaluation_factor
+    if (!factor) continue
+    const existing = evalFactors.get(factor) ?? { themes: [], count: 0 }
+    existing.themes.push(theme.theme_text)
+    existing.count++
+    evalFactors.set(factor, existing)
+  }
+  const evalCriteria = Array.from(evalFactors.entries())
+    .map(([factor, data]) => ({ factor, ...data }))
+    .sort((a, b) => b.count - a.count)
+
   return (
     <div className="space-y-6">
       <div>
@@ -198,8 +212,83 @@ export default async function StrategyPage() {
         </div>
       </div>
 
+      {/* Section M Evaluation Criteria */}
+      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <h2 className="text-sm font-semibold text-white">Section M — Evaluation Criteria Alignment</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            How win themes map to RFP evaluation factors
+          </p>
+        </div>
+        {evalCriteria.length === 0 ? (
+          <div className="px-5 py-8 text-center">
+            <p className="text-sm text-gray-500">
+              No evaluation factors assigned to win themes yet. Add evaluation factors to your win themes to see alignment.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 bg-gray-900/80">
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Evaluation Factor
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 text-center">
+                    Aligned Themes
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Coverage
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Theme Details
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/50">
+                {evalCriteria.map((ec) => (
+                  <tr key={ec.factor} className="transition-colors hover:bg-gray-800/30">
+                    <td className="px-4 py-3 text-sm font-medium text-[#00E5FA]">
+                      {ec.factor}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-block rounded-full bg-[#00E5FA]/10 px-2.5 py-0.5 text-xs font-semibold text-[#00E5FA]">
+                        {ec.count}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-16 rounded-full bg-gray-800">
+                          <div
+                            className={`h-2 rounded-full ${
+                              ec.count >= 3
+                                ? 'bg-emerald-400'
+                                : ec.count >= 2
+                                ? 'bg-amber-400'
+                                : 'bg-red-400'
+                            }`}
+                            style={{ width: `${Math.min(ec.count * 33, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-500">
+                          {ec.count >= 3 ? 'Strong' : ec.count >= 2 ? 'Moderate' : 'Weak'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-400 max-w-xs truncate" title={ec.themes.join('; ')}>
+                      {ec.themes.slice(0, 2).join('; ')}
+                      {ec.themes.length > 2 && ` +${ec.themes.length - 2} more`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <p className="text-xs text-gray-600">
-        Showing {themeList.length} win theme{themeList.length !== 1 ? 's' : ''} and {discList.length} discriminator{discList.length !== 1 ? 's' : ''}.
+        Showing {themeList.length} win theme{themeList.length !== 1 ? 's' : ''}, {discList.length} discriminator{discList.length !== 1 ? 's' : ''}, and {evalCriteria.length} evaluation factor{evalCriteria.length !== 1 ? 's' : ''}.
       </p>
     </div>
   )
