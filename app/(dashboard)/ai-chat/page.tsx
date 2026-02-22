@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
 import { ChatPanel } from '@/components/features/ai-chat/ChatPanel'
+import { TokenBudgetBanner } from '@/components/features/ai/TokenBudgetBanner'
 
 export default async function AIChatPage() {
   const supabase = await createClient()
@@ -54,6 +55,45 @@ export default async function AIChatPage() {
   // Resolve allowed agents for this role
   const allowedAgents = getAllowedAgents(role)
 
+  // Token usage for budget banner
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+
+  const { data: tokenUsage } = await supabase
+    .from('token_usage')
+    .select('input_tokens, output_tokens')
+    .eq('user_id', user.id)
+    .gte('created_at', monthStart.toISOString())
+
+  const totalTokens = (tokenUsage ?? []).reduce(
+    (sum, t) => sum + (t.input_tokens ?? 0) + (t.output_tokens ?? 0),
+    0
+  )
+  const monthlyLimit = 500_000
+  const usagePercent = Math.round((totalTokens / monthlyLimit) * 100)
+  const threshold =
+    usagePercent >= 100
+      ? 'hard_block'
+      : usagePercent >= 90
+        ? 'soft_block'
+        : usagePercent >= 75
+          ? 'urgent'
+          : usagePercent >= 50
+            ? 'warning'
+            : usagePercent >= 25
+              ? 'info'
+              : 'normal'
+
+  const budgetMessage =
+    threshold === 'normal'
+      ? null
+      : threshold === 'info'
+        ? `You've used ${usagePercent}% of your monthly AI token allocation.`
+        : threshold === 'warning'
+          ? `Token usage at ${usagePercent}%. Consider upgrading for additional capacity.`
+          : `Token budget at ${usagePercent}%. AI features may be limited.`
+
   return (
     <div className="space-y-4">
       <div>
@@ -63,6 +103,14 @@ export default async function AIChatPage() {
           GovCon topics.
         </p>
       </div>
+
+      <TokenBudgetBanner
+        threshold={threshold}
+        message={budgetMessage}
+        upgradeCta={usagePercent >= 75}
+        usagePercent={usagePercent}
+        gracePeriod={false}
+      />
 
       <ChatPanel
         existingMessages={existingMessages}
