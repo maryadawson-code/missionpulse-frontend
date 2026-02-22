@@ -51,6 +51,7 @@ interface Document {
 interface GlobalDocumentLibraryProps {
   documents: Document[]
   opportunityMap: Record<string, string>
+  canEdit?: boolean
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -87,6 +88,7 @@ function statusStyle(status: string | null): string {
 export function GlobalDocumentLibrary({
   documents,
   opportunityMap,
+  canEdit = true,
 }: GlobalDocumentLibraryProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [category, setCategory] = useState<string>('Templates')
@@ -134,44 +136,46 @@ export function GlobalDocumentLibrary({
 
   return (
     <div className="space-y-4">
-      {/* Upload bar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="h-8 w-[170px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {COMPANY_CATEGORIES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Upload bar — only visible when user has edit permission */}
+      {canEdit && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="h-8 w-[170px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COMPANY_CATEGORIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Button
-          size="sm"
-          onClick={() => inputRef.current?.click()}
-          disabled={isUploading}
-        >
-          {isUploading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Upload className="h-4 w-4" />
-          )}
-          Upload Document
-        </Button>
+          <Button
+            size="sm"
+            onClick={() => inputRef.current?.click()}
+            disabled={isUploading}
+          >
+            {isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+            Upload Document
+          </Button>
 
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) handleUpload(file)
-          }}
-        />
-      </div>
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) handleUpload(file)
+            }}
+          />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">

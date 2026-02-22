@@ -20,6 +20,7 @@ export default async function DocumentsPage() {
   if (!hasPermission(role, 'documents', 'shouldRender')) {
     redirect('/dashboard')
   }
+  const canEdit = hasPermission(role, 'documents', 'canEdit')
 
   // Fetch all company-level documents + opportunity documents
   const { data: documents } = await supabase
@@ -62,6 +63,7 @@ export default async function DocumentsPage() {
       <GlobalDocumentLibrary
         documents={documents ?? []}
         opportunityMap={oppMap}
+        canEdit={canEdit}
       />
     </div>
   )

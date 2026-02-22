@@ -2,10 +2,11 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getRolePermissions } from '@/lib/rbac/config'
+import { getRolePermissions, isInternalRole } from '@/lib/rbac/config'
 import { getRecentActivity } from '@/lib/actions/audit'
 import Sidebar from '@/components/layout/Sidebar'
 import DashboardHeader from '@/components/layout/DashboardHeader'
+import { PartnerWatermark } from '@/components/layout/PartnerWatermark'
 import type { ModulePermission } from '@/lib/types'
 
 
@@ -60,8 +61,14 @@ export default async function DashboardLayout({
     // Non-critical — continue without notifications
   }
 
+  const isExternal = !isInternalRole(userRole)
+  const companyName = profile?.full_name ?? user.email ?? 'External User'
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
+      {/* Watermark overlay for external roles */}
+      {isExternal && <PartnerWatermark companyName={companyName} />}
+
       {/* Sidebar — RBAC-filtered navigation */}
       <Sidebar
         permissions={permissions}

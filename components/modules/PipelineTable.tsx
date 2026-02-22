@@ -33,6 +33,7 @@ interface PipelineTableProps {
     | 'solicitation_number'
   >[]
   initialSearch?: string
+  canEdit?: boolean
 }
 
 function formatCurrency(value: number | null): string {
@@ -73,7 +74,7 @@ const SortIcon = ({ active, direction }: { active: boolean; direction: SortDirec
   </span>
 )
 
-export function PipelineTable({ opportunities, initialSearch = '' }: PipelineTableProps) {
+export function PipelineTable({ opportunities, initialSearch = '', canEdit = true }: PipelineTableProps) {
   const [sortField, setSortField] = useState<SortField>('due_date')
   const [sortDir, setSortDir] = useState<SortDirection>('asc')
   const [filters, setFilters] = useState<PipelineFilters>({
@@ -209,12 +210,14 @@ export function PipelineTable({ opportunities, initialSearch = '' }: PipelineTab
             </option>
           ))}
         </select>
-        <a
-          href="/pipeline/new"
-          className="ml-auto rounded-md bg-cyan px-4 py-2 text-sm font-medium text-navy hover:bg-cyan/80 transition-colors"
-        >
-          + New Opportunity
-        </a>
+        {canEdit && (
+          <a
+            href="/pipeline/new"
+            className="ml-auto rounded-md bg-cyan px-4 py-2 text-sm font-medium text-navy hover:bg-cyan/80 transition-colors"
+          >
+            + New Opportunity
+          </a>
+        )}
       </div>
 
       {/* Table */}
@@ -243,7 +246,7 @@ export function PipelineTable({ opportunities, initialSearch = '' }: PipelineTab
                 Due Date{' '}
                 <SortIcon active={sortField === 'due_date'} direction={sortDir} />
               </th>
-              <th className={`${thClass} text-right`}>Actions</th>
+              {canEdit && <th className={`${thClass} text-right`}>Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -286,22 +289,24 @@ export function PipelineTable({ opportunities, initialSearch = '' }: PipelineTab
                   <td className={`${tdClass} text-slate`}>
                     {formatDate(opp.due_date)}
                   </td>
-                  <td className={`${tdClass} text-right`}>
-                    <div className="flex items-center justify-end gap-2">
-                      <a
-                        href={`/pipeline/${opp.id}/edit`}
-                        className="text-xs text-slate hover:text-cyan transition-colors"
-                      >
-                        Edit
-                      </a>
-                      <button
-                        onClick={() => setDeleteTarget(opp.id)}
-                        className="text-xs text-slate hover:text-red-400 transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+                  {canEdit && (
+                    <td className={`${tdClass} text-right`}>
+                      <div className="flex items-center justify-end gap-2">
+                        <a
+                          href={`/pipeline/${opp.id}/edit`}
+                          className="text-xs text-slate hover:text-cyan transition-colors"
+                        >
+                          Edit
+                        </a>
+                        <button
+                          onClick={() => setDeleteTarget(opp.id)}
+                          className="text-xs text-slate hover:text-red-400 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             )}

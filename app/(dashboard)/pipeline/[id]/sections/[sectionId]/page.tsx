@@ -62,18 +62,31 @@ export default async function SectionEditorPage({ params }: SectionEditorPagePro
 
   const userName = profile?.full_name ?? profile?.email ?? 'Unknown'
 
-  // Status badge color
+  // Status badge color (6-state color team workflow)
   function statusColor(status: string | null): string {
     switch (status) {
-      case 'Final':
+      case 'final':
         return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-      case 'Review':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-      case 'Revision':
+      case 'pink_review':
+        return 'bg-pink-500/20 text-pink-300 border-pink-500/30'
+      case 'green_review':
+        return 'bg-green-500/20 text-green-300 border-green-500/30'
+      case 'red_review':
+        return 'bg-red-500/20 text-red-300 border-red-500/30'
+      case 'revision':
         return 'bg-amber-500/20 text-amber-300 border-amber-500/30'
       default:
         return 'bg-gray-500/20 text-gray-300 border-gray-500/30'
     }
+  }
+
+  const STATUS_LABELS: Record<string, string> = {
+    draft: 'Draft',
+    pink_review: 'Pink Team',
+    revision: 'Revision',
+    green_review: 'Green Team',
+    red_review: 'Red Team',
+    final: 'Final',
   }
 
   function volumeColor(volume: string | null): string {
@@ -114,7 +127,7 @@ export default async function SectionEditorPage({ params }: SectionEditorPagePro
                 </span>
               )}
               <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor(section.status)}`}>
-                {section.status ?? 'Draft'}
+                {STATUS_LABELS[section.status ?? 'draft'] ?? section.status ?? 'Draft'}
               </span>
               <span className="text-xs text-gray-500">{opportunity.title}</span>
             </div>

@@ -20,7 +20,23 @@ import {
 } from '@/components/ui/select'
 import { SectionCard } from './SectionCard'
 
-const SWIMLANE_COLUMNS = ['Draft', 'Review', 'Revision', 'Final'] as const
+const SWIMLANE_COLUMNS = [
+  { id: 'draft', label: 'Draft' },
+  { id: 'pink_review', label: 'Pink Team' },
+  { id: 'revision', label: 'Revision' },
+  { id: 'green_review', label: 'Green Team' },
+  { id: 'red_review', label: 'Red Team' },
+  { id: 'final', label: 'Final' },
+] as const
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  draft: ['pink_review'],
+  pink_review: ['revision', 'green_review'],
+  revision: ['pink_review', 'green_review', 'red_review'],
+  green_review: ['revision', 'red_review'],
+  red_review: ['revision', 'final'],
+  final: [],
+}
 
 const VOLUME_FILTERS = ['All', 'Technical', 'Management', 'Past Performance', 'Cost'] as const
 
@@ -59,9 +75,10 @@ export function SwimlaneBoard({
       ? sections
       : sections.filter((s) => s.volume === volumeFilter)
 
-  const columns = SWIMLANE_COLUMNS.map((status) => ({
-    status,
-    items: filtered.filter((s) => (s.status ?? 'Draft') === status),
+  const columns = SWIMLANE_COLUMNS.map((col) => ({
+    id: col.id,
+    label: col.label,
+    items: filtered.filter((s) => (s.status ?? 'draft') === col.id),
   }))
 
   function handleDragEnd(result: DropResult) {
@@ -70,12 +87,22 @@ export function SwimlaneBoard({
 
     const newStatus = destination.droppableId
     const section = sections.find((s) => s.id === draggableId)
-    if (!section || (section.status ?? 'Draft') === newStatus) return
+    const currentStatus = section?.status ?? 'draft'
+    if (!section || currentStatus === newStatus) return
+
+    // Client-side transition validation
+    const allowed = VALID_TRANSITIONS[currentStatus] ?? []
+    if (!allowed.includes(newStatus)) {
+      const label = SWIMLANE_COLUMNS.find((c) => c.id === newStatus)?.label ?? newStatus
+      addToast('error', `Cannot move directly to ${label}`)
+      return
+    }
 
     startTransition(async () => {
       const res = await updateSectionStatus(draggableId, newStatus, opportunityId)
       if (res.success) {
-        addToast('success', `Moved to ${newStatus}`)
+        const label = SWIMLANE_COLUMNS.find((c) => c.id === newStatus)?.label ?? newStatus
+        addToast('success', `Moved to ${label}`)
       } else {
         addToast('error', res.error ?? 'Failed to update status')
       }
@@ -111,21 +138,21 @@ export function SwimlaneBoard({
 
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {columns.map(({ status, items }) => (
+            {columns.map(({ id, label, items }) => (
               <div
-                key={status}
-                className="flex w-[280px] min-w-[280px] flex-col rounded-lg border border-border bg-card"
+                key={id}
+                className="flex w-[220px] min-w-[220px] flex-col rounded-lg border border-border bg-card"
               >
                 <div className="flex items-center justify-between border-b border-border px-3 py-2">
                   <h3 className="text-sm font-semibold text-foreground">
-                    {status}
+                    {label}
                   </h3>
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                     {items.length}
                   </span>
                 </div>
 
-                <Droppable droppableId={status}>
+                <Droppable droppableId={id}>
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
@@ -136,7 +163,7 @@ export function SwimlaneBoard({
                     >
                       {items.length === 0 && !snapshot.isDraggingOver && (
                         <p className="py-8 text-center text-xs text-muted-foreground">
-                          No sections in {status}
+                          No sections in {label}
                         </p>
                       )}
                       {items.map((section, index) => (

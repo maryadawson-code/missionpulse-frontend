@@ -39,6 +39,7 @@ interface ReviewItem {
 
 interface ReviewQueueProps {
   items: ReviewItem[]
+  canEdit?: boolean
 }
 
 const TYPE_ICONS = {
@@ -69,7 +70,7 @@ function formatDate(dateStr: string | null): string {
   })
 }
 
-export function ReviewQueue({ items }: ReviewQueueProps) {
+export function ReviewQueue({ items, canEdit = true }: ReviewQueueProps) {
   const [filterType, setFilterType] = useState<string>('All')
 
   const filtered =
@@ -109,7 +110,7 @@ export function ReviewQueue({ items }: ReviewQueueProps) {
       ) : (
         <div className="space-y-2">
           {filtered.map((item) => (
-            <ReviewItemRow key={`${item.type}-${item.id}`} item={item} />
+            <ReviewItemRow key={`${item.type}-${item.id}`} item={item} canEdit={canEdit} />
           ))}
         </div>
       )}
@@ -117,7 +118,7 @@ export function ReviewQueue({ items }: ReviewQueueProps) {
   )
 }
 
-function ReviewItemRow({ item }: { item: ReviewItem }) {
+function ReviewItemRow({ item, canEdit = true }: { item: ReviewItem; canEdit?: boolean }) {
   const [isPending, startTransition] = useTransition()
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [showChangesForm, setShowChangesForm] = useState(false)
@@ -201,49 +202,51 @@ function ReviewItemRow({ item }: { item: ReviewItem }) {
             </p>
           )}
 
-          {/* Action buttons */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleApprove}
-              disabled={isPending}
-              className="h-7 text-xs text-emerald-400 hover:text-emerald-300"
-            >
-              {isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <CheckCircle2 className="h-3 w-3" />
-              )}
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setShowRejectForm(!showRejectForm)
-                setShowChangesForm(false)
-              }}
-              disabled={isPending}
-              className="h-7 text-xs text-red-400 hover:text-red-300"
-            >
-              <XCircle className="h-3 w-3" />
-              Reject
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setShowChangesForm(!showChangesForm)
-                setShowRejectForm(false)
-              }}
-              disabled={isPending}
-              className="h-7 text-xs text-amber-400 hover:text-amber-300"
-            >
-              <MessageSquare className="h-3 w-3" />
-              Request Changes
-            </Button>
-          </div>
+          {/* Action buttons — only visible when user has edit permission */}
+          {canEdit && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleApprove}
+                disabled={isPending}
+                className="h-7 text-xs text-emerald-400 hover:text-emerald-300"
+              >
+                {isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3" />
+                )}
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setShowRejectForm(!showRejectForm)
+                  setShowChangesForm(false)
+                }}
+                disabled={isPending}
+                className="h-7 text-xs text-red-400 hover:text-red-300"
+              >
+                <XCircle className="h-3 w-3" />
+                Reject
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setShowChangesForm(!showChangesForm)
+                  setShowRejectForm(false)
+                }}
+                disabled={isPending}
+                className="h-7 text-xs text-amber-400 hover:text-amber-300"
+              >
+                <MessageSquare className="h-3 w-3" />
+                Request Changes
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

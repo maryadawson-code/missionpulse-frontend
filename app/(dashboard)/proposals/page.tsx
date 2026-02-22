@@ -31,6 +31,7 @@ export default async function ProposalsPage() {
   if (!hasPermission(role, 'proposals', 'shouldRender')) {
     redirect('/dashboard')
   }
+  const canEdit = hasPermission(role, 'proposals', 'canEdit')
 
   // Fetch compliance requirements needing review (status = 'Addressed' but not 'Verified')
   const { data: compReqs } = await supabase
@@ -161,7 +162,7 @@ export default async function ProposalsPage() {
         </div>
       </div>
 
-      <ReviewQueue items={items} />
+      <ReviewQueue items={items} canEdit={canEdit} />
     </div>
   )
 }

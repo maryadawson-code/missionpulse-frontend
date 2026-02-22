@@ -1,6 +1,7 @@
 // filepath: app/(dashboard)/pipeline/page.tsx
 
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { PipelineTable } from '@/components/modules/PipelineTable'
 import { KanbanView } from './KanbanView'
 import { ViewToggle } from './ViewToggle'
@@ -13,6 +14,21 @@ export default async function PipelinePage({
   searchParams: { q?: string; view?: string }
 }) {
   const supabase = await createClient()
+
+  // Resolve canEdit permission
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  let canEdit = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    const role = resolveRole(profile?.role)
+    canEdit = hasPermission(role, 'pipeline', 'canEdit')
+  }
 
   // ─── Fetch Opportunities ────────────────────────────────────
   const { data: opportunities, error } = await supabase
@@ -35,7 +51,7 @@ export default async function PipelinePage({
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle />
-          <CreateOpportunityButton />
+          {canEdit && <CreateOpportunityButton />}
         </div>
       </div>
 
@@ -47,9 +63,9 @@ export default async function PipelinePage({
       )}
 
       {/* Pipeline Views */}
-      {!error && view === 'kanban' && <KanbanView opportunities={opps} />}
+      {!error && view === 'kanban' && <KanbanView opportunities={opps} canEdit={canEdit} />}
       {!error && view !== 'kanban' && (
-        <PipelineTable opportunities={opps} initialSearch={searchParams.q ?? ''} />
+        <PipelineTable opportunities={opps} initialSearch={searchParams.q ?? ''} canEdit={canEdit} />
       )}
     </div>
   )

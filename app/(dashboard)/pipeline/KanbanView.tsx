@@ -22,9 +22,10 @@ type KanbanOpportunity = Pick<
 
 interface KanbanViewProps {
   opportunities: KanbanOpportunity[]
+  canEdit?: boolean
 }
 
-export function KanbanView({ opportunities }: KanbanViewProps) {
+export function KanbanView({ opportunities, canEdit = true }: KanbanViewProps) {
   const [isPending, startTransition] = useTransition()
 
   // Group opportunities by phase
@@ -34,6 +35,7 @@ export function KanbanView({ opportunities }: KanbanViewProps) {
   }))
 
   function handleDragEnd(result: DropResult) {
+    if (!canEdit) return
     const { destination, draggableId } = result
     if (!destination) return
 
