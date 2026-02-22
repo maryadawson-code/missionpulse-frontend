@@ -4,6 +4,7 @@ import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
 import { CompetitorManager } from '@/components/features/blackhat/CompetitorManager'
 import { BlackHatAI } from '@/components/features/blackhat/BlackHatAI'
+import { StrategyAnalysis } from '@/components/features/pipeline/StrategyAnalysis'
 
 interface Props {
   params: { id: string }
@@ -33,7 +34,7 @@ export default async function OpportunityStrategyPage({ params }: Props) {
 
   const { data: opportunity } = await supabase
     .from('opportunities')
-    .select('id, title, agency, description')
+    .select('id, title, agency, description, set_aside, naics_code')
     .eq('id', params.id)
     .single()
 
@@ -84,6 +85,23 @@ export default async function OpportunityStrategyPage({ params }: Props) {
           Competitive analysis, ghost strategies, and counter-tactics for{' '}
           {opportunity.agency ?? 'this opportunity'}.
         </p>
+      </div>
+
+      {/* AI Strategy Analysis */}
+      <div className="rounded-lg border border-border bg-surface p-6">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Strategy Generator
+        </h2>
+        <StrategyAnalysis
+          opportunity={{
+            id: opportunity.id,
+            title: opportunity.title ?? '',
+            agency: opportunity.agency,
+            description: opportunity.description,
+            set_aside: opportunity.set_aside,
+            naics_code: opportunity.naics_code,
+          }}
+        />
       </div>
 
       <CompetitorManager

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 
 interface ProposalSection {
@@ -18,6 +19,7 @@ interface TeamMember {
 interface SectionCardProps {
   section: ProposalSection
   teamMembers: TeamMember[]
+  opportunityId: string
 }
 
 function formatDate(dateStr: string | null): string {
@@ -43,13 +45,16 @@ function volumeColor(volume: string | null): string {
   }
 }
 
-export function SectionCard({ section, teamMembers }: SectionCardProps) {
+export function SectionCard({ section, teamMembers, opportunityId }: SectionCardProps) {
   const owner = teamMembers.find(
     (m) => m.assignee_email === section.writer_id || m.assignee_name === section.writer_id
   )
 
   return (
-    <div className="rounded-lg border border-border bg-background p-3 space-y-2">
+    <Link
+      href={`/pipeline/${opportunityId}/sections/${section.id}`}
+      className="block rounded-lg border border-border bg-background p-3 space-y-2 hover:border-primary/40 hover:bg-accent/5 transition-colors"
+    >
       <p className="text-sm font-medium text-foreground truncate">
         {section.section_title}
       </p>
@@ -70,6 +75,6 @@ export function SectionCard({ section, teamMembers }: SectionCardProps) {
         )}
         {section.due_date && <span>{formatDate(section.due_date)}</span>}
       </div>
-    </div>
+    </Link>
   )
 }

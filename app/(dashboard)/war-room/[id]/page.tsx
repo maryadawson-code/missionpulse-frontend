@@ -231,6 +231,37 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
         </div>
       </div>
 
+      {/* AI Agents */}
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+          AI Agents
+        </h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3">
+          {[
+            { href: `/pipeline/${id}#capture`, label: 'Capture Analysis', icon: '✨', desc: 'pWin scoring & win themes' },
+            { href: `/pipeline/${id}/strategy`, label: 'Strategy Generator', icon: '🎯', desc: 'Discriminators & Section M' },
+            { href: `/pipeline/${id}/contracts`, label: 'Clause Analyzer', icon: '⚖️', desc: 'FAR/DFARS risk assessment' },
+            { href: `/pipeline/${id}/orals`, label: 'Orals Coach', icon: '🎤', desc: 'Evaluator Q&A generation' },
+            { href: `/pipeline/${id}/pricing`, label: 'Pricing AI', icon: '🧮', desc: 'BOE & price-to-win' },
+            { href: `/ai-chat`, label: 'AI Chat', icon: '💬', desc: 'Ask questions about this opp' },
+          ].map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="flex items-start gap-3 rounded-md border border-border bg-navy px-3 py-3 hover:border-cyan/40 hover:bg-elevated transition-colors group"
+            >
+              <span className="text-lg mt-0.5">{link.icon}</span>
+              <div>
+                <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+                  {link.label}
+                </p>
+                <p className="text-xs text-slate mt-0.5">{link.desc}</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="rounded-lg border border-border bg-surface p-6">
         <WarRoomTabs

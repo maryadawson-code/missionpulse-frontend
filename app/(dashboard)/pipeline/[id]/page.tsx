@@ -14,6 +14,7 @@ import {
 } from '@/lib/utils/formatters'
 import type { Database } from '@/lib/supabase/database.types'
 import Link from 'next/link'
+import { CaptureAnalysis } from '@/components/features/pipeline/CaptureAnalysis'
 
 type OpportunityRow = Database['public']['Tables']['opportunities']['Row']
 type AssignmentRow = Database['public']['Tables']['opportunity_assignments']['Row']
@@ -183,6 +184,24 @@ export default async function WarRoomPage({
               </p>
             </div>
           )}
+
+          {/* AI Capture Analysis */}
+          <div id="capture" className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
+              Capture Analysis
+            </h2>
+            <CaptureAnalysis
+              opportunity={{
+                id: opp.id,
+                title: opp.title ?? '',
+                agency: opp.agency,
+                ceiling: opp.ceiling ? Number(opp.ceiling) : null,
+                description: opp.description,
+                naics_code: opp.naics_code,
+                set_aside: opp.set_aside,
+              }}
+            />
+          </div>
 
           {/* Details Grid */}
           <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">

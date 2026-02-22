@@ -159,6 +159,7 @@ export function SwimlaneBoard({
                               <SectionCard
                                 section={section}
                                 teamMembers={teamMembers}
+                                opportunityId={opportunityId}
                               />
                             </div>
                           )}

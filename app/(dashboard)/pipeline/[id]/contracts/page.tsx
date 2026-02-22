@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ContractScanner } from '@/components/features/contracts/ContractScanner'
+import { AIClauseAnalysis } from '@/components/features/contracts/AIClauseAnalysis'
 
 interface ContractsPageProps {
   params: Promise<{ id: string }>
@@ -64,6 +65,17 @@ export default async function ContractsPage({ params }: ContractsPageProps) {
           <p className="mt-1 text-2xl font-bold text-red-400">{highRisk}</p>
         </div>
       </div>
+
+      {/* AI Clause Analysis */}
+      <AIClauseAnalysis
+        clauses={items.map((c) => ({
+          id: c.id,
+          clause_number: c.clause_number,
+          clause_title: c.clause_title ?? '',
+          full_text: c.full_text,
+        }))}
+        opportunityId={id}
+      />
 
       <ContractScanner clauses={items} opportunityId={id} />
     </div>
