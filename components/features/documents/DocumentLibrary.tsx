@@ -284,6 +284,7 @@ export function DocumentLibrary({
                         size="icon"
                         className="h-7 w-7"
                         title="New version"
+                        aria-label="Upload new version"
                         onClick={() => {
                           setReuploadTarget(doc)
                           reuploadRef.current?.click()
@@ -296,6 +297,7 @@ export function DocumentLibrary({
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         title="Delete"
+                        aria-label="Delete document"
                         onClick={() => setDeleteTarget(doc)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />

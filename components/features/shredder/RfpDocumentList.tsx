@@ -77,6 +77,7 @@ export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListPro
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : doc.id)}
                   className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label={isExpanded ? 'Collapse document' : 'Expand document'}
                 >
                   {isExpanded ? (
                     <ChevronDown className="h-4 w-4" />
@@ -114,7 +115,7 @@ export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListPro
 
                   {isProcessed && (
                     <Link href={`/pipeline/${opportunityId}/shredder/requirements?doc=${doc.id}`}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="View requirements">
                         <Eye className="h-4 w-4" />
                       </Button>
                     </Link>
@@ -125,6 +126,7 @@ export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListPro
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                     onClick={() => setDeleteTarget(doc)}
+                    aria-label="Delete document"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
