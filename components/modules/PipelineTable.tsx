@@ -82,6 +82,12 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
     status: null,
     setAside: null,
     search: initialSearch,
+    ceilingMin: '',
+    ceilingMax: '',
+    pwinMin: '',
+    pwinMax: '',
+    dueDateStart: '',
+    dueDateEnd: '',
   })
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -110,6 +116,30 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
     if (filters.phase) result = result.filter((o) => o.phase === filters.phase)
     if (filters.status) result = result.filter((o) => o.status === filters.status)
     if (filters.setAside) result = result.filter((o) => o.set_aside === filters.setAside)
+
+    // Range filters
+    if (filters.ceilingMin) {
+      const min = Number(filters.ceilingMin)
+      result = result.filter((o) => (Number(o.ceiling) || 0) >= min)
+    }
+    if (filters.ceilingMax) {
+      const max = Number(filters.ceilingMax)
+      result = result.filter((o) => (Number(o.ceiling) || 0) <= max)
+    }
+    if (filters.pwinMin) {
+      const min = Number(filters.pwinMin)
+      result = result.filter((o) => (o.pwin ?? 0) >= min)
+    }
+    if (filters.pwinMax) {
+      const max = Number(filters.pwinMax)
+      result = result.filter((o) => (o.pwin ?? 0) <= max)
+    }
+    if (filters.dueDateStart) {
+      result = result.filter((o) => o.due_date && o.due_date >= filters.dueDateStart)
+    }
+    if (filters.dueDateEnd) {
+      result = result.filter((o) => o.due_date && o.due_date <= filters.dueDateEnd)
+    }
 
     result.sort((a, b) => {
       let cmp = 0
@@ -218,6 +248,72 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
             + New Opportunity
           </a>
         )}
+      </div>
+
+      {/* Range Filters Row */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-[10px] font-medium text-gray-500 mb-1">Ceiling ($)</label>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              placeholder="Min"
+              value={filters.ceilingMin}
+              onChange={(e) => setFilters((f) => ({ ...f, ceilingMin: e.target.value }))}
+              className="w-24 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none"
+            />
+            <span className="text-gray-600 text-xs">–</span>
+            <input
+              type="number"
+              placeholder="Max"
+              value={filters.ceilingMax}
+              onChange={(e) => setFilters((f) => ({ ...f, ceilingMax: e.target.value }))}
+              className="w-24 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-medium text-gray-500 mb-1">pWin (%)</label>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              placeholder="Min"
+              min={0}
+              max={100}
+              value={filters.pwinMin}
+              onChange={(e) => setFilters((f) => ({ ...f, pwinMin: e.target.value }))}
+              className="w-16 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none"
+            />
+            <span className="text-gray-600 text-xs">–</span>
+            <input
+              type="number"
+              placeholder="Max"
+              min={0}
+              max={100}
+              value={filters.pwinMax}
+              onChange={(e) => setFilters((f) => ({ ...f, pwinMax: e.target.value }))}
+              className="w-16 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-medium text-gray-500 mb-1">Due Date</label>
+          <div className="flex items-center gap-1">
+            <input
+              type="date"
+              value={filters.dueDateStart}
+              onChange={(e) => setFilters((f) => ({ ...f, dueDateStart: e.target.value }))}
+              className="rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white focus:border-cyan focus:outline-none"
+            />
+            <span className="text-gray-600 text-xs">–</span>
+            <input
+              type="date"
+              value={filters.dueDateEnd}
+              onChange={(e) => setFilters((f) => ({ ...f, dueDateEnd: e.target.value }))}
+              className="rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white focus:border-cyan focus:outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Table */}

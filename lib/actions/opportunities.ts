@@ -348,3 +348,57 @@ export async function deleteOpportunity(id: string): Promise<ActionResult> {
   revalidatePath('/')
   return { success: true }
 }
+
+/**
+ * Update a single field on an opportunity (inline edit).
+ */
+const EDITABLE_FIELDS = new Set([
+  'title', 'agency', 'sub_agency', 'ceiling', 'pwin', 'phase', 'status',
+  'priority', 'set_aside', 'due_date', 'description', 'nickname',
+  'solicitation_number', 'contract_vehicle', 'naics_code',
+  'period_of_performance', 'incumbent', 'contact_name', 'contact_email',
+  'place_of_performance', 'notes',
+])
+
+export async function updateOpportunityField(
+  id: string,
+  field: string,
+  value: string
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  if (!EDITABLE_FIELDS.has(field)) {
+    return { success: false, error: `Field "${field}" is not editable` }
+  }
+
+  // Coerce value types
+  let dbValue: string | number | null = value.trim() || null
+  if ((field === 'ceiling' || field === 'pwin') && dbValue !== null) {
+    const num = Number(String(dbValue).replace(/[,$]/g, ''))
+    if (isNaN(num)) return { success: false, error: `${field} must be a number` }
+    dbValue = num
+  }
+
+  const { error } = await supabase
+    .from('opportunities')
+    .update({ [field]: dbValue, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) return { success: false, error: error.message }
+
+  await supabase.from('audit_logs').insert({
+    action: 'UPDATE',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
+    details: { field, new_value: dbValue },
+  })
+
+  revalidatePath(`/pipeline/${id}`)
+  revalidatePath('/pipeline')
+  return { success: true, id }
+}

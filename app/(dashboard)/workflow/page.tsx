@@ -2,50 +2,8 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole, hasPermission } from '@/lib/rbac/config'
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-function statusColor(status: string | null): string {
-  switch (status) {
-    case 'completed':
-    case 'done':
-      return 'bg-emerald-500/20 text-emerald-300'
-    case 'in_progress':
-    case 'active':
-      return 'bg-blue-500/20 text-blue-300'
-    case 'blocked':
-      return 'bg-red-500/20 text-red-300'
-    case 'pending':
-    case 'todo':
-      return 'bg-gray-500/20 text-gray-300'
-    default:
-      return 'bg-gray-500/20 text-gray-300'
-  }
-}
-
-function priorityColor(priority: string | null): string {
-  switch (priority) {
-    case 'critical':
-    case 'urgent':
-      return 'text-red-400'
-    case 'high':
-      return 'text-amber-400'
-    case 'medium':
-      return 'text-blue-400'
-    case 'low':
-      return 'text-gray-400'
-    default:
-      return 'text-gray-400'
-  }
-}
+import { resolveRole, hasPermission, isInternalRole } from '@/lib/rbac/config'
+import { WorkflowBoard } from '@/components/features/workflow/WorkflowBoard'
 
 export default async function WorkflowPage() {
   const supabase = await createClient()
@@ -62,115 +20,83 @@ export default async function WorkflowPage() {
   if (!hasPermission(role, 'workflow_board', 'shouldRender')) {
     return null
   }
+  const canEdit = hasPermission(role, 'workflow_board', 'canEdit')
+  const internal = isInternalRole(role)
 
-  const { data: tasks, error } = await supabase
-    .from('tasks')
-    .select('id, task_title, task_description, status, priority, assigned_to_name, due_date, estimated_hours, actual_hours, task_type, tags, updated_at')
+  // Fetch active opportunities for the selector
+  const { data: opportunities } = await supabase
+    .from('opportunities')
+    .select('id, title')
+    .in('status', ['Active', 'active', 'In Progress'])
     .order('updated_at', { ascending: false })
-    .limit(100)
+    .limit(50)
 
-  const allTasks = tasks ?? []
-  const todoTasks = allTasks.filter((t) => t.status === 'pending' || t.status === 'todo' || !t.status)
-  const inProgressTasks = allTasks.filter((t) => t.status === 'in_progress' || t.status === 'active')
-  const completedTasks = allTasks.filter((t) => t.status === 'completed' || t.status === 'done')
-  const blockedTasks = allTasks.filter((t) => t.status === 'blocked')
+  // Fetch all proposal sections (or filtered for external roles)
+  let sectionsQuery = supabase
+    .from('proposal_sections')
+    .select('id, section_title, volume, status, due_date, writer_id, reviewer_id, sort_order, opportunity_id')
+    .order('sort_order', { ascending: true })
+
+  if (!internal) {
+    // External roles only see sections for opportunities they're assigned to
+    const { data: assignments } = await supabase
+      .from('opportunity_assignments')
+      .select('opportunity_id')
+      .eq('assignee_email', user.email ?? '')
+
+    const assignedOppIds = (assignments ?? []).map((a) => a.opportunity_id)
+    if (assignedOppIds.length > 0) {
+      sectionsQuery = sectionsQuery.in('opportunity_id', assignedOppIds)
+    } else {
+      sectionsQuery = sectionsQuery.eq('opportunity_id', '__none__')
+    }
+  }
+
+  const { data: sections } = await sectionsQuery
+
+  // Summary counts
+  const allSections = sections ?? []
+  const draftCount = allSections.filter((s) => s.status === 'draft' || !s.status).length
+  const reviewCount = allSections.filter((s) =>
+    s.status === 'pink_review' || s.status === 'green_review' || s.status === 'red_review'
+  ).length
+  const revisionCount = allSections.filter((s) => s.status === 'revision').length
+  const finalCount = allSections.filter((s) => s.status === 'final').length
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Workflow Board</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Visualize and manage task workflows with assignments and status tracking.
+          Manage proposal sections across color team stages.
         </p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">To Do</p>
-          <p className="mt-1 text-xl font-bold text-gray-300">{todoTasks.length}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Draft</p>
+          <p className="mt-1 text-xl font-bold text-gray-300">{draftCount}</p>
         </div>
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-blue-400">In Progress</p>
-          <p className="mt-1 text-xl font-bold text-blue-300">{inProgressTasks.length}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-blue-400">In Review</p>
+          <p className="mt-1 text-xl font-bold text-blue-300">{reviewCount}</p>
         </div>
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-red-400">Blocked</p>
-          <p className="mt-1 text-xl font-bold text-red-300">{blockedTasks.length}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-amber-400">Revision</p>
+          <p className="mt-1 text-xl font-bold text-amber-300">{revisionCount}</p>
         </div>
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-emerald-400">Completed</p>
-          <p className="mt-1 text-xl font-bold text-emerald-300">{completedTasks.length}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-emerald-400">Final</p>
+          <p className="mt-1 text-xl font-bold text-emerald-300">{finalCount}</p>
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
-          Failed to load tasks: {error.message}
-        </div>
-      )}
-
-      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Task</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Priority</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Assigned To</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Type</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Due Date</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Hours</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800/50">
-              {allTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
-                    No tasks created yet. Tasks will appear here as work items are assigned across proposals.
-                  </td>
-                </tr>
-              ) : (
-                allTasks.map((task) => (
-                  <tr key={task.id} className="transition-colors hover:bg-gray-800/30">
-                    <td className="px-4 py-3 text-sm text-gray-200 max-w-xs">
-                      <span className="font-medium">{task.task_title}</span>
-                      {task.task_description && (
-                        <p className="mt-0.5 text-xs text-gray-500 truncate max-w-[250px]">{task.task_description}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(task.status)}`}>
-                        {(task.status ?? 'pending').replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className={`whitespace-nowrap px-4 py-3 text-xs font-medium ${priorityColor(task.priority)}`}>
-                      {(task.priority ?? 'medium').replace(/_/g, ' ')}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
-                      {task.assigned_to_name ?? 'Unassigned'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
-                      {(task.task_type ?? 'general').replace(/_/g, ' ')}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
-                      {formatDate(task.due_date)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-gray-400">
-                      {task.actual_hours ?? '—'} / {task.estimated_hours ?? '—'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <p className="text-xs text-gray-600">
-        Showing {allTasks.length} task{allTasks.length !== 1 ? 's' : ''} across all statuses.
-      </p>
+      <WorkflowBoard
+        opportunities={(opportunities ?? []).map((o) => ({ id: o.id, title: o.title }))}
+        sections={allSections}
+        canEdit={canEdit}
+      />
     </div>
   )
 }

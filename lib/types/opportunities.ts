@@ -61,4 +61,10 @@ export interface PipelineFilters {
   status: string | null
   setAside: string | null
   search: string
+  ceilingMin: string
+  ceilingMax: string
+  pwinMin: string
+  pwinMax: string
+  dueDateStart: string
+  dueDateEnd: string
 }

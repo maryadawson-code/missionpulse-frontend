@@ -11,10 +11,23 @@ interface ChatResult {
   error?: string
 }
 
+const AGENT_SYSTEM_PROMPTS: Record<string, string> = {
+  general: 'You are MissionPulse AI, a GovCon proposal assistant. Help the user with pipeline management, compliance, proposal writing, pricing strategy, and government contracting best practices.',
+  capture: 'You are the Capture Agent specializing in opportunity analysis, pWin scoring, win theme development, and competitive landscape assessment for government contracting.',
+  writer: 'You are the Writer Agent specializing in proposal section drafting, compliance-mapped content, and persuasive government proposal writing using Shipley methodology.',
+  compliance: 'You are the Compliance Agent specializing in RFP requirements extraction, SHALL/MUST analysis, compliance matrix validation, and regulatory cross-referencing.',
+  pricing: 'You are the Pricing Agent specializing in BOE generation, labor category analysis, wrap rate calculations, and price-to-win modeling for government contracts.',
+  strategy: 'You are the Strategy Agent specializing in discriminator development, Section M alignment, win theme strategy, and competitive positioning.',
+  blackhat: 'You are the Black Hat Agent specializing in competitor analysis, ghost strategy development, counter-tactics, and competitive intelligence assessment.',
+  contracts: 'You are the Contracts Agent specializing in FAR/DFARS clause analysis, T&C risk assessment, and contract compliance review.',
+  orals: 'You are the Orals Coach Agent specializing in oral presentation preparation, evaluator Q&A generation, and speaker coaching for government proposal orals.',
+}
+
 export async function sendChatMessage(
   sessionId: string,
   message: string,
-  opportunityContext?: string
+  opportunityContext?: string,
+  agentType?: string
 ): Promise<ChatResult> {
   const supabase = await createClient()
   const {
@@ -30,10 +43,11 @@ export async function sendChatMessage(
     content: message,
   })
 
-  // Build context-aware system prompt
+  // Build context-aware system prompt based on selected agent
+  const basePrompt = AGENT_SYSTEM_PROMPTS[agentType ?? 'general'] ?? AGENT_SYSTEM_PROMPTS.general
   const systemPrompt = opportunityContext
-    ? `You are MissionPulse AI, a GovCon proposal assistant. The user is currently viewing an opportunity. Here is the context:\n\n${opportunityContext}\n\nHelp the user with their question about this opportunity or general GovCon topics.`
-    : 'You are MissionPulse AI, a GovCon proposal assistant. Help the user with pipeline management, compliance, proposal writing, pricing strategy, and government contracting best practices.'
+    ? `${basePrompt}\n\nThe user is currently viewing an opportunity. Here is the context:\n\n${opportunityContext}\n\nHelp the user with their question about this opportunity.`
+    : basePrompt
 
   // Run through AI pipeline
   const aiResponse = await aiRequest({
@@ -67,7 +81,8 @@ export async function sendChatMessage(
 }
 
 export async function createChatSession(
-  opportunityId?: string
+  opportunityId?: string,
+  agentType?: string
 ): Promise<{ success: boolean; sessionId?: string; error?: string }> {
   const supabase = await createClient()
   const {
@@ -80,7 +95,7 @@ export async function createChatSession(
   const { error } = await supabase.from('chat_sessions').insert({
     id: sessionId,
     user_id: user.id,
-    agent_type: 'general',
+    agent_type: agentType ?? 'general',
     opportunity_id: opportunityId ?? null,
   })
 

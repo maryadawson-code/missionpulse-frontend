@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useTransition, useCallback } from 'react'
-import { Send, Loader2, Bot, User, Sparkles } from 'lucide-react'
+import { Send, Loader2, Bot, User, Sparkles, BookOpen, Search, X, Copy } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { addToast } from '@/components/ui/Toast'
@@ -10,6 +10,7 @@ import {
   sendChatMessage,
   createChatSession,
 } from '@/app/(dashboard)/ai-chat/actions'
+import { searchPlaybook, type PlaybookResult } from '@/app/(dashboard)/ai-chat/playbook-actions'
 
 interface ChatMessage {
   id: string
@@ -72,7 +73,29 @@ export function ChatPanel({
   const [selectedOpp, setSelectedOpp] = useState<string>('')
   const [selectedAgent, setSelectedAgent] = useState<string>('general')
   const [isPending, startTransition] = useTransition()
+  const [showPlaybook, setShowPlaybook] = useState(false)
+  const [playbookQuery, setPlaybookQuery] = useState('')
+  const [playbookResults, setPlaybookResults] = useState<PlaybookResult[]>([])
+  const [playbookLoading, setPlaybookLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  async function handlePlaybookSearch() {
+    if (!playbookQuery.trim()) return
+    setPlaybookLoading(true)
+    const result = await searchPlaybook(playbookQuery.trim())
+    if (result.success) {
+      setPlaybookResults(result.results ?? [])
+    } else {
+      addToast('error', result.error ?? 'Search failed')
+    }
+    setPlaybookLoading(false)
+  }
+
+  function insertPlaybookContent(content: string) {
+    setInput((prev) => prev + (prev ? '\n\n' : '') + content)
+    setShowPlaybook(false)
+    addToast('success', 'Content inserted into message')
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -109,7 +132,7 @@ export function ChatPanel({
 
       // Create session if needed
       if (!currentSessionId) {
-        const sessionResult = await createChatSession(selectedOpp || undefined)
+        const sessionResult = await createChatSession(selectedOpp || undefined, selectedAgent)
         if (!sessionResult.success || !sessionResult.sessionId) {
           addToast('error', sessionResult.error ?? 'Failed to create session')
           return
@@ -121,7 +144,8 @@ export function ChatPanel({
       const result = await sendChatMessage(
         currentSessionId,
         userMessage,
-        activeContext
+        activeContext,
+        selectedAgent
       )
 
       if (result.success && result.response) {
@@ -137,7 +161,7 @@ export function ChatPanel({
         addToast('error', result.error ?? 'Failed to get response')
       }
     })
-  }, [input, isPending, sessionId, activeContext, selectedOpp, opportunities, startTransition])
+  }, [input, isPending, sessionId, activeContext, selectedOpp, selectedAgent, startTransition])
 
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card h-[calc(100vh-200px)] min-h-[500px]">
@@ -274,9 +298,66 @@ export function ChatPanel({
         </p>
       </div>
 
+      {/* Playbook Search Panel */}
+      {showPlaybook && (
+        <div className="border-t border-border px-4 py-3 max-h-52 overflow-y-auto">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 flex gap-1">
+              <input
+                type="text"
+                value={playbookQuery}
+                onChange={(e) => setPlaybookQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handlePlaybookSearch() }}
+                placeholder="Search playbook entries..."
+                className="flex-1 h-8 rounded-md border border-border bg-background px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <Button size="icon" variant="outline" className="h-8 w-8" onClick={handlePlaybookSearch} disabled={playbookLoading}>
+                {playbookLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+              </Button>
+            </div>
+            <button onClick={() => setShowPlaybook(false)} className="p-1 text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {playbookResults.length > 0 ? (
+            <div className="space-y-2">
+              {playbookResults.map((r) => (
+                <div key={r.id} className="rounded-md border border-border bg-muted/50 p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-foreground truncate">{r.title}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[9px] text-muted-foreground">{Math.round(r.score * 100)}%</span>
+                      {r.category && (
+                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary">{r.category}</span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground line-clamp-2">{r.content}</p>
+                  <button
+                    onClick={() => insertPlaybookContent(r.content)}
+                    className="mt-1 flex items-center gap-1 text-[10px] text-primary hover:underline"
+                  >
+                    <Copy className="h-2.5 w-2.5" /> Insert into message
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : playbookQuery && !playbookLoading ? (
+            <p className="text-xs text-muted-foreground text-center py-2">No results found</p>
+          ) : null}
+        </div>
+      )}
+
       {/* Input */}
       <div className="border-t border-border px-4 py-3">
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowPlaybook(!showPlaybook)}
+            className={`h-10 w-10 shrink-0 flex items-center justify-center rounded-lg border transition-colors ${showPlaybook ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground hover:border-primary/50'}`}
+            title="Search Playbook"
+          >
+            <BookOpen className="h-4 w-4" />
+          </button>
           <input
             type="text"
             value={input}

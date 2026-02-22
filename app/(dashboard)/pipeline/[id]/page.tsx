@@ -19,6 +19,7 @@ import { PipelineSubNav } from '@/components/features/pipeline/PipelineSubNav'
 import { DangerZone } from '@/components/features/pipeline/DangerZone'
 import { DeadlineCountdown } from '@/components/features/pipeline/DeadlineCountdown'
 import { VolumeProgress } from '@/components/features/pipeline/VolumeProgress'
+import { InlineEditFields } from '@/components/features/pipeline/InlineEditFields'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 type OpportunityRow = Database['public']['Tables']['opportunities']['Row']
@@ -219,23 +220,30 @@ export default async function WarRoomPage({
             </div>
           )}
 
-          {/* Details Grid */}
+          {/* Details Grid — Inline Editable */}
           <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
               Opportunity Details
             </h2>
+            <InlineEditFields
+              opportunityId={id}
+              canEdit={canEdit}
+              fields={[
+                { label: 'Agency', fieldName: 'agency', value: opp.agency },
+                { label: 'Sub-Agency', fieldName: 'sub_agency', value: opp.sub_agency },
+                { label: 'NAICS Code', fieldName: 'naics_code', value: opp.naics_code },
+                { label: 'Contract Vehicle', fieldName: 'contract_vehicle', value: opp.contract_vehicle },
+                { label: 'Solicitation #', fieldName: 'solicitation_number', value: opp.solicitation_number },
+                { label: 'Incumbent', fieldName: 'incumbent', value: opp.incumbent },
+                { label: 'Place of Performance', fieldName: 'place_of_performance', value: opp.place_of_performance },
+                { label: 'Period of Performance', fieldName: 'period_of_performance', value: opp.period_of_performance },
+                { label: 'Priority', fieldName: 'priority', value: opp.priority },
+              ]}
+            />
+            {/* Non-editable fields */}
             <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-              <DetailField label="Agency" value={opp.agency} />
-              <DetailField label="Sub-Agency" value={opp.sub_agency} />
-              <DetailField label="NAICS Code" value={opp.naics_code} />
-              <DetailField label="Contract Vehicle" value={opp.contract_vehicle} />
-              <DetailField label="Solicitation #" value={opp.solicitation_number} />
-              <DetailField label="Incumbent" value={opp.incumbent} />
               <DetailField label="Recompete" value={opp.is_recompete ? 'Yes' : opp.is_recompete === false ? 'No' : '—'} />
-              <DetailField label="Place of Performance" value={opp.place_of_performance} />
-              <DetailField label="Period of Performance" value={opp.period_of_performance} />
               <DetailField label="Go/No-Go" value={opp.go_no_go} />
-              <DetailField label="Priority" value={opp.priority} />
               <DetailField label="Deal Source" value={opp.deal_source} />
             </dl>
           </div>
