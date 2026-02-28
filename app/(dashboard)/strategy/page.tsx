@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { requireMFA } from '@/lib/rbac/server'
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
@@ -49,6 +50,9 @@ export default async function StrategyPage() {
   if (!hasPermission(role, 'strategy', 'shouldRender')) {
     return null
   }
+
+  // CUI module — enforce MFA (AAL2) per NIST AC-3 / CMMC
+  await requireMFA()
 
   // Fetch win themes
   const { data: themes, error: themesError } = await supabase

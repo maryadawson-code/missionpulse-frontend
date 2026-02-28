@@ -21,6 +21,12 @@ export async function signIn(formData: FormData) {
     return { error: error.message }
   }
 
+  // Check if the user has MFA enrolled and needs to complete a challenge
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2') {
+    redirect('/mfa')
+  }
+
   revalidatePath('/', 'layout')
   redirect('/dashboard')
 }

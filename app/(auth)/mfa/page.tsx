@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Shield, Loader2, Copy, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 
-type MFAStep = 'enroll' | 'verify' | 'recovery'
+type MFAMode = 'loading' | 'challenge' | 'enroll' | 'verify'
 
 export default function MFAPage() {
-  const [step, setStep] = useState<MFAStep>('enroll')
+  const [mode, setMode] = useState<MFAMode>('loading')
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [secret, setSecret] = useState<string | null>(null)
   const [factorId, setFactorId] = useState<string | null>(null)
@@ -19,6 +19,35 @@ export default function MFAPage() {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const supabase = createClient()
+
+  // On mount, check if user already has MFA factors enrolled
+  useEffect(() => {
+    async function checkFactors() {
+      const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+
+      if (data?.currentLevel === 'aal2') {
+        // Already fully authenticated with MFA
+        router.push('/dashboard')
+        return
+      }
+
+      if (data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2') {
+        // Has factors enrolled, needs to complete challenge
+        const { data: factors } = await supabase.auth.mfa.listFactors()
+        const totpFactor = factors?.totp?.[0]
+        if (totpFactor) {
+          setFactorId(totpFactor.id)
+          setMode('challenge')
+          return
+        }
+      }
+
+      // No factors enrolled — show enrollment flow
+      setMode('enroll')
+    }
+
+    checkFactors()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleEnroll() {
     setError(null)
@@ -37,7 +66,7 @@ export default function MFAPage() {
         setQrCode(data.totp.qr_code)
         setSecret(data.totp.secret)
         setFactorId(data.id)
-        setStep('verify')
+        setMode('verify')
       }
     })
   }
@@ -60,7 +89,8 @@ export default function MFAPage() {
       })
 
       if (verifyError) {
-        setError(verifyError.message)
+        setError('Invalid code. Please try again.')
+        setVerifyCode('')
         return
       }
 
@@ -85,8 +115,10 @@ export default function MFAPage() {
             Multi-Factor Authentication
           </h1>
           <p className="mt-1 text-sm text-gray-400">
-            {step === 'enroll' && 'Add an extra layer of security to your account'}
-            {step === 'verify' && 'Scan the QR code with your authenticator app'}
+            {mode === 'loading' && 'Checking your security status...'}
+            {mode === 'challenge' && 'Enter the code from your authenticator app'}
+            {mode === 'enroll' && 'Add an extra layer of security to your account'}
+            {mode === 'verify' && 'Scan the QR code with your authenticator app'}
           </p>
         </div>
 
@@ -96,8 +128,49 @@ export default function MFAPage() {
           </div>
         )}
 
+        {/* Loading */}
+        {mode === 'loading' && (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-[#00E5FA]" />
+          </div>
+        )}
+
+        {/* Challenge — user has MFA enrolled, verify code */}
+        {mode === 'challenge' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Enter 6-digit code
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                autoFocus
+                value={verifyCode}
+                onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+                placeholder="000000"
+                className="w-full rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-center text-xl font-mono tracking-[0.5em] text-white placeholder-gray-600 outline-none focus:border-[#00E5FA]/50"
+              />
+            </div>
+
+            <Button
+              className="w-full"
+              onClick={handleVerify}
+              disabled={isPending || verifyCode.length !== 6}
+            >
+              {isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Verify'
+              )}
+            </Button>
+          </div>
+        )}
+
         {/* Enroll Step */}
-        {step === 'enroll' && (
+        {mode === 'enroll' && (
           <div className="space-y-4">
             <div className="rounded-lg border border-gray-800 bg-gray-900/30 p-4">
               <h3 className="text-sm font-medium text-white mb-2">
@@ -129,10 +202,9 @@ export default function MFAPage() {
           </div>
         )}
 
-        {/* Verify Step */}
-        {step === 'verify' && (
+        {/* Verify Step — after scanning QR */}
+        {mode === 'verify' && (
           <div className="space-y-4">
-            {/* QR Code */}
             {qrCode && (
               <div className="flex justify-center">
                 <div className="rounded-lg bg-white p-3">
@@ -142,7 +214,6 @@ export default function MFAPage() {
               </div>
             )}
 
-            {/* Manual entry key */}
             {secret && (
               <div className="rounded-lg border border-gray-800 bg-gray-900/30 p-3">
                 <p className="text-xs text-gray-400 mb-1">
@@ -166,7 +237,6 @@ export default function MFAPage() {
               </div>
             )}
 
-            {/* Verification code input */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">
                 Enter 6-digit code
@@ -177,6 +247,7 @@ export default function MFAPage() {
                 maxLength={6}
                 value={verifyCode}
                 onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
                 placeholder="000000"
                 className="w-full rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-center text-xl font-mono tracking-[0.5em] text-white placeholder-gray-600 outline-none focus:border-[#00E5FA]/50"
               />
@@ -196,15 +267,17 @@ export default function MFAPage() {
           </div>
         )}
 
-        {/* Skip option for non-CUI roles */}
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="text-xs text-gray-500 hover:text-gray-300"
-          >
-            Skip for now
-          </button>
-        </div>
+        {/* Skip option — only during enrollment, not during challenge */}
+        {(mode === 'enroll' || mode === 'verify') && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="text-xs text-gray-500 hover:text-gray-300"
+            >
+              Skip for now
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

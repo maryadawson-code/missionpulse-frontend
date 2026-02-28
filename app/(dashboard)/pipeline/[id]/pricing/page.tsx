@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { requireMFA } from '@/lib/rbac/server'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
 import { CostVolumeManager } from '@/components/features/pricing/CostVolumeManager'
 import { PricingAI } from '@/components/features/pricing/PricingAI'
@@ -28,6 +29,9 @@ export default async function OpportunityPricingPage({ params }: Props) {
   if (!hasPermission(role, 'pricing', 'shouldRender')) {
     return null
   }
+
+  // CUI module — enforce MFA (AAL2) per NIST AC-3 / CMMC
+  await requireMFA()
 
   const { data: opportunity } = await supabase
     .from('opportunities')

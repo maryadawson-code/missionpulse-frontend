@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { requireMFA } from '@/lib/rbac/server'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
 
 function threatColor(level: string | null): string {
@@ -34,6 +35,9 @@ export default async function BlackhatPage() {
   if (!hasPermission(role, 'blackhat', 'shouldRender')) {
     return null
   }
+
+  // CUI module — enforce MFA (AAL2) per NIST AC-3 / CMMC
+  await requireMFA()
 
   const { data: competitors, error } = await supabase
     .from('competitors')
