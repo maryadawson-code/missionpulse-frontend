@@ -9,45 +9,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// Rate limiting: 5 requests per IP per hour
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
-const RATE_LIMIT_MAX = 5
-
-function getClientIp(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  )
-}
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now()
-  const entry = rateLimitMap.get(ip)
-
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
-    return false
-  }
-
-  entry.count++
-  return entry.count > RATE_LIMIT_MAX
-}
-
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
-// POST — Subscribe
+// POST — Subscribe (rate limiting handled by middleware)
 export async function POST(request: NextRequest) {
-  const ip = getClientIp(request)
-
-  if (isRateLimited(ip)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
-      { status: 429 }
-    )
-  }
-
   let body: { email?: string; source?: string }
   try {
     body = await request.json()
@@ -80,7 +47,7 @@ export async function POST(request: NextRequest) {
           source,
           subscribed_at: new Date().toISOString(),
           unsubscribed_at: null,
-          ip_address: ip,
+          ip_address: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
         },
         { onConflict: 'email' }
       )
