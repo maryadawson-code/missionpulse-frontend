@@ -163,7 +163,7 @@ async function seedUser() {
   // or supabase.auth.admin.createUser. This seeds the profile.
   const { error } = await supabase.from('profiles').upsert({
     id: DEMO_USER_ID,
-    email: 'demo@missionpulse.io',
+    email: 'demo@missionpulse.ai',
     full_name: 'Alex Demo',
     role: 'executive',
     company_id: DEMO_COMPANY_ID,
@@ -248,7 +248,7 @@ async function main() {
 
   console.log('\n✓ Demo environment seeded successfully!')
   console.log('\nDemo credentials:')
-  console.log('  Email: demo@missionpulse.io')
+  console.log('  Email: demo@missionpulse.ai')
   console.log('  (Create auth user in Supabase dashboard with this email)')
   console.log(`  Company ID: ${DEMO_COMPANY_ID}`)
   console.log(`  User ID: ${DEMO_USER_ID}`)

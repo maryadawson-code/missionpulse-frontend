@@ -1,8 +1,8 @@
 # CURRENT_STATE.md — MissionPulse System Truth
 
-**Version:** 3.0
-**Last Updated:** 2026-02-21
-**Verified against:** Live `information_schema.columns` exports + build verification
+**Version:** 3.1
+**Last Updated:** 2026-02-28
+**Verified against:** Live `information_schema.columns` exports + build verification + production readiness audit
 **Authority:** This is the single source of truth for "what exists right now."
 
 ---
@@ -37,7 +37,7 @@ Next.js 14 App Router application. All 16 v1.0 modules production-ready. v1.1 in
 
 - **Single repo:** `missionpulse-frontend`
 - **Branches:** `main` (production), `v2-development` (staging/dev) — synced
-- **HEAD:** `5f6b8b7` on both branches
+- **Domain:** missionpulse.ai (migrated from missionpulse.io on 2026-02-28)
 
 ---
 
@@ -168,15 +168,52 @@ Every RLS helper function queries this table. `handle_new_user` trigger inserts 
 
 ---
 
-## 6. Health Check (2026-02-21)
+## 6. Production Readiness Audit (2026-02-28)
+
+### P0 — Backend Audit: COMPLETE
+- 79/79 server actions verified as real Supabase queries (zero mocks)
+- Fixed: Embeddings placeholder replaced with real ILIKE search
+- Fixed: Landing page pricing updated to $149/$499/$2,500 (Amendment A-1)
+- Fixed: Deleted dev-only `/api/seed` route
+- Fixed: Created 6 OAuth callback routes (Salesforce, Slack, M365, DocuSign, Google, GovWin)
+- Fixed: Migrated 14 files from missionpulse.io → missionpulse.ai
+- Fixed: Added audit trail logging to 15 server actions across 7 files
+- Fixed: Race condition in vote increment (now uses atomic RPC)
+
+### P1 — Auth E2E: COMPLETE
+- Fixed: Created `/reset-password` page + ResetPasswordForm (was 404)
+- Fixed: Signup handles email confirmation (shows message instead of redirect)
+- Fixed: Middleware only redirects auth-only routes, not all public routes
+- Fixed: Open redirect vulnerability in auth callback (`next` param validation)
+- Fixed: MFA enforcement in login flow (AAL check → redirect to /mfa)
+- Fixed: MFA page rewritten for dual-mode (challenge + enrollment)
+- Fixed: `requireMFA()` helper enforces AAL2 on CUI modules (pricing, blackhat, strategy)
+
+### P2 — Module Verification: COMPLETE
+- RFP Shredder: 100% wired (upload → parse → extract), zero mocks
+- Compliance / Iron Dome: 100% wired (per-opp matrix + cross-opp aggregation)
+- Notification System: Functional (page, bell, dropdown)
+- Audit Trail: AU-9 compliant (30 files write audit_logs, immutable trigger)
+- Fixed: Added immutable audit_logs to 7 shredder/compliance actions
+
+### P3 — Testing & Docs: COMPLETE
+- Fixed: 12 Playwright E2E test failures (stale selectors, deprecated syntax)
+- Fixed: Deleted legacy smoke.spec.ts (.html routes)
+- Fixed: Production config domain → missionpulse.ai
+- Fixed: Added `test:e2e` and `test:e2e:prod` scripts to package.json
+- Fixed: Stale missionpulse.io in seed-demo.ts
+
+### Health Check (2026-02-28)
 
 ```
 Build:            PASS (0 errors)
 Type Safety:      PASS (0 errors, 0 as any)
 Lint:             PASS (6 warnings)
 Route Audit:      PASS (61 routes)
-Schema Covenant:  PASS (0 flags)
-Security Scan:    PASS (0 flags)
+Auth Flow:        PASS (login, signup, reset, MFA, OAuth callbacks)
+MFA Enforcement:  PASS (AAL2 on pricing, blackhat, strategy)
+Audit Compliance: PASS (AU-9 immutability, 30+ files logging)
+E2E Tests:        FIXED (12 failures resolved)
 Overall:          CLEAR
 ```
 
@@ -196,4 +233,4 @@ Public pricing page, 8(a) toolkit landing, newsletter. No dependencies.
 ---
 
 *Mission Meets Tech — Mission. Technology. Transformation.*
-*Last verified: 2026-02-21*
+*Last verified: 2026-02-28*

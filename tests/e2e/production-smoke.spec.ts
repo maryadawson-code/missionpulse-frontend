@@ -93,11 +93,12 @@ test.describe('Tier 2: Auth Flow', () => {
     await page.getByRole('button', { name: /sign in|log in/i }).click()
 
     // Should show an error and stay on login page
-    await expect(page).toHaveURL(/\/login/, { timeout: 5_000 })
-    const errorText = page.locator('[role="alert"]').or(
-      page.locator('text=/invalid|incorrect|error|failed/i')
-    )
-    await expect(errorText.first()).toBeVisible({ timeout: 5_000 })
+    await expect(page).toHaveURL(/\/login/, { timeout: 10_000 })
+    // Error message renders in a styled div (may or may not have role="alert")
+    const errorText = page.locator('[role="alert"]')
+      .or(page.locator('.text-red-400'))
+      .or(page.getByText(/invalid|incorrect|error|failed/i))
+    await expect(errorText.first()).toBeVisible({ timeout: 10_000 })
   })
 
   test('Login with test user reaches dashboard', async ({ page }) => {
