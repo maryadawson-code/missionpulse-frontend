@@ -1,6 +1,7 @@
 // filepath: app/(dashboard)/pipeline/page.tsx
 
 import type { Metadata } from 'next'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -8,10 +9,27 @@ export const metadata: Metadata = {
 }
 import { resolveRole, hasPermission, isInternalRole } from '@/lib/rbac/config'
 import { PipelineTable } from '@/components/modules/PipelineTable'
-import { KanbanView } from './KanbanView'
 import { ViewToggle } from './ViewToggle'
 import { CreateOpportunityButton } from './CreateOpportunityModal'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { Opportunity } from '@/lib/types'
+
+const KanbanView = dynamic(
+  () => import('./KanbanView').then((m) => m.KanbanView),
+  {
+    loading: () => (
+      <div className="grid grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="space-y-3">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ))}
+      </div>
+    ),
+  }
+)
 
 export default async function PipelinePage({
   searchParams,

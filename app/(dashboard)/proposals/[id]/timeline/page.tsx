@@ -10,6 +10,7 @@
  */
 
 import { redirect, notFound } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
   CalendarDays,
   CheckCircle2,
@@ -21,8 +22,15 @@ import {
 import { createClient } from '@/lib/supabase/server'
 import { createSyncClient } from '@/lib/supabase/sync-client'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
-import { GanttTimeline } from '@/components/features/proposals/GanttTimeline'
 import { MilestoneBar } from '@/components/features/proposals/MilestoneBar'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const GanttTimeline = dynamic(
+  () => import('@/components/features/proposals/GanttTimeline').then((m) => m.GanttTimeline),
+  {
+    loading: () => <Skeleton className="h-48 w-full" />,
+  }
+)
 import {
   sortMilestones,
   formatDate,

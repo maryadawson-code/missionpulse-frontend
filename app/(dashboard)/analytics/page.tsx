@@ -1,9 +1,29 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
-import { AnalyticsDashboard } from '@/components/features/analytics/AnalyticsDashboard'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const AnalyticsDashboard = dynamic(
+  () => import('@/components/features/analytics/AnalyticsDashboard').then((m) => m.AnalyticsDashboard),
+  {
+    loading: () => (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    ),
+  }
+)
 
 export const metadata: Metadata = {
   title: 'Analytics — MissionPulse',

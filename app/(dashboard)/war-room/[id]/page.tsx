@@ -1,11 +1,31 @@
 // filepath: app/(dashboard)/war-room/[id]/page.tsx
 import { notFound } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
 import { PwinGauge } from '@/components/modules/WarRoom/PwinGauge'
 import { WarRoomTabs } from '@/components/modules/WarRoom/WarRoomTabs'
 import { ColorTeamFeedback } from '@/components/features/proposals/ColorTeamFeedback'
-import { ActivityLog } from '@/components/features/shared/ActivityLog'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const ActivityLog = dynamic(
+  () => import('@/components/features/shared/ActivityLog').then((m) => m.ActivityLog),
+  {
+    loading: () => (
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex items-start gap-3">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <div className="flex-1 space-y-1">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+    ),
+  }
+)
 
 interface WarRoomPageProps {
   params: Promise<{ id: string }>

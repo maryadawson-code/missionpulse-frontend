@@ -9,13 +9,26 @@
  * v1.3 Sprint 31 T-31.2 — Work Breakdown Structure & Section Assignments
  */
 import { redirect, notFound } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { createSyncClient } from '@/lib/supabase/sync-client'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
-import { WorkBreakdownMatrix } from '@/components/features/proposals/WorkBreakdownMatrix'
 import { TeamRollup } from '@/components/features/proposals/TeamRollup'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { SectionAssignment } from '@/lib/types/sync'
+
+const WorkBreakdownMatrix = dynamic(
+  () => import('@/components/features/proposals/WorkBreakdownMatrix').then((m) => m.WorkBreakdownMatrix),
+  {
+    loading: () => (
+      <div className="space-y-3">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    ),
+  }
+)
 
 // ─── Summary Card ────────────────────────────────────────────────
 
