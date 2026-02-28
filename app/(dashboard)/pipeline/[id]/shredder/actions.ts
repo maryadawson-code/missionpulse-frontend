@@ -158,6 +158,14 @@ export async function deleteRfpDocument(
     },
   })
 
+  await supabase.from('audit_logs').insert({
+    action: 'delete_rfp',
+    user_id: user.id,
+    entity_type: 'rfp_document',
+    entity_id: documentId,
+    details: { opportunity_id: opportunityId, file_name: doc?.file_name },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/shredder`)
   return { success: true }
 }

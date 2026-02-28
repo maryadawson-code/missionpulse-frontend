@@ -107,6 +107,14 @@ export async function updateRequirement(
     },
   })
 
+  await supabase.from('audit_logs').insert({
+    action: 'update_requirement',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: requirementId,
+    details: { opportunity_id: opportunityId, updates },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/shredder/requirements`)
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }
@@ -138,6 +146,14 @@ export async function deleteRequirement(
       entity_id: requirementId,
       opportunity_id: opportunityId,
     },
+  })
+
+  await supabase.from('audit_logs').insert({
+    action: 'delete_requirement',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: requirementId,
+    details: { opportunity_id: opportunityId },
   })
 
   revalidatePath(`/pipeline/${opportunityId}/shredder/requirements`)
@@ -177,6 +193,14 @@ export async function bulkUpdateRequirements(
       count: requirementIds.length,
       updates,
     },
+  })
+
+  await supabase.from('audit_logs').insert({
+    action: 'bulk_update_requirements',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: opportunityId,
+    details: { opportunity_id: opportunityId, count: requirementIds.length, updates },
   })
 
   revalidatePath(`/pipeline/${opportunityId}/shredder/requirements`)

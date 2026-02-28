@@ -45,6 +45,14 @@ export async function updateComplianceStatus(
     },
   })
 
+  await supabase.from('audit_logs').insert({
+    action: 'update_compliance_status',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: requirementId,
+    details: { opportunity_id: opportunityId, new_status: status },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }
 }
@@ -82,6 +90,14 @@ export async function assignComplianceReviewer(
     },
   })
 
+  await supabase.from('audit_logs').insert({
+    action: 'assign_compliance_reviewer',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: requirementId,
+    details: { opportunity_id: opportunityId, assigned_to: assignedTo },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }
 }
@@ -116,6 +132,14 @@ export async function updateComplianceEvidence(
       entity_id: requirementId,
       opportunity_id: opportunityId,
     },
+  })
+
+  await supabase.from('audit_logs').insert({
+    action: 'update_compliance_evidence',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: requirementId,
+    details: { opportunity_id: opportunityId },
   })
 
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
