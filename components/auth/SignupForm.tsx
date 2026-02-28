@@ -7,6 +7,7 @@ import { signUp } from '@/lib/actions/auth'
 export default function SignupForm() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [confirmEmail, setConfirmEmail] = useState(false)
 
   async function handleSubmit(formData: FormData) {
     setLoading(true)
@@ -15,7 +16,23 @@ export default function SignupForm() {
     if (result?.error) {
       setError(result.error)
       setLoading(false)
+    } else if (result?.confirmEmail) {
+      setConfirmEmail(true)
+      setLoading(false)
     }
+  }
+
+  if (confirmEmail) {
+    return (
+      <div className="space-y-4 text-center">
+        <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-4 text-sm text-green-400">
+          Check your email to confirm your account. You can close this tab.
+        </div>
+        <Link href="/login" className="text-sm text-[#00E5FA] hover:text-[#00E5FA]/80">
+          Back to Sign In
+        </Link>
+      </div>
+    )
   }
 
   return (

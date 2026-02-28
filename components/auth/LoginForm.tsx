@@ -4,8 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signIn } from '@/lib/actions/auth'
 
-export default function LoginForm() {
-  const [error, setError] = useState<string | null>(null)
+export default function LoginForm({ callbackError }: { callbackError?: string }) {
+  const [error, setError] = useState<string | null>(callbackError ?? null)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(formData: FormData) {

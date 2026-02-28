@@ -8,7 +8,10 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/api/auth/callback', '/api/health', '/plans', '/8a-toolkit', '/api/newsletter', '/robots.txt', '/sitemap.xml']
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password', '/api/auth/callback', '/api/health', '/plans', '/8a-toolkit', '/api/newsletter', '/robots.txt', '/sitemap.xml', '/mfa']
+
+// Auth pages that authenticated users should be redirected away from
+const AUTH_ONLY_ROUTES = ['/login', '/signup', '/forgot-password']
 
 // Simple in-memory rate limiter for auth endpoints
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -108,8 +111,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Authenticated user trying to access auth pages → send to dashboard
-  if (user && isPublicRoute && pathname !== '/api/auth/callback') {
+  // Authenticated user trying to access auth-only pages → send to dashboard
+  const isAuthOnlyRoute = AUTH_ONLY_ROUTES.some((route) => pathname.startsWith(route))
+  if (user && isAuthOnlyRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
