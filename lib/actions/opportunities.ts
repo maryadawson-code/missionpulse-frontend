@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { logNotification } from '@/lib/utils/notifications'
 import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 import { createLogger } from '@/lib/logging/logger'
+import { sanitizePlainText } from '@/lib/security/sanitize'
 import type { OpportunityInsert, OpportunityUpdate } from '@/lib/types/opportunities'
 
 const log = createLogger('opportunities')
@@ -97,7 +98,7 @@ export async function createOpportunity(
   }
 
   const insert: OpportunityInsert = {
-    title: title.trim(),
+    title: sanitizePlainText(title.trim()),
     agency: formData.get('agency') as string | null,
     sub_agency: formData.get('sub_agency') as string | null,
     ceiling,
@@ -190,7 +191,7 @@ export async function updateOpportunity(
   const pwin = pwinRaw ? Number(pwinRaw) : 50
 
   const update: OpportunityUpdate = {
-    title: String(title).trim(),
+    title: sanitizePlainText(String(title).trim()),
     agency: formData.get('agency') as string | null,
     sub_agency: formData.get('sub_agency') as string | null,
     ceiling,
@@ -382,8 +383,8 @@ export async function updateOpportunityField(
     return { success: false, error: `Field "${field}" is not editable` }
   }
 
-  // Coerce value types
-  let dbValue: string | number | null = value.trim() || null
+  // Sanitize and coerce value types
+  let dbValue: string | number | null = sanitizePlainText(value.trim()) || null
   if ((field === 'ceiling' || field === 'pwin') && dbValue !== null) {
     const num = Number(String(dbValue).replace(/[,$]/g, ''))
     if (isNaN(num)) return { success: false, error: `${field} must be a number` }

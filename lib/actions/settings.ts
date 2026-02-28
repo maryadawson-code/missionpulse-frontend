@@ -4,6 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logging/logger'
+import { sanitizePlainText } from '@/lib/security/sanitize'
 
 const log = createLogger('settings')
 
@@ -32,8 +33,8 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const { error } = await supabase
     .from('profiles')
     .update({
-      full_name: fullName?.trim() || null,
-      company: company?.trim() || null,
+      full_name: fullName ? sanitizePlainText(fullName.trim()) : null,
+      company: company ? sanitizePlainText(company.trim()) : null,
       phone: phone?.trim() || null,
       avatar_url: avatarUrl?.trim() || null,
       updated_at: new Date().toISOString(),
