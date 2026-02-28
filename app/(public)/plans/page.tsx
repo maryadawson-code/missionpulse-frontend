@@ -9,10 +9,10 @@ export const metadata: Metadata = {
     title: 'MissionPulse Pricing — Plans Starting at $149/mo',
     description:
       'Three tiers for every GovCon firm. Starter, Professional, and Enterprise. 17% annual discount. Below federal micro-purchase threshold.',
-    url: 'https://missionpulse.io/plans',
+    url: 'https://missionpulse.ai/plans',
   },
   alternates: {
-    canonical: 'https://missionpulse.io/plans',
+    canonical: 'https://missionpulse.ai/plans',
   },
 }
 
@@ -51,7 +51,7 @@ export default function PricingPage() {
             )}
           </div>
           <p className="mt-6 text-sm text-gray-500">
-            Need a custom plan? <a href="mailto:sales@missionpulse.io" className="text-[#00E5FA] hover:underline">Contact our sales team</a>.
+            Need a custom plan? <a href="mailto:sales@missionpulse.ai" className="text-[#00E5FA] hover:underline">Contact our sales team</a>.
           </p>
         </div>
       </div>

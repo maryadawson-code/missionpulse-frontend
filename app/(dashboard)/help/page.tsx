@@ -119,7 +119,7 @@ export default async function HelpPage() {
         <h2 className="text-sm font-semibold text-white">Need more help?</h2>
         <p className="mt-1 text-xs text-gray-400">
           Contact support at{' '}
-          <span className="text-[#00E5FA]">support@missionpulse.io</span> or
+          <span className="text-[#00E5FA]">support@missionpulse.ai</span> or
           visit our{' '}
           <Link href="/settings" className="text-[#00E5FA] hover:underline">
             Settings

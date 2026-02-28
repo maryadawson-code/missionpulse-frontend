@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     title: 'MissionPulse — Win More Federal Contracts',
     description:
       'AI-powered proposal management platform built for government contractors. From capture to submission.',
-    url: 'https://missionpulse.io',
+    url: 'https://missionpulse.ai',
     siteName: 'MissionPulse',
     type: 'website',
   },
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     follow: true,
   },
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://missionpulse.io'
+    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://missionpulse.ai'
   ),
 }
 

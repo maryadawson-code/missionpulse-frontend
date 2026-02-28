@@ -3,7 +3,7 @@
  */
 import type { MetadataRoute } from 'next'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://missionpulse.io'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://missionpulse.ai'
 
 export default function robots(): MetadataRoute.Robots {
   return {

@@ -6,7 +6,7 @@ import { resolveRole, hasPermission, getAllowedAgents } from '@/lib/rbac/config'
 export const metadata: Metadata = {
   title: 'AI Chat — MissionPulse',
 }
-import { ChatPanel } from '@/components/features/ai-chat/ChatPanel'
+import { SmartChatInterface } from '@/components/features/ai-chat/SmartChatInterface'
 import { TokenBudgetBanner } from '@/components/features/ai/TokenBudgetBanner'
 
 export default async function AIChatPage() {
@@ -18,7 +18,7 @@ export default async function AIChatPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, full_name')
     .eq('id', user.id)
     .single()
 
@@ -50,10 +50,10 @@ export default async function AIChatPage() {
     existingMessages = messages ?? []
   }
 
-  // Fetch opportunities for context picker
+  // Fetch opportunities for context picker (include phase for smart routing)
   const { data: opportunities } = await supabase
     .from('opportunities')
-    .select('id, title, agency')
+    .select('id, title, agency, phase')
     .order('updated_at', { ascending: false })
     .limit(50)
 
@@ -104,8 +104,7 @@ export default async function AIChatPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">AI Assistant</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Ask questions about your pipeline, compliance, strategy, or general
-          GovCon topics.
+          Just type naturally — your message is automatically routed to the right agent.
         </p>
       </div>
 
@@ -117,15 +116,18 @@ export default async function AIChatPage() {
         gracePeriod={false}
       />
 
-      <ChatPanel
+      <SmartChatInterface
         existingMessages={existingMessages}
         existingSessionId={latestSessionId}
         opportunities={(opportunities ?? []).map((o) => ({
           id: o.id,
           title: o.title,
           agency: o.agency,
+          phase: o.phase ?? null,
         }))}
         allowedAgents={allowedAgents}
+        userRole={role}
+        userName={profile?.full_name ?? user.email?.split('@')[0] ?? 'there'}
       />
     </div>
   )
