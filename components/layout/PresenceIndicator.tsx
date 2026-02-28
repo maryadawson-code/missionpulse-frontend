@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { Wifi, WifiOff, Users } from 'lucide-react'
 import {
   joinPresenceChannel,
@@ -72,9 +73,11 @@ export function PresenceIndicator({
                 title={u.userName}
               >
                 {u.avatarUrl ? (
-                  <img
+                  <Image
                     src={u.avatarUrl}
                     alt={u.userName}
+                    width={20}
+                    height={20}
                     className="h-5 w-5 rounded-full object-cover"
                   />
                 ) : (
@@ -125,9 +128,11 @@ export function PresenceIndicator({
                     <div className="relative">
                       <div className="h-6 w-6 rounded-full bg-gray-700 flex items-center justify-center">
                         {u.avatarUrl ? (
-                          <img
+                          <Image
                             src={u.avatarUrl}
                             alt={u.userName}
+                            width={24}
+                            height={24}
                             className="h-6 w-6 rounded-full object-cover"
                           />
                         ) : (

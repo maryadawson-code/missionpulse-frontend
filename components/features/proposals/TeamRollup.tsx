@@ -10,6 +10,7 @@
  * v1.3 Sprint 31 T-31.2 — Work Breakdown Structure
  */
 
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -159,9 +160,11 @@ export function TeamRollup({ assignments, teamMembers, sections }: TeamRollupPro
             {/* Header: avatar + name */}
             <div className="flex items-center gap-3">
               {summary.member.avatar_url ? (
-                <img
+                <Image
                   src={summary.member.avatar_url}
                   alt={summary.member.full_name ?? summary.member.email}
+                  width={36}
+                  height={36}
                   className="h-9 w-9 rounded-full object-cover"
                 />
               ) : (
