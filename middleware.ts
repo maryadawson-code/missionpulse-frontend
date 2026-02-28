@@ -21,6 +21,7 @@ import {
   isAllowlisted,
 } from '@/lib/security/rate-limiter'
 import { createLogger } from '@/lib/logging/logger'
+import { checkBruteForce } from '@/lib/security/brute-force'
 
 const log = createLogger('middleware')
 
@@ -57,6 +58,35 @@ export async function middleware(request: NextRequest) {
       }
     }
   }
+  // Brute force protection for auth endpoints
+  if (pathname === '/login' || pathname === '/signup') {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    // Extract email from form body on POST (brute force only applies to login attempts)
+    if (request.method === 'POST') {
+      try {
+        const cloned = request.clone()
+        const formData = await cloned.formData().catch(() => null)
+        const email = formData?.get('email')?.toString() ?? ''
+        if (email) {
+          const bf = await checkBruteForce(ip, email)
+          if (!bf.allowed) {
+            log.warn('Brute force block', { ip, reason: bf.reason })
+            return NextResponse.json(
+              { error: 'Too many failed attempts. Please try again later.' },
+              { status: 429, headers: bf.lockoutExpiresAt ? { 'Retry-After': String(bf.lockoutExpiresAt - Math.floor(Date.now() / 1000)) } : {} }
+            )
+          }
+          // Progressive delay
+          if (bf.delayMs && bf.delayMs > 0) {
+            await new Promise((r) => setTimeout(r, bf.delayMs))
+          }
+        }
+      } catch {
+        // Non-blocking: form parsing may fail for non-form requests
+      }
+    }
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { createLogger } from '@/lib/logging/logger'
+import { adminUnlockAccount } from '@/lib/security/brute-force'
 
 const log = createLogger('admin')
 
@@ -69,5 +70,45 @@ export async function updateUserRole(
   })
 
   revalidatePath('/admin')
+  return { success: true }
+}
+
+/**
+ * Unlock a brute-force-locked user account. Admin-only.
+ */
+export async function unlockUserAccount(
+  email: string
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('role, full_name')
+    .eq('id', user.id)
+    .single()
+
+  const callerRole = resolveRole(callerProfile?.role)
+  if (!hasPermission(callerRole, 'admin', 'canEdit')) {
+    return { success: false, error: 'Insufficient permissions' }
+  }
+
+  const unlocked = await adminUnlockAccount(email)
+  if (!unlocked) {
+    return { success: false, error: 'Failed to unlock account (Redis unavailable)' }
+  }
+
+  await supabase.from('audit_logs').insert({
+    action: 'UNLOCK_ACCOUNT',
+    entity_type: 'profile',
+    user_id: user.id,
+    details: { unlocked_email: email, unlocked_by: callerProfile?.full_name },
+  })
+
+  log.info('Account unlocked by admin', { admin: user.id })
   return { success: true }
 }
