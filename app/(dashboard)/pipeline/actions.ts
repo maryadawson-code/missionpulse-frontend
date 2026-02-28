@@ -65,7 +65,16 @@ export async function actionCreateOpportunity(
     return { success: false, error: error.message }
   }
 
-  // Log activity (activity_log table — schema: action, user_name, user_role, details, ip_address)
+  // Immutable audit log (AU-9)
+  await supabase.from('audit_logs').insert({
+    action: 'CREATE',
+    entity_type: 'opportunity',
+    entity_id: data.id,
+    user_id: user.id,
+    details: { title: insertData.title },
+  })
+
+  // Activity log (user-visible)
   const { data: actorProfile } = await supabase
     .from('profiles')
     .select('full_name, role')
@@ -130,7 +139,16 @@ export async function actionUpdateOpportunity(
     return { success: false, error: error.message }
   }
 
-  // Log activity
+  // Immutable audit log (AU-9)
+  await supabase.from('audit_logs').insert({
+    action: 'UPDATE',
+    entity_type: 'opportunity',
+    entity_id: opportunityId,
+    user_id: user.id,
+    details: { title: updateData.title },
+  })
+
+  // Activity log (user-visible)
   const { data: actorProfile } = await supabase
     .from('profiles')
     .select('full_name, role')
@@ -181,7 +199,16 @@ export async function actionDeleteOpportunity(
     return { success: false, error: error.message }
   }
 
-  // Log activity
+  // Immutable audit log (AU-9)
+  await supabase.from('audit_logs').insert({
+    action: 'DELETE',
+    entity_type: 'opportunity',
+    entity_id: opportunityId,
+    user_id: user.id,
+    details: { title: existing?.title ?? 'Unknown' },
+  })
+
+  // Activity log (user-visible)
   const { data: actorProfile } = await supabase
     .from('profiles')
     .select('full_name, role')
@@ -256,7 +283,16 @@ export async function actionCreateOpportunityTyped(
     return { success: false, error: error.message }
   }
 
-  // Log activity
+  // Immutable audit log (AU-9)
+  await supabase.from('audit_logs').insert({
+    action: 'CREATE',
+    entity_type: 'opportunity',
+    entity_id: inserted.id,
+    user_id: user.id,
+    details: { title: data.title },
+  })
+
+  // Activity log (user-visible)
   const { data: actorProfile } = await supabase
     .from('profiles')
     .select('full_name, role')

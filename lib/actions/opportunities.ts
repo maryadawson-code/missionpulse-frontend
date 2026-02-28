@@ -398,6 +398,13 @@ export async function updateOpportunityField(
     details: { field, new_value: dbValue },
   })
 
+  await supabase.from('activity_log').insert({
+    action: 'updated_opportunity_field',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
+  })
+
   revalidatePath(`/pipeline/${id}`)
   revalidatePath('/pipeline')
   return { success: true, id }
