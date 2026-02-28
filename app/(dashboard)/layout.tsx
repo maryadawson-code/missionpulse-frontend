@@ -19,6 +19,7 @@ import { RoleProvider } from '@/lib/rbac/RoleContext'
 import { SessionTimeoutGuard } from '@/components/layout/SessionTimeoutGuard'
 import { GlobalSearch } from '@/components/layout/GlobalSearch'
 import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
+import { SkipNav } from '@/components/layout/SkipNav'
 import type { ModulePermission } from '@/lib/types'
 
 
@@ -122,6 +123,7 @@ export default async function DashboardLayout({
 
   return (
     <RoleProvider value={roleContextValue}>
+      <SkipNav />
       <SessionTimeoutGuard timeoutSeconds={sessionTimeout} />
       <GlobalSearch />
       <KeyboardShortcuts />
@@ -130,14 +132,14 @@ export default async function DashboardLayout({
         {(isExternal || forceCUI) && <PartnerWatermark companyName={companyName} />}
 
         {/* Sidebar — desktop: always visible; mobile: hidden */}
-        <div className="hidden md:flex">
+        <aside className="hidden md:flex" aria-label="Main navigation">
           <Sidebar
             permissions={permissions}
             userDisplayName={profile?.full_name ?? user.email ?? null}
             userRole={userRole}
             unreadNotifications={unreadNotifications}
           />
-        </div>
+        </aside>
 
         {/* Mobile nav drawer (hidden on desktop) */}
         <MobileNav>
@@ -153,7 +155,7 @@ export default async function DashboardLayout({
         <div className="flex flex-1 flex-col overflow-hidden">
           <DashboardHeader userEmail={user.email ?? null} notifications={headerNotifications} />
 
-          <main className="flex-1 overflow-y-auto p-6">
+          <main id="main-content" className="flex-1 overflow-y-auto p-6">
             {/* Global CUI banner for forceCUIWatermark roles */}
             {cuiMarking && <CUIBanner marking={cuiMarking} className="mb-4" />}
             {children}
