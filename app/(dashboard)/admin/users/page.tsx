@@ -21,18 +21,14 @@ export default async function AdminUsersPage() {
     redirect('/dashboard')
   }
 
-  const { data: users } = await supabase
-    .from('profiles')
-    .select(
-      'id, full_name, email, role, company, status, last_login, created_at'
-    )
-    .order('created_at', { ascending: false })
+  // Parallel fetch: users + invitations (independent after RBAC gate)
+  const [usersResult, invitationsResult] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, email, role, company, status, last_login, created_at').order('created_at', { ascending: false }),
+    supabase.from('user_invitations').select('id, email, full_name, role, status, created_at').order('created_at', { ascending: false }).limit(20),
+  ])
 
-  const { data: invitations } = await supabase
-    .from('user_invitations')
-    .select('id, email, full_name, role, status, created_at')
-    .order('created_at', { ascending: false })
-    .limit(20)
+  const users = usersResult.data
+  const invitations = invitationsResult.data
 
   return (
     <div className="space-y-6">

@@ -141,14 +141,38 @@ export default async function DashboardPage() {
     }
   }
 
-  // Fetch widget visibility preferences
-  const { data: widgetRows } = await supabase
-    .from('dashboard_widgets')
-    .select('widget_type, is_visible')
-    .eq('user_id', user?.id ?? '')
+  // Parallel fetch: widgets, opportunities, activity, counts, assignments, sections
+  // All are independent after RBAC gate — run them all at once
+  const [
+    widgetResult,
+    oppResult,
+    activityResult,
+    countSectionsInReview,
+    countComplianceGaps,
+    countClausesNeedReview,
+    countDocsInReview,
+    countUnreadNotifications,
+    countComplianceTotal,
+    countComplianceCompliant,
+    assignmentResult,
+    sectionResult,
+  ] = await Promise.all([
+    supabase.from('dashboard_widgets').select('widget_type, is_visible').eq('user_id', user?.id ?? ''),
+    supabase.from('opportunities').select('*').order('due_date', { ascending: true }),
+    getRecentActivity(10).catch(() => ({ data: [] as Awaited<ReturnType<typeof getRecentActivity>>['data'] })),
+    supabase.from('proposal_sections').select('id', { count: 'exact', head: true }).in('status', ['pink_review', 'green_review', 'red_review']),
+    supabase.from('compliance_requirements').select('id', { count: 'exact', head: true }).eq('status', 'Addressed'),
+    supabase.from('contract_clauses').select('id', { count: 'exact', head: true }).eq('compliance_status', 'Review Needed'),
+    supabase.from('documents').select('id', { count: 'exact', head: true }).eq('status', 'in_review'),
+    supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('is_read', false).eq('is_dismissed', false),
+    supabase.from('opportunity_compliance').select('id', { count: 'exact', head: true }),
+    supabase.from('opportunity_compliance').select('id', { count: 'exact', head: true }).eq('status', 'compliant'),
+    supabase.from('opportunity_assignments').select('assignee_name, opportunity_id'),
+    supabase.from('proposal_sections').select('writer_id, status'),
+  ])
 
   const widgetVisibility = new Map<string, boolean>()
-  for (const w of widgetRows ?? []) {
+  for (const w of widgetResult.data ?? []) {
     widgetVisibility.set(w.widget_type, w.is_visible ?? true)
   }
   const isVisible = (type: string) => widgetVisibility.get(type) ?? true
@@ -157,55 +181,25 @@ export default async function DashboardPage() {
     is_visible: isVisible(d.widget_type),
   }))
 
-  // Fetch all opportunities for the user's company (RLS enforces tenant isolation)
-  const { data: opportunities, error } = await supabase
-    .from('opportunities')
-    .select('*')
-    .order('due_date', { ascending: true })
+  const opps: Opportunity[] = oppResult.data ?? []
+  const error = oppResult.error
+  const activityItems = activityResult.data ?? []
 
-  const opps: Opportunity[] = opportunities ?? []
-
-  // Fetch recent activity for feed
-  let activityItems: Awaited<ReturnType<typeof getRecentActivity>>['data'] = []
-  try {
-    const result = await getRecentActivity(10)
-    activityItems = result.data ?? []
-  } catch {
-    // Non-critical — continue without activity feed
-  }
-
-  // ─── Module Summary Counts ─────────────────────────────────
-  const [
-    { count: sectionsInReview },
-    { count: complianceGaps },
-    { count: clausesNeedReview },
-    { count: docsInReview },
-    { count: unreadNotifications },
-    { count: complianceTotal },
-    { count: complianceCompliant },
-  ] = await Promise.all([
-    supabase.from('proposal_sections').select('id', { count: 'exact', head: true }).in('status', ['pink_review', 'green_review', 'red_review']),
-    supabase.from('compliance_requirements').select('id', { count: 'exact', head: true }).eq('status', 'Addressed'),
-    supabase.from('contract_clauses').select('id', { count: 'exact', head: true }).eq('compliance_status', 'Review Needed'),
-    supabase.from('documents').select('id', { count: 'exact', head: true }).eq('status', 'in_review'),
-    supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('is_read', false).eq('is_dismissed', false),
-    supabase.from('opportunity_compliance').select('id', { count: 'exact', head: true }),
-    supabase.from('opportunity_compliance').select('id', { count: 'exact', head: true }).eq('status', 'compliant'),
-  ])
+  const sectionsInReview = countSectionsInReview.count
+  const complianceGaps = countComplianceGaps.count
+  const clausesNeedReview = countClausesNeedReview.count
+  const docsInReview = countDocsInReview.count
+  const unreadNotifications = countUnreadNotifications.count
+  const complianceTotal = countComplianceTotal.count
+  const complianceCompliant = countComplianceCompliant.count
 
   const complianceHealthPct =
     (complianceTotal ?? 0) > 0
       ? Math.round(((complianceCompliant ?? 0) / (complianceTotal ?? 1)) * 100)
       : 0
 
-  // Team workload data (for operations dashboard)
-  const { data: assignments } = await supabase
-    .from('opportunity_assignments')
-    .select('assignee_name, opportunity_id')
-
-  const { data: allSections } = await supabase
-    .from('proposal_sections')
-    .select('writer_id, status')
+  const assignments = assignmentResult.data
+  const allSections = sectionResult.data
 
   const assignmentMap = new Map<string, Set<string>>()
   for (const a of assignments ?? []) {

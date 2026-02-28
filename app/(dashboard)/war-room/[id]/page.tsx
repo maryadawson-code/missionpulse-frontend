@@ -41,24 +41,16 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
   } = await supabase.auth.getUser()
   if (!user) notFound()
 
-  // Fetch opportunity (RLS-enforced)
-  const { data: opportunity, error } = await supabase
-    .from('opportunities')
-    .select('*')
-    .eq('id', id)
-    .single()
+  // Parallel fetch: opportunity + user profile (both independent, depend only on id/user.id)
+  const [oppResult, profileResult] = await Promise.all([
+    supabase.from('opportunities').select('*').eq('id', id).single(),
+    supabase.from('profiles').select('role, email').eq('id', user.id).single(),
+  ])
 
-  if (error || !opportunity) {
-    notFound()
-  }
+  const opportunity = oppResult.data
+  if (oppResult.error || !opportunity) notFound()
 
-  // Fetch user profile for RBAC
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, email')
-    .eq('id', user.id)
-    .single()
-
+  const profile = profileResult.data
   const userRole = profile?.role ?? 'viewer'
   const role = resolveRole(userRole)
   if (!hasPermission(role, 'pipeline', 'canView')) return null
@@ -75,11 +67,16 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
   ]
   const canAccessSensitive = sensitiveRoles.includes(userRole)
 
-  // Fetch team assignments (schema: id, role, assignee_email, assignee_name)
-  const { data: rawAssignments } = await supabase
-    .from('opportunity_assignments')
-    .select('id, role, assignee_email, assignee_name')
-    .eq('opportunity_id', id)
+  // Parallel fetch: assignments, volumes, color reviews (all independent, depend only on opp id)
+  const [assignmentsResult, volumesResult, reviewsResult] = await Promise.all([
+    supabase.from('opportunity_assignments').select('id, role, assignee_email, assignee_name').eq('opportunity_id', id),
+    supabase.from('proposal_volumes').select('id, volume_name, volume_number, page_limit, current_pages, compliance_score, status').eq('opportunity_id', id).order('volume_number', { ascending: true }),
+    supabase.from('color_team_reviews').select('id, review_name, review_type, status, overall_rating, lead_reviewer_name, scheduled_date').eq('opportunity_id', id).order('scheduled_date', { ascending: true }),
+  ])
+
+  const rawAssignments = assignmentsResult.data
+  const volumes = volumesResult.data
+  const colorReviews = reviewsResult.data
 
   // Ownership/assignment gate — user must own OR be assigned OR have sensitive role
   const isOwner = opportunity.owner_id === user.id
@@ -88,86 +85,44 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
   )
   if (!isOwner && !isAssigned && !canAccessSensitive) return null
 
-  // Resolve profiles for assignments by email
-  const assignments: {
-    id: string
-    role: string | null
-    profile: {
-      id: string
-      full_name: string | null
-      email: string
-      role: string | null
-    } | null
-  }[] = []
+  // Batch profile resolution (eliminates N+1 loop)
+  const assignmentEmails = (rawAssignments ?? [])
+    .map((a) => a.assignee_email)
+    .filter((e): e is string => Boolean(e))
 
-  for (const assignment of rawAssignments ?? []) {
-    let resolvedProfile: {
-      id: string
-      full_name: string | null
-      email: string
-      role: string | null
-    } | null = null
-
-    if (assignment.assignee_email) {
-      const { data: assignedProfile } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, role')
-        .eq('email', assignment.assignee_email)
-        .single()
-
-      resolvedProfile = assignedProfile
+  const profileMap = new Map<string, { id: string; full_name: string | null; email: string; role: string | null }>()
+  if (assignmentEmails.length > 0) {
+    const { data: resolvedProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, role')
+      .in('email', assignmentEmails)
+    for (const p of resolvedProfiles ?? []) {
+      profileMap.set(p.email, p)
     }
+  }
 
-    // Fallback: create display-only stub from assignment data
-    if (!resolvedProfile && assignment.assignee_email) {
-      resolvedProfile = {
-        id: '',
-        full_name: assignment.assignee_name,
-        email: assignment.assignee_email,
-        role: assignment.role,
-      }
-    }
-
-    assignments.push({
+  const assignments = (rawAssignments ?? []).map((assignment) => {
+    const resolved = assignment.assignee_email ? profileMap.get(assignment.assignee_email) : null
+    return {
       id: assignment.id,
       role: assignment.role,
-      profile: resolvedProfile,
-    })
-  }
+      profile: resolved ?? (assignment.assignee_email
+        ? { id: '', full_name: assignment.assignee_name, email: assignment.assignee_email, role: assignment.role }
+        : null),
+    }
+  })
 
-  // Fetch proposal volumes for progress tracking
-  const { data: volumes } = await supabase
-    .from('proposal_volumes')
-    .select('id, volume_name, volume_number, page_limit, current_pages, compliance_score, status')
-    .eq('opportunity_id', id)
-    .order('volume_number', { ascending: true })
-
-  // Fetch color team reviews for this opportunity
-  const { data: colorReviews } = await supabase
-    .from('color_team_reviews')
-    .select('id, review_name, review_type, status, overall_rating, lead_reviewer_name, scheduled_date')
-    .eq('opportunity_id', id)
-    .order('scheduled_date', { ascending: true })
-
+  // Parallel fetch: color team findings + reviewers (both depend on reviewIds)
   const reviewIds = (colorReviews ?? []).map((r) => r.id)
   let colorFindings: { id: string; review_id: string | null; description: string; severity: string | null; finding_type: string | null; reviewer_name: string | null; status: string | null; recommendation: string | null; page_number: number | null; created_at: string | null }[] = []
-  if (reviewIds.length > 0) {
-    const { data } = await supabase
-      .from('color_team_findings')
-      .select('id, review_id, description, severity, finding_type, reviewer_name, status, recommendation, page_number, created_at')
-      .in('review_id', reviewIds)
-      .order('created_at', { ascending: true })
-    colorFindings = data ?? []
-  }
-
-  // Fetch color team reviewers
   let colorReviewers: { id: string; review_id: string | null; user_name: string; role: string | null; status: string | null; section_assigned: string | null; findings_submitted: number | null }[] = []
   if (reviewIds.length > 0) {
-    const { data: reviewerData } = await supabase
-      .from('color_team_reviewers')
-      .select('id, review_id, user_name, role, status, section_assigned, findings_submitted')
-      .in('review_id', reviewIds)
-    colorReviewers = reviewerData ?? []
+    const [findingsResult, reviewersResult] = await Promise.all([
+      supabase.from('color_team_findings').select('id, review_id, description, severity, finding_type, reviewer_name, status, recommendation, page_number, created_at').in('review_id', reviewIds).order('created_at', { ascending: true }),
+      supabase.from('color_team_reviewers').select('id, review_id, user_name, role, status, section_assigned, findings_submitted').in('review_id', reviewIds),
+    ])
+    colorFindings = findingsResult.data ?? []
+    colorReviewers = reviewersResult.data ?? []
   }
 
   const reviewsWithFindings = (colorReviews ?? []).map((r) => ({
