@@ -10,6 +10,8 @@ import {
   Award,
   TrendingUp,
 } from 'lucide-react'
+import { TrackPageView } from '@/components/marketing/TrackPageView'
+import { TrackedCTA } from '@/components/marketing/TrackedCTA'
 
 export const metadata: Metadata = {
   title: '8(a) Toolkit — Win More Set-Aside Contracts | MissionPulse',
@@ -89,6 +91,7 @@ const TESTIMONIALS = [
 export default function EightAToolkitPage() {
   return (
     <div>
+      <TrackPageView event="eight_a_toolkit_view" />
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-[#00E5FA]/5 to-transparent" />
@@ -113,13 +116,15 @@ export default function EightAToolkitPage() {
           </p>
 
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link
+            <TrackedCTA
               href="/signup?plan=starter"
+              event="pilot_signup_click"
+              params={{ plan_tier: 'starter', source: '8a_toolkit_hero' }}
               className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-8 py-3 text-base font-semibold text-[#00050F] hover:bg-[#00E5FA]/90"
             >
               Start Your Free Pilot
               <ChevronRight className="h-4 w-4" />
-            </Link>
+            </TrackedCTA>
             <Link
               href="/plans"
               className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-8 py-3 text-base font-medium text-gray-300 hover:border-gray-500 hover:text-white"
@@ -255,13 +260,15 @@ export default function EightAToolkitPage() {
             Join 8(a) firms who are competing — and winning — with AI-powered
             proposal management.
           </p>
-          <Link
+          <TrackedCTA
             href="/signup?plan=starter"
+            event="pilot_signup_click"
+            params={{ plan_tier: 'starter', source: '8a_toolkit_cta' }}
             className="mt-8 inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-8 py-3 text-base font-semibold text-[#00050F] hover:bg-[#00E5FA]/90"
           >
             Start Your Free Pilot
             <ChevronRight className="h-4 w-4" />
-          </Link>
+          </TrackedCTA>
         </div>
       </section>
     </div>

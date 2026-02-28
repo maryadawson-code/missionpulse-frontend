@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics/gtag'
 
 // Amendment A-1 pricing
 const PLANS = [
@@ -98,6 +99,10 @@ function formatMonthly(price: number): string {
 export function PricingCards() {
   const [isAnnual, setIsAnnual] = useState(true)
 
+  useEffect(() => {
+    trackEvent('pricing_page_view')
+  }, [])
+
   return (
     <div>
       {/* Billing toggle */}
@@ -110,7 +115,11 @@ export function PricingCards() {
           Monthly
         </span>
         <button
-          onClick={() => setIsAnnual(!isAnnual)}
+          onClick={() => {
+            const next = !isAnnual
+            setIsAnnual(next)
+            trackEvent('plan_selected', { billing_interval: next ? 'annual' : 'monthly' })
+          }}
           className={`relative h-7 w-12 rounded-full transition-colors ${
             isAnnual ? 'bg-[#00E5FA]' : 'bg-gray-700'
           }`}
@@ -201,6 +210,13 @@ export function PricingCards() {
 
             <Link
               href={plan.slug === 'enterprise' ? '/signup?plan=enterprise' : `/signup?plan=${plan.slug}`}
+              onClick={() =>
+                trackEvent('pilot_signup_click', {
+                  plan_tier: plan.slug,
+                  billing_interval: isAnnual ? 'annual' : 'monthly',
+                  source: 'pricing_page',
+                })
+              }
               className={`mt-8 block rounded-lg px-6 py-3 text-center text-sm font-medium transition-colors ${
                 plan.highlighted
                   ? 'bg-[#00E5FA] text-[#00050F] hover:bg-[#00E5FA]/90'
