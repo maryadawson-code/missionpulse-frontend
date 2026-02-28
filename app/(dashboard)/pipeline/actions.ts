@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
 import type { Database } from '@/lib/supabase/database.types'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 
 type OpportunityInsert = Database['public']['Tables']['opportunities']['Insert']
 type OpportunityUpdate = Database['public']['Tables']['opportunities']['Update']
@@ -87,6 +88,9 @@ export async function actionCreateOpportunity(
     user_role: actorProfile?.role ?? 'unknown',
     details: { entity_type: 'opportunity', entity_id: data.id, title: insertData.title },
   })
+
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('create_opportunity')
 
   revalidatePath('/')
   revalidatePath('/pipeline')
@@ -305,6 +309,9 @@ export async function actionCreateOpportunityTyped(
     user_role: actorProfile?.role ?? 'unknown',
     details: { entity_type: 'opportunity', entity_id: inserted.id, title: data.title },
   })
+
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('create_opportunity')
 
   revalidatePath('/')
   revalidatePath('/pipeline')

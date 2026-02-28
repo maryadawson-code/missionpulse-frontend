@@ -4,6 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { logNotification } from '@/lib/utils/notifications'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 import type { OpportunityInsert, OpportunityUpdate } from '@/lib/types/opportunities'
 
 interface ActionResult {
@@ -144,6 +145,9 @@ export async function createOpportunity(
     entity_id: data.id,
     user_id: user.id,
   })
+
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('create_opportunity')
 
   revalidatePath('/pipeline')
   revalidatePath('/')

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
 import { revokeExternalAccess } from '@/lib/actions/external-access'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 
 export async function approveReviewItem(
   itemId: string,
@@ -290,6 +291,9 @@ export async function assembleBinder(
     details: { section_count: allSections.length },
     created_at: new Date().toISOString(),
   })
+
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('generate_document')
 
   revalidatePath(`/pipeline/${opportunityId}/launch`)
   return {

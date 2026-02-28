@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { aiRequest } from '@/lib/ai/pipeline'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 
 interface ChatResult {
   success: boolean
@@ -71,6 +72,9 @@ export async function sendChatMessage(
     .from('chat_sessions')
     .update({ updated_at: new Date().toISOString() })
     .eq('id', sessionId)
+
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('run_ai_agent')
 
   return {
     success: true,

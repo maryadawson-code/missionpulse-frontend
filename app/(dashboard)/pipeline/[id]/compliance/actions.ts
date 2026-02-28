@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 
 export async function updateComplianceStatus(
   requirementId: string,
@@ -52,6 +53,9 @@ export async function updateComplianceStatus(
     entity_id: requirementId,
     details: { opportunity_id: opportunityId, new_status: status },
   })
+
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('review_compliance')
 
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }

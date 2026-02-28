@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 
 interface ActionResult {
   success: boolean
@@ -55,6 +56,9 @@ export async function inviteUser(data: {
       invited_role: data.role,
     },
   })
+
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('invite_team')
 
   revalidatePath('/admin/users')
   return { success: true }
