@@ -71,6 +71,17 @@ export async function assignComplianceReviewer(
 
   if (error) return { success: false, error: error.message }
 
+  await supabase.from('activity_log').insert({
+    action: 'assign_compliance_reviewer',
+    user_name: user.email ?? 'Unknown',
+    details: {
+      entity_type: 'compliance_requirement',
+      entity_id: requirementId,
+      opportunity_id: opportunityId,
+      assigned_to: assignedTo,
+    },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }
 }
@@ -96,6 +107,16 @@ export async function updateComplianceEvidence(
     .eq('id', requirementId)
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'update_compliance_evidence',
+    user_name: user.email ?? 'Unknown',
+    details: {
+      entity_type: 'compliance_requirement',
+      entity_id: requirementId,
+      opportunity_id: opportunityId,
+    },
+  })
 
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }

@@ -325,7 +325,7 @@ export async function linkChannelToOpportunity(
 // ─── Block Kit Builders ─────────────────────────────────────
 
 function buildNotificationBlocks(payload: NotificationPayload): unknown[] {
-  const link = `https://missionpulse.io/pipeline/${payload.opportunityId}`
+  const link = `https://missionpulse.ai/pipeline/${payload.opportunityId}`
 
   switch (payload.type) {
     case 'gate_approval':

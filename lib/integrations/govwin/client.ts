@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/server'
 const GOVWIN_CLIENT_ID = process.env.GOVWIN_CLIENT_ID ?? ''
 const GOVWIN_CLIENT_SECRET = process.env.GOVWIN_CLIENT_SECRET ?? ''
 const GOVWIN_REDIRECT_URI =
-  process.env.GOVWIN_REDIRECT_URI ?? 'https://missionpulse.io/api/integrations/govwin/callback'
+  process.env.GOVWIN_REDIRECT_URI ?? 'https://missionpulse.ai/api/integrations/govwin/callback'
 const GOVWIN_BASE_URL =
   process.env.GOVWIN_BASE_URL ?? 'https://api.govwin.com/v2'
 const GOVWIN_AUTH_URL =

@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/server'
 const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID ?? ''
 const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET ?? ''
 const SLACK_REDIRECT_URI =
-  process.env.SLACK_REDIRECT_URI ?? 'https://missionpulse.io/api/integrations/slack/callback'
+  process.env.SLACK_REDIRECT_URI ?? 'https://missionpulse.ai/api/integrations/slack/callback'
 
 const BOT_SCOPES = [
   'chat:write',

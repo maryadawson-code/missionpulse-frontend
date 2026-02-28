@@ -116,7 +116,7 @@ export async function reactivateUser(
 
   const { data: callerProfile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, full_name')
     .eq('id', user.id)
     .single()
 
@@ -131,6 +131,15 @@ export async function reactivateUser(
     .eq('id', targetUserId)
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('audit_logs').insert({
+    action: 'REACTIVATE_USER',
+    user_id: user.id,
+    metadata: {
+      target_user_id: targetUserId,
+      changed_by: callerProfile?.full_name,
+    },
+  })
 
   revalidatePath('/admin/users')
   return { success: true }

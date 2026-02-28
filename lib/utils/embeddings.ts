@@ -1,22 +1,40 @@
 'use server'
 
+import { createClient } from '@/lib/supabase/server'
+
 /**
  * Embedding utilities for pgvector semantic search.
- * Currently uses text search as a fallback. When AskSage AI gateway
- * is wired (Sprint 10+), this will generate real embeddings via API.
+ * Uses text-based ILIKE search as a production fallback.
+ * When AskSage embedding endpoint is configured, this will
+ * upgrade to pgvector cosine similarity search.
  */
 
 /**
- * Search playbook entries using text search.
- * Falls back to ILIKE when pgvector embeddings are not yet available.
+ * Search playbook entries using text search (ILIKE across title, response, category).
+ * Returns matching entry IDs for downstream consumption.
  */
 export async function searchPlaybookEntries(
   query: string,
-  _options?: { limit?: number; category?: string }
+  options?: { limit?: number; category?: string }
 ): Promise<string[]> {
-  // Placeholder: returns empty array.
-  // Real implementation will call AskSage embedding endpoint
-  // and use pgvector <=> operator for cosine similarity search.
-  void query
-  return []
+  if (!query.trim()) return []
+
+  const supabase = await createClient()
+  const limit = options?.limit ?? 10
+
+  let qb = supabase
+    .from('playbook_entries')
+    .select('id')
+    .or(`title.ilike.%${query}%,assistant_response.ilike.%${query}%,category.ilike.%${query}%`)
+    .order('effectiveness_score', { ascending: false })
+    .limit(limit)
+
+  if (options?.category) {
+    qb = qb.eq('category', options.category)
+  }
+
+  const { data, error } = await qb
+
+  if (error || !data) return []
+  return data.map((row) => row.id)
 }

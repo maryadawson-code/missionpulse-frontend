@@ -127,6 +127,17 @@ export async function assignSectionOwner(
 
   if (error) return { success: false, error: error.message }
 
+  await supabase.from('activity_log').insert({
+    action: 'assign_section_owner',
+    user_name: user.email ?? 'Unknown',
+    details: {
+      entity_type: 'proposal_section',
+      entity_id: sectionId,
+      opportunity_id: opportunityId,
+      writer_id: writerId,
+    },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/swimlane`)
   return { success: true }
 }

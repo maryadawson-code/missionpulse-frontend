@@ -20,8 +20,9 @@ export async function createPlaybookEntry(data: {
   } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
+  const entryId = crypto.randomUUID()
   const { error } = await supabase.from('playbook_entries').insert({
-    id: crypto.randomUUID(),
+    id: entryId,
     title: data.title,
     category: data.category,
     user_prompt: data.content,
@@ -34,6 +35,12 @@ export async function createPlaybookEntry(data: {
   })
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'create_playbook_entry',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'playbook_entry', entity_id: entryId, title: data.title, category: data.category },
+  })
 
   revalidatePath('/playbook')
   return { success: true }
@@ -67,6 +74,12 @@ export async function updatePlaybookRating(
 
   if (error) return { success: false, error: error.message }
 
+  await supabase.from('activity_log').insert({
+    action: 'update_playbook_rating',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'playbook_entry', entity_id: entryId, rating },
+  })
+
   revalidatePath('/playbook')
   return { success: true }
 }
@@ -78,7 +91,8 @@ export async function incrementUsage(entryId: string): Promise<ActionResult> {
   } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
-  // Get current count
+  // NOTE: Read-then-write is not atomic. Create an `increment_use_count` RPC
+  // in Supabase for production-grade atomicity (similar to increment_votes).
   const { data: entry } = await supabase
     .from('playbook_entries')
     .select('use_count')
@@ -116,6 +130,12 @@ export async function deletePlaybookEntry(
     .eq('id', entryId)
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'delete_playbook_entry',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'playbook_entry', entity_id: entryId },
+  })
 
   revalidatePath('/playbook')
   return { success: true }

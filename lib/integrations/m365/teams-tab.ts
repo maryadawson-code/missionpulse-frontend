@@ -79,7 +79,7 @@ export async function addTeamsTab(
   const token = await getToken(companyId)
   if (!token) return null
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.io'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.ai'
   const contentUrl = `${baseUrl}/pipeline/${opportunity.id}?embed=teams`
   const websiteUrl = `${baseUrl}/pipeline/${opportunity.id}`
 
@@ -163,7 +163,7 @@ export async function listMissionPulseTabs(
   if (!response.ok) return []
 
   const data = await response.json()
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.io'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.ai'
 
   return (data.value ?? [])
     .filter((tab: Record<string, unknown>) => {

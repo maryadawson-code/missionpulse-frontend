@@ -18,7 +18,7 @@ import { createClient } from '@/lib/supabase/server'
 const SF_CLIENT_ID = process.env.SALESFORCE_CLIENT_ID ?? ''
 const SF_CLIENT_SECRET = process.env.SALESFORCE_CLIENT_SECRET ?? ''
 const SF_REDIRECT_URI =
-  process.env.SALESFORCE_REDIRECT_URI ?? 'https://missionpulse.io/api/integrations/salesforce/callback'
+  process.env.SALESFORCE_REDIRECT_URI ?? 'https://missionpulse.ai/api/integrations/salesforce/callback'
 const SF_LOGIN_URL =
   process.env.SALESFORCE_LOGIN_URL ?? 'https://login.salesforce.com'
 

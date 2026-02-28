@@ -65,6 +65,16 @@ export async function updateClauseNotes(
 
   if (error) return { success: false, error: error.message }
 
+  await supabase.from('activity_log').insert({
+    action: 'update_clause_notes',
+    user_name: user.email ?? 'Unknown',
+    details: {
+      entity_type: 'contract_clause',
+      entity_id: clauseId,
+      opportunity_id: opportunityId,
+    },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/contracts`)
   return { success: true }
 }
@@ -90,6 +100,17 @@ export async function updateClauseRisk(
     .eq('id', clauseId)
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'update_clause_risk',
+    user_name: user.email ?? 'Unknown',
+    details: {
+      entity_type: 'contract_clause',
+      entity_id: clauseId,
+      opportunity_id: opportunityId,
+      risk_level: riskLevel,
+    },
+  })
 
   revalidatePath(`/pipeline/${opportunityId}/contracts`)
   return { success: true }

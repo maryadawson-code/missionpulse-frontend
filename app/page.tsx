@@ -37,20 +37,20 @@ const FEATURES = [
 const PRICING_TIERS = [
   {
     name: 'Starter',
-    price: '$99',
+    price: '$149',
     period: '/mo',
     description: 'For solo consultants and small firms',
-    features: ['5 active opportunities', 'Solo Mode AI assistance', 'SAM.gov integration', 'Basic compliance tracking', 'Email support'],
-    cta: 'Start Free Trial',
+    features: ['5 active opportunities', 'Solo Mode AI assistance', 'SAM.gov integration', 'Basic compliance tracking', 'Email support', '500K tokens/month'],
+    cta: 'Start Free Pilot',
     highlighted: false,
   },
   {
     name: 'Professional',
-    price: '$299',
+    price: '$499',
     period: '/mo',
     description: 'For growing GovCon firms',
-    features: ['25 active opportunities', 'Full AI agent suite', 'All integrations', 'Team collaboration (10 users)', 'Priority support', 'CUI-protected modules'],
-    cta: 'Start Free Trial',
+    features: ['25 active opportunities', 'Full AI agent suite (8 agents)', 'All integrations', 'Team collaboration (10 users)', 'Priority support', 'CUI-protected modules', '2M tokens/month'],
+    cta: 'Start Free Pilot',
     highlighted: true,
   },
   {
@@ -58,7 +58,7 @@ const PRICING_TIERS = [
     price: '$2,500',
     period: '/mo',
     description: 'For large GovCon organizations',
-    features: ['Unlimited opportunities', 'Custom AI model tuning', 'SSO / SAML', 'Unlimited users', 'Dedicated CSM', 'On-premises deployment option', 'Custom integrations'],
+    features: ['Unlimited opportunities', 'Custom AI model tuning', 'SSO / SAML', 'Unlimited users', 'Dedicated CSM', 'On-premises deployment option', 'Custom integrations', '10M tokens/month'],
     cta: 'Contact Sales',
     highlighted: false,
   },
@@ -122,7 +122,7 @@ export default function LandingPage() {
               href="/signup"
               className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-8 py-3 text-base font-semibold text-[#00050F] hover:bg-[#00E5FA]/90"
             >
-              Start Free Trial
+              Start Free Pilot
               <ChevronRight className="h-4 w-4" />
             </Link>
             <Link
@@ -247,7 +247,7 @@ export default function LandingPage() {
             href="/signup"
             className="mt-8 inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-8 py-3 text-base font-semibold text-[#00050F] hover:bg-[#00E5FA]/90"
           >
-            Start Your Free Trial
+            Start Your Free Pilot
             <ChevronRight className="h-4 w-4" />
           </Link>
         </div>

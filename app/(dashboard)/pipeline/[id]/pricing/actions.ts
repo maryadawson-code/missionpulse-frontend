@@ -21,8 +21,9 @@ export async function createCostVolume(formData: FormData) {
     .eq('id', user.id)
     .single()
 
+  const volumeId = crypto.randomUUID()
   const { error } = await supabase.from('cost_volumes').insert({
-    id: crypto.randomUUID(),
+    id: volumeId,
     opportunity_id: opportunityId,
     company_id: profile?.company_id ?? null,
     volume_name: volumeName,
@@ -34,6 +35,12 @@ export async function createCostVolume(formData: FormData) {
   })
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'create_cost_volume',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'cost_volume', entity_id: volumeId, opportunity_id: opportunityId, volume_name: volumeName },
+  })
 
   revalidatePath(`/pipeline/${opportunityId}/pricing`)
   return { success: true }
@@ -54,8 +61,9 @@ export async function addLaborCategory(formData: FormData) {
   const annualHours = Number(formData.get('annualHours') ?? 1880)
   const opportunityId = formData.get('opportunityId') as string
 
+  const lcatId = crypto.randomUUID()
   const { error } = await supabase.from('cost_labor_categories').insert({
-    id: crypto.randomUUID(),
+    id: lcatId,
     cost_volume_id: costVolumeId,
     labor_category: laborCategory,
     level: level || null,
@@ -67,6 +75,12 @@ export async function addLaborCategory(formData: FormData) {
   })
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'add_labor_category',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'cost_labor_category', entity_id: lcatId, opportunity_id: opportunityId, labor_category: laborCategory },
+  })
 
   revalidatePath(`/pipeline/${opportunityId}/pricing`)
   return { success: true }
@@ -101,6 +115,12 @@ export async function updateCostVolumeRates(formData: FormData) {
     .eq('id', costVolumeId)
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'update_cost_volume_rates',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'cost_volume', entity_id: costVolumeId, opportunity_id: opportunityId, wrap_rate: wrapRate },
+  })
 
   revalidatePath(`/pipeline/${opportunityId}/pricing`)
   return { success: true }
