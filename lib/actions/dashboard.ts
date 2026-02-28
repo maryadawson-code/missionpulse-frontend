@@ -2,7 +2,10 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createLogger } from '@/lib/logging/logger'
 import type { DashboardKPIs } from '@/lib/types/opportunities'
+
+const log = createLogger('dashboard')
 
 /**
  * Fetch dashboard KPIs. RBAC scoping:
@@ -31,7 +34,7 @@ export async function getDashboardKPIs(): Promise<{
     .eq('status', 'Active')
 
   if (fetchError) {
-    console.error('[dashboard:kpis]', fetchError.message)
+    log.error('KPI fetch failed', { error: fetchError.message })
     return { data: null, error: fetchError.message }
   }
 

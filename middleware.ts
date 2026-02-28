@@ -38,9 +38,15 @@ function isLandingPage(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
+  // Generate correlation ID for request tracing
+  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID()
+  request.headers.set('x-request-id', requestId)
+
   // Landing page is public for everyone
   if (isLandingPage(pathname)) {
-    return NextResponse.next()
+    const response = NextResponse.next()
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   // Rate limit auth endpoints
@@ -119,6 +125,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  response.headers.set('x-request-id', requestId)
   return response
 }
 

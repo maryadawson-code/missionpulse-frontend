@@ -5,7 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { logNotification } from '@/lib/utils/notifications'
 import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
+import { createLogger } from '@/lib/logging/logger'
 import type { OpportunityInsert, OpportunityUpdate } from '@/lib/types/opportunities'
+
+const log = createLogger('opportunities')
 
 interface ActionResult {
   success: boolean
@@ -28,7 +31,7 @@ export async function getOpportunities() {
     .order('updated_at', { ascending: false })
 
   if (error) {
-    console.error('[opportunities:list]', error.message)
+    log.error('List failed', { error: error.message })
     return { data: null, error: error.message }
   }
 
@@ -48,7 +51,7 @@ export async function getOpportunity(id: string) {
     .single()
 
   if (error) {
-    console.error('[opportunities:get]', error.message)
+    log.error('Get failed', { error: error.message })
     return { data: null, error: error.message }
   }
 
@@ -125,7 +128,7 @@ export async function createOpportunity(
     .single()
 
   if (error) {
-    console.error('[opportunities:create]', error.message)
+    log.error('Create failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -217,7 +220,7 @@ export async function updateOpportunity(
     .eq('id', id)
 
   if (error) {
-    console.error('[opportunities:update]', error.message)
+    log.error('Update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -263,7 +266,7 @@ export async function updateOpportunityPhase(
     .eq('id', id)
 
   if (error) {
-    console.error('[opportunities:updatePhase]', error.message)
+    log.error('Phase update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -329,7 +332,7 @@ export async function deleteOpportunity(id: string): Promise<ActionResult> {
   const { error } = await supabase.from('opportunities').delete().eq('id', id)
 
   if (error) {
-    console.error('[opportunities:delete]', error.message)
+    log.error('Delete failed', { error: error.message })
     return { success: false, error: error.message }
   }
 

@@ -4,8 +4,11 @@
  * Tracks timing for named operations, maintains a sliding window of
  * metrics, and provides p50/p95/p99 latency calculations.
  *
- * Server-only utility. No external dependencies.
+ * Server-only utility.
  */
+import { createLogger } from '@/lib/logging/logger'
+
+const log = createLogger('perf')
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -60,9 +63,11 @@ export function recordMetric(entry: PerfEntry): void {
     const p95Index = Math.floor(sorted.length * 0.95)
     const p95 = sorted[p95Index]
     if (p95 > P95_ALERT_THRESHOLD_MS) {
-      console.warn(
-        `[perf-alert] ${entry.operation} p95=${p95}ms exceeds threshold ${P95_ALERT_THRESHOLD_MS}ms`
-      )
+      log.warn('P95 threshold exceeded', {
+        operation: entry.operation,
+        p95_ms: p95,
+        threshold_ms: P95_ALERT_THRESHOLD_MS,
+      })
     }
   }
 }

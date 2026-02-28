@@ -3,6 +3,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createLogger } from '@/lib/logging/logger'
+
+const log = createLogger('settings')
 
 interface ActionResult {
   success: boolean
@@ -38,7 +41,7 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     .eq('id', user.id)
 
   if (error) {
-    console.error('[settings:profile]', error.message)
+    log.error('Profile update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -71,7 +74,7 @@ export async function updatePassword(
   const { error } = await supabase.auth.updateUser({ password })
 
   if (error) {
-    console.error('[settings:password]', error.message)
+    log.error('Password update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -111,7 +114,7 @@ export async function updateNotificationPreferences(
       )
 
     if (error) {
-      console.error('[settings:notif-prefs]', error.message)
+      log.error('Notification prefs update failed', { error: error.message })
       return { success: false, error: error.message }
     }
   }

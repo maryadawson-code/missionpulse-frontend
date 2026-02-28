@@ -4,6 +4,9 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { createLogger } from '@/lib/logging/logger'
+
+const log = createLogger('admin')
 
 interface ActionResult {
   success: boolean
@@ -45,7 +48,7 @@ export async function updateUserRole(
     .eq('id', targetUserId)
 
   if (error) {
-    console.error('[admin:updateRole]', error.message)
+    log.error('Role update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
