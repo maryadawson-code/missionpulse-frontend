@@ -40,8 +40,21 @@ const AGENT_COLORS: Record<string, string> = {
   classify: '#94a3b8',
 }
 
+const PROVIDER_COLORS: Record<string, string> = {
+  asksage: '#10b981',
+  anthropic: '#8b5cf6',
+  openai: '#f59e0b',
+}
+
 function formatCost(value: number): string {
   return `$${value.toFixed(2)}`
+}
+
+function getProvider(metadata: unknown): string {
+  if (metadata && typeof metadata === 'object' && 'provider' in metadata) {
+    return String((metadata as Record<string, unknown>).provider)
+  }
+  return 'asksage'
 }
 
 export function TokenUsageCharts({
@@ -69,6 +82,34 @@ export function TokenUsageCharts({
   }
 
   const costByAgent = Array.from(agentMap.entries())
+    .map(([name, data]) => ({
+      name,
+      cost: Number(data.cost.toFixed(4)),
+      tokens: data.tokens,
+      count: data.count,
+    }))
+    .sort((a, b) => b.cost - a.cost)
+
+  // Aggregate by provider
+  const providerMap = new Map<
+    string,
+    { tokens: number; cost: number; count: number }
+  >()
+
+  for (const entry of entries) {
+    const provider = getProvider(entry.metadata)
+    const existing = providerMap.get(provider) ?? {
+      tokens: 0,
+      cost: 0,
+      count: 0,
+    }
+    existing.tokens += entry.input_tokens + entry.output_tokens
+    existing.cost += entry.estimated_cost_usd
+    existing.count++
+    providerMap.set(provider, existing)
+  }
+
+  const costByProvider = Array.from(providerMap.entries())
     .map(([name, data]) => ({
       name,
       cost: Number(data.cost.toFixed(4)),
@@ -145,7 +186,7 @@ export function TokenUsageCharts({
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Daily usage */}
         <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="mb-4 text-sm font-semibold text-foreground">
@@ -244,6 +285,69 @@ export function TokenUsageCharts({
             </div>
           )}
         </div>
+
+        {/* Cost by provider */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="mb-4 text-sm font-semibold text-foreground">
+            Cost by Provider
+          </h3>
+          {costByProvider.length > 0 ? (
+            <div className="flex items-center gap-4">
+              <ResponsiveContainer width="60%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={costByProvider}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="cost"
+                  >
+                    {costByProvider.map((entry, i) => (
+                      <Cell
+                        key={i}
+                        fill={
+                          PROVIDER_COLORS[entry.name] ??
+                          `hsl(${(i * 120) % 360}, 60%, 50%)`
+                        }
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0F172A',
+                      border: '1px solid #1E293B',
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(value) => [formatCost(Number(value)), 'Cost']}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-1.5">
+                {costByProvider.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2">
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{
+                        backgroundColor:
+                          PROVIDER_COLORS[item.name] ?? '#64748b',
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {item.name}: {formatCost(item.cost)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
+              No usage data yet
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Recent requests table */}
@@ -264,6 +368,9 @@ export function TokenUsageCharts({
                   Agent
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
+                  Provider
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
                   Tokens
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
@@ -275,7 +382,7 @@ export function TokenUsageCharts({
               {entries.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={5}
                     className="px-4 py-8 text-center text-sm text-muted-foreground"
                   >
                     No AI requests recorded yet
@@ -305,6 +412,9 @@ export function TokenUsageCharts({
                       >
                         {entry.agent_id}
                       </span>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground">
+                      {getProvider(entry.metadata)}
                     </td>
                     <td className="px-4 py-2 text-xs font-mono text-foreground">
                       {(

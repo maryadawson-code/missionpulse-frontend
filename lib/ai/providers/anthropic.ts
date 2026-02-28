@@ -5,10 +5,13 @@
 'use server'
 
 import { AIError } from '../types'
+import { classifyContent } from './classify-shared'
 import type {
   AIProvider,
   ProviderQueryRequest,
   ProviderQueryResponse,
+  ProviderClassifyRequest,
+  ProviderClassifyResponse,
 } from './interface'
 
 // ─── Config ──────────────────────────────────────────────────
@@ -137,6 +140,10 @@ export async function createAnthropicProvider(): Promise<AIProvider> {
       }
 
       throw lastError ?? new AIError('UNKNOWN', 'All retries exhausted', false)
+    },
+
+    async classify(request: ProviderClassifyRequest): Promise<ProviderClassifyResponse> {
+      return classifyContent(request, 'anthropic')
     },
 
     async ping() {

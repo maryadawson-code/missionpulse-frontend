@@ -3,7 +3,7 @@
  * All AI providers (AskSage, Anthropic, OpenAI) implement this interface.
  */
 
-import type { ClassificationLevel } from '../types'
+import type { ClassificationLevel, ClassificationResult } from '../types'
 
 // ─── Provider Types ─────────────────────────────────────────
 
@@ -41,6 +41,16 @@ export interface ProviderEmbedResponse {
   provider: ProviderId
 }
 
+export interface ProviderClassifyRequest {
+  content: string
+  context?: string
+}
+
+export interface ProviderClassifyResponse {
+  classification: ClassificationResult
+  provider: ProviderId
+}
+
 // ─── Provider Interface ─────────────────────────────────────
 
 export interface AIProvider {
@@ -61,6 +71,9 @@ export interface AIProvider {
 
   /** Generate embeddings (optional — not all providers support this) */
   embed?(request: ProviderEmbedRequest): Promise<ProviderEmbedResponse>
+
+  /** Classify content by sensitivity level (CUI/OPSEC detection) */
+  classify(request: ProviderClassifyRequest): Promise<ProviderClassifyResponse>
 
   /** Quick connectivity check */
   ping(): Promise<{ ok: boolean; latencyMs: number }>

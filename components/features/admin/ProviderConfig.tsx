@@ -7,6 +7,7 @@ import { getProviderStatus } from '@/lib/ai/router'
 import type { ProviderId } from '@/lib/ai/providers/interface'
 import type { ProviderCostSummary } from '@/lib/ai/providers/costs'
 import { getProviderCostBreakdown } from '@/lib/ai/providers/costs'
+import { updateRoutingConfig } from '@/lib/ai/providers/routing-config'
 
 interface ProviderInfo {
   id: ProviderId
@@ -38,6 +39,13 @@ export function ProviderConfig() {
   const [costs, setCosts] = useState<ProviderCostSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [testing, setTesting] = useState<ProviderId | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [selectedPrimary, setSelectedPrimary] = useState<ProviderId>('asksage')
+  const [selectedFallback, setSelectedFallback] = useState<ProviderId>('anthropic')
+  const [configMessage, setConfigMessage] = useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -50,6 +58,10 @@ export function ProviderConfig() {
       setProviders(providerData)
       setHealth(healthData)
       setCosts(costData)
+      const primary = providerData.find((p) => p.isPrimary)
+      const fallback = providerData.find((p) => p.isFallback)
+      if (primary) setSelectedPrimary(primary.id)
+      if (fallback) setSelectedFallback(fallback.id)
     } catch {
       // Graceful degradation
     } finally {
@@ -69,6 +81,24 @@ export function ProviderConfig() {
       setHealth(healthData)
     } finally {
       setTesting(null)
+    }
+  }
+
+  const saveRoutingConfig = async () => {
+    setSaving(true)
+    setConfigMessage(null)
+    try {
+      const result = await updateRoutingConfig(selectedPrimary, selectedFallback)
+      if (result.success) {
+        setConfigMessage({ type: 'success', text: 'Routing configuration saved.' })
+        await loadData()
+      } else {
+        setConfigMessage({ type: 'error', text: result.error ?? 'Failed to save.' })
+      }
+    } catch {
+      setConfigMessage({ type: 'error', text: 'An unexpected error occurred.' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -221,21 +251,57 @@ export function ProviderConfig() {
           Routing Configuration
         </h3>
         <p className="mt-1 text-xs text-gray-500">
-          Set via environment variables. Restart required after changes.
+          Set primary and fallback providers for UNCLASSIFIED requests.
         </p>
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-3">
           <div className="flex items-center justify-between rounded bg-[#00050F]/50 px-3 py-2">
-            <code className="text-xs text-gray-400">AI_PRIMARY_PROVIDER</code>
-            <span className="text-xs font-medium text-[#00E5FA]">
-              {providers.find((p) => p.isPrimary)?.id ?? 'asksage'}
-            </span>
+            <label htmlFor="primary-provider" className="text-xs text-gray-400">
+              Primary Provider
+            </label>
+            <select
+              id="primary-provider"
+              value={selectedPrimary}
+              onChange={(e) => setSelectedPrimary(e.target.value as ProviderId)}
+              className="rounded border border-[#1E293B] bg-[#0F172A] px-2 py-1 text-xs text-[#00E5FA] focus:outline-none focus:ring-1 focus:ring-[#00E5FA]"
+            >
+              {providers.map((p) => (
+                <option key={p.id} value={p.id} disabled={!p.configured}>
+                  {p.name}{!p.configured ? ' (not configured)' : ''}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center justify-between rounded bg-[#00050F]/50 px-3 py-2">
-            <code className="text-xs text-gray-400">AI_FALLBACK_PROVIDER</code>
-            <span className="text-xs font-medium text-yellow-400">
-              {providers.find((p) => p.isFallback)?.id ?? 'anthropic'}
-            </span>
+            <label htmlFor="fallback-provider" className="text-xs text-gray-400">
+              Fallback Provider
+            </label>
+            <select
+              id="fallback-provider"
+              value={selectedFallback}
+              onChange={(e) => setSelectedFallback(e.target.value as ProviderId)}
+              className="rounded border border-[#1E293B] bg-[#0F172A] px-2 py-1 text-xs text-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+            >
+              {providers.map((p) => (
+                <option key={p.id} value={p.id} disabled={!p.configured || p.id === selectedPrimary}>
+                  {p.name}{!p.configured ? ' (not configured)' : ''}
+                </option>
+              ))}
+            </select>
           </div>
+          <button
+            onClick={saveRoutingConfig}
+            disabled={saving}
+            className="rounded bg-[#00E5FA]/10 px-4 py-1.5 text-xs font-medium text-[#00E5FA] hover:bg-[#00E5FA]/20 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save Configuration'}
+          </button>
+          {configMessage && (
+            <p
+              className={`text-xs ${configMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}
+            >
+              {configMessage.text}
+            </p>
+          )}
         </div>
         <p className="mt-3 text-[10px] text-gray-600">
           CUI-classified requests always route to FedRAMP providers regardless of

@@ -19,6 +19,10 @@ import { getAllowedProviders } from './providers/interface'
 import { createAskSageProvider } from './providers/asksage'
 import { createAnthropicProvider } from './providers/anthropic'
 import { createOpenAIProvider } from './providers/openai'
+import {
+  getPrimaryProviderId as getConfiguredPrimary,
+  getFallbackProviderId as getConfiguredFallback,
+} from './providers/routing-config'
 
 // ─── Provider Registry ──────────────────────────────────────
 
@@ -41,23 +45,9 @@ async function getProviderById(id: ProviderId): Promise<AIProvider | null> {
   return providers.find((p) => p.id === id) ?? null
 }
 
-// ─── Environment Config ─────────────────────────────────────
-
-function getPrimaryProviderId(): ProviderId {
-  const envVal = process.env.AI_PRIMARY_PROVIDER ?? 'asksage'
-  if (['asksage', 'anthropic', 'openai'].includes(envVal)) {
-    return envVal as ProviderId
-  }
-  return 'asksage'
-}
-
-function getFallbackProviderId(): ProviderId {
-  const envVal = process.env.AI_FALLBACK_PROVIDER ?? 'anthropic'
-  if (['asksage', 'anthropic', 'openai'].includes(envVal)) {
-    return envVal as ProviderId
-  }
-  return 'anthropic'
-}
+// ─── Routing Config ─────────────────────────────────────────
+// Primary/fallback provider resolved from Redis (admin-configurable)
+// with fallback to AI_PRIMARY_PROVIDER / AI_FALLBACK_PROVIDER env vars.
 
 // ─── Routing ────────────────────────────────────────────────
 
@@ -105,9 +95,9 @@ export async function routeRequest(
     }
   }
 
-  // UNCLASSIFIED → respect env priority
-  const primaryId = getPrimaryProviderId()
-  const fallbackId = getFallbackProviderId()
+  // UNCLASSIFIED → respect configured priority
+  const primaryId = await getConfiguredPrimary()
+  const fallbackId = await getConfiguredFallback()
 
   const primary = await getProviderById(primaryId)
   const fallback = await getProviderById(fallbackId)
@@ -167,8 +157,8 @@ export async function getProviderStatus(): Promise<
   }>
 > {
   const providers = await getProviders()
-  const primaryId = getPrimaryProviderId()
-  const fallbackId = getFallbackProviderId()
+  const primaryId = await getConfiguredPrimary()
+  const fallbackId = await getConfiguredFallback()
 
   return providers.map((p) => ({
     id: p.id,

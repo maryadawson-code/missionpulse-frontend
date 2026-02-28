@@ -1,7 +1,7 @@
 /**
  * Provider Health Monitoring — circuit breaker + health tracking.
  * 3 consecutive failures → mark degraded → route to fallback.
- * Status cached with 5-minute TTL.
+ * Status persisted in Redis with 5-minute TTL (falls back to in-memory).
  */
 'use server'
 
@@ -9,6 +9,7 @@ import type { ProviderId, AIProvider } from './interface'
 import { createAskSageProvider } from './asksage'
 import { createAnthropicProvider } from './anthropic'
 import { createOpenAIProvider } from './openai'
+import { getRedis } from '@/lib/cache/redis'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -23,9 +24,7 @@ export interface ProviderHealthStatus {
   fedRamp: boolean
 }
 
-// ─── In-Memory Circuit Breaker State ────────────────────────
-// In production, this would be in Redis with 5-minute TTL.
-// For serverless, we use module-level state (resets on cold start).
+// ─── Circuit Breaker State ──────────────────────────────────
 
 interface CircuitState {
   failures: number
@@ -35,37 +34,72 @@ interface CircuitState {
 }
 
 const CIRCUIT_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const CIRCUIT_TTL_SECONDS = 300 // 5 minutes for Redis
 const FAILURE_THRESHOLD = 3
+const REDIS_KEY_PREFIX = 'mp:health:circuit:'
 
-const circuitStates = new Map<ProviderId, CircuitState>()
+// In-memory fallback when Redis is unavailable
+const memoryCircuitStates = new Map<ProviderId, CircuitState>()
 
-function getCircuitState(id: ProviderId): CircuitState {
-  const existing = circuitStates.get(id)
+async function getCircuitState(id: ProviderId): Promise<CircuitState> {
+  const redis = getRedis()
+  const defaultState: CircuitState = {
+    failures: 0,
+    status: 'healthy',
+    lastChecked: 0,
+    latencyMs: 0,
+  }
+
+  if (redis) {
+    try {
+      const cached = await redis.get<CircuitState>(`${REDIS_KEY_PREFIX}${id}`)
+      if (cached && Date.now() - cached.lastChecked < CIRCUIT_TTL_MS) {
+        return cached
+      }
+      return defaultState
+    } catch {
+      // Redis failed — fall through to in-memory
+    }
+  }
+
+  const existing = memoryCircuitStates.get(id)
   if (existing && Date.now() - existing.lastChecked < CIRCUIT_TTL_MS) {
     return existing
   }
-  return { failures: 0, status: 'healthy', lastChecked: 0, latencyMs: 0 }
+  return defaultState
 }
 
-function updateCircuitState(id: ProviderId, ok: boolean, latencyMs: number) {
-  const current = getCircuitState(id)
+async function updateCircuitState(
+  id: ProviderId,
+  ok: boolean,
+  latencyMs: number
+): Promise<void> {
+  const current = await getCircuitState(id)
 
-  if (ok) {
-    circuitStates.set(id, {
-      failures: 0,
-      status: 'healthy',
-      lastChecked: Date.now(),
-      latencyMs,
-    })
-  } else {
-    const failures = current.failures + 1
-    circuitStates.set(id, {
-      failures,
-      status: failures >= FAILURE_THRESHOLD ? 'down' : 'degraded',
-      lastChecked: Date.now(),
-      latencyMs,
-    })
+  const newState: CircuitState = ok
+    ? { failures: 0, status: 'healthy', lastChecked: Date.now(), latencyMs }
+    : {
+        failures: current.failures + 1,
+        status:
+          current.failures + 1 >= FAILURE_THRESHOLD ? 'down' : 'degraded',
+        lastChecked: Date.now(),
+        latencyMs,
+      }
+
+  // Persist to Redis with TTL
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.set(`${REDIS_KEY_PREFIX}${id}`, newState, {
+        ex: CIRCUIT_TTL_SECONDS,
+      })
+    } catch {
+      // Redis write failed — fall through to in-memory
+    }
   }
+
+  // Always update in-memory as fallback
+  memoryCircuitStates.set(id, newState)
 }
 
 // ─── Health Check ───────────────────────────────────────────
@@ -87,8 +121,8 @@ async function checkProviderHealth(
   }
 
   const { ok, latencyMs } = await provider.ping()
-  updateCircuitState(provider.id, ok, latencyMs)
-  const state = getCircuitState(provider.id)
+  await updateCircuitState(provider.id, ok, latencyMs)
+  const state = await getCircuitState(provider.id)
 
   return {
     id: provider.id,
@@ -120,7 +154,7 @@ export async function getAllProviderHealth(): Promise<ProviderHealthStatus[]> {
  * Uses cached circuit state (fast) — doesn't ping on every call.
  */
 export async function isProviderHealthy(id: ProviderId): Promise<boolean> {
-  const state = getCircuitState(id)
+  const state = await getCircuitState(id)
 
   // If cache expired, check fresh
   if (Date.now() - state.lastChecked >= CIRCUIT_TTL_MS) {
@@ -143,12 +177,21 @@ export async function isProviderHealthy(id: ProviderId): Promise<boolean> {
  * Called by the router when a provider query fails.
  */
 export async function recordProviderFailure(id: ProviderId): Promise<void> {
-  updateCircuitState(id, false, 0)
+  await updateCircuitState(id, false, 0)
 }
 
 /**
  * Reset circuit breaker for a provider (manual recovery).
  */
 export async function resetProviderCircuit(id: ProviderId): Promise<void> {
-  circuitStates.delete(id)
+  memoryCircuitStates.delete(id)
+
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.del(`${REDIS_KEY_PREFIX}${id}`)
+    } catch {
+      // Redis delete failed — in-memory already cleared
+    }
+  }
 }
