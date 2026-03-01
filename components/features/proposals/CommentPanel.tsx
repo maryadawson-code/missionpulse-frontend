@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   MessageSquare,
   Send,
@@ -36,16 +36,16 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
   const [showResolved, setShowResolved] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    loadComments()
-  }, [sectionId])
-
-  const loadComments = async () => {
+  const loadComments = useCallback(async () => {
     setLoading(true)
     const result = await getComments(sectionId)
     setComments(result)
     setLoading(false)
-  }
+  }, [sectionId])
+
+  useEffect(() => {
+    loadComments()
+  }, [loadComments])
 
   const handleSubmit = async () => {
     if (!newComment.trim() || submitting) return
@@ -226,8 +226,8 @@ function CommentThread({
   sectionId: string
   userId: string
   userName: string
-  onReply: (reply: Comment) => void
-  onResolve: (resolved: boolean) => void
+  onReply: (_reply: Comment) => void
+  onResolve: (_resolved: boolean) => void
 }) {
   const [replyText, setReplyText] = useState('')
   const [showReply, setShowReply] = useState(false)

@@ -53,7 +53,7 @@ export default async function GateReviewsPage({
 
   // Fetch review comments for all gate reviews
   const gateIds = items.map((r) => r.id)
-  let commentsMap: Record<string, { id: string; comment_text: string; comment_type: string | null; priority: number | null; section_ref: string | null; status: string | null; recommendation: string | null; response: string | null }[]> = {}
+  const commentsMap: Record<string, { id: string; comment_text: string; comment_type: string | null; priority: number | null; section_ref: string | null; status: string | null; recommendation: string | null; response: string | null }[]> = {}
   if (gateIds.length > 0) {
     const { data: comments } = await supabase
       .from('review_comments')

@@ -18,7 +18,7 @@ interface PersonnelRecord {
 interface PersonnelAssignmentPanelProps {
   personnel: PersonnelRecord[]
   assignedIds: string[]
-  onAssign?: (personId: string) => void
+  onAssign?: (_personId: string) => void
 }
 
 function clearanceColor(status: string | null): string {

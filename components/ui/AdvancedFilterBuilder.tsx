@@ -21,7 +21,7 @@ export interface FilterCondition {
 interface AdvancedFilterBuilderProps {
   fields: FilterField[]
   filters: FilterCondition[]
-  onChange: (filters: FilterCondition[]) => void
+  onChange: (_filters: FilterCondition[]) => void
 }
 
 const TEXT_OPERATORS = [

@@ -28,7 +28,7 @@ export interface PresenceState {
 export function joinPresenceChannel(
   opportunityId: string,
   user: { id: string; name: string; avatarUrl: string | null },
-  onSync: (users: PresenceUser[]) => void
+  onSync: (_users: PresenceUser[]) => void
 ): { channel: RealtimeChannel; leave: () => void } {
   const supabase = createClient()
   const channelName = `presence:opportunity:${opportunityId}`

@@ -16,8 +16,6 @@ import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 import { TeamRollup } from '@/components/features/proposals/TeamRollup'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { SectionAssignment } from '@/lib/types/sync'
-
 const WorkBreakdownMatrix = dynamic(
   () => import('@/components/features/proposals/WorkBreakdownMatrix').then((m) => m.WorkBreakdownMatrix),
   {

@@ -94,7 +94,7 @@ function formatWordCount(count: number): string {
 
 // ─── Component ───────────────────────────────────────────────────
 
-export function TeamRollup({ assignments, teamMembers, sections }: TeamRollupProps) {
+export function TeamRollup({ assignments, teamMembers, sections: _sections }: TeamRollupProps) {
   // Build per-member summaries
   const summaries: MemberSummary[] = teamMembers
     .map((member): MemberSummary | null => {

@@ -17,7 +17,7 @@ interface WordOnlineButtonProps {
 // ─── Component ───────────────────────────────────────────────
 
 export function WordOnlineButton({
-  documentId,
+  documentId: _documentId,
   cloudFileId,
   provider,
   className,

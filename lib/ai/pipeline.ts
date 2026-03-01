@@ -4,6 +4,7 @@
  */
 'use server'
 
+import { createLogger } from '@/lib/logging/logger'
 import { createClient } from '@/lib/supabase/server'
 import type { AIRequestOptions, AIResponse } from './types'
 import { AIError } from './types'
@@ -183,10 +184,11 @@ export async function aiRequest(
     const latencyMs = Date.now() - startTime
 
     // Graceful fallback — feature works without AI
+    const log = createLogger('ai-pipeline')
     if (err instanceof AIError) {
-      console.error(`[ai-pipeline] ${err.code}: ${err.message}`)
+      log.error(`${err.code}: ${err.message}`, { code: err.code })
     } else {
-      console.error('[ai-pipeline] Unexpected error:', err)
+      log.error('Unexpected error', { error: err instanceof Error ? err.message : String(err) })
     }
 
     return {

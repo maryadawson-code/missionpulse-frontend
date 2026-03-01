@@ -4,6 +4,7 @@
  */
 'use server'
 
+import { createLogger } from '@/lib/logging/logger'
 import type {
   TaskType,
   ClassificationLevel,
@@ -98,7 +99,7 @@ async function checkBudget(): Promise<{
     }
   } catch {
     // If budget check fails, allow the request but log warning
-    console.warn('[model-selector] Budget check failed — allowing request')
+    createLogger('model-selector').warn('Budget check failed — allowing request')
     return { spent: 0, remaining: MONTHLY_BUDGET_USD, overThreshold: false }
   }
 }
@@ -117,9 +118,9 @@ export async function selectModel(
 
   // If over budget threshold, downgrade to cheaper model
   if (budget.overThreshold && primaryKey !== 'claude-haiku') {
-    console.warn(
-      `[model-selector] Budget at ${((budget.spent / MONTHLY_BUDGET_USD) * 100).toFixed(0)}% — downgrading model`
-    )
+    createLogger('model-selector').warn('Budget threshold exceeded — downgrading model', {
+      budgetPct: ((budget.spent / MONTHLY_BUDGET_USD) * 100).toFixed(0),
+    })
     primaryKey = fallbackKey
   }
 
