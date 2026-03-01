@@ -26,37 +26,37 @@ export function SectionMetrics({ content, currentPages, pageLimit }: SectionMetr
   const isOverLimit = limit > 0 && estimatedPages > limit
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+    <div className="rounded-xl border border-border bg-card/50 p-4">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Section Metrics
       </h3>
 
       <div className="space-y-3">
         {/* Word Count */}
         <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <AlignLeft className="h-3 w-3" />
             Word Count
           </span>
-          <span className="text-sm font-mono text-gray-200">{wordCount.toLocaleString()}</span>
+          <span className="text-sm font-mono text-foreground">{wordCount.toLocaleString()}</span>
         </div>
 
         {/* Page Count */}
         <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <FileText className="h-3 w-3" />
             Est. Pages
           </span>
-          <span className={`text-sm font-mono ${isOverLimit ? 'text-red-400' : 'text-gray-200'}`}>
+          <span className={`text-sm font-mono ${isOverLimit ? 'text-red-400' : 'text-foreground'}`}>
             {estimatedPages}
-            {limit > 0 && <span className="text-gray-500"> / {limit}</span>}
+            {limit > 0 && <span className="text-muted-foreground"> / {limit}</span>}
           </span>
         </div>
 
         {/* Progress Bar */}
         {limit > 0 && (
           <div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-800">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className={`h-full rounded-full transition-all ${
                   isOverLimit

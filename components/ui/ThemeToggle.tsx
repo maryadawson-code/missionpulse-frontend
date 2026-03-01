@@ -12,7 +12,7 @@ export function ThemeToggle() {
   if (!mounted) {
     return (
       <button
-        className="rounded-lg p-2 text-gray-500"
+        className="rounded-lg p-2 text-muted-foreground"
         aria-label="Toggle theme"
         disabled
       >
@@ -28,7 +28,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-800/50 hover:text-gray-200 dark:hover:bg-gray-800/50"
+      className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground dark:hover:bg-muted/50"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >

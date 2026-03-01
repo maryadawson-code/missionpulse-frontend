@@ -15,60 +15,60 @@ function utilizationColor(pct: number): string {
   if (pct >= 80) return 'bg-red-500/30 text-red-300'
   if (pct >= 50) return 'bg-amber-500/30 text-amber-300'
   if (pct > 0) return 'bg-emerald-500/30 text-emerald-300'
-  return 'bg-gray-800/50 text-gray-500'
+  return 'bg-muted/50 text-muted-foreground'
 }
 
 export function TeamWorkloadHeatmap({ members }: TeamWorkloadHeatmapProps) {
   if (members.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-gray-500">
+      <p className="py-6 text-center text-sm text-muted-foreground">
         No team assignment data available.
       </p>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-800">
+    <div className="overflow-hidden rounded-lg border border-border">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-gray-800 bg-gray-900/80">
-            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <tr className="border-b border-border bg-card/80">
+            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Team Member
             </th>
-            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500 text-center">
+            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
               Opps
             </th>
-            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500 text-center">
+            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
               In Progress
             </th>
-            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500 text-center">
+            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
               Total Sections
             </th>
-            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Utilization
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-800/50">
+        <tbody className="divide-y divide-border/50">
           {members.map((m) => {
             const util = Math.min(Math.round((m.assignedOpps / 5) * 100), 100)
             return (
-              <tr key={m.name} className="transition-colors hover:bg-gray-800/30">
-                <td className="px-4 py-2.5 text-sm font-medium text-gray-200">
+              <tr key={m.name} className="transition-colors hover:bg-muted/30">
+                <td className="px-4 py-2.5 text-sm font-medium text-foreground">
                   {m.name}
                 </td>
-                <td className="px-4 py-2.5 text-center text-sm text-gray-300">
+                <td className="px-4 py-2.5 text-center text-sm text-muted-foreground">
                   {m.assignedOpps}
                 </td>
                 <td className="px-4 py-2.5 text-center text-sm text-amber-400">
                   {m.sectionsInProgress}
                 </td>
-                <td className="px-4 py-2.5 text-center text-sm text-gray-400">
+                <td className="px-4 py-2.5 text-center text-sm text-muted-foreground">
                   {m.sectionsTotal}
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="h-2 w-20 rounded-full bg-gray-800">
+                    <div className="h-2 w-20 rounded-full bg-muted">
                       <div
                         className={`h-2 rounded-full transition-all ${
                           util >= 80

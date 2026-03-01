@@ -65,17 +65,17 @@ export function CascadePreview({
   }, [loadPreview])
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-[#00050F]/95 p-5 shadow-xl">
+    <div className="rounded-xl border border-border bg-background/95 p-5 shadow-xl">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15">
           <Zap className="h-4.5 w-4.5 text-amber-400" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-gray-100">
+          <h3 className="text-sm font-semibold text-foreground">
             Cascade Preview
           </h3>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             The following documents will be updated when this rule executes.
           </p>
         </div>
@@ -84,8 +84,8 @@ export function CascadePreview({
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-          <span className="ml-2 text-sm text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">
             Analyzing affected documents...
           </span>
         </div>
@@ -95,12 +95,12 @@ export function CascadePreview({
           <p className="text-sm text-red-300">{error}</p>
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-gray-800 bg-gray-900/30 px-4 py-6 text-center">
-          <FileText className="mx-auto h-8 w-8 text-gray-600 mb-2" />
-          <p className="text-sm text-gray-400">
+        <div className="rounded-lg border border-border bg-card/30 px-4 py-6 text-center">
+          <FileText className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">
             No documents would be affected by this change.
           </p>
-          <p className="text-xs text-gray-600 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Target documents matching this rule&apos;s criteria were not found.
           </p>
         </div>
@@ -112,73 +112,73 @@ export function CascadePreview({
               {items.length} document{items.length !== 1 ? 's' : ''} affected
             </span>
             {items[0]?.ruleDescription && (
-              <span className="text-xs text-gray-500 truncate">
+              <span className="text-xs text-muted-foreground truncate">
                 {items[0].ruleDescription}
               </span>
             )}
           </div>
 
           {/* Changes table */}
-          <div className="overflow-hidden rounded-lg border border-gray-800">
+          <div className="overflow-hidden rounded-lg border border-border">
             {/* Table header */}
-            <div className="grid grid-cols-4 gap-px bg-gray-800">
-              <div className="bg-gray-900/70 px-3 py-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+            <div className="grid grid-cols-4 gap-px bg-border">
+              <div className="bg-card/70 px-3 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Document
                 </span>
               </div>
-              <div className="bg-gray-900/70 px-3 py-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              <div className="bg-card/70 px-3 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Field
                 </span>
               </div>
-              <div className="bg-gray-900/70 px-3 py-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              <div className="bg-card/70 px-3 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Current Value
                 </span>
               </div>
-              <div className="bg-gray-900/70 px-3 py-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              <div className="bg-card/70 px-3 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   New Value
                 </span>
               </div>
             </div>
 
             {/* Table rows */}
-            <div className="divide-y divide-gray-800">
+            <div className="divide-y divide-border">
               {items.map((item) => (
                 <div
                   key={`${item.documentId}-${item.targetFieldPath}`}
-                  className="grid grid-cols-4 gap-px bg-gray-800"
+                  className="grid grid-cols-4 gap-px bg-border"
                 >
-                  <div className="bg-[#00050F] px-3 py-2.5">
+                  <div className="bg-background px-3 py-2.5">
                     <div className="flex items-center gap-1.5">
-                      <FileText className="h-3 w-3 shrink-0 text-gray-500" />
-                      <span className="text-xs text-gray-300 truncate" title={item.documentTitle}>
+                      <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="text-xs text-foreground truncate" title={item.documentTitle}>
                         {item.documentTitle}
                       </span>
                     </div>
-                    <span className="text-[10px] text-gray-600 mt-0.5 block">
+                    <span className="text-[10px] text-muted-foreground mt-0.5 block">
                       {formatDocType(item.targetDocType)}
                     </span>
                   </div>
 
-                  <div className="bg-[#00050F] px-3 py-2.5">
+                  <div className="bg-background px-3 py-2.5">
                     <span
-                      className="text-xs font-mono text-gray-400 truncate block"
+                      className="text-xs font-mono text-muted-foreground truncate block"
                       title={item.targetFieldPath}
                     >
                       {item.targetFieldPath}
                     </span>
                   </div>
 
-                  <div className="bg-[#00050F] px-3 py-2.5">
+                  <div className="bg-background px-3 py-2.5">
                     <span className="text-xs text-red-300/70 break-all line-clamp-2">
                       {formatValue(item.currentValue)}
                     </span>
                   </div>
 
-                  <div className="bg-[#00050F] px-3 py-2.5">
+                  <div className="bg-background px-3 py-2.5">
                     <div className="flex items-start gap-1">
                       <ArrowRight className="h-3 w-3 shrink-0 text-cyan mt-0.5" />
                       <span className="text-xs text-emerald-300 break-all line-clamp-2">
@@ -199,7 +199,7 @@ export function CascadePreview({
           variant="outline"
           size="sm"
           onClick={onCancel}
-          className="gap-1.5 border-gray-700 text-gray-400 hover:text-gray-200"
+          className="gap-1.5 border-border text-muted-foreground hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />
           Cancel
@@ -210,7 +210,7 @@ export function CascadePreview({
           disabled={loading || items.length === 0}
           className={cn(
             'gap-1.5',
-            'bg-[#00E5FA] text-[#00050F] hover:bg-[#00E5FA]/90',
+            'bg-primary text-primary-foreground hover:bg-primary/90',
             'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
         >

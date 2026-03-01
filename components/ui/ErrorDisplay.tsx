@@ -23,7 +23,7 @@ export function ErrorDisplay({ error, reset, context }: ErrorDisplayProps) {
   return (
     <div className="flex min-h-[50vh] items-center justify-center">
       <div className="rounded-lg border border-red-500/30 bg-red-950/20 p-8 max-w-md text-center">
-        <h2 className="text-lg font-semibold text-white mb-2">
+        <h2 className="text-lg font-semibold text-foreground mb-2">
           {context ? `Failed to load ${context.replace('loading ', '')}` : 'Error'}
         </h2>
         <p className="text-sm text-slate-400 mb-6">
@@ -38,7 +38,7 @@ export function ErrorDisplay({ error, reset, context }: ErrorDisplayProps) {
         )}
         <button
           onClick={reset}
-          className="rounded-md bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] hover:bg-[#00E5FA]/80 transition-colors"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80 transition-colors"
         >
           Try again
         </button>

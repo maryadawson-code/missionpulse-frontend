@@ -85,7 +85,7 @@ export function GuidedTour({ show }: GuidedTourProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative mx-4 w-full max-w-lg rounded-2xl border border-border bg-[#0F172A] p-6 shadow-2xl">
+      <div className="relative mx-4 w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
         {/* Close button */}
         <button
           onClick={handleSkip}
@@ -101,7 +101,7 @@ export function GuidedTour({ show }: GuidedTourProps) {
             <div
               key={i}
               className={`h-1.5 flex-1 rounded-full transition-colors ${
-                i <= step ? 'bg-[#00E5FA]' : 'bg-gray-700'
+                i <= step ? 'bg-primary' : 'bg-muted'
               }`}
             />
           ))}

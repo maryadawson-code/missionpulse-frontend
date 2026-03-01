@@ -140,7 +140,7 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
       case 'validating':
         return <Clock className="h-4 w-4 text-yellow-400" />
       default:
-        return <Clock className="h-4 w-4 text-gray-500" />
+        return <Clock className="h-4 w-4 text-muted-foreground" />
     }
   }
 
@@ -151,7 +151,7 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
         <button
           onClick={handleExport}
           disabled={exporting}
-          className="flex items-center gap-2 rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:border-gray-600 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:border-border disabled:opacity-50"
         >
           {exporting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -176,24 +176,24 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
 
       {/* Export stats */}
       {exportStats && (
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <h3 className="text-sm font-medium text-white mb-2">Latest Export</h3>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <h3 className="text-sm font-medium text-foreground mb-2">Latest Export</h3>
           <div className="grid grid-cols-3 gap-3 text-center">
             <div>
               <p className="text-lg font-semibold text-cyan-400">{exportStats.totalExported}</p>
-              <p className="text-xs text-gray-500">Training pairs</p>
+              <p className="text-xs text-muted-foreground">Training pairs</p>
             </div>
             <div>
-              <p className="text-lg font-semibold text-white">
+              <p className="text-lg font-semibold text-foreground">
                 {exportStats.avgConfidence.toFixed(1)}
               </p>
-              <p className="text-xs text-gray-500">Avg confidence</p>
+              <p className="text-xs text-muted-foreground">Avg confidence</p>
             </div>
             <div>
-              <p className="text-lg font-semibold text-white">
+              <p className="text-lg font-semibold text-foreground">
                 {Object.keys(exportStats.taskTypes).length}
               </p>
-              <p className="text-xs text-gray-500">Task types</p>
+              <p className="text-xs text-muted-foreground">Task types</p>
             </div>
           </div>
         </div>
@@ -201,13 +201,13 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
 
       {/* Job list */}
       <div>
-        <h2 className="text-lg font-semibold text-white mb-3">Fine-tune Jobs</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-3">Fine-tune Jobs</h2>
 
         {jobs.length === 0 ? (
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-8 text-center">
-            <Brain className="mx-auto mb-3 h-10 w-10 text-gray-600" />
-            <p className="text-sm text-gray-500">No fine-tuning jobs yet.</p>
-            <p className="mt-1 text-xs text-gray-600">
+          <div className="rounded-xl border border-border bg-card/50 p-8 text-center">
+            <Brain className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No fine-tuning jobs yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               Export and accept AI outputs to build training data, then start a job.
             </p>
           </div>
@@ -216,14 +216,14 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
             {jobs.map((job) => (
               <div
                 key={job.id}
-                className="rounded-lg border border-gray-800 bg-gray-900/50 p-4"
+                className="rounded-lg border border-border bg-card/50 p-4"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {statusIcon(job.status)}
                     <div>
-                      <p className="text-sm font-medium text-white">{job.modelName}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm font-medium text-foreground">{job.modelName}</p>
+                      <p className="text-xs text-muted-foreground">
                         Base: {job.baseModel} • {job.trainingPairs} pairs •{' '}
                         {new Date(job.createdAt).toLocaleDateString()}
                       </p>
@@ -248,7 +248,7 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
                     {(job.status === 'queued' || job.status === 'training') && (
                       <button
                         onClick={() => handleCancel(job.id)}
-                        className="rounded p-1 text-gray-500 hover:bg-gray-800 hover:text-red-400"
+                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-400"
                         title="Cancel job"
                       >
                         <Square className="h-3.5 w-3.5" />
@@ -259,7 +259,7 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
 
                 {/* Metrics */}
                 {job.metrics && (
-                  <div className="mt-2 flex gap-4 text-xs text-gray-500">
+                  <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
                     {job.metrics.trainingLoss !== undefined && (
                       <span>Training loss: {job.metrics.trainingLoss.toFixed(4)}</span>
                     )}

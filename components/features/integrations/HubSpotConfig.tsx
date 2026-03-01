@@ -119,7 +119,7 @@ export function HubSpotConfig({
                   name="syncDirection"
                   value={dir}
                   defaultChecked={dir === 'Bidirectional'}
-                  className="rounded-full border-border text-[#00E5FA]"
+                  className="rounded-full border-border text-primary"
                   disabled={!isConnected}
                 />
                 <span className="text-xs text-foreground">{dir}</span>

@@ -239,14 +239,14 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
       <div className="flex items-center gap-2 text-xs">
         {(['upload', 'mapping', 'preview', 'complete'] as const).map((s, i) => (
           <div key={s} className="flex items-center gap-2">
-            {i > 0 && <div className="h-px w-8 bg-gray-700" />}
+            {i > 0 && <div className="h-px w-8 bg-border" />}
             <div
               className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${
                 step === s || (step === 'importing' && s === 'preview')
-                  ? 'bg-cyan-500/10 text-cyan-400'
+                  ? 'bg-primary/10 text-primary'
                   : (['upload', 'mapping', 'preview', 'complete'].indexOf(step === 'importing' ? 'preview' : step) > i)
                     ? 'bg-emerald-500/10 text-emerald-400'
-                    : 'bg-gray-800 text-gray-500'
+                    : 'bg-muted text-muted-foreground'
               }`}
             >
               {s === 'upload' && <Upload className="h-3 w-3" />}
@@ -270,25 +270,25 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
                 onClick={() => setImportType(type.value)}
                 className={`rounded-lg border p-4 text-left transition-colors ${
                   importType === type.value
-                    ? 'border-cyan-500 bg-cyan-500/5'
-                    : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border bg-card/50 hover:border-border'
                 }`}
               >
-                <p className={`text-sm font-medium ${importType === type.value ? 'text-cyan-400' : 'text-white'}`}>
+                <p className={`text-sm font-medium ${importType === type.value ? 'text-primary' : 'text-foreground'}`}>
                   {type.label}
                 </p>
-                <p className="mt-1 text-xs text-gray-500">{type.description}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{type.description}</p>
               </button>
             ))}
           </div>
 
           {/* File drop zone */}
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-700 bg-gray-900/30 p-12 transition-colors hover:border-cyan-500/50 hover:bg-gray-900/50">
-            <FileSpreadsheet className="mb-3 h-10 w-10 text-gray-500" />
-            <p className="text-sm font-medium text-white">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card/30 p-12 transition-colors hover:border-primary/50 hover:bg-card/50">
+            <FileSpreadsheet className="mb-3 h-10 w-10 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">
               {fileName ?? 'Drop CSV or Excel file here'}
             </p>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               Supports .csv, .xlsx, .xls
             </p>
             <input
@@ -306,15 +306,15 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">Map Columns</h2>
-              <p className="text-xs text-gray-500">
+              <h2 className="text-lg font-semibold text-foreground">Map Columns</h2>
+              <p className="text-xs text-muted-foreground">
                 {parsed.totalRows} rows found in {fileName}
               </p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handleReset}
-                className="flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-400 hover:border-gray-600"
+                className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-border"
               >
                 <ArrowLeft className="h-3 w-3" />
                 Back
@@ -322,7 +322,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
               <button
                 onClick={handlePreview}
                 disabled={mappings.length === 0}
-                className="flex items-center gap-1 rounded-lg bg-cyan-500 px-4 py-1.5 text-xs font-medium text-black hover:bg-cyan-400 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-[#00050F] hover:bg-primary/90 disabled:opacity-50"
               >
                 Preview
                 <ArrowRight className="h-3 w-3" />
@@ -331,18 +331,18 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
           </div>
 
           {/* Mapping table */}
-          <div className="rounded-lg border border-gray-800 overflow-hidden">
+          <div className="rounded-lg border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-800 bg-gray-900/50">
+              <thead className="border-b border-border bg-card/50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     Source Column
                   </th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">→</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2 text-center text-xs font-medium text-muted-foreground">→</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     MissionPulse Field
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">
                     Sample
                   </th>
                 </tr>
@@ -352,14 +352,14 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
                   const mapping = mappings.find((m) => m.sourceColumn === header)
                   const sampleValue = parsed.rows[0]?.[header] ?? ''
                   return (
-                    <tr key={header} className="border-b border-gray-800/50">
-                      <td className="px-4 py-2 font-mono text-xs text-white">{header}</td>
-                      <td className="px-4 py-2 text-center text-gray-600">→</td>
+                    <tr key={header} className="border-b border-border/50">
+                      <td className="px-4 py-2 font-mono text-xs text-foreground">{header}</td>
+                      <td className="px-4 py-2 text-center text-muted-foreground">→</td>
                       <td className="px-4 py-2">
                         <select
                           value={mapping?.targetField ?? ''}
                           onChange={(e) => updateMapping(header, e.target.value)}
-                          className="w-full rounded bg-gray-800 px-2 py-1 text-xs text-white border border-gray-700 focus:border-cyan-500 focus:outline-none"
+                          className="w-full rounded bg-muted px-2 py-1 text-xs text-foreground border border-border focus:border-primary focus:outline-none"
                         >
                           <option value="">— Skip —</option>
                           {getTargetFields().map((f) => (
@@ -369,7 +369,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
                           ))}
                         </select>
                       </td>
-                      <td className="px-4 py-2 text-xs text-gray-500 truncate max-w-[200px]">
+                      <td className="px-4 py-2 text-xs text-muted-foreground truncate max-w-[200px]">
                         {sampleValue}
                       </td>
                     </tr>
@@ -385,12 +385,12 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
       {(step === 'preview' || step === 'importing') && validation && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Validation Results</h2>
+            <h2 className="text-lg font-semibold text-foreground">Validation Results</h2>
             <div className="flex gap-2">
               <button
                 onClick={() => setStep('mapping')}
                 disabled={importing}
-                className="flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-400 hover:border-gray-600 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-border disabled:opacity-50"
               >
                 <ArrowLeft className="h-3 w-3" />
                 Fix Mappings
@@ -398,7 +398,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
               <button
                 onClick={handleImport}
                 disabled={!validation.valid || importing}
-                className="flex items-center gap-1 rounded-lg bg-cyan-500 px-4 py-1.5 text-xs font-medium text-black hover:bg-cyan-400 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-[#00050F] hover:bg-primary/90 disabled:opacity-50"
               >
                 {importing ? (
                   <>
@@ -417,47 +417,47 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
 
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
-            <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-3 text-center">
-              <Table className="mx-auto mb-1 h-4 w-4 text-gray-500" />
-              <p className="text-lg font-semibold text-white">{validation.summary.total}</p>
-              <p className="text-xs text-gray-500">Total</p>
+            <div className="rounded-lg border border-border bg-card/50 p-3 text-center">
+              <Table className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />
+              <p className="text-lg font-semibold text-foreground">{validation.summary.total}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
             </div>
             <div className="rounded-lg border border-emerald-900/50 bg-emerald-900/10 p-3 text-center">
               <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-emerald-400" />
               <p className="text-lg font-semibold text-emerald-400">{validation.summary.valid}</p>
-              <p className="text-xs text-gray-500">Valid</p>
+              <p className="text-xs text-muted-foreground">Valid</p>
             </div>
             <div className="rounded-lg border border-yellow-900/50 bg-yellow-900/10 p-3 text-center">
               <AlertTriangle className="mx-auto mb-1 h-4 w-4 text-yellow-400" />
               <p className="text-lg font-semibold text-yellow-400">{validation.summary.warnings}</p>
-              <p className="text-xs text-gray-500">Warnings</p>
+              <p className="text-xs text-muted-foreground">Warnings</p>
             </div>
             <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-3 text-center">
               <XCircle className="mx-auto mb-1 h-4 w-4 text-red-400" />
               <p className="text-lg font-semibold text-red-400">{validation.summary.errors}</p>
-              <p className="text-xs text-gray-500">Errors</p>
+              <p className="text-xs text-muted-foreground">Errors</p>
             </div>
           </div>
 
           {/* Preview table (first 10 rows) */}
-          <div className="rounded-lg border border-gray-800 overflow-x-auto">
+          <div className="rounded-lg border border-border overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="border-b border-gray-800 bg-gray-900/50">
+              <thead className="border-b border-border bg-card/50">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">#</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Status</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">#</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
                   {mappings.map((m) => (
-                    <th key={m.targetField} className="px-3 py-2 text-left font-medium text-gray-500">
+                    <th key={m.targetField} className="px-3 py-2 text-left font-medium text-muted-foreground">
                       {m.targetField}
                     </th>
                   ))}
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Issues</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Issues</th>
                 </tr>
               </thead>
               <tbody>
                 {validation.records.slice(0, 10).map((record) => (
-                  <tr key={record.index} className="border-b border-gray-800/50">
-                    <td className="px-3 py-2 text-gray-500">{record.index + 1}</td>
+                  <tr key={record.index} className="border-b border-border/50">
+                    <td className="px-3 py-2 text-muted-foreground">{record.index + 1}</td>
                     <td className="px-3 py-2">
                       {record.status === 'valid' && (
                         <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
@@ -470,7 +470,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
                       )}
                     </td>
                     {mappings.map((m) => (
-                      <td key={m.targetField} className="px-3 py-2 text-gray-400 max-w-[150px] truncate">
+                      <td key={m.targetField} className="px-3 py-2 text-muted-foreground max-w-[150px] truncate">
                         {String(record.data[m.targetField] ?? '')}
                       </td>
                     ))}
@@ -487,7 +487,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
               </tbody>
             </table>
             {validation.records.length > 10 && (
-              <div className="border-t border-gray-800 px-3 py-2 text-center text-xs text-gray-500">
+              <div className="border-t border-border px-3 py-2 text-center text-xs text-muted-foreground">
                 Showing first 10 of {validation.records.length} rows
               </div>
             )}
@@ -499,8 +499,8 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
       {step === 'complete' && (
         <div className="rounded-xl border border-emerald-900/50 bg-emerald-900/10 p-8 text-center">
           <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-400" />
-          <h2 className="text-xl font-semibold text-white">Import Complete</h2>
-          <p className="mt-1 text-sm text-gray-400">
+          <h2 className="text-xl font-semibold text-foreground">Import Complete</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             Successfully imported {importedCount} {importType} records.
           </p>
 
@@ -514,7 +514,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
             </button>
             <button
               onClick={handleReset}
-              className="flex items-center gap-1.5 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-black hover:bg-cyan-400"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-[#00050F] hover:bg-primary/90"
             >
               Import More
             </button>

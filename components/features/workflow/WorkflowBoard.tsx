@@ -27,7 +27,7 @@ interface WorkflowBoardProps {
 }
 
 const COLUMNS = [
-  { key: 'draft', label: 'Draft', color: 'border-gray-600' },
+  { key: 'draft', label: 'Draft', color: 'border-border' },
   { key: 'pink_review', label: 'Pink Team', color: 'border-pink-500' },
   { key: 'revision', label: 'Revision', color: 'border-amber-500' },
   { key: 'green_review', label: 'Green Team', color: 'border-emerald-500' },
@@ -44,11 +44,11 @@ function daysUntil(dateStr: string | null): string {
 }
 
 function dueColor(dateStr: string | null): string {
-  if (!dateStr) return 'text-gray-600'
+  if (!dateStr) return 'text-muted-foreground'
   const diff = Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   if (diff < 0) return 'text-red-400'
   if (diff <= 3) return 'text-amber-400'
-  return 'text-gray-500'
+  return 'text-muted-foreground'
 }
 
 export function WorkflowBoard({ opportunities, sections, canEdit }: WorkflowBoardProps) {
@@ -88,7 +88,7 @@ export function WorkflowBoard({ opportunities, sections, canEdit }: WorkflowBoar
         <select
           value={selectedOpp}
           onChange={(e) => setSelectedOpp(e.target.value)}
-          className="rounded-md border border-gray-700 bg-gray-900/50 px-3 py-2 text-sm text-gray-200 focus:border-[#00E5FA]/50 focus:outline-none focus:ring-1 focus:ring-[#00E5FA]/25"
+          className="rounded-md border border-border bg-card/50 px-3 py-2 text-sm text-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/25"
         >
           <option value="">All Opportunities ({filteredSections.length} sections)</option>
           {opportunities.map((o) => (
@@ -100,32 +100,32 @@ export function WorkflowBoard({ opportunities, sections, canEdit }: WorkflowBoar
       {/* Swimlane Columns */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         {COLUMNS.map((col) => (
-          <div key={col.key} className={`rounded-xl border-t-2 ${col.color} border border-gray-800 bg-gray-900/30`}>
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase">{col.label}</h3>
-              <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] font-medium text-gray-400">
+          <div key={col.key} className={`rounded-xl border-t-2 ${col.color} border border-border bg-card/30`}>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase">{col.label}</h3>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                 {columns[col.key].length}
               </span>
             </div>
             <div className="p-2 space-y-2 min-h-[120px]">
               {columns[col.key].length === 0 ? (
-                <p className="text-center text-[10px] text-gray-600 py-6">No sections</p>
+                <p className="text-center text-[10px] text-muted-foreground py-6">No sections</p>
               ) : (
                 columns[col.key].map((section) => (
                   <Link
                     key={section.id}
                     href={`/pipeline/${section.opportunity_id ?? ''}/sections/${section.id}`}
-                    className="block rounded-lg border border-gray-800 bg-gray-900/50 p-2.5 hover:border-[#00E5FA]/30 hover:bg-gray-800/50 transition-colors"
+                    className="block rounded-lg border border-border bg-card/50 p-2.5 hover:border-primary/30 hover:bg-muted/50 transition-colors"
                   >
-                    <p className="text-xs font-medium text-gray-200 truncate">
+                    <p className="text-xs font-medium text-foreground truncate">
                       {section.section_title}
                     </p>
                     {section.volume && (
-                      <p className="text-[10px] text-gray-500 mt-0.5 truncate">{section.volume}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{section.volume}</p>
                     )}
                     <div className="flex items-center justify-between mt-1.5">
                       {!selectedOpp && (
-                        <span className="text-[9px] text-gray-600 truncate max-w-[80px]">
+                        <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">
                           {section.opportunity_id ? (oppMap[section.opportunity_id] ?? '') : ''}
                         </span>
                       )}
@@ -143,7 +143,7 @@ export function WorkflowBoard({ opportunities, sections, canEdit }: WorkflowBoar
         ))}
       </div>
 
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-muted-foreground">
         {filteredSections.length} section{filteredSections.length !== 1 ? 's' : ''} across {COLUMNS.length} stages.
         {canEdit ? ' Click a section to edit.' : ''}
       </p>

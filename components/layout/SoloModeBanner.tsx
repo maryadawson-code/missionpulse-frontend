@@ -8,9 +8,9 @@ interface SoloModeBannerProps {
 
 export function SoloModeBanner({ companyName }: SoloModeBannerProps) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-[#00E5FA]/20 bg-[#00E5FA]/5 px-3 py-1.5">
-      <Zap className="h-3.5 w-3.5 text-[#00E5FA]" />
-      <span className="text-xs font-medium text-[#00E5FA]">
+    <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5">
+      <Zap className="h-3.5 w-3.5 text-primary" />
+      <span className="text-xs font-medium text-primary">
         Solo Mode
       </span>
       {companyName && (

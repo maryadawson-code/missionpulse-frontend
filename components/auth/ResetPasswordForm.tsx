@@ -63,7 +63,7 @@ export default function ResetPasswordForm() {
       )}
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-slate-400 mb-1.5">
+        <label htmlFor="password" className="block text-sm font-medium text-muted-foreground mb-1.5">
           New Password
         </label>
         <input
@@ -73,13 +73,13 @@ export default function ResetPasswordForm() {
           required
           minLength={8}
           autoComplete="new-password"
-          className="w-full rounded-lg border border-[#1E293B] bg-[#0F172A] px-4 py-2.5 text-white placeholder-slate-500 focus:border-[#00E5FA] focus:outline-none focus:ring-1 focus:ring-[#00E5FA]"
+          className="w-full rounded-lg border border-border bg-card px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="Min 8 characters"
         />
       </div>
 
       <div>
-        <label htmlFor="confirm_password" className="block text-sm font-medium text-slate-400 mb-1.5">
+        <label htmlFor="confirm_password" className="block text-sm font-medium text-muted-foreground mb-1.5">
           Confirm Password
         </label>
         <input
@@ -89,7 +89,7 @@ export default function ResetPasswordForm() {
           required
           minLength={8}
           autoComplete="new-password"
-          className="w-full rounded-lg border border-[#1E293B] bg-[#0F172A] px-4 py-2.5 text-white placeholder-slate-500 focus:border-[#00E5FA] focus:outline-none focus:ring-1 focus:ring-[#00E5FA]"
+          className="w-full rounded-lg border border-border bg-card px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="Confirm new password"
         />
       </div>
@@ -97,7 +97,7 @@ export default function ResetPasswordForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-[#00E5FA] px-4 py-2.5 font-semibold text-[#00050F] transition hover:bg-[#00E5FA]/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-[#00050F] transition hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Updating...' : 'Update Password'}
       </button>

@@ -25,7 +25,7 @@ function formatCurrency(value: number | null): string {
 }
 
 function probabilityColor(pct: number | null): string {
-  if (pct === null) return 'text-gray-400'
+  if (pct === null) return 'text-muted-foreground'
   if (pct >= 60) return 'text-emerald-400'
   if (pct >= 40) return 'text-amber-400'
   return 'text-red-400'
@@ -70,11 +70,11 @@ export function PriceToWinAnalysis({
     <div className="space-y-4">
       {/* Ceiling Reference */}
       {ceiling !== null && (
-        <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900/80 px-4 py-3">
-          <span className="text-xs uppercase tracking-wider text-gray-500">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card/80 px-4 py-3">
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">
             Government Ceiling Estimate
           </span>
-          <span className="font-mono text-lg font-bold text-white">
+          <span className="font-mono text-lg font-bold text-foreground">
             {formatCurrency(ceiling)}
           </span>
         </div>
@@ -96,14 +96,14 @@ export function PriceToWinAnalysis({
               onClick={() => setSelected(idx)}
               className={`rounded-lg border p-4 text-left transition-all ${
                 isSelected
-                  ? 'border-[#00E5FA]/50 bg-[#00E5FA]/5 ring-1 ring-[#00E5FA]/20'
-                  : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
+                  ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20'
+                  : 'border-border bg-card/50 hover:border-border'
               }`}
             >
               <div className="flex items-center justify-between">
                 <span
                   className={`text-xs font-semibold uppercase tracking-wider ${
-                    isSelected ? 'text-[#00E5FA]' : 'text-gray-500'
+                    isSelected ? 'text-primary' : 'text-muted-foreground'
                   }`}
                 >
                   {scenario.label}
@@ -118,11 +118,11 @@ export function PriceToWinAnalysis({
                   }`}
                 />
               </div>
-              <p className="mt-2 font-mono text-xl font-bold text-white">
+              <p className="mt-2 font-mono text-xl font-bold text-foreground">
                 {formatCurrency(scenario.pricePoint)}
               </p>
               <div className="mt-2 flex items-center gap-2">
-                <span className="text-[10px] text-gray-500">Win Prob:</span>
+                <span className="text-[10px] text-muted-foreground">Win Prob:</span>
                 <span
                   className={`font-mono text-sm font-semibold ${probabilityColor(
                     scenario.winProbability
@@ -134,7 +134,7 @@ export function PriceToWinAnalysis({
                 </span>
               </div>
               {ceiling && scenario.pricePoint && (
-                <p className="mt-1 text-[10px] text-gray-500">
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   {Math.round((scenario.pricePoint / ceiling) * 100)}% of
                   ceiling
                 </p>
@@ -145,49 +145,49 @@ export function PriceToWinAnalysis({
       </div>
 
       {/* Detail for selected scenario */}
-      <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <div className="rounded-lg border border-border bg-card/50 p-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {displayScenarios[selected]?.label} Positioning
         </h3>
-        <p className="mt-2 text-sm text-gray-300">
+        <p className="mt-2 text-sm text-muted-foreground">
           {displayScenarios[selected]?.positioning}
         </p>
       </div>
 
       {/* Comparison Table */}
-      <div className="overflow-hidden rounded-lg border border-gray-800">
+      <div className="overflow-hidden rounded-lg border border-border">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-gray-800 bg-gray-900/80">
-              <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <tr className="border-b border-border bg-card/80">
+              <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Metric
               </th>
               {displayScenarios.map((s) => (
                 <th
                   key={s.label}
-                  className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500"
+                  className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
                   {s.label}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-800/50">
-            <tr className="hover:bg-gray-800/30">
-              <td className="px-4 py-2.5 text-xs text-gray-400">
+          <tbody className="divide-y divide-border/50">
+            <tr className="hover:bg-muted/30">
+              <td className="px-4 py-2.5 text-xs text-muted-foreground">
                 Price Point
               </td>
               {displayScenarios.map((s) => (
                 <td
                   key={s.label}
-                  className="px-4 py-2.5 text-center font-mono text-sm text-gray-200"
+                  className="px-4 py-2.5 text-center font-mono text-sm text-foreground"
                 >
                   {formatCurrency(s.pricePoint)}
                 </td>
               ))}
             </tr>
-            <tr className="hover:bg-gray-800/30">
-              <td className="px-4 py-2.5 text-xs text-gray-400">
+            <tr className="hover:bg-muted/30">
+              <td className="px-4 py-2.5 text-xs text-muted-foreground">
                 Win Probability
               </td>
               {displayScenarios.map((s) => (
@@ -201,14 +201,14 @@ export function PriceToWinAnalysis({
                 </td>
               ))}
             </tr>
-            <tr className="hover:bg-gray-800/30">
-              <td className="px-4 py-2.5 text-xs text-gray-400">
+            <tr className="hover:bg-muted/30">
+              <td className="px-4 py-2.5 text-xs text-muted-foreground">
                 % of Ceiling
               </td>
               {displayScenarios.map((s) => (
                 <td
                   key={s.label}
-                  className="px-4 py-2.5 text-center text-xs text-gray-400"
+                  className="px-4 py-2.5 text-center text-xs text-muted-foreground"
                 >
                   {ceiling && s.pricePoint
                     ? `${Math.round((s.pricePoint / ceiling) * 100)}%`

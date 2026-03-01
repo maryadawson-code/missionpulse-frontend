@@ -334,7 +334,7 @@ export function CompetitorManager({
 
                 {comp.counter_strategy && (
                   <div>
-                    <h5 className="text-xs font-semibold uppercase text-[#00E5FA] mb-1">
+                    <h5 className="text-xs font-semibold uppercase text-primary mb-1">
                       Counter Strategy
                     </h5>
                     <p className="text-xs text-muted-foreground">

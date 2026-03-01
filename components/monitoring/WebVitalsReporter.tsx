@@ -48,8 +48,8 @@ export function WebVitalsReporter() {
   if (entries.length === 0) return null
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 rounded-lg border border-gray-700 bg-[#00050F]/95 px-3 py-2 font-mono text-xs shadow-lg backdrop-blur">
-      <div className="mb-1 text-[10px] font-semibold tracking-wider text-[#00E5FA]">
+    <div className="fixed bottom-4 right-4 z-50 rounded-lg border border-border bg-background/95 px-3 py-2 font-mono text-xs shadow-lg backdrop-blur">
+      <div className="mb-1 text-[10px] font-semibold tracking-wider text-primary">
         WEB VITALS
       </div>
       <div className="space-y-0.5">
@@ -57,7 +57,7 @@ export function WebVitalsReporter() {
           const rating = rateVital(name, value)
           return (
             <div key={name} className="flex items-center justify-between gap-3">
-              <span className="text-gray-400">{name}</span>
+              <span className="text-muted-foreground">{name}</span>
               <span className={RATING_COLORS[rating]}>
                 {formatValue(name, value)}
               </span>

@@ -142,7 +142,7 @@ export function CloudBinderPanel({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div className="flex items-center gap-3">
-          <FileArchive className="h-5 w-5 text-[#00E5FA]" />
+          <FileArchive className="h-5 w-5 text-primary" />
           <div>
             <h3 className="text-sm font-semibold text-foreground">
               Cloud Binder Assembly

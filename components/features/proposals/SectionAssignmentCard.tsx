@@ -39,7 +39,7 @@ const ASSIGNMENT_STATUS_STYLES: Record<string, { bg: string; text: string; label
 
 const DEFAULT_STATUS_STYLE = {
   bg: 'bg-slate-500/15 border-slate-500/30',
-  text: 'text-slate-300',
+  text: 'text-muted-foreground',
   label: 'Unknown',
 }
 

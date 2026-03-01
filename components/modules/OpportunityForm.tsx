@@ -90,9 +90,9 @@ export function OpportunityForm({ opportunity, mode }: OpportunityFormProps) {
   }
 
   const inputClass =
-    'w-full rounded-md border border-border bg-navy px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan disabled:opacity-50'
+    'w-full rounded-md border border-border bg-navy px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan disabled:opacity-50'
   const selectClass =
-    'w-full rounded-md border border-border bg-navy px-3 py-2 text-sm text-white focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan disabled:opacity-50'
+    'w-full rounded-md border border-border bg-navy px-3 py-2 text-sm text-foreground focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan disabled:opacity-50'
   const labelClass = 'block text-sm font-medium text-slate mb-1'
   const errorClass = 'text-xs text-red-400 mt-1'
 
@@ -100,7 +100,7 @@ export function OpportunityForm({ opportunity, mode }: OpportunityFormProps) {
     <form action={handleSubmit} className="space-y-8 max-w-3xl">
       {/* Section: Core Information */}
       <fieldset className="space-y-4 rounded-lg border border-border bg-surface p-6">
-        <legend className="text-sm font-semibold text-white px-2">
+        <legend className="text-sm font-semibold text-foreground px-2">
           Core Information
         </legend>
 
@@ -171,7 +171,7 @@ export function OpportunityForm({ opportunity, mode }: OpportunityFormProps) {
 
       {/* Section: Agency & Contract */}
       <fieldset className="space-y-4 rounded-lg border border-border bg-surface p-6">
-        <legend className="text-sm font-semibold text-white px-2">
+        <legend className="text-sm font-semibold text-foreground px-2">
           Agency &amp; Contract
         </legend>
 
@@ -338,7 +338,7 @@ export function OpportunityForm({ opportunity, mode }: OpportunityFormProps) {
 
       {/* Section: Pipeline Status */}
       <fieldset className="space-y-4 rounded-lg border border-border bg-surface p-6">
-        <legend className="text-sm font-semibold text-white px-2">
+        <legend className="text-sm font-semibold text-foreground px-2">
           Pipeline Status
         </legend>
 
@@ -439,7 +439,7 @@ export function OpportunityForm({ opportunity, mode }: OpportunityFormProps) {
 
       {/* Section: Contact */}
       <fieldset className="space-y-4 rounded-lg border border-border bg-surface p-6">
-        <legend className="text-sm font-semibold text-white px-2">
+        <legend className="text-sm font-semibold text-foreground px-2">
           Primary Contact
         </legend>
 
@@ -496,7 +496,7 @@ export function OpportunityForm({ opportunity, mode }: OpportunityFormProps) {
           type="button"
           onClick={() => router.push('/pipeline')}
           disabled={isPending}
-          className="rounded-md border border-border px-6 py-2.5 text-sm text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+          className="rounded-md border border-border px-6 py-2.5 text-sm text-foreground hover:bg-white/5 transition-colors disabled:opacity-50"
         >
           Cancel
         </button>

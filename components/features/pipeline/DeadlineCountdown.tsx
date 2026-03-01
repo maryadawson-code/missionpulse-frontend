@@ -41,10 +41,10 @@ export function DeadlineCountdown({ targetDate }: DeadlineCountdownProps) {
     <div className="flex items-center gap-2">
       <div className={`flex items-baseline gap-1 font-mono text-sm font-bold ${colorClass}`}>
         {overdue && <span className="text-xs font-medium">OVERDUE</span>}
-        <span>{days}<span className="text-xs font-normal text-gray-500">d</span></span>
-        <span>{padTwo(hours)}<span className="text-xs font-normal text-gray-500">h</span></span>
-        <span>{padTwo(minutes)}<span className="text-xs font-normal text-gray-500">m</span></span>
-        <span>{padTwo(seconds)}<span className="text-xs font-normal text-gray-500">s</span></span>
+        <span>{days}<span className="text-xs font-normal text-muted-foreground">d</span></span>
+        <span>{padTwo(hours)}<span className="text-xs font-normal text-muted-foreground">h</span></span>
+        <span>{padTwo(minutes)}<span className="text-xs font-normal text-muted-foreground">m</span></span>
+        <span>{padTwo(seconds)}<span className="text-xs font-normal text-muted-foreground">s</span></span>
       </div>
     </div>
   )

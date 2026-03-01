@@ -93,7 +93,7 @@ function statusIndicator(status: string | null) {
     case 'error':
       return 'bg-red-400'
     default:
-      return 'bg-gray-600'
+      return 'bg-muted-foreground'
   }
 }
 

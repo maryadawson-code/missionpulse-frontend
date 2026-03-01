@@ -76,12 +76,12 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-gray-400" />
-          <span className="text-sm font-medium text-white">Comments</span>
+          <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">Comments</span>
           {unresolvedComments.length > 0 && (
-            <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-400">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
               {unresolvedComments.length}
             </span>
           )}
@@ -94,16 +94,16 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
           <div className="space-y-3">
             {[1, 2].map((i) => (
               <div key={i} className="animate-pulse space-y-2">
-                <div className="h-3 w-24 rounded bg-gray-800" />
-                <div className="h-8 rounded bg-gray-800" />
+                <div className="h-3 w-24 rounded bg-muted" />
+                <div className="h-8 rounded bg-muted" />
               </div>
             ))}
           </div>
         ) : unresolvedComments.length === 0 && resolvedComments.length === 0 ? (
           <div className="py-8 text-center">
-            <MessageSquare className="mx-auto mb-2 h-8 w-8 text-gray-700" />
-            <p className="text-xs text-gray-500">No comments yet.</p>
-            <p className="mt-1 text-xs text-gray-600">
+            <MessageSquare className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">No comments yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               Use @role to mention team members.
             </p>
           </div>
@@ -140,7 +140,7 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
               <div className="mt-4">
                 <button
                   onClick={() => setShowResolved(!showResolved)}
-                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-400"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-muted-foreground"
                 >
                   {showResolved ? (
                     <ChevronDown className="h-3 w-3" />
@@ -183,7 +183,7 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-800 p-3">
+      <div className="border-t border-border p-3">
         <div className="flex gap-2">
           <textarea
             ref={inputRef}
@@ -191,7 +191,7 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
             onChange={(e) => setNewComment(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Add a comment... (use @role to mention)"
-            className="flex-1 resize-none rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
+            className="flex-1 resize-none rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
             rows={2}
           />
           <button
@@ -203,7 +203,7 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
             <Send className="h-4 w-4" />
           </button>
         </div>
-        <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-600">
+        <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
           <AtSign className="h-3 w-3" />
           @capture_manager, @contracts, @executive...
         </div>
@@ -258,7 +258,7 @@ function CommentThread({
     const parts = text.split(/(@\w+)/g)
     return parts.map((part, i) =>
       part.startsWith('@') ? (
-        <span key={i} className="rounded bg-cyan-500/10 px-1 text-cyan-400">
+        <span key={i} className="rounded bg-primary/10 px-1 text-primary">
           {part}
         </span>
       ) : (
@@ -279,27 +279,27 @@ function CommentThread({
   }
 
   return (
-    <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-3">
+    <div className="rounded-lg border border-border bg-card/50 p-3">
       {/* Author */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <div className="h-5 w-5 rounded-full bg-gray-700 flex items-center justify-center">
-            <span className="text-[9px] font-medium text-gray-300">
+          <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center">
+            <span className="text-[9px] font-medium text-foreground">
               {comment.authorName.charAt(0).toUpperCase()}
             </span>
           </div>
-          <span className="text-xs font-medium text-white">{comment.authorName}</span>
+          <span className="text-xs font-medium text-foreground">{comment.authorName}</span>
           {comment.authorRole && (
-            <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
               {comment.authorRole}
             </span>
           )}
         </div>
-        <span className="text-[10px] text-gray-600">{timeAgo(comment.createdAt)}</span>
+        <span className="text-[10px] text-muted-foreground">{timeAgo(comment.createdAt)}</span>
       </div>
 
       {/* Content */}
-      <p className="text-xs text-gray-300 leading-relaxed">
+      <p className="text-xs text-foreground leading-relaxed">
         {renderContent(comment.content)}
       </p>
 
@@ -307,13 +307,13 @@ function CommentThread({
       <div className="mt-2 flex items-center gap-3">
         <button
           onClick={() => setShowReply(!showReply)}
-          className="text-[10px] text-gray-500 hover:text-gray-400"
+          className="text-[10px] text-muted-foreground hover:text-muted-foreground"
         >
           Reply
         </button>
         <button
           onClick={handleResolve}
-          className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-400"
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground"
         >
           {comment.resolved ? (
             <>
@@ -331,16 +331,16 @@ function CommentThread({
 
       {/* Replies */}
       {comment.replies.length > 0 && (
-        <div className="mt-2 ml-4 space-y-2 border-l border-gray-800 pl-3">
+        <div className="mt-2 ml-4 space-y-2 border-l border-border pl-3">
           {comment.replies.map((reply) => (
             <div key={reply.id}>
               <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] font-medium text-gray-400">
+                <span className="text-[10px] font-medium text-muted-foreground">
                   {reply.authorName}
                 </span>
-                <span className="text-[10px] text-gray-600">{timeAgo(reply.createdAt)}</span>
+                <span className="text-[10px] text-muted-foreground">{timeAgo(reply.createdAt)}</span>
               </div>
-              <p className="text-[11px] text-gray-400">{renderContent(reply.content)}</p>
+              <p className="text-[11px] text-muted-foreground">{renderContent(reply.content)}</p>
             </div>
           ))}
         </div>
@@ -359,7 +359,7 @@ function CommentThread({
               }
             }}
             placeholder={`Reply as ${userName}...`}
-            className="flex-1 rounded border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-white placeholder-gray-600 focus:border-cyan-500 focus:outline-none"
+            className="flex-1 rounded border border-border bg-card px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
           <button
             onClick={handleReply}

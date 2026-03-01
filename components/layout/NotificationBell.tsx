@@ -31,7 +31,7 @@ function priorityDot(priority: string | null) {
     case 'high':
       return 'bg-amber-400'
     default:
-      return 'bg-[#00E5FA]'
+      return 'bg-primary'
   }
 }
 
@@ -91,7 +91,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
             </h3>
             <Link
               href="/notifications"
-              className="text-xs text-[#00E5FA] hover:underline"
+              className="text-xs text-primary hover:underline"
               onClick={() => setIsOpen(false)}
             >
               View All
@@ -137,7 +137,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
                           <button
                             onClick={() => handleMarkRead(n.id)}
                             disabled={isPending}
-                            className="text-[10px] text-[#00E5FA] hover:underline"
+                            className="text-[10px] text-primary hover:underline"
                           >
                             Mark read
                           </button>
@@ -158,7 +158,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
                           setIsOpen(false)
                           if (!n.is_read) handleMarkRead(n.id)
                         }}
-                        className="shrink-0 text-xs text-[#00E5FA] hover:underline"
+                        className="shrink-0 text-xs text-primary hover:underline"
                       >
                         View
                       </Link>

@@ -168,7 +168,7 @@ export function TeamRollup({ assignments, teamMembers, sections: _sections }: Te
                   className="h-9 w-9 rounded-full object-cover"
                 />
               ) : (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#00E5FA]/10 text-xs font-semibold text-[#00E5FA]">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                   {getInitials(summary.member.full_name, summary.member.email)}
                 </div>
               )}
@@ -195,7 +195,7 @@ export function TeamRollup({ assignments, teamMembers, sections: _sections }: Te
                     pct === 100
                       ? 'bg-emerald-500'
                       : pct >= 50
-                        ? 'bg-[#00E5FA]'
+                        ? 'bg-primary'
                         : 'bg-amber-500'
                   )}
                   style={{ width: `${pct}%` }}

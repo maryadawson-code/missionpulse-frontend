@@ -50,9 +50,9 @@ export function SpendingTrends({
 
   if (!agency) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 text-center">
-        <BarChart3 className="mx-auto mb-2 h-8 w-8 text-gray-600" />
-        <p className="text-sm text-gray-500">No agency specified — spending trends unavailable</p>
+      <div className="rounded-xl border border-border bg-card/50 p-6 text-center">
+        <BarChart3 className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">No agency specified — spending trends unavailable</p>
       </div>
     )
   }
@@ -82,8 +82,8 @@ export function SpendingTrends({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-cyan-400" />
-          <h3 className="font-semibold text-white">Spending Trends</h3>
-          <span className="text-xs text-gray-500">5-Year History</span>
+          <h3 className="font-semibold text-foreground">Spending Trends</h3>
+          <span className="text-xs text-muted-foreground">5-Year History</span>
         </div>
         {sortedTrends.length >= 2 && (
           <div className="flex items-center gap-1">
@@ -92,7 +92,7 @@ export function SpendingTrends({
             ) : overallTrend < 0 ? (
               <TrendingDown className="h-4 w-4 text-red-400" />
             ) : (
-              <Minus className="h-4 w-4 text-gray-400" />
+              <Minus className="h-4 w-4 text-muted-foreground" />
             )}
             <span
               className={`text-xs font-medium ${
@@ -100,7 +100,7 @@ export function SpendingTrends({
                   ? 'text-emerald-400'
                   : overallTrend < 0
                     ? 'text-red-400'
-                    : 'text-gray-400'
+                    : 'text-muted-foreground'
               }`}
             >
               {overallTrend > 0 ? 'Growing' : overallTrend < 0 ? 'Declining' : 'Flat'}
@@ -114,8 +114,8 @@ export function SpendingTrends({
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className="h-4 w-10 animate-pulse rounded bg-gray-800/50" />
-              <div className="h-6 flex-1 animate-pulse rounded bg-gray-800/50" />
+              <div className="h-4 w-10 animate-pulse rounded bg-muted/50" />
+              <div className="h-6 flex-1 animate-pulse rounded bg-muted/50" />
             </div>
           ))}
         </div>
@@ -141,26 +141,26 @@ export function SpendingTrends({
               <div key={trend.fiscalYear} className="group">
                 <div className="flex items-center gap-3">
                   {/* Year label */}
-                  <span className="w-12 shrink-0 text-xs font-medium text-gray-400">
+                  <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">
                     FY{trend.fiscalYear.toString().slice(-2)}
                   </span>
 
                   {/* Bar */}
-                  <div className="flex-1 h-7 rounded bg-gray-800/30 relative overflow-hidden">
+                  <div className="flex-1 h-7 rounded bg-muted/30 relative overflow-hidden">
                     <div
                       className="h-full rounded bg-gradient-to-r from-cyan-500/30 to-cyan-500/60 transition-all duration-500"
                       style={{ width: `${Math.max(barWidth, 2)}%` }}
                     />
                     {/* Amount overlay */}
                     <div className="absolute inset-0 flex items-center px-2">
-                      <span className="text-xs font-medium text-white/90">
+                      <span className="text-xs font-medium text-foreground/90">
                         {formatCurrency(trend.totalObligation)}
                       </span>
                     </div>
                   </div>
 
                   {/* Transaction count */}
-                  <span className="w-16 shrink-0 text-right text-xs text-gray-500">
+                  <span className="w-16 shrink-0 text-right text-xs text-muted-foreground">
                     {trend.transactionCount.toLocaleString()} txns
                   </span>
 
@@ -173,7 +173,7 @@ export function SpendingTrends({
                             ? 'text-emerald-400'
                             : yoyChange < 0
                               ? 'text-red-400'
-                              : 'text-gray-500'
+                              : 'text-muted-foreground'
                         }`}
                       >
                         {yoyChange > 0 ? '+' : ''}
@@ -190,32 +190,32 @@ export function SpendingTrends({
 
       {/* Empty state */}
       {!isPending && sortedTrends.length === 0 && !error && (
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4 text-center">
-          <BarChart3 className="mx-auto mb-2 h-6 w-6 text-gray-600" />
-          <p className="text-sm text-gray-500">No spending trend data available</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4 text-center">
+          <BarChart3 className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">No spending trend data available</p>
         </div>
       )}
 
       {/* Summary stats */}
       {sortedTrends.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-800">
+        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border">
           <div className="text-center">
-            <p className="text-xs text-gray-500">5yr Total</p>
-            <p className="text-sm font-semibold text-white">
+            <p className="text-xs text-muted-foreground">5yr Total</p>
+            <p className="text-sm font-semibold text-foreground">
               {formatCurrency(sortedTrends.reduce((sum, t) => sum + t.totalObligation, 0))}
             </p>
           </div>
           <div className="text-center">
-            <p className="text-xs text-gray-500">Avg/Year</p>
-            <p className="text-sm font-semibold text-white">
+            <p className="text-xs text-muted-foreground">Avg/Year</p>
+            <p className="text-sm font-semibold text-foreground">
               {formatCurrency(
                 sortedTrends.reduce((sum, t) => sum + t.totalObligation, 0) / sortedTrends.length
               )}
             </p>
           </div>
           <div className="text-center">
-            <p className="text-xs text-gray-500">Total Txns</p>
-            <p className="text-sm font-semibold text-white">
+            <p className="text-xs text-muted-foreground">Total Txns</p>
+            <p className="text-sm font-semibold text-foreground">
               {sortedTrends.reduce((sum, t) => sum + t.transactionCount, 0).toLocaleString()}
             </p>
           </div>

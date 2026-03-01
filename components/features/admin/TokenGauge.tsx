@@ -56,7 +56,7 @@ export function TokenGauge({
           <p className="text-xs font-medium uppercase text-muted-foreground">
             Token Allocation
           </p>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             {planName} — {formatTokens(allocated)} tokens/mo
           </p>
         </div>
@@ -81,7 +81,7 @@ export function TokenGauge({
               cy="80"
               r={radius}
               fill="none"
-              stroke="#1E293B"
+              stroke="hsl(var(--border))"
               strokeWidth="12"
             />
             {/* Progress arc */}
@@ -100,30 +100,30 @@ export function TokenGauge({
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-bold text-white">
+            <span className="text-2xl font-bold text-foreground">
               {usagePercent}%
             </span>
-            <span className="text-xs text-gray-500">used</span>
+            <span className="text-xs text-muted-foreground">used</span>
           </div>
         </div>
 
         {/* Stats */}
         <div className="space-y-3 flex-1">
           <div>
-            <p className="text-xs text-gray-500">Consumed</p>
-            <p className="text-lg font-semibold text-white">
+            <p className="text-xs text-muted-foreground">Consumed</p>
+            <p className="text-lg font-semibold text-foreground">
               {formatTokens(consumed)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-500">Remaining</p>
+            <p className="text-xs text-muted-foreground">Remaining</p>
             <p className="text-lg font-semibold text-emerald-400">
               {formatTokens(remaining)}
             </p>
           </div>
           {purchased > 0 && (
             <div>
-              <p className="text-xs text-gray-500">Purchased (add-on)</p>
+              <p className="text-xs text-muted-foreground">Purchased (add-on)</p>
               <p className="text-sm font-medium text-cyan-400">
                 +{formatTokens(purchased)}
               </p>
@@ -143,7 +143,7 @@ export function TokenGauge({
             }}
           />
         </div>
-        <div className="mt-1 flex justify-between text-[10px] text-gray-600">
+        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
           <span>0</span>
           <span>50%</span>
           <span>75%</span>

@@ -112,7 +112,7 @@ export function CostVolumeManager({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <DollarSign className="h-5 w-5 text-[#00E5FA]" />
+          <DollarSign className="h-5 w-5 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">
             Cost Volumes ({costVolumes.length})
           </h3>
@@ -217,7 +217,7 @@ export function CostVolumeManager({
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Total Proposed</p>
-                <p className="text-lg font-bold font-mono text-[#00E5FA]">
+                <p className="text-lg font-bold font-mono text-primary">
                   {formatCurrency(vol.total_proposed)}
                 </p>
               </div>

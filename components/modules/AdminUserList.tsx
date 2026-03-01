@@ -63,44 +63,44 @@ export function AdminUserList({ users }: AdminUserListProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-muted-foreground">
           {users.length} user{users.length !== 1 ? 's' : ''} total
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
+      <div className="overflow-hidden rounded-xl border border-border bg-card/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <tr className="border-b border-border bg-card/80">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   User
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Role
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Company
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Status
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Joined
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-border/50">
               {users.map((u) => (
-                <tr key={u.id} className="transition-colors hover:bg-gray-800/30">
+                <tr key={u.id} className="transition-colors hover:bg-muted/30">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-200">
+                    <p className="font-medium text-foreground">
                       {u.full_name ?? 'No name'}
                     </p>
-                    <p className="text-xs text-gray-500">{u.email}</p>
+                    <p className="text-xs text-muted-foreground">{u.email}</p>
                   </td>
                   <td className="px-4 py-3">
                     {editingId === u.id ? (
@@ -108,7 +108,7 @@ export function AdminUserList({ users }: AdminUserListProps) {
                         defaultValue={u.role ?? 'partner'}
                         onChange={(e) => handleRoleChange(u.id, e.target.value)}
                         disabled={isPending}
-                        className="rounded border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-200 focus:border-[#00E5FA]/50 focus:outline-none disabled:opacity-50"
+                        className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground focus:border-primary/50 focus:outline-none disabled:opacity-50"
                       >
                         {ASSIGNABLE_ROLES.map((r) => (
                           <option key={r} value={r}>
@@ -117,12 +117,12 @@ export function AdminUserList({ users }: AdminUserListProps) {
                         ))}
                       </select>
                     ) : (
-                      <span className="inline-block rounded-md bg-gray-800 px-2 py-0.5 text-xs text-gray-300">
+                      <span className="inline-block rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                         {(u.role ?? 'none').replace(/_/g, ' ')}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-400">
+                  <td className="px-4 py-3 text-muted-foreground">
                     {u.company ?? '—'}
                   </td>
                   <td className="px-4 py-3">
@@ -130,27 +130,27 @@ export function AdminUserList({ users }: AdminUserListProps) {
                       className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${
                         u.status === 'active'
                           ? 'bg-emerald-500/20 text-emerald-300'
-                          : 'bg-gray-500/20 text-gray-400'
+                          : 'bg-muted/20 text-muted-foreground'
                       }`}
                     >
                       {u.status ?? 'unknown'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
                     {formatDate(u.created_at)}
                   </td>
                   <td className="px-4 py-3">
                     {editingId === u.id ? (
                       <button
                         onClick={() => setEditingId(null)}
-                        className="text-xs text-gray-400 hover:text-white transition-colors"
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                       >
                         Cancel
                       </button>
                     ) : (
                       <button
                         onClick={() => setEditingId(u.id)}
-                        className="text-xs text-gray-400 hover:text-[#00E5FA] transition-colors"
+                        className="text-xs text-muted-foreground hover:text-primary transition-colors"
                       >
                         Change Role
                       </button>

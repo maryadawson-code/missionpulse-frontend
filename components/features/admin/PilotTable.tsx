@@ -31,7 +31,7 @@ function statusBadge(status: PilotInfo['status']) {
   switch (status) {
     case 'pilot':
       return (
-        <span className="rounded bg-[#00E5FA]/10 px-2 py-0.5 text-xs font-medium text-[#00E5FA]">
+        <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
           Active
         </span>
       )
@@ -100,7 +100,7 @@ export function PilotTable() {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 animate-pulse rounded bg-[#0F172A]" />
+          <div key={i} className="h-16 animate-pulse rounded bg-card" />
         ))}
       </div>
     )
@@ -108,9 +108,9 @@ export function PilotTable() {
 
   if (pilots.length === 0) {
     return (
-      <div className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-8 text-center">
-        <p className="text-sm text-gray-400">No pilots to display.</p>
-        <p className="mt-1 text-xs text-gray-600">
+      <div className="rounded-lg border border-border bg-card p-8 text-center">
+        <p className="text-sm text-muted-foreground">No pilots to display.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
           Pilots appear here when companies start a 30-day trial.
         </p>
       </div>
@@ -121,32 +121,32 @@ export function PilotTable() {
   const sorted = [...pilots].sort((a, b) => b.engagementScore - a.engagementScore)
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[#1E293B]">
+    <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[#1E293B] bg-[#0F172A]">
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400">
+          <tr className="border-b border-border bg-card">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
               Company
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
               Plan
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400">
+            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">
               Status
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400">
+            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">
               Days Left
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400">
+            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">
               Engagement
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400">
+            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">
               Token Usage
             </th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400">
+            <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
               Pilot Paid
             </th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400">
+            <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
               Actions
             </th>
           </tr>
@@ -155,17 +155,17 @@ export function PilotTable() {
           {sorted.map((pilot) => (
             <tr
               key={pilot.companyId}
-              className="border-b border-[#1E293B]/50 bg-[#00050F]/30 hover:bg-[#0F172A]/50"
+              className="border-b border-border/50 bg-background/30 hover:bg-card/50"
             >
               <td className="px-4 py-3">
-                <div className="font-medium text-gray-200">
+                <div className="font-medium text-foreground">
                   {pilot.companyName}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   {formatDate(pilot.startDate)} — {formatDate(pilot.endDate)}
                 </div>
               </td>
-              <td className="px-4 py-3 text-gray-300">{pilot.planName}</td>
+              <td className="px-4 py-3 text-muted-foreground">{pilot.planName}</td>
               <td className="px-4 py-3 text-center">{statusBadge(pilot.status)}</td>
               <td className="px-4 py-3 text-center">
                 <span
@@ -174,7 +174,7 @@ export function PilotTable() {
                       ? 'text-red-400'
                       : pilot.daysRemaining <= 10
                         ? 'text-yellow-400'
-                        : 'text-gray-300'
+                        : 'text-muted-foreground'
                   }`}
                 >
                   {pilot.daysRemaining}
@@ -192,16 +192,16 @@ export function PilotTable() {
               </td>
               <td className="px-4 py-3 text-center">
                 <div className="flex items-center justify-center gap-2">
-                  <div className="h-1.5 w-16 rounded-full bg-[#1E293B]">
+                  <div className="h-1.5 w-16 rounded-full bg-border">
                     <div
-                      className="h-1.5 rounded-full bg-[#00E5FA]"
+                      className="h-1.5 rounded-full bg-primary"
                       style={{ width: `${Math.min(100, pilot.tokenUsagePercent)}%` }}
                     />
                   </div>
-                  <span className="text-xs text-gray-400">{pilot.tokenUsagePercent}%</span>
+                  <span className="text-xs text-muted-foreground">{pilot.tokenUsagePercent}%</span>
                 </div>
               </td>
-              <td className="px-4 py-3 text-right text-gray-300">
+              <td className="px-4 py-3 text-right text-muted-foreground">
                 {formatCurrency(pilot.amountPaidCents)}
               </td>
               <td className="px-4 py-3 text-right">
@@ -210,7 +210,7 @@ export function PilotTable() {
                     <button
                       onClick={() => handleExtend(pilot.companyId)}
                       disabled={actionLoading === pilot.companyId}
-                      className="rounded bg-[#1E293B] px-2 py-1 text-xs text-gray-300 hover:bg-[#1E293B]/80 disabled:opacity-50"
+                      className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/80 disabled:opacity-50"
                     >
                       +7 Days
                     </button>

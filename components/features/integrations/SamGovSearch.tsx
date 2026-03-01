@@ -139,7 +139,7 @@ export function SamGovSearch() {
                       href={`https://sam.gov/opp/${opp.noticeId}/view`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-[#00E5FA]"
+                      className="text-muted-foreground hover:text-primary"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </a>

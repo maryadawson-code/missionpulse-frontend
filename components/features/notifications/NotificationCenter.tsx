@@ -49,7 +49,7 @@ function typeBadge(type: string) {
     case 'deadline':
       return 'bg-red-500/20 text-red-300'
     case 'assignment':
-      return 'bg-[#00E5FA]/20 text-[#00E5FA]'
+      return 'bg-primary/20 text-primary'
     case 'ai_complete':
       return 'bg-purple-500/20 text-purple-300'
     default:
@@ -120,7 +120,7 @@ export function NotificationCenter({
           >
             Unread ({unreadCount})
           </button>
-          <span className="mx-1 text-gray-700">|</span>
+          <span className="mx-1 text-border">|</span>
           {TYPE_FILTERS.map((t) => (
             <button
               key={t.key}
@@ -160,7 +160,7 @@ export function NotificationCenter({
           filtered.map((n) => (
             <div
               key={n.id}
-              className={`px-5 py-4 transition-colors hover:bg-muted/10 ${!n.is_read ? 'border-l-2 border-l-[#00E5FA]' : ''}`}
+              className={`px-5 py-4 transition-colors hover:bg-muted/10 ${!n.is_read ? 'border-l-2 border-l-primary' : ''}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -202,7 +202,7 @@ export function NotificationCenter({
                     {n.link_url && (
                       <Link
                         href={n.link_url}
-                        className="text-[10px] text-[#00E5FA] hover:underline"
+                        className="text-[10px] text-primary hover:underline"
                       >
                         {n.link_text ?? 'View'}
                       </Link>
@@ -214,7 +214,7 @@ export function NotificationCenter({
                     <button
                       onClick={() => handleMarkRead(n.id)}
                       disabled={isPending}
-                      className="rounded p-1 text-muted-foreground hover:text-[#00E5FA]"
+                      className="rounded p-1 text-muted-foreground hover:text-primary"
                       title="Mark as read"
                     >
                       <Check className="h-4 w-4" />

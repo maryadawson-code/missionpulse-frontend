@@ -125,18 +125,18 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-        <span className="ml-2 text-sm text-gray-500">Loading version history...</span>
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading version history...</span>
       </div>
     )
   }
 
   if (versions.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900/30 px-6 py-10 text-center">
-        <FileText className="mx-auto h-10 w-10 text-gray-600 mb-3" />
-        <p className="text-sm text-gray-400">No versions recorded yet.</p>
-        <p className="text-xs text-gray-600 mt-1">
+      <div className="rounded-xl border border-border bg-card/30 px-6 py-10 text-center">
+        <FileText className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+        <p className="text-sm text-muted-foreground">No versions recorded yet.</p>
+        <p className="text-xs text-muted-foreground mt-1">
           Versions are created automatically when the document is saved.
         </p>
       </div>
@@ -148,22 +148,22 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
       {/* Version selectors */}
       <div className="flex items-center gap-3">
         <div className="flex-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1 block">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
             Base Version (Old)
           </label>
           <Select
             value={leftVersionId ?? ''}
             onValueChange={(val) => setLeftVersionId(val || null)}
           >
-            <SelectTrigger className="w-full bg-gray-900/50 border-gray-800 text-gray-300 text-xs">
+            <SelectTrigger className="w-full bg-card/50 border-border text-muted-foreground text-xs">
               <SelectValue placeholder="Select base version" />
             </SelectTrigger>
-            <SelectContent className="bg-[#00050F] border-gray-800">
+            <SelectContent className="bg-background border-border">
               {versions.map((ver) => (
                 <SelectItem
                   key={ver.id}
                   value={ver.id}
-                  className="text-xs text-gray-300 focus:bg-gray-800 focus:text-gray-100"
+                  className="text-xs text-muted-foreground focus:bg-muted focus:text-foreground"
                 >
                   v{ver.version_number} — {formatSource(ver.source)} — {formatDate(ver.created_at)}
                 </SelectItem>
@@ -172,25 +172,25 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
           </Select>
         </div>
 
-        <ArrowLeftRight className="h-4 w-4 text-gray-600 mt-5 shrink-0" />
+        <ArrowLeftRight className="h-4 w-4 text-muted-foreground mt-5 shrink-0" />
 
         <div className="flex-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1 block">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
             Compare Version (New)
           </label>
           <Select
             value={rightVersionId ?? ''}
             onValueChange={(val) => setRightVersionId(val || null)}
           >
-            <SelectTrigger className="w-full bg-gray-900/50 border-gray-800 text-gray-300 text-xs">
+            <SelectTrigger className="w-full bg-card/50 border-border text-muted-foreground text-xs">
               <SelectValue placeholder="Select compare version" />
             </SelectTrigger>
-            <SelectContent className="bg-[#00050F] border-gray-800">
+            <SelectContent className="bg-background border-border">
               {versions.map((ver) => (
                 <SelectItem
                   key={ver.id}
                   value={ver.id}
-                  className="text-xs text-gray-300 focus:bg-gray-800 focus:text-gray-100"
+                  className="text-xs text-muted-foreground focus:bg-muted focus:text-foreground"
                 >
                   v{ver.version_number} — {formatSource(ver.source)} — {formatDate(ver.created_at)}
                 </SelectItem>
@@ -202,10 +202,10 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
 
       {/* Diff stats bar */}
       {stats && !diffLoading && (
-        <div className="flex items-center gap-4 rounded-lg border border-gray-800 bg-gray-900/30 px-4 py-2.5">
+        <div className="flex items-center gap-4 rounded-lg border border-border bg-card/30 px-4 py-2.5">
           <div className="flex items-center gap-1.5">
-            <GitCompareArrows className="h-3.5 w-3.5 text-gray-500" />
-            <span className="text-xs text-gray-400">Changes:</span>
+            <GitCompareArrows className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Changes:</span>
           </div>
           <div className="flex items-center gap-1">
             <Plus className="h-3 w-3 text-emerald-400" />
@@ -219,7 +219,7 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
             <PenLine className="h-3 w-3 text-amber-400" />
             <span className="text-xs text-amber-300">{stats.modifications} modified</span>
           </div>
-          <span className="text-xs text-gray-600 ml-auto">
+          <span className="text-xs text-muted-foreground ml-auto">
             {stats.unchanged} unchanged
           </span>
         </div>
@@ -228,38 +228,38 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
       {/* Diff content */}
       {diffLoading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-          <span className="ml-2 text-sm text-gray-500">Computing diff...</span>
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Computing diff...</span>
         </div>
       ) : !leftVersionId || !rightVersionId ? (
-        <div className="rounded-lg border border-gray-800 bg-gray-900/30 px-4 py-6 text-center">
-          <p className="text-sm text-gray-400">
+        <div className="rounded-lg border border-border bg-card/30 px-4 py-6 text-center">
+          <p className="text-sm text-muted-foreground">
             Select two versions above to compare.
           </p>
         </div>
       ) : leftVersionId === rightVersionId ? (
-        <div className="rounded-lg border border-gray-800 bg-gray-900/30 px-4 py-6 text-center">
-          <p className="text-sm text-gray-400">
+        <div className="rounded-lg border border-border bg-card/30 px-4 py-6 text-center">
+          <p className="text-sm text-muted-foreground">
             Same version selected on both sides. Select different versions to compare.
           </p>
         </div>
       ) : diffResult ? (
-        <div className="rounded-lg border border-gray-800 overflow-hidden">
+        <div className="rounded-lg border border-border overflow-hidden">
           {/* Diff header */}
-          <div className="grid grid-cols-2 gap-px bg-gray-800">
-            <div className="bg-gray-900/70 px-3 py-2 flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          <div className="grid grid-cols-2 gap-px bg-muted">
+            <div className="bg-card/70 px-3 py-2 flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Base
               </span>
-              <span className="text-[10px] text-gray-600">
+              <span className="text-[10px] text-muted-foreground">
                 (v{versions.find((v) => v.id === leftVersionId)?.version_number ?? '?'})
               </span>
             </div>
-            <div className="bg-gray-900/70 px-3 py-2 flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+            <div className="bg-card/70 px-3 py-2 flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Compare
               </span>
-              <span className="text-[10px] text-gray-600">
+              <span className="text-[10px] text-muted-foreground">
                 (v{versions.find((v) => v.id === rightVersionId)?.version_number ?? '?'})
               </span>
             </div>
@@ -298,7 +298,7 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
             {diffResult.additions.length === 0 &&
               diffResult.deletions.length === 0 &&
               diffResult.modifications.length === 0 && (
-                <div className="px-4 py-6 text-center text-gray-500">
+                <div className="px-4 py-6 text-center text-muted-foreground">
                   No differences found between these versions.
                 </div>
               )}
@@ -364,11 +364,11 @@ function DiffBlockRow({ type, block }: DiffBlockRowProps) {
     <div className={cn('border-l-2', config.borderColor, config.bg)}>
       {/* Block header with path info */}
       {block.path !== 'line' && (
-        <div className="px-3 py-1 border-b border-gray-800/50">
+        <div className="px-3 py-1 border-b border-border/50">
           <span className={cn('text-[10px] font-semibold', config.prefixColor)}>
             {config.label}
           </span>
-          <span className="text-[10px] text-gray-600 ml-2">
+          <span className="text-[10px] text-muted-foreground ml-2">
             {block.path}
           </span>
         </div>
@@ -378,9 +378,9 @@ function DiffBlockRow({ type, block }: DiffBlockRowProps) {
       {lines.map((line, idx) => (
         <div
           key={idx}
-          className="flex items-start px-3 py-0.5 border-b border-gray-800/20"
+          className="flex items-start px-3 py-0.5 border-b border-border/20"
         >
-          <span className="w-8 shrink-0 text-right pr-3 text-gray-600 select-none">
+          <span className="w-8 shrink-0 text-right pr-3 text-muted-foreground select-none">
             {lineStart + idx + 1}
           </span>
           <span className={cn('w-4 shrink-0 text-center select-none', config.prefixColor)}>

@@ -6,6 +6,9 @@ import {
   Droppable,
   Draggable,
   type DropResult,
+  type DragStart,
+  type DragUpdate,
+  type ResponderProvided,
 } from '@hello-pangea/dnd'
 import { Loader2 } from 'lucide-react'
 
@@ -72,6 +75,7 @@ export function SwimlaneBoard({
 }: SwimlaneBoardProps) {
   const [isPending, startTransition] = useTransition()
   const [volumeFilter, setVolumeFilter] = useState<string>('All')
+  const [liveMessage, setLiveMessage] = useState('')
 
   const filtered =
     volumeFilter === 'All'
@@ -84,34 +88,103 @@ export function SwimlaneBoard({
     items: filtered.filter((s) => (s.status ?? 'draft') === col.id),
   }))
 
-  const handleDragEnd = useCallback(function handleDragEnd(result: DropResult) {
-    if (!canEdit) return
-    const { destination, draggableId } = result
-    if (!destination) return
+  const findSectionTitle = useCallback(
+    (id: string) => sections.find((s) => s.id === id)?.section_title ?? 'section',
+    [sections]
+  )
 
-    const newStatus = destination.droppableId
-    const section = sections.find((s) => s.id === draggableId)
-    const currentStatus = section?.status ?? 'draft'
-    if (!section || currentStatus === newStatus) return
+  const getColumnLabel = useCallback(
+    (colId: string) => SWIMLANE_COLUMNS.find((c) => c.id === colId)?.label ?? colId,
+    []
+  )
 
-    // Client-side transition validation
-    const allowed = VALID_TRANSITIONS[currentStatus] ?? []
-    if (!allowed.includes(newStatus)) {
-      const label = SWIMLANE_COLUMNS.find((c) => c.id === newStatus)?.label ?? newStatus
-      addToast('error', `Cannot move directly to ${label}`)
-      return
-    }
+  const handleDragStart = useCallback(
+    (start: DragStart, provided: ResponderProvided) => {
+      const title = findSectionTitle(start.draggableId)
+      const label = getColumnLabel(start.source.droppableId)
+      const msg = `Picked up ${title} from ${label}. Use arrow keys to move.`
+      setLiveMessage(msg)
+      provided.announce(msg)
+    },
+    [findSectionTitle, getColumnLabel]
+  )
 
-    startTransition(async () => {
-      const res = await updateSectionStatus(draggableId, newStatus, opportunityId)
-      if (res.success) {
-        const label = SWIMLANE_COLUMNS.find((c) => c.id === newStatus)?.label ?? newStatus
-        addToast('success', `Moved to ${label}`)
-      } else {
-        addToast('error', res.error ?? 'Failed to update status')
+  const handleDragUpdate = useCallback(
+    (update: DragUpdate, provided: ResponderProvided) => {
+      if (!update.destination) {
+        const msg = 'Not over a droppable area.'
+        setLiveMessage(msg)
+        provided.announce(msg)
+        return
       }
-    })
-  }, [canEdit, sections, opportunityId, startTransition])
+      const title = findSectionTitle(update.draggableId)
+      const label = getColumnLabel(update.destination.droppableId)
+      const msg = `${title} is over ${label}, position ${update.destination.index + 1}.`
+      setLiveMessage(msg)
+      provided.announce(msg)
+    },
+    [findSectionTitle, getColumnLabel]
+  )
+
+  const handleDragEnd = useCallback(
+    (result: DropResult, provided: ResponderProvided) => {
+      const title = findSectionTitle(result.draggableId)
+
+      if (!result.destination) {
+        const msg = `${title} dropped. No change.`
+        setLiveMessage(msg)
+        provided.announce(msg)
+        return
+      }
+
+      if (!canEdit) {
+        const msg = `Cannot move ${title}. You do not have edit permissions.`
+        setLiveMessage(msg)
+        provided.announce(msg)
+        return
+      }
+
+      const { destination, draggableId } = result
+      const newStatus = destination.droppableId
+      const section = sections.find((s) => s.id === draggableId)
+      const currentStatus = section?.status ?? 'draft'
+
+      if (!section || currentStatus === newStatus) {
+        const currentLabel = getColumnLabel(currentStatus)
+        const msg = `${title} returned to ${currentLabel}.`
+        setLiveMessage(msg)
+        provided.announce(msg)
+        return
+      }
+
+      // Client-side transition validation
+      const allowed = VALID_TRANSITIONS[currentStatus] ?? []
+      if (!allowed.includes(newStatus)) {
+        const targetLabel = getColumnLabel(newStatus)
+        const currentLabel = getColumnLabel(currentStatus)
+        const msg = `Cannot move ${title} from ${currentLabel} to ${targetLabel}. Invalid transition.`
+        setLiveMessage(msg)
+        provided.announce(msg)
+        addToast('error', `Cannot move directly to ${targetLabel}`)
+        return
+      }
+
+      const targetLabel = getColumnLabel(newStatus)
+      const msg = `Moved ${title} to ${targetLabel}.`
+      setLiveMessage(msg)
+      provided.announce(msg)
+
+      startTransition(async () => {
+        const res = await updateSectionStatus(draggableId, newStatus, opportunityId)
+        if (res.success) {
+          addToast('success', `Moved to ${targetLabel}`)
+        } else {
+          addToast('error', res.error ?? 'Failed to update status')
+        }
+      })
+    },
+    [canEdit, sections, opportunityId, findSectionTitle, getColumnLabel, startTransition]
+  )
 
   return (
     <div className="space-y-4">
@@ -133,25 +206,41 @@ export function SwimlaneBoard({
       </div>
 
       {/* Board */}
-      <div className="relative">
+      <div className="relative" role="region" aria-label="Section Swimlane Board">
+        {/* Live region for screen reader announcements */}
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {liveMessage}
+        </div>
+
         {isPending && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Saving changes" />
           </div>
         )}
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
+        <DragDropContext
+          onDragStart={handleDragStart}
+          onDragUpdate={handleDragUpdate}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4" role="list" aria-label="Review stages">
             {columns.map(({ id, label, items }) => (
               <div
                 key={id}
+                role="listitem"
+                aria-label={`${label} column, ${items.length} ${items.length === 1 ? 'section' : 'sections'}`}
                 className="flex w-[220px] min-w-[220px] flex-col rounded-lg border border-border bg-card"
               >
                 <div className="flex items-center justify-between border-b border-border px-3 py-2">
                   <h3 className="text-sm font-semibold text-foreground">
                     {label}
                   </h3>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground" aria-hidden="true">
                     {items.length}
                   </span>
                 </div>
@@ -182,12 +271,20 @@ export function SwimlaneBoard({
                               ref={dragProvided.innerRef}
                               {...dragProvided.draggableProps}
                               {...dragProvided.dragHandleProps}
+                              role="button"
+                              tabIndex={0}
+                              aria-roledescription="draggable section"
+                              aria-describedby={`swimlane-instructions-${section.id}`}
+                              aria-label={`${section.section_title}, ${label}`}
                               className={
                                 dragSnapshot.isDragging
                                   ? 'opacity-90 shadow-lg'
                                   : ''
                               }
                             >
+                              <span id={`swimlane-instructions-${section.id}`} className="sr-only">
+                                Press Space or Enter to pick up. Use arrow keys to move between columns. Press Space or Enter to drop. Press Escape to cancel.
+                              </span>
                               <SectionCard
                                 section={section}
                                 teamMembers={teamMembers}

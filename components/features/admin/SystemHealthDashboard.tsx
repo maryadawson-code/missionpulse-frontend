@@ -28,7 +28,7 @@ function statusIcon(status: string) {
     case 'not_configured':
       return <XCircle className="h-5 w-5 text-red-400" />
     default:
-      return <AlertTriangle className="h-5 w-5 text-gray-400" />
+      return <AlertTriangle className="h-5 w-5 text-muted-foreground" />
   }
 }
 

@@ -57,7 +57,7 @@ function severityIcon(severity: string | null) {
     case 'minor':
       return <AlertTriangle className="h-3 w-3 text-amber-400" />
     default:
-      return <MessageSquare className="h-3 w-3 text-gray-400" />
+      return <MessageSquare className="h-3 w-3 text-muted-foreground" />
   }
 }
 

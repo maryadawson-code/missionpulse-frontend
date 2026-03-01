@@ -112,7 +112,7 @@ export function ProviderConfig() {
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-32 animate-pulse rounded-lg bg-[#0F172A]" />
+          <div key={i} className="h-32 animate-pulse rounded-lg bg-card" />
         ))}
       </div>
     )
@@ -129,12 +129,12 @@ export function ProviderConfig() {
           return (
             <div
               key={p.id}
-              className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-5"
+              className="rounded-lg border border-border bg-card p-5"
             >
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-gray-100">
+                    <h3 className="text-base font-semibold text-foreground">
                       {p.name}
                     </h3>
                     {p.fedRamp && (
@@ -143,7 +143,7 @@ export function ProviderConfig() {
                       </span>
                     )}
                     {p.isPrimary && (
-                      <span className="rounded bg-[#00E5FA]/10 px-2 py-0.5 text-[10px] font-medium text-[#00E5FA]">
+                      <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                         Primary
                       </span>
                     )}
@@ -153,8 +153,8 @@ export function ProviderConfig() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Provider ID: <code className="text-gray-400">{p.id}</code>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Provider ID: <code className="text-muted-foreground">{p.id}</code>
                   </p>
                 </div>
 
@@ -163,7 +163,7 @@ export function ProviderConfig() {
                   <span
                     className={`h-2.5 w-2.5 rounded-full ${
                       !p.configured
-                        ? 'bg-gray-600'
+                        ? 'bg-muted'
                         : h?.status === 'healthy'
                           ? 'bg-green-500'
                           : h?.status === 'degraded'
@@ -171,7 +171,7 @@ export function ProviderConfig() {
                             : 'bg-red-500'
                     }`}
                   />
-                  <span className="text-sm text-gray-400">
+                  <span className="text-sm text-muted-foreground">
                     {!p.configured
                       ? 'Not configured'
                       : h?.status === 'healthy'
@@ -186,26 +186,26 @@ export function ProviderConfig() {
               {/* Stats row */}
               <div className="mt-4 grid grid-cols-4 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">Latency</p>
-                  <p className="text-sm font-medium text-gray-200">
+                  <p className="text-xs text-muted-foreground">Latency</p>
+                  <p className="text-sm font-medium text-foreground">
                     {h?.latencyMs ? `${h.latencyMs}ms` : '—'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Failures</p>
-                  <p className="text-sm font-medium text-gray-200">
+                  <p className="text-xs text-muted-foreground">Failures</p>
+                  <p className="text-sm font-medium text-foreground">
                     {h?.consecutiveFailures ?? 0}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">This Month</p>
-                  <p className="text-sm font-medium text-gray-200">
+                  <p className="text-xs text-muted-foreground">This Month</p>
+                  <p className="text-sm font-medium text-foreground">
                     {c ? formatCurrency(c.totalCost) : '$0.00'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Tokens Used</p>
-                  <p className="text-sm font-medium text-gray-200">
+                  <p className="text-xs text-muted-foreground">Tokens Used</p>
+                  <p className="text-sm font-medium text-foreground">
                     {c ? formatTokens(c.totalTokens) : '0'}
                   </p>
                 </div>
@@ -213,11 +213,11 @@ export function ProviderConfig() {
 
               {/* Actions */}
               {p.configured && (
-                <div className="mt-4 border-t border-[#1E293B] pt-3">
+                <div className="mt-4 border-t border-border pt-3">
                   <button
                     onClick={() => testConnection(p.id)}
                     disabled={testing === p.id}
-                    className="rounded bg-[#1E293B] px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-[#1E293B]/80 disabled:opacity-50"
+                    className="rounded bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/80 disabled:opacity-50"
                   >
                     {testing === p.id ? 'Testing...' : 'Test Connection'}
                   </button>
@@ -246,23 +246,23 @@ export function ProviderConfig() {
       </div>
 
       {/* Routing Config */}
-      <div className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-5">
-        <h3 className="text-sm font-semibold text-gray-200">
+      <div className="rounded-lg border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground">
           Routing Configuration
         </h3>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           Set primary and fallback providers for UNCLASSIFIED requests.
         </p>
         <div className="mt-3 space-y-3">
-          <div className="flex items-center justify-between rounded bg-[#00050F]/50 px-3 py-2">
-            <label htmlFor="primary-provider" className="text-xs text-gray-400">
+          <div className="flex items-center justify-between rounded bg-background/50 px-3 py-2">
+            <label htmlFor="primary-provider" className="text-xs text-muted-foreground">
               Primary Provider
             </label>
             <select
               id="primary-provider"
               value={selectedPrimary}
               onChange={(e) => setSelectedPrimary(e.target.value as ProviderId)}
-              className="rounded border border-[#1E293B] bg-[#0F172A] px-2 py-1 text-xs text-[#00E5FA] focus:outline-none focus:ring-1 focus:ring-[#00E5FA]"
+              className="rounded border border-border bg-card px-2 py-1 text-xs text-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id} disabled={!p.configured}>
@@ -271,15 +271,15 @@ export function ProviderConfig() {
               ))}
             </select>
           </div>
-          <div className="flex items-center justify-between rounded bg-[#00050F]/50 px-3 py-2">
-            <label htmlFor="fallback-provider" className="text-xs text-gray-400">
+          <div className="flex items-center justify-between rounded bg-background/50 px-3 py-2">
+            <label htmlFor="fallback-provider" className="text-xs text-muted-foreground">
               Fallback Provider
             </label>
             <select
               id="fallback-provider"
               value={selectedFallback}
               onChange={(e) => setSelectedFallback(e.target.value as ProviderId)}
-              className="rounded border border-[#1E293B] bg-[#0F172A] px-2 py-1 text-xs text-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+              className="rounded border border-border bg-card px-2 py-1 text-xs text-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400"
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id} disabled={!p.configured || p.id === selectedPrimary}>
@@ -291,7 +291,7 @@ export function ProviderConfig() {
           <button
             onClick={saveRoutingConfig}
             disabled={saving}
-            className="rounded bg-[#00E5FA]/10 px-4 py-1.5 text-xs font-medium text-[#00E5FA] hover:bg-[#00E5FA]/20 disabled:opacity-50"
+            className="rounded bg-primary/10 px-4 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Configuration'}
           </button>
@@ -303,7 +303,7 @@ export function ProviderConfig() {
             </p>
           )}
         </div>
-        <p className="mt-3 text-[10px] text-gray-600">
+        <p className="mt-3 text-[10px] text-muted-foreground">
           CUI-classified requests always route to FedRAMP providers regardless of
           these settings.
         </p>

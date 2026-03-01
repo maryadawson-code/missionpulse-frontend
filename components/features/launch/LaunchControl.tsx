@@ -175,7 +175,7 @@ export function LaunchControl({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-[#00E5FA]" />
+            <Shield className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Compliance
             </p>
@@ -192,7 +192,7 @@ export function LaunchControl({
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Rocket className="h-4 w-4 text-[#00E5FA]" />
+            <Rocket className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               pWin
             </p>
@@ -209,7 +209,7 @@ export function LaunchControl({
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-[#00E5FA]" />
+            <Clock className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Deadline
             </p>
@@ -224,7 +224,7 @@ export function LaunchControl({
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-[#00E5FA]" />
+            <Users className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Team
             </p>
@@ -237,7 +237,7 @@ export function LaunchControl({
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-[#00E5FA]" />
+            <FileText className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Documents
             </p>

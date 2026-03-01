@@ -55,7 +55,7 @@ export function DashboardCustomizer({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:border-gray-600 hover:text-white"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
       >
         <Settings className="h-3.5 w-3.5" />
         Customize
@@ -63,20 +63,20 @@ export function DashboardCustomizer({
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">
+              <h3 className="text-sm font-semibold text-foreground">
                 Customize Dashboard
               </h3>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <p className="mb-4 text-xs text-gray-500">
+            <p className="mb-4 text-xs text-muted-foreground">
               Toggle which sections appear on your dashboard.
             </p>
 
@@ -84,13 +84,13 @@ export function DashboardCustomizer({
               {widgets.map((w) => (
                 <div
                   key={w.widget_type}
-                  className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-gray-800/50"
+                  className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-muted/50"
                 >
-                  <span className="text-sm text-gray-200">{w.title}</span>
+                  <span className="text-sm text-foreground">{w.title}</span>
                   <button
                     onClick={() => toggle(w.widget_type)}
                     className={`h-5 w-9 rounded-full transition-colors ${
-                      w.is_visible ? 'bg-primary' : 'bg-gray-700'
+                      w.is_visible ? 'bg-primary' : 'bg-muted'
                     }`}
                   >
                     <div

@@ -71,12 +71,12 @@ export function InlineEditField({
   const displayValue = format ? format(value) : (value ?? '—')
 
   const inputClass =
-    'w-full rounded border border-[#00E5FA]/50 bg-gray-900 px-2 py-1 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-[#00E5FA]/25'
+    'w-full rounded border border-primary/50 bg-card px-2 py-1 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary/25'
 
   if (editing) {
     return (
       <div>
-        <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</dt>
+        <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</dt>
         <dd className="mt-1 flex items-center gap-1">
           {type === 'textarea' ? (
             <textarea
@@ -102,7 +102,7 @@ export function InlineEditField({
           <button onClick={save} disabled={isPending} className="p-1 text-emerald-400 hover:text-emerald-300">
             <Check className="h-3.5 w-3.5" />
           </button>
-          <button onClick={cancel} disabled={isPending} className="p-1 text-gray-500 hover:text-gray-300">
+          <button onClick={cancel} disabled={isPending} className="p-1 text-muted-foreground hover:text-foreground">
             <X className="h-3.5 w-3.5" />
           </button>
         </dd>
@@ -112,13 +112,13 @@ export function InlineEditField({
 
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</dt>
+      <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="mt-1 flex items-center gap-1.5 group">
-        <span className="text-sm text-gray-200">{displayValue}</span>
+        <span className="text-sm text-foreground">{displayValue}</span>
         {canEdit && (
           <button
             onClick={startEdit}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-gray-500 hover:text-[#00E5FA]"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-muted-foreground hover:text-primary"
             title={`Edit ${label}`}
           >
             <Pencil className="h-3 w-3" />
