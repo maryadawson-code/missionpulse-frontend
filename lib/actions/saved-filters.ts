@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createSavedFilterSchema } from '@/lib/api/schemas'
 import type { Json } from '@/lib/supabase/database.types'
 
 export async function getSavedFilters(): Promise<{
@@ -22,10 +23,16 @@ export async function createSavedFilter(
   name: string,
   filters: Record<string, unknown>
 ): Promise<{ success: boolean; error?: string }> {
+  // Validate inputs
+  const parsed = createSavedFilterSchema.safeParse({ name, filters })
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
   const { error } = await supabase
     .from('saved_filters')
-    .insert({ name, filters: filters as unknown as Json })
+    .insert({ name: parsed.data.name, filters: parsed.data.filters as unknown as Json })
 
   if (error) return { success: false, error: error.message }
   return { success: true }

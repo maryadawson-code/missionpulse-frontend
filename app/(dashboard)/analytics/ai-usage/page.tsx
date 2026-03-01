@@ -1,8 +1,27 @@
 import { redirect } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
-import { AIUsageAnalytics } from '@/components/features/analytics/AIUsageAnalytics'
 import { getCacheMetrics } from '@/lib/cache/semantic-cache'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const AIUsageAnalytics = dynamic(
+  () => import('@/components/features/analytics/AIUsageAnalytics').then((m) => m.AIUsageAnalytics),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    ),
+  }
+)
 
 export default async function AIUsageAnalyticsPage() {
   const supabase = await createClient()

@@ -7,6 +7,7 @@ import { logNotification } from '@/lib/utils/notifications'
 import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 import { createLogger } from '@/lib/logging/logger'
 import { sanitizePlainText } from '@/lib/security/sanitize'
+import { updatePhaseSchema } from '@/lib/api/schemas'
 import type { OpportunityInsert, OpportunityUpdate } from '@/lib/types/opportunities'
 
 const log = createLogger('opportunities')
@@ -254,6 +255,12 @@ export async function updateOpportunityPhase(
   id: string,
   phase: string
 ): Promise<ActionResult> {
+  // Validate inputs
+  const parsed = updatePhaseSchema.safeParse({ id, phase })
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
 
   const {

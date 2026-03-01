@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { KanbanView } from '@/app/(dashboard)/pipeline/KanbanView'
+import { getMockOpportunity } from '@/tests/fixtures'
 
 // Mock the server action
 vi.mock('@/lib/actions/opportunities', () => ({
@@ -19,8 +20,10 @@ vi.mock('@/components/features/pipeline/OpportunityCard', () => ({
   ),
 }))
 
+// Build test data from shared fixtures with overrides for test-specific values
+const baseOpp = getMockOpportunity('active')
 const testOpportunities = [
-  { id: '1', title: 'Opp Alpha', agency: 'DoD', ceiling: 1_000_000, pwin: 75, due_date: '2026-06-01', phase: 'Gate 1' },
+  { id: '1', title: 'Opp Alpha', agency: baseOpp.agency, ceiling: 1_000_000, pwin: 75, due_date: '2026-06-01', phase: 'Gate 1' },
   { id: '2', title: 'Opp Bravo', agency: 'GSA', ceiling: 500_000, pwin: 50, due_date: '2026-07-01', phase: 'Gate 2' },
   { id: '3', title: 'Opp Charlie', agency: 'DHS', ceiling: 2_000_000, pwin: 30, due_date: '2026-08-01', phase: 'Gate 1' },
 ]

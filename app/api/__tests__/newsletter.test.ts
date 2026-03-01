@@ -94,7 +94,7 @@ describe('POST /api/newsletter', () => {
     const body = await res.json()
 
     expect(res.status).toBe(400)
-    expect(body.error).toBe('Invalid request body')
+    expect(body.error).toBe('Invalid JSON body')
   })
 })
 

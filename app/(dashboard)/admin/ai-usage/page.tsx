@@ -1,12 +1,26 @@
 import { redirect } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
-import { TokenUsageCharts } from '@/components/features/admin/TokenUsageCharts'
 import { TokenGauge } from '@/components/features/admin/TokenGauge'
 import { BurnRateProjection } from '@/components/features/admin/BurnRateProjection'
 import { getCompanySubscription } from '@/lib/billing/plans'
 import { getTokenBalance } from '@/lib/billing/ledger'
 import { getBurnRateProjection } from '@/lib/billing/burn-rate'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const TokenUsageCharts = dynamic(
+  () => import('@/components/features/admin/TokenUsageCharts').then((m) => m.TokenUsageCharts),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-4">
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    ),
+  }
+)
 
 const MONTHLY_BUDGET = Number(process.env.AI_MONTHLY_BUDGET_USD ?? '500')
 

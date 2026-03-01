@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createDebriefSchema } from '@/lib/api/schemas'
 import type { Json } from '@/lib/supabase/database.types'
 
 interface CreateDebriefInput {
@@ -19,6 +20,12 @@ interface CreateDebriefInput {
 export async function createDebrief(
   input: CreateDebriefInput
 ): Promise<{ success: boolean; error?: string }> {
+  // Validate critical fields
+  const parsed = createDebriefSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -28,9 +35,9 @@ export async function createDebrief(
   const { error } = await supabase.from('debriefs').insert({
     opportunity_id: input.opportunity_id || null,
     opportunity_name: input.opportunity_name,
-    debrief_type: input.debrief_type,
-    debrief_date: input.debrief_date,
-    outcome: input.outcome,
+    debrief_type: parsed.data.debrief_type,
+    debrief_date: parsed.data.debrief_date,
+    outcome: parsed.data.outcome,
     contract_value: input.contract_value,
     notes: input.notes,
     strengths: input.strengths as unknown as Json,

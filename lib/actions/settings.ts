@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logging/logger'
 import { sanitizePlainText } from '@/lib/security/sanitize'
+import { updateNotificationPreferencesSchema } from '@/lib/api/schemas'
 
 const log = createLogger('settings')
 
@@ -93,6 +94,12 @@ export async function updateNotificationPreferences(
     push_enabled: boolean
   }[]
 ): Promise<ActionResult> {
+  // Validate inputs
+  const parsed = updateNotificationPreferencesSchema.safeParse(preferences)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
 
   const {

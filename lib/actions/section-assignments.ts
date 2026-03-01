@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { updateSectionAssignmentSchema } from '@/lib/api/schemas'
 
 export async function updateSectionAssignment(
   sectionId: string,
@@ -8,6 +9,17 @@ export async function updateSectionAssignment(
   reviewerId: string | null,
   opportunityId: string
 ): Promise<{ success: boolean; error?: string }> {
+  // Validate inputs
+  const parsed = updateSectionAssignmentSchema.safeParse({
+    sectionId,
+    writerId,
+    reviewerId,
+    opportunityId,
+  })
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
 
   const updates: Record<string, string | null> = {}

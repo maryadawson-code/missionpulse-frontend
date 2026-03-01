@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { createLogger } from '@/lib/logging/logger'
 import { adminUnlockAccount } from '@/lib/security/brute-force'
+import { updateUserRoleSchema } from '@/lib/api/schemas'
+import { emailSchema } from '@/lib/utils/validation'
 
 const log = createLogger('admin')
 
@@ -22,6 +24,12 @@ export async function updateUserRole(
   targetUserId: string,
   newRole: string
 ): Promise<ActionResult> {
+  // Validate inputs
+  const parsed = updateUserRoleSchema.safeParse({ targetUserId, newRole })
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
 
   // Verify caller is authenticated
@@ -79,6 +87,12 @@ export async function updateUserRole(
 export async function unlockUserAccount(
   email: string
 ): Promise<ActionResult> {
+  // Validate email format
+  const parsed = emailSchema.safeParse(email)
+  if (!parsed.success) {
+    return { success: false, error: 'Invalid email address' }
+  }
+
   const supabase = await createClient()
 
   const {

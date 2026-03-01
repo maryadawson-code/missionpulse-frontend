@@ -8,32 +8,21 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
+import {
+  validateRequestBody,
+  validationErrorResponse,
+  newsletterSubscribeSchema,
+  newsletterUnsubscribeSchema,
+} from '@/lib/api/schemas'
 
 // POST — Subscribe (rate limiting handled by middleware)
 export async function POST(request: NextRequest) {
-  let body: { email?: string; source?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
-    )
+  const validation = await validateRequestBody(request, newsletterSubscribeSchema)
+  if (!validation.success) {
+    return validationErrorResponse(validation.error, validation.details)
   }
 
-  const email = body.email?.toLowerCase().trim()
-  const source = body.source ?? 'website'
-
-  if (!email || !isValidEmail(email)) {
-    return NextResponse.json(
-      { error: 'Valid email address required' },
-      { status: 400 }
-    )
-  }
+  const { email, source } = validation.data
 
   try {
     const supabase = createAdminClient()
@@ -43,8 +32,8 @@ export async function POST(request: NextRequest) {
       .from('newsletter_subscribers')
       .upsert(
         {
-          email,
-          source,
+          email: email.toLowerCase(),
+          source: source ?? 'website',
           subscribed_at: new Date().toISOString(),
           unsubscribed_at: null,
           ip_address: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
@@ -70,24 +59,12 @@ export async function POST(request: NextRequest) {
 
 // DELETE — Unsubscribe (GDPR)
 export async function DELETE(request: NextRequest) {
-  let body: { email?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
-    )
+  const validation = await validateRequestBody(request, newsletterUnsubscribeSchema)
+  if (!validation.success) {
+    return validationErrorResponse(validation.error, validation.details)
   }
 
-  const email = body.email?.toLowerCase().trim()
-
-  if (!email || !isValidEmail(email)) {
-    return NextResponse.json(
-      { error: 'Valid email address required' },
-      { status: 400 }
-    )
-  }
+  const { email } = validation.data
 
   try {
     const supabase = createAdminClient()
@@ -95,7 +72,7 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
       .from('newsletter_subscribers')
       .update({ unsubscribed_at: new Date().toISOString() })
-      .eq('email', email)
+      .eq('email', email.toLowerCase())
 
     if (error) {
       return NextResponse.json(

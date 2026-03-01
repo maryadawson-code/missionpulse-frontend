@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { RBACGate } from '../RBACGate'
+import { getMockProfile } from '@/tests/fixtures'
 
 // Mock useRole to control role state in tests
 const mockUseRole = vi.fn()
@@ -15,7 +16,8 @@ describe('RBACGate', () => {
   })
 
   it('renders children when user has view permission (executive + dashboard)', () => {
-    mockUseRole.mockReturnValue({ dbRole: 'executive', loading: false })
+    const execProfile = getMockProfile('executive')
+    mockUseRole.mockReturnValue({ dbRole: execProfile.role, loading: false })
     render(
       <RBACGate moduleId="dashboard" require="view">
         <div data-testid="protected">Secret Content</div>
@@ -25,7 +27,8 @@ describe('RBACGate', () => {
   })
 
   it('renders nothing when user lacks permission (partner + admin)', () => {
-    mockUseRole.mockReturnValue({ dbRole: 'partner', loading: false })
+    const partnerProfile = getMockProfile('partner')
+    mockUseRole.mockReturnValue({ dbRole: partnerProfile.role, loading: false })
     const { container } = render(
       <RBACGate moduleId="admin" require="edit">
         <div data-testid="protected">Admin Panel</div>
