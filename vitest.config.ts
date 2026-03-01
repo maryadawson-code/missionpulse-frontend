@@ -12,6 +12,8 @@ export default defineConfig({
     globals: true,
     coverage: {
       provider: 'v8',
+      reporter: ['text', 'lcov', 'json-summary'],
+      reportsDirectory: 'coverage',
       include: ['lib/**', 'components/**', 'app/**'],
       exclude: [
         'lib/supabase/database.types.ts',
@@ -19,6 +21,11 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.test.tsx',
       ],
+      thresholds: {
+        lines: 4,
+        functions: 3,
+        branches: 2,
+      },
     },
   },
 })
