@@ -92,7 +92,7 @@ export async function actionCreateOpportunity(
   // Pilot onboarding hook
   tryCompleteOnboardingStep('create_opportunity')
 
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   revalidatePath('/pipeline')
   redirect(`/pipeline/${data.id}`)
 }
@@ -166,7 +166,7 @@ export async function actionUpdateOpportunity(
     details: { entity_type: 'opportunity', entity_id: opportunityId, title: updateData.title },
   })
 
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   revalidatePath('/pipeline')
   revalidatePath(`/pipeline/${opportunityId}`)
 
@@ -226,7 +226,7 @@ export async function actionDeleteOpportunity(
     details: { entity_type: 'opportunity', entity_id: opportunityId, title: existing?.title ?? 'Unknown' },
   })
 
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   revalidatePath('/pipeline')
   redirect('/pipeline')
 }
@@ -313,7 +313,7 @@ export async function actionCreateOpportunityTyped(
   // Pilot onboarding hook
   tryCompleteOnboardingStep('create_opportunity')
 
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   revalidatePath('/pipeline')
 
   return { success: true, data: { id: inserted.id } }

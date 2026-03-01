@@ -55,7 +55,7 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
   })
 
   revalidatePath('/settings')
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 

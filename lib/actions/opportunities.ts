@@ -154,7 +154,7 @@ export async function createOpportunity(
   tryCompleteOnboardingStep('create_opportunity')
 
   revalidatePath('/pipeline')
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true, id: data.id }
 }
 
@@ -242,7 +242,7 @@ export async function updateOpportunity(
 
   revalidatePath('/pipeline')
   revalidatePath(`/war-room/${id}`)
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true, id }
 }
 
@@ -308,7 +308,7 @@ export async function updateOpportunityPhase(
 
   revalidatePath('/pipeline')
   revalidatePath(`/war-room/${id}`)
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true, id }
 }
 
@@ -353,7 +353,7 @@ export async function deleteOpportunity(id: string): Promise<ActionResult> {
   })
 
   revalidatePath('/pipeline')
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 

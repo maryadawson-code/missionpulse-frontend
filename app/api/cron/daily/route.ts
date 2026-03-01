@@ -7,6 +7,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createLogger } from '@/lib/logging/logger'
+
+const log = createLogger('daily-cron')
 
 function getAdminClient() {
   return createClient(
@@ -53,91 +56,137 @@ export async function GET(request: NextRequest) {
       .select('company_id')
       .eq('status', 'pilot')
 
+    const companyIds = (pilots ?? []).map((p) => p.company_id as string)
     let engagementUpdated = 0
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    for (const pilot of pilots ?? []) {
-      const companyId = pilot.company_id as string
+    if (companyIds.length > 0) {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-      // Calculate engagement factors
-      const { data: loginData } = await supabase
-        .from('activity_log')
-        .select('timestamp')
-        .eq('action', 'login')
-        .gte('timestamp', thirtyDaysAgo)
+      // Batch all independent queries with Promise.all
+      const [loginResult, aiResult, activityResult, teamResult, docsResult, subsResult] =
+        await Promise.all([
+          // Login activity (all companies)
+          supabase
+            .from('activity_log')
+            .select('timestamp')
+            .eq('action', 'login')
+            .gte('timestamp', thirtyDaysAgo),
 
+          // AI token usage (all companies)
+          supabase
+            .from('token_usage')
+            .select('id, company_id')
+            .in('company_id', companyIds)
+            .gte('created_at', thirtyDaysAgo),
+
+          // Feature adoption activity (all companies)
+          supabase
+            .from('activity_log')
+            .select('action, company_id')
+            .in('company_id', companyIds)
+            .gte('timestamp', thirtyDaysAgo),
+
+          // Team members per company
+          supabase
+            .from('profiles')
+            .select('id, company_id')
+            .in('company_id', companyIds),
+
+          // Documents generated per company
+          supabase
+            .from('company_documents')
+            .select('id, company_id')
+            .in('company_id', companyIds)
+            .gte('created_at', thirtyDaysAgo),
+
+          // Subscription metadata for all pilot companies
+          supabase
+            .from('company_subscriptions')
+            .select('company_id, metadata')
+            .in('company_id', companyIds),
+        ])
+
+      // Build per-company lookup maps
       const loginDays = new Set(
-        (loginData ?? []).map((r) => new Date(r.timestamp as string).toDateString())
+        (loginResult.data ?? []).map((r) => new Date(r.timestamp as string).toDateString())
       )
       const loginScore = Math.min(100, Math.round((loginDays.size / 30) * 100))
 
-      const { data: aiData } = await supabase
-        .from('token_usage')
-        .select('id')
-        .gte('created_at', thirtyDaysAgo)
+      const aiByCompany = new Map<string, number>()
+      for (const row of aiResult.data ?? []) {
+        const cid = row.company_id as string
+        aiByCompany.set(cid, (aiByCompany.get(cid) ?? 0) + 1)
+      }
 
-      const aiPerDay = (aiData?.length ?? 0) / 30
-      const aiScore = Math.min(100, Math.round((aiPerDay / 10) * 100))
+      const actionsByCompany = new Map<string, Set<string>>()
+      for (const row of activityResult.data ?? []) {
+        const cid = row.company_id as string
+        if (!actionsByCompany.has(cid)) actionsByCompany.set(cid, new Set())
+        actionsByCompany.get(cid)!.add(row.action as string)
+      }
 
-      const { data: activityData } = await supabase
-        .from('activity_log')
-        .select('action')
-        .gte('timestamp', thirtyDaysAgo)
+      const teamByCompany = new Map<string, number>()
+      for (const row of teamResult.data ?? []) {
+        const cid = row.company_id as string
+        teamByCompany.set(cid, (teamByCompany.get(cid) ?? 0) + 1)
+      }
 
-      const uniqueActions = new Set((activityData ?? []).map((r) => r.action))
-      const featureScore = Math.min(100, Math.round((uniqueActions.size / 14) * 100))
+      const docsByCompany = new Map<string, number>()
+      for (const row of docsResult.data ?? []) {
+        const cid = row.company_id as string
+        docsByCompany.set(cid, (docsByCompany.get(cid) ?? 0) + 1)
+      }
 
-      const { data: teamData } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('company_id', companyId)
+      const metaByCompany = new Map<string, Record<string, unknown>>()
+      for (const row of subsResult.data ?? []) {
+        const cid = row.company_id as string
+        metaByCompany.set(cid, (row.metadata as Record<string, unknown>) ?? {})
+      }
 
-      const teamScore = Math.min(100, Math.round((((teamData?.length ?? 1) - 1) / 5) * 100))
+      // Compute scores and batch update
+      for (const companyId of companyIds) {
+        const aiPerDay = (aiByCompany.get(companyId) ?? 0) / 30
+        const aiScore = Math.min(100, Math.round((aiPerDay / 10) * 100))
 
-      const { count: docsCount } = await supabase
-        .from('company_documents')
-        .select('id', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .gte('created_at', thirtyDaysAgo)
+        const uniqueActions = actionsByCompany.get(companyId) ?? new Set()
+        const featureScore = Math.min(100, Math.round((uniqueActions.size / 14) * 100))
 
-      const docsScore = Math.min(100, Math.round(((docsCount ?? 0) / 10) * 100))
+        const teamCount = teamByCompany.get(companyId) ?? 1
+        const teamScore = Math.min(100, Math.round(((teamCount - 1) / 5) * 100))
 
-      const score = Math.round(
-        loginScore * WEIGHTS.loginFrequency +
-        aiScore * WEIGHTS.aiUsage +
-        featureScore * WEIGHTS.featureAdoption +
-        teamScore * WEIGHTS.teamInvites +
-        docsScore * WEIGHTS.docsGenerated
-      )
+        const docsCount = docsByCompany.get(companyId) ?? 0
+        const docsScore = Math.min(100, Math.round((docsCount / 10) * 100))
 
-      // Persist to metadata
-      const { data: sub } = await supabase
-        .from('company_subscriptions')
-        .select('metadata')
-        .eq('company_id', companyId)
-        .single()
+        const score = Math.round(
+          loginScore * WEIGHTS.loginFrequency +
+          aiScore * WEIGHTS.aiUsage +
+          featureScore * WEIGHTS.featureAdoption +
+          teamScore * WEIGHTS.teamInvites +
+          docsScore * WEIGHTS.docsGenerated
+        )
 
-      const currentMeta = (sub?.metadata as Record<string, unknown>) ?? {}
+        const currentMeta = metaByCompany.get(companyId) ?? {}
 
-      await supabase
-        .from('company_subscriptions')
-        .update({
-          metadata: {
-            ...currentMeta,
-            engagement_score: score,
-            engagement_factors: {
-              loginFrequency: loginScore,
-              aiUsage: aiScore,
-              featureAdoption: featureScore,
-              teamInvites: teamScore,
-              docsGenerated: docsScore,
+        await supabase
+          .from('company_subscriptions')
+          .update({
+            metadata: {
+              ...currentMeta,
+              engagement_score: score,
+              engagement_factors: {
+                loginFrequency: loginScore,
+                aiUsage: aiScore,
+                featureAdoption: featureScore,
+                teamInvites: teamScore,
+                docsGenerated: docsScore,
+              },
+              engagement_computed_at: now,
             },
-            engagement_computed_at: now,
-          },
-        })
-        .eq('company_id', companyId)
+          })
+          .eq('company_id', companyId)
 
-      engagementUpdated++
+        engagementUpdated++
+      }
     }
 
     // ─── 3. Audit log ─────────────────────────────────────────
@@ -161,7 +210,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Cron processing error'
-    console.error('[daily-cron] Error:', message)
+    log.error('Cron processing failed', { error: message })
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

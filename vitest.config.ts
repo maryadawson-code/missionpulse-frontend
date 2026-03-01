@@ -3,14 +3,14 @@ import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
+  plugins: [react(), tsconfigPaths({ projects: ['./tsconfig.test.json'] })],
   test: {
     environment: 'jsdom',
     typecheck: {
       tsconfig: './tsconfig.test.json',
     },
     include: ['**/*.test.ts', '**/*.test.tsx'],
-    exclude: ['node_modules', '.next', 'tests/e2e/**', 'tests/sync/**', 'tests/collaboration/**'],
+    exclude: ['node_modules', '.next', 'tests/e2e/**'],
     setupFiles: ['./tests/setup.ts'],
     globals: true,
     coverage: {
