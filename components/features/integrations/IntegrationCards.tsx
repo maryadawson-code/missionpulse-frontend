@@ -163,8 +163,8 @@ export function IntegrationCards({ integrations }: IntegrationCardsProps) {
             )}
 
             <div className="flex gap-2">
-              <Link href={avail.href}>
-                <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={avail.href}>
                   {isConnected ? (
                     <>
                       <RefreshCw className="h-3 w-3" />
@@ -176,8 +176,8 @@ export function IntegrationCards({ integrations }: IntegrationCardsProps) {
                       Connect
                     </>
                   )}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </div>
         )
