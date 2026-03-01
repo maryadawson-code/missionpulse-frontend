@@ -52,7 +52,7 @@ export default async function InterviewPrepPage({
 
   // Fetch questions for all interviews
   const interviewIds = interviewItems.map((i) => i.id)
-  let questionsMap: Record<
+  const questionsMap: Record<
     string,
     { id: string; question_text: string; question_category: string | null; score: number | null; expected_response: string | null; actual_response: string | null }[]
   > = {}

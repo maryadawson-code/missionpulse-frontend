@@ -92,7 +92,7 @@ describe('RBACGate', () => {
   it('require="edit" blocks view-only users', () => {
     // Author can view proposals but might not be able to edit admin
     mockUseRole.mockReturnValue({ dbRole: 'author', loading: false })
-    const { container } = render(
+    render(
       <RBACGate moduleId="admin" require="edit">
         <div data-testid="protected">Admin Edit</div>
       </RBACGate>

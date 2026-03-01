@@ -47,7 +47,7 @@ export default async function VolumesPage({
 
   // Resolve owner names
   const ownerIds = Array.from(new Set((volumes ?? []).map((v) => v.owner_id).filter(Boolean))) as string[]
-  let ownerMap: Record<string, string> = {}
+  const ownerMap: Record<string, string> = {}
   if (ownerIds.length > 0) {
     const { data: owners } = await supabase
       .from('profiles')

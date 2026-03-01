@@ -55,7 +55,7 @@ export default async function SectionsHubPage({
   const writerIds = Array.from(
     new Set(items.map((s) => s.writer_id).filter(Boolean))
   ) as string[]
-  let writerMap: Record<string, string> = {}
+  const writerMap: Record<string, string> = {}
   if (writerIds.length > 0) {
     const { data: writers } = await supabase
       .from('profiles')

@@ -5,7 +5,7 @@
 
 interface ExportColumn<T> {
   header: string
-  accessor: (row: T) => string | number | null | undefined
+  accessor: (_row: T) => string | number | null | undefined
 }
 
 export function exportToCSV<T>(

@@ -1,6 +1,8 @@
 /**
- * Sentry Client-Side Configuration
- * Loaded automatically by @sentry/nextjs in the browser runtime.
+ * Client-Side Instrumentation — Sentry SDK initialization.
+ * Uses the Next.js instrumentation-client.ts pattern (Turbopack-ready).
+ *
+ * Migrated from sentry.client.config.ts (deprecated pattern).
  *
  * CUI Compliance: No session replay (privacy), no PII in context,
  * beforeSend scrubs CUI markers from event data.

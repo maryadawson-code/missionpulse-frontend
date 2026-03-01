@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { History, RotateCcw, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 
 import { addToast } from '@/components/ui/Toast'
@@ -34,12 +34,7 @@ export function SectionVersionHistory({
   const [expanded, setExpanded] = useState(false)
   const [previewId, setPreviewId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!expanded) return
-    loadVersions()
-  }, [expanded, sectionId])
-
-  async function loadVersions() {
+  const loadVersions = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(
@@ -53,7 +48,12 @@ export function SectionVersionHistory({
       // silently fail — versions are optional
     }
     setLoading(false)
-  }
+  }, [sectionId])
+
+  useEffect(() => {
+    if (!expanded) return
+    loadVersions()
+  }, [expanded, loadVersions])
 
   function handleRestore(version: VersionEntry) {
     if (!version.details.content_snapshot) {

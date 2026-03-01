@@ -28,7 +28,7 @@ import type { SyncConflict, ConflictResolution } from '@/lib/types/sync'
 
 interface ConflictResolutionModalProps {
   conflict: SyncConflict
-  onResolve: (resolution: ConflictResolution) => void
+  onResolve: (_resolution: ConflictResolution) => void
   onClose: () => void
 }
 

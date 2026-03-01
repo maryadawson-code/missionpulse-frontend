@@ -75,7 +75,7 @@ export default async function RisksPage({
 
   // Fetch mitigations for all risks
   const riskIds = (risks ?? []).map((r) => r.id)
-  let mitigationsMap: Record<
+  const mitigationsMap: Record<
     string,
     { id: string; action: string; assigned_to: string | null; status: string | null; due_date: string | null }[]
   > = {}

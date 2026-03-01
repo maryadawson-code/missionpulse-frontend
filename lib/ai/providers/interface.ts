@@ -67,13 +67,13 @@ export interface AIProvider {
   isConfigured(): boolean
 
   /** Send a query to the provider */
-  query(request: ProviderQueryRequest): Promise<ProviderQueryResponse>
+  query(_request: ProviderQueryRequest): Promise<ProviderQueryResponse>
 
   /** Generate embeddings (optional — not all providers support this) */
-  embed?(request: ProviderEmbedRequest): Promise<ProviderEmbedResponse>
+  embed?(_request: ProviderEmbedRequest): Promise<ProviderEmbedResponse>
 
   /** Classify content by sensitivity level (CUI/OPSEC detection) */
-  classify(request: ProviderClassifyRequest): Promise<ProviderClassifyResponse>
+  classify(_request: ProviderClassifyRequest): Promise<ProviderClassifyResponse>
 
   /** Quick connectivity check */
   ping(): Promise<{ ok: boolean; latencyMs: number }>

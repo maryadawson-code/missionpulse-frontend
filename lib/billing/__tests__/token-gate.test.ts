@@ -33,7 +33,7 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
-import { checkTokenGate, type TokenGateResult } from '../token-gate'
+import { checkTokenGate, type TokenGateResult as _TokenGateResult } from '../token-gate'
 import { getTokenBalance, getThresholdLevel } from '../ledger'
 import { getCompanySubscription } from '../plans'
 import type { TokenBalance } from '../ledger'

@@ -125,7 +125,7 @@ const NAV_ITEMS: NavItem[] = [
 
 // ─── Section Grouping ───────────────────────────────────────────
 const PRIMARY_MODULES = ['dashboard', 'pipeline', 'proposals', 'workflow_board', 'ai_chat', 'documents']
-const RESOURCES_MODULES = ['_resources']
+const _RESOURCES_MODULES = ['_resources']
 const ADMIN_MODULES = ['admin', 'integrations', 'audit_log']
 // Everything else (strategy, blackhat, compliance, pricing, analytics, personnel, playbook) is secondary
 
