@@ -11,7 +11,7 @@ const mockQueryBuilder = {
   order: vi.fn().mockReturnThis(),
   limit: vi.fn().mockReturnThis(),
   contains: vi.fn().mockReturnThis(),
-  then: vi.fn((resolve: (v: unknown) => void) => resolve(mockQueryResult)),
+  then: vi.fn((resolve: (_v: unknown) => void) => resolve(mockQueryResult)),
 }
 
 // Make the builder thenable so `await query` resolves to mockQueryResult
@@ -19,7 +19,7 @@ Object.defineProperty(mockQueryBuilder, Symbol.toStringTag, {
   get: () => 'Promise',
 })
 // Override the implicit await by providing a proper thenable
-mockQueryBuilder.then = vi.fn((resolve: (v: unknown) => void) =>
+mockQueryBuilder.then = vi.fn((resolve: (_v: unknown) => void) =>
   Promise.resolve(mockQueryResult).then(resolve)
 )
 
@@ -86,7 +86,7 @@ describe('ActivityLog', () => {
     // Default: resolve with empty data
     mockQueryResult.data = []
     mockQueryResult.error = null
-    mockQueryBuilder.then = vi.fn((resolve: (v: unknown) => void) =>
+    mockQueryBuilder.then = vi.fn((resolve: (_v: unknown) => void) =>
       Promise.resolve(mockQueryResult).then(resolve)
     )
   })

@@ -26,7 +26,7 @@ vi.mock('@/components/ui/ConfirmModal', () => ({
 
 // Mock Select components (shadcn radix primitives don't render in jsdom)
 vi.mock('@/components/ui/select', () => ({
-  Select: ({ children, value }: { children: React.ReactNode; value?: string }) => (
+  Select: ({ children, value: _value }: { children: React.ReactNode; value?: string }) => (
     <div data-testid="select">{children}</div>
   ),
   SelectTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

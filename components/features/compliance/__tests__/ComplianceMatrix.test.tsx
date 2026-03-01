@@ -202,7 +202,7 @@ describe('ComplianceMatrix', () => {
   })
 
   it('renders priority with correct color classes', () => {
-    const { container } = render(
+    render(
       <ComplianceMatrix
         requirements={sampleRequirements}
         teamMembers={sampleTeamMembers}
