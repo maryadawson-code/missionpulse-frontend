@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useTransition } from 'react'
-import { Pencil, Check, X } from 'lucide-react'
+import { Pencil, Check, X, Loader2 } from 'lucide-react'
+import { addToast } from '@/components/ui/Toast'
 
 interface InlineEditFieldProps {
   label: string
@@ -54,6 +55,8 @@ export function InlineEditField({
       const result = await onSave(fieldName, draft)
       if (result.success) {
         setEditing(false)
+      } else {
+        addToast('error', result.error ?? `Failed to save ${label}`)
       }
     })
   }
@@ -99,10 +102,10 @@ export function InlineEditField({
               disabled={isPending}
             />
           )}
-          <button onClick={save} disabled={isPending} className="p-1 text-emerald-400 hover:text-emerald-300">
-            <Check className="h-3.5 w-3.5" />
+          <button onClick={save} disabled={isPending} className="p-1 text-emerald-400 hover:text-emerald-300" aria-label={`Save ${label}`}>
+            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
           </button>
-          <button onClick={cancel} disabled={isPending} className="p-1 text-muted-foreground hover:text-foreground">
+          <button onClick={cancel} disabled={isPending} className="p-1 text-muted-foreground hover:text-foreground" aria-label={`Cancel editing ${label}`}>
             <X className="h-3.5 w-3.5" />
           </button>
         </dd>
@@ -119,7 +122,7 @@ export function InlineEditField({
           <button
             onClick={startEdit}
             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-muted-foreground hover:text-primary"
-            title={`Edit ${label}`}
+            aria-label={`Edit ${label}`}
           >
             <Pencil className="h-3 w-3" />
           </button>

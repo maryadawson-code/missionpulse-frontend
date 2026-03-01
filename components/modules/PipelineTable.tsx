@@ -1,7 +1,8 @@
 // filepath: components/modules/PipelineTable.tsx
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useCallback } from 'react'
+import { X } from 'lucide-react'
 import { deleteOpportunity } from '@/lib/actions/opportunities'
 import { addToast } from '@/components/ui/Toast'
 import { exportToCSV } from '@/lib/utils/export'
@@ -92,6 +93,36 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
   })
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const hasActiveFilters = useMemo(() => {
+    return !!(
+      filters.phase ||
+      filters.status ||
+      filters.setAside ||
+      filters.search ||
+      filters.ceilingMin ||
+      filters.ceilingMax ||
+      filters.pwinMin ||
+      filters.pwinMax ||
+      filters.dueDateStart ||
+      filters.dueDateEnd
+    )
+  }, [filters])
+
+  const clearFilters = useCallback(() => {
+    setFilters({
+      phase: null,
+      status: null,
+      setAside: null,
+      search: '',
+      ceilingMin: '',
+      ceilingMax: '',
+      pwinMin: '',
+      pwinMax: '',
+      dueDateStart: '',
+      dueDateEnd: '',
+    })
+  }, [])
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -195,12 +226,14 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
         <input
           type="text"
           placeholder="Search pipeline..."
+          aria-label="Search pipeline by title, agency, or solicitation number"
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
           className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan w-64"
         />
         <select
           value={filters.phase ?? ''}
+          aria-label="Filter by Shipley phase"
           onChange={(e) =>
             setFilters((f) => ({ ...f, phase: e.target.value || null }))
           }
@@ -215,6 +248,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
         </select>
         <select
           value={filters.status ?? ''}
+          aria-label="Filter by status"
           onChange={(e) =>
             setFilters((f) => ({ ...f, status: e.target.value || null }))
           }
@@ -229,6 +263,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
         </select>
         <select
           value={filters.setAside ?? ''}
+          aria-label="Filter by set-aside type"
           onChange={(e) =>
             setFilters((f) => ({ ...f, setAside: e.target.value || null }))
           }
@@ -263,6 +298,16 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
         >
           Export CSV
         </button>
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm text-slate hover:text-foreground hover:border-red-400 transition-colors"
+            aria-label="Clear all filters"
+          >
+            <X className="h-3.5 w-3.5" />
+            Clear Filters
+          </button>
+        )}
         {canEdit && (
           <a
             href="/pipeline/new"
@@ -281,6 +326,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
             <input
               type="number"
               placeholder="Min"
+              aria-label="Minimum ceiling value"
               value={filters.ceilingMin}
               onChange={(e) => setFilters((f) => ({ ...f, ceilingMin: e.target.value }))}
               className="w-24 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none"
@@ -289,6 +335,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
             <input
               type="number"
               placeholder="Max"
+              aria-label="Maximum ceiling value"
               value={filters.ceilingMax}
               onChange={(e) => setFilters((f) => ({ ...f, ceilingMax: e.target.value }))}
               className="w-24 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none"
@@ -301,6 +348,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
             <input
               type="number"
               placeholder="Min"
+              aria-label="Minimum pWin percentage"
               min={0}
               max={100}
               value={filters.pwinMin}
@@ -311,6 +359,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
             <input
               type="number"
               placeholder="Max"
+              aria-label="Maximum pWin percentage"
               min={0}
               max={100}
               value={filters.pwinMax}
@@ -324,6 +373,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
           <div className="flex items-center gap-1">
             <input
               type="date"
+              aria-label="Due date start"
               value={filters.dueDateStart}
               onChange={(e) => setFilters((f) => ({ ...f, dueDateStart: e.target.value }))}
               className="rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground focus:border-cyan focus:outline-none"
@@ -331,6 +381,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
             <span className="text-muted-foreground text-xs">–</span>
             <input
               type="date"
+              aria-label="Due date end"
               value={filters.dueDateEnd}
               onChange={(e) => setFilters((f) => ({ ...f, dueDateEnd: e.target.value }))}
               className="rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground focus:border-cyan focus:outline-none"

@@ -52,6 +52,7 @@ export function PipelineSubNav({ opportunityId }: { opportunityId: string }) {
           <Link
             key={item.href}
             href={item.href}
+            aria-current={isActive ? 'page' : undefined}
             className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               isActive
                 ? 'bg-primary/10 text-primary'

@@ -315,8 +315,8 @@ export function ChatPanel({
                 {playbookLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
               </Button>
             </div>
-            <button onClick={() => setShowPlaybook(false)} className="p-1 text-muted-foreground hover:text-foreground">
-              <X className="h-4 w-4" />
+            <button onClick={() => setShowPlaybook(false)} className="p-1 text-muted-foreground hover:text-foreground" aria-label="Close playbook">
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
           {playbookResults.length > 0 ? (

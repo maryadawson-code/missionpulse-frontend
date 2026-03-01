@@ -53,6 +53,7 @@ export default function DashboardHeader({ userEmail, notifications = [] }: Dashb
         <input
           type="text"
           placeholder="Search opportunities, proposals..."
+          aria-label="Search opportunities and proposals"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full rounded-lg border border-input bg-card/50 py-2 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/25"
