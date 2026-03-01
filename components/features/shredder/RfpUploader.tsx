@@ -2,8 +2,9 @@
 
 import { useCallback, useState, useRef } from 'react'
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { createBrowserClient } from '@supabase/ssr'
 
-import { uploadAndParseRfp, uploadAndParseZip } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
+import { processStoredFile, processStoredZip } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
 import { addToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
@@ -41,7 +42,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
       const validFiles: File[] = []
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        if (!ACCEPTED_TYPES.includes(file.type)) {
+        if (!ACCEPTED_TYPES.includes(file.type) && !file.name.endsWith('.zip')) {
           addToast('error', `${file.name}: unsupported file type`)
           continue
         }
@@ -59,6 +60,12 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         validFiles.map((f) => ({ name: f.name, status: 'uploading' }))
       )
 
+      // Create browser Supabase client for direct storage upload
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+
       let totalProcessed = 0
 
       for (let i = 0; i < validFiles.length; i++) {
@@ -66,10 +73,30 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         const isZip = file.type === 'application/zip' || file.type === 'application/x-zip-compressed' || file.name.endsWith('.zip')
 
         try {
+          // Step 1: Upload file directly to Supabase Storage from browser
+          // This bypasses Vercel's 4.5MB serverless body limit
+          const storagePath = `rfp/${opportunityId}/${Date.now()}_${file.name}`
+          const { error: storageError } = await supabase.storage
+            .from('documents')
+            .upload(storagePath, file, {
+              contentType: file.type || 'application/octet-stream',
+              upsert: false,
+            })
+
+          if (storageError) {
+            setFileStatuses((prev) =>
+              prev.map((s, idx) =>
+                idx === i
+                  ? { ...s, status: 'error', message: `Storage upload failed: ${storageError.message}` }
+                  : s
+              )
+            )
+            continue
+          }
+
+          // Step 2: Call server action with only metadata (no file data)
           if (isZip) {
-            const formData = new FormData()
-            formData.append('file', file)
-            const result = await uploadAndParseZip(opportunityId, formData)
+            const result = await processStoredZip(opportunityId, storagePath, file.name, file.size)
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
@@ -85,9 +112,13 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
             )
             if (result.success) totalProcessed += result.data?.count ?? 0
           } else {
-            const formData = new FormData()
-            formData.append('file', file)
-            const result = await uploadAndParseRfp(opportunityId, formData)
+            const result = await processStoredFile(
+              opportunityId,
+              storagePath,
+              file.name,
+              file.type,
+              file.size
+            )
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
@@ -104,7 +135,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
             if (result.success) totalProcessed++
           }
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'Upload failed — file may be too large for server'
+          const message = err instanceof Error ? err.message : 'Upload failed'
           setFileStatuses((prev) =>
             prev.map((s, idx) =>
               idx === i
@@ -184,7 +215,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
                 Processing files...
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Extracting text from documents
+                Uploading to storage and extracting text
               </p>
             </div>
           </div>

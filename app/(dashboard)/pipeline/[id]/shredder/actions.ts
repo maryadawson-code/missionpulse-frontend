@@ -9,9 +9,65 @@ import { extractPptxText } from '@/lib/utils/pptx-parser'
 import JSZip from 'jszip'
 import type { ActionResult } from '@/lib/types'
 
-export async function uploadAndParseRfp(
+// ─── Helper: extract text from a buffer based on MIME type ──────
+async function extractText(buffer: Buffer, mimeType: string): Promise<{ text: string; status: string }> {
+  try {
+    if (mimeType === 'application/pdf') {
+      const parsed = await extractPdfText(buffer)
+      return { text: parsed.text, status: 'processed' }
+    } else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimeType === 'application/msword'
+    ) {
+      const parsed = await extractDocxText(buffer)
+      return { text: parsed.text, status: 'processed' }
+    } else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mimeType === 'application/vnd.ms-excel'
+    ) {
+      const parsed = await extractXlsxText(buffer)
+      return { text: parsed.text, status: 'processed' }
+    } else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+      mimeType === 'application/vnd.ms-powerpoint'
+    ) {
+      const parsed = await extractPptxText(buffer)
+      return { text: parsed.text, status: 'processed' }
+    } else {
+      return { text: buffer.toString('utf-8'), status: 'processed' }
+    }
+  } catch (err) {
+    return {
+      text: err instanceof Error ? err.message : 'Extraction failed',
+      status: 'extraction_failed',
+    }
+  }
+}
+
+// ─── Helper: MIME type from file extension ──────────────────────
+function mimeFromExt(ext: string): string {
+  switch (ext) {
+    case '.pdf': return 'application/pdf'
+    case '.docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    case '.doc': return 'application/msword'
+    case '.xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    case '.xls': return 'application/vnd.ms-excel'
+    case '.pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    case '.ppt': return 'application/vnd.ms-powerpoint'
+    default: return 'text/plain'
+  }
+}
+
+// ─── Process a single file already uploaded to Storage ──────────
+// The client uploads directly to Supabase Storage (bypasses Vercel body limit),
+// then calls this action with only metadata to extract text and create records.
+
+export async function processStoredFile(
   opportunityId: string,
-  formData: FormData
+  storagePath: string,
+  fileName: string,
+  fileType: string,
+  fileSize: number
 ): Promise<ActionResult<{ documentId: string }>> {
   try {
     const supabase = await createClient()
@@ -21,86 +77,26 @@ export async function uploadAndParseRfp(
     } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
-    const file = formData.get('file') as File | null
-    if (!file) return { success: false, error: 'No file provided' }
-
-    if (file.size > 50 * 1024 * 1024) {
-      return { success: false, error: 'File exceeds maximum size of 50MB' }
-    }
-
-    const allowedTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'application/vnd.ms-powerpoint',
-      'text/plain',
-    ]
-    if (!allowedTypes.includes(file.type)) {
-      return { success: false, error: 'Unsupported file type. Upload PDF, DOCX, XLSX, PPTX, or TXT files.' }
-    }
-
-    // Upload to Supabase Storage
-    const storagePath = `rfp/${opportunityId}/${Date.now()}_${file.name}`
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    const { error: uploadError } = await supabase.storage
+    // Download from storage for text extraction
+    const { data: blob, error: downloadError } = await supabase.storage
       .from('documents')
-      .upload(storagePath, buffer, {
-        contentType: file.type,
-        upsert: false,
-      })
+      .download(storagePath)
 
-    if (uploadError) {
-      return { success: false, error: `Upload failed: ${uploadError.message}` }
+    if (downloadError || !blob) {
+      return { success: false, error: `Failed to read file: ${downloadError?.message ?? 'unknown'}` }
     }
 
-    // Extract text based on file type
-    let extractedText = ''
-    let uploadStatus = 'processed'
-
-    try {
-      if (file.type === 'application/pdf') {
-        const parsed = await extractPdfText(buffer)
-        extractedText = parsed.text
-      } else if (
-        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        file.type === 'application/msword'
-      ) {
-        const parsed = await extractDocxText(buffer)
-        extractedText = parsed.text
-      } else if (
-        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.type === 'application/vnd.ms-excel'
-      ) {
-        const parsed = await extractXlsxText(buffer)
-        extractedText = parsed.text
-      } else if (
-        file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
-        file.type === 'application/vnd.ms-powerpoint'
-      ) {
-        const parsed = await extractPptxText(buffer)
-        extractedText = parsed.text
-      } else {
-        // text/plain
-        extractedText = buffer.toString('utf-8')
-      }
-    } catch (err) {
-      uploadStatus = 'extraction_failed'
-      extractedText = err instanceof Error ? err.message : 'Extraction failed'
-    }
+    const buffer = Buffer.from(await blob.arrayBuffer())
+    const { text: extractedText, status: uploadStatus } = await extractText(buffer, fileType)
 
     // Insert rfp_documents record
     const { data: doc, error: insertError } = await supabase
       .from('rfp_documents')
       .insert({
         opportunity_id: opportunityId,
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
+        file_name: fileName,
+        file_type: fileType,
+        file_size: fileSize,
         storage_path: storagePath,
         extracted_text: extractedText,
         upload_status: uploadStatus,
@@ -120,7 +116,7 @@ export async function uploadAndParseRfp(
         entity_type: 'rfp_document',
         entity_id: doc.id,
         opportunity_id: opportunityId,
-        file_name: file.name,
+        file_name: fileName,
         status: uploadStatus,
       },
     })
@@ -131,24 +127,26 @@ export async function uploadAndParseRfp(
       user_id: user.id,
       entity_type: 'rfp_document',
       entity_id: doc.id,
-      details: { opportunity_id: opportunityId, file_name: file.name, upload_status: uploadStatus },
+      details: { opportunity_id: opportunityId, file_name: fileName, upload_status: uploadStatus },
     })
 
     revalidatePath(`/pipeline/${opportunityId}/shredder`)
     return { success: true, data: { documentId: doc.id } }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Upload failed'
+    const message = err instanceof Error ? err.message : 'Processing failed'
     return { success: false, error: message }
   }
 }
 
-// ─── ZIP Upload (SAM.gov packages) ────────────────────────────
+// ─── Process a ZIP already uploaded to Storage ──────────────────
 
 const EXTRACTABLE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.txt']
 
-export async function uploadAndParseZip(
+export async function processStoredZip(
   opportunityId: string,
-  formData: FormData
+  storagePath: string,
+  zipFileName: string,
+  fileSize: number
 ): Promise<ActionResult<{ count: number; fileNames: string[] }>> {
   try {
     const supabase = await createClient()
@@ -156,14 +154,16 @@ export async function uploadAndParseZip(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
-    const file = formData.get('file') as File | null
-    if (!file) return { success: false, error: 'No file provided' }
+    // Download ZIP from storage
+    const { data: blob, error: downloadError } = await supabase.storage
+      .from('documents')
+      .download(storagePath)
 
-    if (file.size > 50 * 1024 * 1024) {
-      return { success: false, error: 'ZIP file exceeds maximum size of 50MB' }
+    if (downloadError || !blob) {
+      return { success: false, error: `Failed to read ZIP: ${downloadError?.message ?? 'unknown'}` }
     }
 
-    const arrayBuffer = await file.arrayBuffer()
+    const arrayBuffer = await blob.arrayBuffer()
     let zip: JSZip
 
     try {
@@ -175,7 +175,6 @@ export async function uploadAndParseZip(
     const processedFiles: string[] = []
     const entries = Object.entries(zip.files).filter(([name, entry]) => {
       if (entry.dir) return false
-      // Skip macOS resource forks and hidden files
       if (name.startsWith('__MACOSX/') || name.startsWith('.')) return false
       const ext = name.substring(name.lastIndexOf('.')).toLowerCase()
       return EXTRACTABLE_EXTENSIONS.includes(ext)
@@ -189,49 +188,17 @@ export async function uploadAndParseZip(
       const entryBuffer = Buffer.from(await entry.async('arraybuffer'))
       const fileName = name.includes('/') ? name.substring(name.lastIndexOf('/') + 1) : name
       const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase()
+      const mimeType = mimeFromExt(ext)
 
-      // Determine MIME type from extension
-      let mimeType = 'text/plain'
-      if (ext === '.pdf') mimeType = 'application/pdf'
-      else if (ext === '.docx') mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      else if (ext === '.doc') mimeType = 'application/msword'
-      else if (ext === '.xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      else if (ext === '.xls') mimeType = 'application/vnd.ms-excel'
-      else if (ext === '.pptx') mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-      else if (ext === '.ppt') mimeType = 'application/vnd.ms-powerpoint'
-
-      // Upload to storage
-      const storagePath = `rfp/${opportunityId}/${Date.now()}_${fileName}`
+      // Upload extracted file to storage
+      const entryPath = `rfp/${opportunityId}/${Date.now()}_${fileName}`
       const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(storagePath, entryBuffer, { contentType: mimeType, upsert: false })
+        .upload(entryPath, entryBuffer, { contentType: mimeType, upsert: false })
 
       if (uploadError) continue
 
-      // Extract text
-      let extractedText = ''
-      let uploadStatus = 'processed'
-
-      try {
-        if (ext === '.pdf') {
-          const parsed = await extractPdfText(entryBuffer)
-          extractedText = parsed.text
-        } else if (ext === '.docx' || ext === '.doc') {
-          const parsed = await extractDocxText(entryBuffer)
-          extractedText = parsed.text
-        } else if (ext === '.xlsx' || ext === '.xls') {
-          const parsed = await extractXlsxText(entryBuffer)
-          extractedText = parsed.text
-        } else if (ext === '.pptx' || ext === '.ppt') {
-          const parsed = await extractPptxText(entryBuffer)
-          extractedText = parsed.text
-        } else {
-          extractedText = entryBuffer.toString('utf-8')
-        }
-      } catch {
-        uploadStatus = 'extraction_failed'
-        extractedText = 'Extraction failed'
-      }
+      const { text: extractedText, status: uploadStatus } = await extractText(entryBuffer, mimeType)
 
       // Insert record
       const { data: doc } = await supabase
@@ -241,7 +208,7 @@ export async function uploadAndParseZip(
           file_name: fileName,
           file_type: mimeType,
           file_size: entryBuffer.length,
-          storage_path: storagePath,
+          storage_path: entryPath,
           extracted_text: extractedText,
           upload_status: uploadStatus,
         })
@@ -259,7 +226,7 @@ export async function uploadAndParseZip(
             entity_id: doc.id,
             opportunity_id: opportunityId,
             file_name: fileName,
-            source: `zip:${file.name}`,
+            source: `zip:${zipFileName}`,
             status: uploadStatus,
           },
         })
@@ -272,12 +239,15 @@ export async function uploadAndParseZip(
           details: {
             opportunity_id: opportunityId,
             file_name: fileName,
-            source_zip: file.name,
+            source_zip: zipFileName,
             upload_status: uploadStatus,
           },
         })
       }
     }
+
+    // Clean up the ZIP from storage (individual files are already stored)
+    await supabase.storage.from('documents').remove([storagePath])
 
     revalidatePath(`/pipeline/${opportunityId}/shredder`)
     return {
@@ -289,6 +259,8 @@ export async function uploadAndParseZip(
     return { success: false, error: message }
   }
 }
+
+// ─── Delete ─────────────────────────────────────────────────────
 
 export async function deleteRfpDocument(
   documentId: string,
