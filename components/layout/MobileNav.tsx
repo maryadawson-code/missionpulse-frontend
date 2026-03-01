@@ -22,10 +22,10 @@ export function MobileNav({ children }: MobileNavProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mr-3 rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-gray-200 md:hidden"
+        className="mr-3 rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-gray-200 lg:hidden"
         aria-label="Open menu"
       >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
         </svg>
       </button>
@@ -34,10 +34,10 @@ export function MobileNav({ children }: MobileNavProps) {
       {open && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/60 md:hidden"
+            className="fixed inset-0 z-40 bg-black/60 lg:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-64 md:hidden">
+          <div className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden">
             {children}
           </div>
         </>

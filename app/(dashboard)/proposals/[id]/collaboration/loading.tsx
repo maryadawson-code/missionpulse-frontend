@@ -1,6 +1,6 @@
 export default function CollaborationLoading() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6 animate-pulse motion-reduce:animate-none" role="status" aria-busy="true" aria-label="Loading collaboration">
       <div>
         <div className="h-7 w-48 rounded bg-slate-700" />
         <div className="h-4 w-64 rounded bg-slate-700 mt-2" />

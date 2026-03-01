@@ -1,6 +1,6 @@
 export default function PipelineDetailLoading() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6 animate-pulse motion-reduce:animate-none" role="status" aria-busy="true" aria-label="Loading opportunity details">
       <div>
         <div className="h-7 w-48 rounded bg-slate-700" />
         <div className="h-4 w-72 rounded bg-slate-700 mt-2" />

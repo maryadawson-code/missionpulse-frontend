@@ -1,6 +1,6 @@
 export default function WarRoomDetailLoading() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6 animate-pulse motion-reduce:animate-none" role="status" aria-busy="true" aria-label="Loading war room details">
       <div>
         <div className="h-7 w-56 rounded bg-slate-700" />
         <div className="h-4 w-40 rounded bg-slate-700 mt-2" />

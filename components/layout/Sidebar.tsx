@@ -174,7 +174,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
         className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-700 bg-[#00050F] lg:hidden"
         aria-label="Open menu"
       >
-        <svg className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
@@ -200,6 +200,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={2}
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -217,14 +218,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
           className="rounded p-1 text-gray-500 hover:text-gray-200 lg:hidden"
           aria-label="Close menu"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Main navigation">
         <ul className="space-y-1">
           {/* Primary section */}
           {primary.map((item) => {
@@ -237,6 +238,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
@@ -254,6 +256,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={1.5}
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
@@ -284,6 +287,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
@@ -301,6 +305,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={1.5}
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
@@ -336,6 +341,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
@@ -353,6 +359,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={1.5}
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
@@ -378,6 +385,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
@@ -395,6 +403,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={1.5}
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
@@ -415,6 +424,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
       <div className="border-t border-gray-800 px-3 py-2 space-y-1">
         <Link
           href="/notifications"
+          aria-current={pathname === '/notifications' ? 'page' : undefined}
           className={`
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
@@ -432,6 +442,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={1.5}
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
           </svg>
@@ -444,6 +455,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
         </Link>
         <Link
           href="/settings"
+          aria-current={pathname === '/settings' ? 'page' : undefined}
           className={`
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
@@ -461,6 +473,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={1.5}
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           </svg>
@@ -468,6 +481,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
         </Link>
         <Link
           href="/help"
+          aria-current={pathname === '/help' ? 'page' : undefined}
           className={`
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
@@ -485,6 +499,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={1.5}
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
           </svg>
@@ -526,7 +541,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-red-400"
             title="Sign out"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
             </svg>
           </button>

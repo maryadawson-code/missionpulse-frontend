@@ -132,7 +132,7 @@ export default async function DashboardLayout({
         {(isExternal || forceCUI) && <PartnerWatermark companyName={companyName} />}
 
         {/* Sidebar — desktop: always visible; mobile: hidden */}
-        <aside className="hidden md:flex" aria-label="Main navigation">
+        <aside className="hidden lg:flex" aria-label="Main navigation">
           <Sidebar
             permissions={permissions}
             userDisplayName={profile?.full_name ?? user.email ?? null}
