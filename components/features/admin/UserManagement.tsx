@@ -1,7 +1,17 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Loader2, UserX, UserCheck } from 'lucide-react'
+import {
+  Plus,
+  Loader2,
+  UserX,
+  UserCheck,
+  Download,
+  Upload,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -14,10 +24,13 @@ import {
 import { addToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { updateUserRole } from '@/lib/actions/admin'
+import { parseCSV } from '@/lib/migration/csv-parser'
 import {
   inviteUser,
   deactivateUser,
   reactivateUser,
+  validateBulkInvite,
+  commitBulkInvite,
 } from '@/app/(dashboard)/admin/users/actions'
 
 const ASSIGNABLE_ROLES = [
@@ -81,6 +94,16 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
   const [inviteName, setInviteName] = useState('')
   const [inviteRole, setInviteRole] = useState<string>('author')
 
+  // Bulk import state
+  const [showBulk, setShowBulk] = useState(false)
+  const [bulkStep, setBulkStep] = useState<'upload' | 'preview' | 'done'>('upload')
+  const [bulkValidation, setBulkValidation] = useState<{
+    valid: boolean
+    records: { index: number; email: string; fullName: string; role: string; status: string; issues: string[] }[]
+    summary: { total: number; valid: number; errors: number; duplicates: number }
+  } | null>(null)
+  const [bulkRawRows, setBulkRawRows] = useState<{ email: string; full_name: string; role: string }[]>([])
+
   const filteredUsers =
     filter === 'all'
       ? users
@@ -132,6 +155,77 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
     })
   }
 
+  const handleCSVTemplateDownload = () => {
+    const csv = `email,full_name,role\njane.doe@example.com,Jane Doe,capture_manager\njohn.smith@example.com,John Smith,author\nanna.lee@example.com,Anna Lee,proposal_manager\n`
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'missionpulse-invite-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleBulkFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const text = await file.text()
+    const parsed = await parseCSV(text)
+
+    if (parsed.headers.length === 0) {
+      addToast('error', 'Could not parse CSV file')
+      return
+    }
+
+    // Validate required headers
+    const normalizedHeaders = parsed.headers.map((h) => h.toLowerCase().trim())
+    const hasEmail = normalizedHeaders.includes('email')
+    const hasName = normalizedHeaders.includes('full_name')
+    const hasRole = normalizedHeaders.includes('role')
+
+    if (!hasEmail || !hasName || !hasRole) {
+      const missing = [!hasEmail && 'email', !hasName && 'full_name', !hasRole && 'role'].filter(Boolean)
+      addToast('error', `Missing required columns: ${missing.join(', ')}`)
+      return
+    }
+
+    const rows = parsed.rows.map((row) => ({
+      email: row['email'] ?? row['Email'] ?? '',
+      full_name: row['full_name'] ?? row['Full_Name'] ?? row['Full Name'] ?? '',
+      role: row['role'] ?? row['Role'] ?? '',
+    }))
+
+    setBulkRawRows(rows)
+
+    startTransition(async () => {
+      const result = await validateBulkInvite(rows)
+      setBulkValidation(result)
+      setBulkStep('preview')
+    })
+  }
+
+  const handleBulkCommit = () => {
+    startTransition(async () => {
+      const result = await commitBulkInvite(bulkRawRows)
+      if (result.success) {
+        addToast('success', `${result.invited} invitation${result.invited !== 1 ? 's' : ''} sent`)
+        setBulkStep('done')
+        setBulkValidation(null)
+        setBulkRawRows([])
+        setShowBulk(false)
+      } else {
+        addToast('error', result.error ?? 'Failed to import users')
+      }
+    })
+  }
+
+  const handleBulkReset = () => {
+    setBulkStep('upload')
+    setBulkValidation(null)
+    setBulkRawRows([])
+  }
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -149,14 +243,31 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
         <span className="text-sm text-muted-foreground">
           {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
         </span>
-        <Button
-          size="sm"
-          onClick={() => setShowInvite(!showInvite)}
-          className="ml-auto"
-        >
-          <Plus className="h-4 w-4" />
-          Invite User
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCSVTemplateDownload}
+          >
+            <Download className="h-4 w-4" />
+            CSV Template
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setShowBulk(!showBulk); if (showBulk) handleBulkReset() }}
+          >
+            <Upload className="h-4 w-4" />
+            Bulk Import
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowInvite(!showInvite)}
+          >
+            <Plus className="h-4 w-4" />
+            Invite User
+          </Button>
+        </div>
       </div>
 
       {/* Invite form */}
@@ -216,6 +327,127 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
               Cancel
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Bulk import section */}
+      {showBulk && (
+        <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-foreground">Bulk Import Users</h3>
+
+          {/* Step 1: Upload */}
+          {bulkStep === 'upload' && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Upload a CSV file with columns: <code className="rounded bg-muted px-1">email</code>,{' '}
+                <code className="rounded bg-muted px-1">full_name</code>,{' '}
+                <code className="rounded bg-muted px-1">role</code>
+              </p>
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-background p-6 transition-colors hover:border-primary/50">
+                <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
+                <span className="text-sm text-foreground">Drop CSV file here or click to browse</span>
+                <span className="mt-1 text-xs text-muted-foreground">
+                  Use &quot;CSV Template&quot; button for the correct format
+                </span>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleBulkFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          )}
+
+          {/* Step 2: Preview */}
+          {bulkStep === 'preview' && bulkValidation && (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="rounded-lg border border-border bg-card/50 p-3 text-center">
+                  <p className="text-lg font-semibold text-foreground">{bulkValidation.summary.total}</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                </div>
+                <div className="rounded-lg border border-emerald-900/50 bg-emerald-900/10 p-3 text-center">
+                  <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-emerald-400" />
+                  <p className="text-lg font-semibold text-emerald-400">{bulkValidation.summary.valid}</p>
+                  <p className="text-xs text-muted-foreground">Valid</p>
+                </div>
+                <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-3 text-center">
+                  <XCircle className="mx-auto mb-1 h-4 w-4 text-red-400" />
+                  <p className="text-lg font-semibold text-red-400">{bulkValidation.summary.errors}</p>
+                  <p className="text-xs text-muted-foreground">Errors</p>
+                </div>
+                <div className="rounded-lg border border-yellow-900/50 bg-yellow-900/10 p-3 text-center">
+                  <AlertTriangle className="mx-auto mb-1 h-4 w-4 text-yellow-400" />
+                  <p className="text-lg font-semibold text-yellow-400">{bulkValidation.summary.duplicates}</p>
+                  <p className="text-xs text-muted-foreground">Duplicates</p>
+                </div>
+              </div>
+
+              {/* Preview table */}
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="border-b border-border bg-muted/30">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">#</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Email</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Role</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Issues</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {bulkValidation.records.map((record) => (
+                        <tr key={record.index}>
+                          <td className="px-3 py-2 text-muted-foreground">{record.index + 1}</td>
+                          <td className="px-3 py-2">
+                            {record.status === 'valid' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
+                            {record.status === 'duplicate' && <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />}
+                            {record.status === 'error' && <XCircle className="h-3.5 w-3.5 text-red-400" />}
+                          </td>
+                          <td className="px-3 py-2 text-foreground">{record.email}</td>
+                          <td className="px-3 py-2 text-foreground">{record.fullName}</td>
+                          <td className="px-3 py-2 text-foreground">{record.role.replace(/_/g, ' ')}</td>
+                          <td className="px-3 py-2">
+                            {record.issues.length > 0 && (
+                              <span className={record.status === 'error' ? 'text-red-400' : 'text-yellow-400'}>
+                                {record.issues.join(', ')}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleBulkCommit}
+                  disabled={isPending || !bulkValidation.valid}
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Import {bulkValidation.summary.valid} User{bulkValidation.summary.valid !== 1 ? 's' : ''}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleBulkReset}>
+                  Upload Different File
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setShowBulk(false); handleBulkReset() }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
