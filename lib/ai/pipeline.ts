@@ -91,8 +91,9 @@ export async function aiRequest(
       classification.level
     )
 
-    // Step 3: Check cache
+    // Step 3: Check cache (companyId scoped — CMMC SC-4 isolation)
     const cacheInput = {
+      companyId: companyId ?? 'unknown',
       prompt: options.prompt,
       model: modelSelection.primary.model,
       classification: classification.level,

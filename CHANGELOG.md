@@ -4,6 +4,31 @@ All notable changes to MissionPulse are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] — 2026-02-28 (Production Polish)
+
+### Added
+- 178 new unit tests (277 → 455 total) across 14 new test files
+- RBAC hooks tests (useRole, useModuleAccess, useVisibleNav) with fail-closed verification
+- Role × module permission matrix spot-checks (internal/external boundary, CUI watermark, gate authority)
+- Integration test stubs: Salesforce sync, Slack notifications, GovWin import
+- Utility tests: validation schemas, activity helpers, structured logger
+- Semantic cache company isolation tests (CMMC SC-4)
+- Dependabot grouped updates (major/minor separation) + GitHub Actions ecosystem monitoring
+- Weekly CI cron schedule for health checks
+
+### Changed
+- Semantic cache keys now include companyId to prevent cross-tenant cache hits (CMMC SC-4)
+- Cron daily route rewritten: N+1 queries → batched Promise.all with .in() (6 queries vs 7×N)
+- revalidatePath('/') replaced with targeted paths across 5 files (11 occurrences)
+- 8 legacy test files migrated from custom async runner to Vitest format
+- Stripe webhook console.error migrated to structured logger
+- vitest.config.ts tsconfigPaths fixed to resolve @/ aliases in tests/ directory
+
+### Security
+- Cache isolation: companyId is first segment of all AI cache keys (SC-4 compliance)
+- All external roles verified: no admin, no pipeline, forced CUI watermark, 1hr session timeout
+- SQL injection in role strings safely resolves to 'partner' (most restrictive)
+
 ## [1.5.0] — 2026-02-28 (Ship-Readiness)
 
 ### Added
