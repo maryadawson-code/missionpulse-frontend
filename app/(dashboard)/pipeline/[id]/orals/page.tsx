@@ -62,8 +62,8 @@ export default async function OralsPage({ params }: Props) {
         ]}
       />
       <div>
-        <h1 className="text-2xl font-bold text-white">Orals Preparation</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Orals Preparation</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           AI-generated evaluator questions, coaching tips, and speaker notes for{' '}
           {opportunity.title}.
         </p>
@@ -81,19 +81,19 @@ export default async function OralsPage({ params }: Props) {
 
       {/* Saved Question Bank for This Opportunity */}
       {questions.length > 0 && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <div className="rounded-xl border border-border bg-card/50 p-6 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Saved Question Bank ({questions.length})
           </h2>
           <div className="divide-y divide-border rounded-lg border border-border">
             {questions.map((q) => (
               <div key={q.id} className="p-3 space-y-1">
                 <div className="flex items-start justify-between">
-                  <p className="text-sm font-medium text-white flex-1">
+                  <p className="text-sm font-medium text-foreground flex-1">
                     {q.question}
                   </p>
                   <div className="ml-3 flex items-center gap-2">
-                    <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                       {q.category}
                     </span>
                     {q.difficulty && (
@@ -112,11 +112,11 @@ export default async function OralsPage({ params }: Props) {
                   </div>
                 </div>
                 {q.suggested_answer && (
-                  <p className="text-xs text-gray-400 bg-gray-900/30 rounded p-2">
+                  <p className="text-xs text-muted-foreground bg-card/30 rounded p-2">
                     {q.suggested_answer}
                   </p>
                 )}
-                <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   {q.times_asked != null && q.times_asked > 0 && (
                     <span>Practiced {q.times_asked}x</span>
                   )}

@@ -7,11 +7,11 @@ export const metadata: Metadata = {
 
 export default function AccessibilityPage() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16 text-gray-200">
-      <h1 className="text-3xl font-bold text-white mb-8">Accessibility Statement</h1>
+    <main className="mx-auto max-w-3xl px-6 py-16 text-foreground">
+      <h1 className="text-3xl font-bold text-foreground mb-8">Accessibility Statement</h1>
 
       <section className="space-y-4 mb-8">
-        <h2 className="text-xl font-semibold text-white">Our Commitment</h2>
+        <h2 className="text-xl font-semibold text-foreground">Our Commitment</h2>
         <p>
           Mission Meets Tech, LLC is committed to ensuring digital accessibility for
           people with disabilities. We are continually improving the user experience
@@ -20,7 +20,7 @@ export default function AccessibilityPage() {
       </section>
 
       <section className="space-y-4 mb-8">
-        <h2 className="text-xl font-semibold text-white">Conformance Status</h2>
+        <h2 className="text-xl font-semibold text-foreground">Conformance Status</h2>
         <p>
           MissionPulse targets conformance with the Web Content Accessibility
           Guidelines (WCAG) 2.1 Level AA. These guidelines explain how to make
@@ -33,7 +33,7 @@ export default function AccessibilityPage() {
       </section>
 
       <section className="space-y-4 mb-8">
-        <h2 className="text-xl font-semibold text-white">Accessibility Features</h2>
+        <h2 className="text-xl font-semibold text-foreground">Accessibility Features</h2>
         <ul className="list-disc pl-6 space-y-2">
           <li>Skip navigation link for keyboard users</li>
           <li>ARIA landmarks for page regions (navigation, main content, sidebar)</li>
@@ -47,7 +47,7 @@ export default function AccessibilityPage() {
       </section>
 
       <section className="space-y-4 mb-8">
-        <h2 className="text-xl font-semibold text-white">Section 508 Compliance</h2>
+        <h2 className="text-xl font-semibold text-foreground">Section 508 Compliance</h2>
         <p>
           As a tool used by federal government contractors, MissionPulse is designed
           to meet Section 508 of the Rehabilitation Act requirements. We work to ensure
@@ -57,7 +57,7 @@ export default function AccessibilityPage() {
       </section>
 
       <section className="space-y-4 mb-8">
-        <h2 className="text-xl font-semibold text-white">Known Limitations</h2>
+        <h2 className="text-xl font-semibold text-foreground">Known Limitations</h2>
         <ul className="list-disc pl-6 space-y-2">
           <li>
             <strong>Drag-and-drop interfaces</strong> (Kanban board, Swimlane): While keyboard
@@ -77,7 +77,7 @@ export default function AccessibilityPage() {
       </section>
 
       <section className="space-y-4 mb-8">
-        <h2 className="text-xl font-semibold text-white">Feedback</h2>
+        <h2 className="text-xl font-semibold text-foreground">Feedback</h2>
         <p>
           We welcome your feedback on the accessibility of MissionPulse. If you
           encounter accessibility barriers, please contact us:
@@ -89,7 +89,7 @@ export default function AccessibilityPage() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-semibold text-white">Assessment Approach</h2>
+        <h2 className="text-xl font-semibold text-foreground">Assessment Approach</h2>
         <p>
           Mission Meets Tech assessed the accessibility of MissionPulse through:
         </p>
@@ -99,7 +99,7 @@ export default function AccessibilityPage() {
           <li>Screen reader testing with VoiceOver (macOS)</li>
           <li>Color contrast analysis using WCAG 2.1 AA thresholds (4.5:1 normal text, 3:1 large text)</li>
         </ul>
-        <p className="text-sm text-gray-400 mt-4">
+        <p className="text-sm text-muted-foreground mt-4">
           Last updated: February 2026
         </p>
       </section>

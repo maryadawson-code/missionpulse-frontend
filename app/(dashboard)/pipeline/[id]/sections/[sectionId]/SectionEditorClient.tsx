@@ -81,9 +81,9 @@ export function SectionEditorClient({
       {/* Left Column: Content Editor + AI Writer */}
       <div className="lg:col-span-2 space-y-6">
         {/* Content Editor */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
+        <div className="rounded-xl border border-border bg-card/50 p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Section Content
             </h2>
             <Button
@@ -104,7 +104,7 @@ export function SectionEditorClient({
             onChange={(e) => setContent(e.target.value)}
             disabled={isLocked}
             placeholder="Start writing your section content..."
-            className="w-full min-h-[400px] resize-y rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-sm leading-relaxed text-gray-200 placeholder-gray-600 focus:border-[#00E5FA] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full min-h-[400px] resize-y rounded-lg border border-border bg-card px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
           {content !== initialContent && (
             <p className="mt-2 text-xs text-amber-400">Unsaved changes</p>
@@ -112,8 +112,8 @@ export function SectionEditorClient({
         </div>
 
         {/* AI Writer */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <div className="rounded-xl border border-border bg-card/50 p-6">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             AI Writer
           </h2>
           <AIWriterPanel
@@ -137,8 +137,8 @@ export function SectionEditorClient({
         />
 
         {/* Section Lock */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <div className="rounded-xl border border-border bg-card/50 p-4">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Edit Lock
           </h3>
           <SectionLockControl
@@ -156,7 +156,7 @@ export function SectionEditorClient({
         </div>
 
         {/* Comments */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 min-h-[300px]">
+        <div className="rounded-xl border border-border bg-card/50 min-h-[300px]">
           <CommentPanel
             sectionId={sectionId}
             userId={userId}
@@ -171,26 +171,26 @@ export function SectionEditorClient({
         />
 
         {/* Linked Requirements */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <div className="rounded-xl border border-border bg-card/50 p-4">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Linked Requirements
           </h3>
           {requirements.length > 0 ? (
             <ul className="space-y-2">
               {requirements.slice(0, 10).map((req, i) => (
-                <li key={i} className="text-xs text-gray-400 leading-relaxed">
-                  <span className="mr-1 text-[#00E5FA]">{i + 1}.</span>
+                <li key={i} className="text-xs text-muted-foreground leading-relaxed">
+                  <span className="mr-1 text-primary">{i + 1}.</span>
                   {req}
                 </li>
               ))}
               {requirements.length > 10 && (
-                <li className="text-xs text-gray-500 italic">
+                <li className="text-xs text-muted-foreground italic">
                   +{requirements.length - 10} more requirements
                 </li>
               )}
             </ul>
           ) : (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               No compliance requirements linked. Extract requirements via the RFP Shredder.
             </p>
           )}

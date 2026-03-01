@@ -14,19 +14,19 @@ export default function AuthLayout({
         {/* Brand */}
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-[#00E5FA]">Mission</span>Pulse
+            <span className="text-primary">Mission</span>Pulse
           </h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             Mission. Technology. Transformation.
           </p>
         </div>
 
         {/* Card */}
-        <div className="rounded-xl border border-[#1E293B] bg-[#0F172A] p-8">
+        <div className="rounded-xl border border-border bg-card p-8">
           {children}
         </div>
 
-        <p className="text-center text-xs text-slate-500">
+        <p className="text-center text-xs text-muted-foreground">
           © 2026 Mission Meets Tech. All rights reserved.
         </p>
       </div>

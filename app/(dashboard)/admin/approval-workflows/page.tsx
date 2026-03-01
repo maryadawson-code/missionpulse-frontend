@@ -53,8 +53,8 @@ export default async function ApprovalWorkflowsPage() {
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">Approval Workflows</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Approval Workflows</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Define approval chains for proposals, gate reviews, and submissions.
           Each workflow defines sequential approval steps with required roles.
         </p>
@@ -77,12 +77,12 @@ export default async function ApprovalWorkflowsPage() {
             return (
               <div
                 key={wf.id}
-                className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-3"
+                className="rounded-xl border border-border bg-card/50 p-6 space-y-3"
               >
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-3">
-                      <h3 className="text-sm font-semibold text-white">
+                      <h3 className="text-sm font-semibold text-foreground">
                         {wf.name}
                       </h3>
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
@@ -95,12 +95,12 @@ export default async function ApprovalWorkflowsPage() {
                       )}
                     </div>
                     {wf.description && (
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {wf.description}
                       </p>
                     )}
                   </div>
-                  <span className="text-[10px] text-gray-500">
+                  <span className="text-[10px] text-muted-foreground">
                     Updated {formatDate(wf.updated_at ?? wf.created_at)}
                   </span>
                 </div>
@@ -113,24 +113,24 @@ export default async function ApprovalWorkflowsPage() {
                       .map((step, i) => (
                         <div key={i} className="flex items-center gap-2">
                           {i > 0 && (
-                            <div className="h-px w-6 bg-gray-700" />
+                            <div className="h-px w-6 bg-muted" />
                           )}
                           <div
                             className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
                               step.required !== false
                                 ? 'border-primary/30 bg-primary/5'
-                                : 'border-gray-700 bg-gray-800/50'
+                                : 'border-border bg-muted/50'
                             }`}
                           >
-                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-800 text-[10px] font-bold text-gray-400">
+                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
                               {i + 1}
                             </div>
                             <div>
-                              <p className="text-xs font-medium text-white">
+                              <p className="text-xs font-medium text-foreground">
                                 {step.name}
                               </p>
                               {step.approver_role && (
-                                <p className="text-[10px] text-gray-500">
+                                <p className="text-[10px] text-muted-foreground">
                                   {step.approver_role.replace(/_/g, ' ')}
                                 </p>
                               )}

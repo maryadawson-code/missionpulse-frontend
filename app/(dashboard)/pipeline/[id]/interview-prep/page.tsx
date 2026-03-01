@@ -92,32 +92,32 @@ export default async function InterviewPrepPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">Interview Preparation</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Interview Preparation</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Prep candidates, track questions, and score practice sessions for{' '}
           {opp.title}.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Sessions</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Sessions</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {interviewItems.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Avg Score</p>
-          <p className="mt-1 text-lg font-bold text-white">{avgScore}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Avg Score</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{avgScore}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Completed</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Completed</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">
             {interviewItems.filter((i) => i.status === 'completed').length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Scheduled</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Scheduled</p>
           <p className="mt-1 text-lg font-bold text-amber-400">
             {interviewItems.filter((i) => i.status === 'scheduled').length}
           </p>
@@ -137,16 +137,16 @@ export default async function InterviewPrepPage({
             return (
               <div
                 key={interview.id}
-                className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-3"
+                className="rounded-xl border border-border bg-card/50 p-5 space-y-3"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-white">
+                      <h3 className="text-sm font-semibold text-foreground">
                         {interview.candidate_name}
                       </h3>
                       {interview.position_title && (
-                        <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                           {interview.position_title}
                         </span>
                       )}
@@ -158,7 +158,7 @@ export default async function InterviewPrepPage({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 mt-1 text-[10px] text-gray-500">
+                    <div className="flex items-center gap-4 mt-1 text-[10px] text-muted-foreground">
                       {interview.interview_type && (
                         <span>Type: {interview.interview_type}</span>
                       )}
@@ -200,22 +200,22 @@ export default async function InterviewPrepPage({
                 )}
 
                 {questions.length > 0 && (
-                  <div className="border-t border-gray-800 pt-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  <div className="border-t border-border pt-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                       Questions ({questions.length})
                     </p>
                     <div className="space-y-1">
                       {questions.map((q) => (
                         <div
                           key={q.id}
-                          className="flex items-center justify-between rounded px-2 py-1 text-xs bg-gray-800/30"
+                          className="flex items-center justify-between rounded px-2 py-1 text-xs bg-muted/30"
                         >
-                          <span className="text-gray-300 flex-1">
+                          <span className="text-muted-foreground flex-1">
                             {q.question_text}
                           </span>
-                          <div className="flex items-center gap-2 text-[10px] text-gray-500 ml-2">
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground ml-2">
                             {q.question_category && (
-                              <span className="rounded bg-gray-700 px-1 py-0.5">
+                              <span className="rounded bg-muted px-1 py-0.5">
                                 {q.question_category}
                               </span>
                             )}

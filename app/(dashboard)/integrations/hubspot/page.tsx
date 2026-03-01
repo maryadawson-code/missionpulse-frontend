@@ -31,8 +31,8 @@ export default async function HubSpotPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">HubSpot Integration</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">HubSpot Integration</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Connect HubSpot CRM for bi-directional sync of opportunities, deals,
           and contacts.
         </p>

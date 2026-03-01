@@ -87,28 +87,28 @@ export default async function GateReviewsPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">Gate Reviews</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Gate Reviews</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Shipley gate review decisions and pWin tracking for {opp.title}.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Gates Reviewed</p>
-          <p className="mt-1 text-lg font-bold text-white">{items.length}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Gates Reviewed</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{items.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Go Decisions</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Go Decisions</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">{goCount}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">No-Go</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">No-Go</p>
           <p className="mt-1 text-lg font-bold text-red-400">{noGoCount}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Latest pWin</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Latest pWin</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {latestPwin != null ? `${latestPwin}%` : '—'}
           </p>
         </div>
@@ -123,7 +123,7 @@ export default async function GateReviewsPage({
       ) : (
         <div className="relative">
           {/* Timeline line */}
-          <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-gray-800" />
+          <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-muted" />
 
           <div className="space-y-4">
             {items.map((review) => (
@@ -139,17 +139,17 @@ export default async function GateReviewsPage({
                         : review.decision === 'conditional' ||
                             review.decision === 'conditional_go'
                           ? 'border-amber-500 bg-amber-500/15 text-amber-300'
-                          : 'border-gray-600 bg-gray-800 text-gray-400'
+                          : 'border-gray-600 bg-muted text-muted-foreground'
                   }`}
                 >
                   {review.gate_number ?? '?'}
                 </div>
 
                 {/* Card */}
-                <div className="flex-1 rounded-xl border border-gray-800 bg-gray-900/50 p-4 space-y-2">
+                <div className="flex-1 rounded-xl border border-border bg-card/50 p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-white">
+                      <h3 className="text-sm font-semibold text-foreground">
                         {review.gate_name ?? `Gate ${review.gate_number}`}
                       </h3>
                       {review.decision && (
@@ -160,7 +160,7 @@ export default async function GateReviewsPage({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                       {review.pwin_at_gate != null && (
                         <span className="font-medium text-cyan">
                           pWin: {review.pwin_at_gate}%
@@ -179,14 +179,14 @@ export default async function GateReviewsPage({
 
                   {review.conditions && review.conditions.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                         Conditions
                       </p>
                       <ul className="space-y-0.5">
                         {review.conditions.map((condition, i) => (
                           <li
                             key={i}
-                            className="text-xs text-gray-400 flex items-start gap-1.5"
+                            className="text-xs text-muted-foreground flex items-start gap-1.5"
                           >
                             <span className="mt-1 h-1 w-1 rounded-full bg-amber-400 flex-shrink-0" />
                             {condition}
@@ -198,21 +198,21 @@ export default async function GateReviewsPage({
 
                   {/* Review Comments */}
                   {(commentsMap[review.id] ?? []).length > 0 && (
-                    <div className="border-t border-gray-800 pt-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                    <div className="border-t border-border pt-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                         Comments ({commentsMap[review.id].length})
                       </p>
                       <div className="space-y-1">
                         {commentsMap[review.id].map((c) => (
                           <div
                             key={c.id}
-                            className="rounded px-2 py-1.5 text-xs bg-gray-800/30 space-y-0.5"
+                            className="rounded px-2 py-1.5 text-xs bg-muted/30 space-y-0.5"
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <p className="text-gray-300 flex-1">{c.comment_text}</p>
+                              <p className="text-muted-foreground flex-1">{c.comment_text}</p>
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 {c.comment_type && (
-                                  <span className="rounded bg-gray-700 px-1 py-0.5 text-[10px] text-gray-400">
+                                  <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
                                     {c.comment_type}
                                   </span>
                                 )}

@@ -32,8 +32,8 @@ type CommentRow = Database['public']['Tables']['opportunity_comments']['Row']
 function DetailField({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-200">{value ?? '—'}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm text-foreground">{value ?? '—'}</dd>
     </div>
   )
 }
@@ -120,14 +120,14 @@ export default async function WarRoomPage({
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">{opp.title}</h1>
+            <h1 className="text-2xl font-bold text-foreground">{opp.title}</h1>
             {opp.status && (
               <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${statusColor(opp.status)}`}>
                 {opp.status}
               </span>
             )}
           </div>
-          <div className="mt-1 flex items-center gap-4 text-sm text-gray-500">
+          <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
             {opp.agency && <span>{opp.agency}</span>}
             {opp.phase && (
               <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${phaseColor(opp.phase)}`}>
@@ -143,7 +143,7 @@ export default async function WarRoomPage({
         {canEdit && (
           <Link
             href={`/pipeline/${id}/edit`}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -155,21 +155,21 @@ export default async function WarRoomPage({
 
       {/* ─── Key Metrics Bar ─────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Ceiling</p>
-          <p className="mt-1 text-lg font-bold text-white">{formatCurrency(opp.ceiling)}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ceiling</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{formatCurrency(opp.ceiling)}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Win Probability</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Win Probability</p>
           <p className={`mt-1 text-lg font-bold ${pwinColor(opp.pwin)}`}>{formatPwin(opp.pwin)}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Due Date</p>
-          <p className="mt-1 text-lg font-bold text-white">{formatDate(opp.due_date)}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Due Date</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{formatDate(opp.due_date)}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Set-Aside</p>
-          <p className="mt-1 text-lg font-bold text-white">{opp.set_aside ?? '—'}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Set-Aside</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{opp.set_aside ?? '—'}</p>
         </div>
       </div>
 
@@ -189,11 +189,11 @@ export default async function WarRoomPage({
         <div className="lg:col-span-2 space-y-6">
           {/* Description */}
           {opp.description && (
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+            <div className="rounded-xl border border-border bg-card/50 p-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Description
               </h2>
-              <p className="mt-3 text-sm leading-relaxed text-gray-300 whitespace-pre-wrap">
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
                 {opp.description}
               </p>
             </div>
@@ -201,8 +201,8 @@ export default async function WarRoomPage({
 
           {/* AI Capture Analysis — only for roles with 'capture' agent */}
           {showCaptureAgent && (
-            <div id="capture" className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
+            <div id="capture" className="rounded-xl border border-border bg-card/50 p-6">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Capture Analysis
               </h2>
               <CaptureAnalysis
@@ -220,8 +220,8 @@ export default async function WarRoomPage({
           )}
 
           {/* Market Intelligence */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <div className="rounded-xl border border-border bg-card/50 p-6">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Market Intelligence
             </h2>
             <div className="space-y-6">
@@ -243,8 +243,8 @@ export default async function WarRoomPage({
           </div>
 
           {/* Details Grid — Inline Editable */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <div className="rounded-xl border border-border bg-card/50 p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Opportunity Details
             </h2>
             <InlineEditFields
@@ -271,8 +271,8 @@ export default async function WarRoomPage({
           </div>
 
           {/* Contact Info */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <div className="rounded-xl border border-border bg-card/50 p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Point of Contact
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
@@ -282,8 +282,8 @@ export default async function WarRoomPage({
           </div>
 
           {/* Key Dates */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <div className="rounded-xl border border-border bg-card/50 p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Key Dates
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
@@ -300,15 +300,15 @@ export default async function WarRoomPage({
         {/* Right: Team & Comments */}
         <div className="space-y-6">
           {/* Team Assignments */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <div className="rounded-xl border border-border bg-card/50 p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Team
             </h2>
             {team.length > 0 ? (
               <ul className="mt-4 space-y-3">
                 {team.map((assignment) => (
                   <li key={assignment.id} className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-700 text-xs font-medium text-gray-300">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
                       {assignment.assignee_name
                         .split(' ')
                         .map((n) => n[0])
@@ -317,10 +317,10 @@ export default async function WarRoomPage({
                         .slice(0, 2)}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-200">
+                      <p className="text-sm font-medium text-foreground">
                         {assignment.assignee_name}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {assignment.role.replace(/_/g, ' ')}
                       </p>
                     </div>
@@ -328,42 +328,42 @@ export default async function WarRoomPage({
                 ))}
               </ul>
             ) : (
-              <p className="mt-4 text-sm text-gray-500">No team members assigned</p>
+              <p className="mt-4 text-sm text-muted-foreground">No team members assigned</p>
             )}
           </div>
 
           {/* Comments */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <div className="rounded-xl border border-border bg-card/50 p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Comments
             </h2>
             {commentList.length > 0 ? (
               <ul className="mt-4 space-y-4">
                 {commentList.map((comment) => (
-                  <li key={comment.id} className="border-b border-gray-800 pb-3 last:border-0 last:pb-0">
+                  <li key={comment.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-gray-400">
+                      <p className="text-xs font-medium text-muted-foreground">
                         {comment.author ?? 'Unknown'}
                       </p>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs text-muted-foreground">
                         {formatRelativeDate(comment.created_at)}
                       </p>
                     </div>
-                    <p className="mt-1 text-sm text-gray-300">{comment.content}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{comment.content}</p>
                     {comment.is_pinned && (
-                      <span className="mt-1 inline-block text-xs text-[#00E5FA]">📌 Pinned</span>
+                      <span className="mt-1 inline-block text-xs text-primary">📌 Pinned</span>
                     )}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-4 text-sm text-gray-500">No comments yet</p>
+              <p className="mt-4 text-sm text-muted-foreground">No comments yet</p>
             )}
           </div>
 
           {/* Metadata */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <div className="rounded-xl border border-border bg-card/50 p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Metadata
             </h2>
             <dl className="mt-4 space-y-3">
@@ -378,9 +378,9 @@ export default async function WarRoomPage({
 
       {/* Notes */}
       {opp.notes && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Notes</h2>
-          <p className="mt-3 text-sm leading-relaxed text-gray-300 whitespace-pre-wrap">
+        <div className="rounded-xl border border-border bg-card/50 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Notes</h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
             {opp.notes}
           </p>
         </div>

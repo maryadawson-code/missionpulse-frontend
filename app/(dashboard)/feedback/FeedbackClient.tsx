@@ -112,14 +112,14 @@ export function FeedbackClient({
       {/* Submit button */}
       <div className="flex justify-end">
         {showForm ? (
-          <div className="w-full rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-3">
+          <div className="w-full rounded-xl border border-border bg-card/50 p-6 space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">
+              <h3 className="text-sm font-semibold text-foreground">
                 New Suggestion
               </h3>
               <button
                 onClick={() => setShowForm(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -177,7 +177,7 @@ export function FeedbackClient({
           {suggestions.map((s) => (
             <div
               key={s.id}
-              className="flex items-start gap-4 rounded-xl border border-gray-800 bg-gray-900/50 px-5 py-4"
+              className="flex items-start gap-4 rounded-xl border border-border bg-card/50 px-5 py-4"
             >
               {/* Vote button */}
               <button
@@ -186,7 +186,7 @@ export function FeedbackClient({
                 className={`flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 transition-colors ${
                   s.hasVoted
                     ? 'bg-primary/10 text-primary'
-                    : 'text-gray-500 hover:bg-gray-800 hover:text-white'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 <ThumbsUp className="h-4 w-4" />
@@ -196,8 +196,8 @@ export function FeedbackClient({
               {/* Content */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-medium text-white">{s.title}</h3>
-                  <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                  <h3 className="text-sm font-medium text-foreground">{s.title}</h3>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                     {s.category}
                   </span>
                   {s.status && s.status !== 'submitted' && (
@@ -211,7 +211,7 @@ export function FeedbackClient({
                   )}
                 </div>
                 {s.description && (
-                  <p className="mt-1 text-xs text-gray-400">{s.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{s.description}</p>
                 )}
               </div>
             </div>

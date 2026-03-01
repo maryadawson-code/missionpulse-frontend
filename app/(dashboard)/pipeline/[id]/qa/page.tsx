@@ -79,28 +79,28 @@ export default async function QAPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">RFP Questions & Answers</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">RFP Questions & Answers</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Track and respond to RFP questions for {opp.title}.
         </p>
       </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Questions</p>
-          <p className="mt-1 text-lg font-bold text-white">{items.length}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Questions</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{items.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Answered</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Answered</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">{answered}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Pending</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Pending</p>
           <p className="mt-1 text-lg font-bold text-amber-400">{pending}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Overdue</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Overdue</p>
           <p className="mt-1 text-lg font-bold text-red-400">{overdue}</p>
         </div>
       </div>
@@ -121,21 +121,21 @@ export default async function QAPage({
             )
             return (
               <div key={cat} className="space-y-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {cat} ({catQuestions.length})
                 </h2>
-                <div className="divide-y divide-gray-800 rounded-xl border border-gray-800 bg-gray-900/50">
+                <div className="divide-y divide-border rounded-xl border border-border bg-card/50">
                   {catQuestions.map((q) => (
                     <div key={q.id} className="p-4 space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             {q.question_number && (
-                              <span className="text-xs font-mono text-gray-500">
+                              <span className="text-xs font-mono text-muted-foreground">
                                 Q{q.question_number}
                               </span>
                             )}
-                            <p className="text-sm font-medium text-white">
+                            <p className="text-sm font-medium text-foreground">
                               {q.question_text}
                             </p>
                           </div>
@@ -152,14 +152,14 @@ export default async function QAPage({
                       </div>
 
                       {q.response_text && (
-                        <div className="rounded bg-gray-900/30 p-3">
-                          <p className="text-xs text-gray-300 whitespace-pre-wrap">
+                        <div className="rounded bg-card/30 p-3">
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap">
                             {q.response_text}
                           </p>
                         </div>
                       )}
 
-                      <div className="flex items-center gap-4 text-[10px] text-gray-500">
+                      <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
                         {q.assigned_to && <span>Assigned: {q.assigned_to}</span>}
                         {q.due_date && (
                           <span

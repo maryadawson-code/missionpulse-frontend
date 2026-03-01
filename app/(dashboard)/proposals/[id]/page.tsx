@@ -121,7 +121,7 @@ export default async function ProposalDetailPage({ params }: Props) {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-foreground">
             {outline.outline_name}
           </h1>
           <span
@@ -130,10 +130,10 @@ export default async function ProposalDetailPage({ params }: Props) {
             {(outline.status ?? 'draft').replace(/_/g, ' ')}
           </span>
         </div>
-        <div className="mt-1 flex items-center gap-3 text-sm text-gray-500">
+        <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
           {opportunityTitle && <span>{opportunityTitle}</span>}
           {outline.volume_type && (
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-muted-foreground">
               {outline.volume_type}
             </span>
           )}

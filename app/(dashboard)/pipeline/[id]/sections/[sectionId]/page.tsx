@@ -119,7 +119,7 @@ export default async function SectionEditorPage({ params }: SectionEditorPagePro
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">{section.section_title}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{section.section_title}</h1>
         <div className="mt-1 flex items-center gap-2">
           {section.volume && (
             <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${volumeColor(section.volume)}`}>
@@ -129,7 +129,7 @@ export default async function SectionEditorPage({ params }: SectionEditorPagePro
           <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor(section.status)}`}>
             {STATUS_LABELS[section.status ?? 'draft'] ?? section.status ?? 'Draft'}
           </span>
-          <span className="text-xs text-gray-500">{opportunity.title}</span>
+          <span className="text-xs text-muted-foreground">{opportunity.title}</span>
         </div>
       </div>
 

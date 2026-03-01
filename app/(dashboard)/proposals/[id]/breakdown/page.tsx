@@ -44,7 +44,7 @@ function SummaryCard({ label, value, accent, subtext }: SummaryCardProps) {
       <p
         className={
           accent
-            ? 'mt-1 text-2xl font-bold text-[#00E5FA]'
+            ? 'mt-1 text-2xl font-bold text-primary'
             : 'mt-1 text-2xl font-bold text-foreground'
         }
       >
@@ -187,7 +187,7 @@ export default async function BreakdownPage({
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">
+        <h1 className="text-2xl font-bold text-foreground">
           Work Breakdown &mdash; {opportunity.title}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -220,7 +220,7 @@ export default async function BreakdownPage({
       <section>
         <div className="mb-3 flex items-center gap-2">
           <svg
-            className="h-4 w-4 text-[#00E5FA]"
+            className="h-4 w-4 text-primary"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -249,7 +249,7 @@ export default async function BreakdownPage({
       <section>
         <div className="mb-3 flex items-center gap-2">
           <svg
-            className="h-4 w-4 text-[#00E5FA]"
+            className="h-4 w-4 text-primary"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

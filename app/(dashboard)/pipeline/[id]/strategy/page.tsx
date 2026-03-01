@@ -91,10 +91,10 @@ export default async function OpportunityStrategyPage({ params }: Props) {
         ]}
       />
       <div>
-        <h1 className="text-2xl font-bold text-white">
+        <h1 className="text-2xl font-bold text-foreground">
           Black Hat Review — {opportunity.title}
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           Competitive analysis, ghost strategies, and counter-tactics for{' '}
           {opportunity.agency ?? 'this opportunity'}.
         </p>

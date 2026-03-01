@@ -176,7 +176,7 @@ export default async function ProposalsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Proposals</h1>
+        <h1 className="text-2xl font-bold text-foreground">Proposals</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Manage proposal outlines and review pending items.
         </p>

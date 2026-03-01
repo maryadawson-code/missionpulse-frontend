@@ -42,38 +42,38 @@ export default async function HubSpotMappingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">HubSpot Integration</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">HubSpot Integration</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Configure field mappings between MissionPulse and HubSpot CRM.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Mappings</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Mappings</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {mappingItems.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Active</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Active</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">
             {activeMappings}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Inbound</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Inbound</p>
           <p className="mt-1 text-lg font-bold text-blue-400">{inbound}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Outbound</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Outbound</p>
           <p className="mt-1 text-lg font-bold text-amber-400">{outbound}</p>
         </div>
       </div>
 
       {/* Field Mappings */}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Field Mappings
         </h2>
         {mappingItems.length === 0 ? (
@@ -83,23 +83,23 @@ export default async function HubSpotMappingsPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-800">
+          <div className="overflow-x-auto rounded-xl border border-border">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-gray-800 bg-gray-900/80">
-                  <th className="px-3 py-2 text-left font-medium text-gray-400">
+                <tr className="border-b border-border bg-card/80">
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                     MissionPulse Field
                   </th>
-                  <th className="px-3 py-2 text-center font-medium text-gray-400">
+                  <th className="px-3 py-2 text-center font-medium text-muted-foreground">
                     Direction
                   </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-400">
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                     HubSpot Field
                   </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-400">
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                     Transform
                   </th>
-                  <th className="px-3 py-2 text-center font-medium text-gray-400">
+                  <th className="px-3 py-2 text-center font-medium text-muted-foreground">
                     Active
                   </th>
                 </tr>
@@ -108,9 +108,9 @@ export default async function HubSpotMappingsPage() {
                 {mappingItems.map((m) => (
                   <tr
                     key={m.id}
-                    className="border-b border-gray-800/50 hover:bg-gray-800/20"
+                    className="border-b border-border/50 hover:bg-muted/20"
                   >
-                    <td className="px-3 py-2 font-mono text-sm text-white">
+                    <td className="px-3 py-2 font-mono text-sm text-foreground">
                       {m.missionpulse_field}
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -130,16 +130,16 @@ export default async function HubSpotMappingsPage() {
                             : 'Bidirectional'}
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-mono text-sm text-gray-300">
+                    <td className="px-3 py-2 font-mono text-sm text-muted-foreground">
                       {m.hubspot_field}
                     </td>
-                    <td className="px-3 py-2 text-gray-400">
+                    <td className="px-3 py-2 text-muted-foreground">
                       {m.transform_type ?? 'direct'}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <span
                         className={`inline-block h-2 w-2 rounded-full ${
-                          m.is_active ? 'bg-emerald-400' : 'bg-gray-600'
+                          m.is_active ? 'bg-emerald-400' : 'bg-muted'
                         }`}
                       />
                     </td>
@@ -154,10 +154,10 @@ export default async function HubSpotMappingsPage() {
       {/* Sync Logs */}
       {logItems.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Recent Sync Logs
           </h2>
-          <div className="divide-y divide-gray-800 rounded-xl border border-gray-800 bg-gray-900/50">
+          <div className="divide-y divide-border rounded-xl border border-border bg-card/50">
             {logItems.map((log) => (
               <div
                 key={log.id}
@@ -174,7 +174,7 @@ export default async function HubSpotMappingsPage() {
                     }`}
                   />
                   <div>
-                    <p className="text-sm text-white">
+                    <p className="text-sm text-foreground">
                       {log.sync_direction ?? 'Sync'}
                     </p>
                     {log.error_message && (
@@ -184,7 +184,7 @@ export default async function HubSpotMappingsPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   {log.hubspot_deal_id && (
                     <span>Deal: {log.hubspot_deal_id}</span>
                   )}

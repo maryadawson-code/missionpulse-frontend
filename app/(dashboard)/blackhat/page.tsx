@@ -16,7 +16,7 @@ function threatColor(level: string | null): string {
     case 'low':
       return 'bg-emerald-500/20 text-emerald-300'
     default:
-      return 'bg-gray-500/20 text-gray-300'
+      return 'bg-gray-500/20 text-muted-foreground'
   }
 }
 
@@ -51,8 +51,8 @@ export default async function BlackhatPage() {
     <div className="space-y-6">
       <CUIBanner marking="OPSEC" />
       <div>
-        <h1 className="text-2xl font-bold text-white">Black Hat Review</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Black Hat Review</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Conduct competitive analysis and black hat reviews to anticipate competitor strategies.
         </p>
       </div>
@@ -63,31 +63,31 @@ export default async function BlackhatPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
+      <div className="overflow-hidden rounded-xl border border-border bg-card/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Competitor</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Threat</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">pWin Est.</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Incumbent</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Strengths</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Weaknesses</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Likely Strategy</th>
+              <tr className="border-b border-border bg-card/80">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Competitor</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Threat</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">pWin Est.</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Incumbent</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Strengths</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Weaknesses</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Likely Strategy</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-border/50">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No competitor intel recorded yet. Add competitors to begin black hat analysis.
                   </td>
                 </tr>
               ) : (
                 items.map((comp) => (
-                  <tr key={comp.id} className="transition-colors hover:bg-gray-800/30">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-200">
+                  <tr key={comp.id} className="transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3 text-sm font-medium text-foreground">
                       {comp.name}
                     </td>
                     <td className="px-4 py-3">
@@ -95,19 +95,19 @@ export default async function BlackhatPage() {
                         {(comp.threat_level ?? 'unknown').replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-300">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-muted-foreground">
                       {comp.pwin_estimate != null ? `${comp.pwin_estimate}%` : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {comp.incumbent ? 'Yes' : 'No'}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 max-w-[160px]">
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[160px]">
                       {comp.strengths?.length ? comp.strengths.slice(0, 3).join(', ') : '—'}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 max-w-[160px]">
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[160px]">
                       {comp.weaknesses?.length ? comp.weaknesses.slice(0, 3).join(', ') : '—'}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[180px] truncate" title={comp.likely_strategy ?? ''}>
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[180px] truncate" title={comp.likely_strategy ?? ''}>
                       {comp.likely_strategy ?? '—'}
                     </td>
                   </tr>
@@ -118,7 +118,7 @@ export default async function BlackhatPage() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-muted-foreground">
         Showing {items.length} competitor{items.length !== 1 ? 's' : ''}. Black hat data is classified CUI//OPSEC.
       </p>
     </div>

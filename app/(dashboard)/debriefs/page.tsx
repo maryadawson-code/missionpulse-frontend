@@ -56,8 +56,8 @@ export default async function DebriefsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Win/Loss Debriefs</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Win/Loss Debriefs</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Capture lessons learned from proposal outcomes to improve future win
             rates.
           </p>
@@ -84,7 +84,7 @@ export default async function DebriefsPage() {
             return (
               <div
                 key={d.id}
-                className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-3"
+                className="rounded-xl border border-border bg-card/50 p-6 space-y-3"
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -92,12 +92,12 @@ export default async function DebriefsPage() {
                       {d.opportunity_id ? (
                         <Link
                           href={`/pipeline/${d.opportunity_id}`}
-                          className="text-sm font-semibold text-white hover:text-primary transition-colors"
+                          className="text-sm font-semibold text-foreground hover:text-primary transition-colors"
                         >
                           {d.opportunity_name ?? 'Unnamed Opportunity'}
                         </Link>
                       ) : (
-                        <span className="text-sm font-semibold text-white">
+                        <span className="text-sm font-semibold text-foreground">
                           {d.opportunity_name ?? 'Unnamed Opportunity'}
                         </span>
                       )}
@@ -111,7 +111,7 @@ export default async function DebriefsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
+                    <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                       {d.debrief_type && (
                         <span>{d.debrief_type.replace(/_/g, ' ')}</span>
                       )}
@@ -124,7 +124,7 @@ export default async function DebriefsPage() {
                 </div>
 
                 {d.notes && (
-                  <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {d.notes}
                   </p>
                 )}
@@ -139,7 +139,7 @@ export default async function DebriefsPage() {
                         {strengths.map((s, i) => (
                           <li
                             key={i}
-                            className="text-xs text-gray-400 flex items-start gap-1"
+                            className="text-xs text-muted-foreground flex items-start gap-1"
                           >
                             <span className="text-emerald-500 mt-0.5">+</span>
                             {String(s)}
@@ -157,7 +157,7 @@ export default async function DebriefsPage() {
                         {weaknesses.map((w, i) => (
                           <li
                             key={i}
-                            className="text-xs text-gray-400 flex items-start gap-1"
+                            className="text-xs text-muted-foreground flex items-start gap-1"
                           >
                             <span className="text-red-500 mt-0.5">-</span>
                             {String(w)}
@@ -175,7 +175,7 @@ export default async function DebriefsPage() {
                         {lessons.map((l, i) => (
                           <li
                             key={i}
-                            className="text-xs text-gray-400 flex items-start gap-1"
+                            className="text-xs text-muted-foreground flex items-start gap-1"
                           >
                             <span className="text-amber-500 mt-0.5">*</span>
                             {String(l)}

@@ -24,7 +24,7 @@ function statusBadge(status: string | null): string {
     case 'rejected':
       return 'bg-red-500/20 text-red-300'
     default:
-      return 'bg-gray-500/20 text-gray-300'
+      return 'bg-gray-500/20 text-muted-foreground'
   }
 }
 
@@ -32,7 +32,7 @@ function priorityBadge(priority: number | null): string {
   const p = priority ?? 3
   if (p <= 1) return 'text-red-400'
   if (p <= 2) return 'text-amber-400'
-  return 'text-gray-400'
+  return 'text-muted-foreground'
 }
 
 export default async function StrategyPage() {
@@ -88,8 +88,8 @@ export default async function StrategyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Strategy</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Strategy</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Define win themes, competitive positioning, and capture strategies for upcoming pursuits.
         </p>
       </div>
@@ -101,44 +101,44 @@ export default async function StrategyPage() {
       )}
 
       {/* Win Themes */}
-      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
-        <div className="px-5 py-4 border-b border-gray-800">
-          <h2 className="text-sm font-semibold text-white">Win Themes</h2>
-          <p className="text-xs text-gray-500 mt-1">Core messaging themes that differentiate your solution</p>
+      <div className="overflow-hidden rounded-xl border border-border bg-card/50">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Win Themes</h2>
+          <p className="text-xs text-muted-foreground mt-1">Core messaging themes that differentiate your solution</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Priority</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Theme</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Type</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Eval Factor</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Ghost</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Created</th>
+              <tr className="border-b border-border bg-card/80">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Priority</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Theme</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Eval Factor</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ghost</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Created</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-border/50">
               {themeList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     No win themes defined yet. Themes will appear here as capture strategy develops.
                   </td>
                 </tr>
               ) : (
                 themeList.map((theme) => (
-                  <tr key={theme.id} className="transition-colors hover:bg-gray-800/30">
+                  <tr key={theme.id} className="transition-colors hover:bg-muted/30">
                     <td className={`whitespace-nowrap px-4 py-3 text-sm font-mono font-bold ${priorityBadge(theme.priority)}`}>
                       #{theme.priority ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-200 max-w-xs">
+                    <td className="px-4 py-3 text-sm text-foreground max-w-xs">
                       {theme.theme_text}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {(theme.theme_type ?? 'general').replace(/_/g, ' ')}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {theme.evaluation_factor ?? '—'}
                     </td>
                     <td className="px-4 py-3">
@@ -146,10 +146,10 @@ export default async function StrategyPage() {
                         {(theme.status ?? 'draft').replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[140px] truncate" title={theme.ghost_statement ?? ''}>
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate" title={theme.ghost_statement ?? ''}>
                       {theme.ghost_competitor ?? '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {formatDate(theme.created_at)}
                     </td>
                   </tr>
@@ -161,37 +161,37 @@ export default async function StrategyPage() {
       </div>
 
       {/* Discriminators */}
-      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
-        <div className="px-5 py-4 border-b border-gray-800">
-          <h2 className="text-sm font-semibold text-white">Discriminators</h2>
-          <p className="text-xs text-gray-500 mt-1">Unique strengths that set you apart from competitors</p>
+      <div className="overflow-hidden rounded-xl border border-border bg-card/50">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Discriminators</h2>
+          <p className="text-xs text-muted-foreground mt-1">Unique strengths that set you apart from competitors</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Discriminator</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Type</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">vs. Competitor</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Quantified Value</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Evidence</th>
+              <tr className="border-b border-border bg-card/80">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Discriminator</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">vs. Competitor</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quantified Value</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evidence</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-border/50">
               {discList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     No discriminators defined yet. Add competitive differentiators to strengthen win strategy.
                   </td>
                 </tr>
               ) : (
                 discList.map((disc) => (
-                  <tr key={disc.id} className="transition-colors hover:bg-gray-800/30">
-                    <td className="px-4 py-3 text-sm text-gray-200 max-w-xs">
+                  <tr key={disc.id} className="transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3 text-sm text-foreground max-w-xs">
                       {disc.discriminator_text}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {(disc.discriminator_type ?? 'general').replace(/_/g, ' ')}
                     </td>
                     <td className="px-4 py-3">
@@ -199,13 +199,13 @@ export default async function StrategyPage() {
                         {(disc.status ?? 'draft').replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {disc.vs_competitor ?? '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {disc.quantified_value ?? '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500 max-w-[120px] truncate" title={disc.evidence_source ?? ''}>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground max-w-[120px] truncate" title={disc.evidence_source ?? ''}>
                       {disc.evidence_source ?? '—'}
                     </td>
                   </tr>
@@ -217,16 +217,16 @@ export default async function StrategyPage() {
       </div>
 
       {/* Section M Evaluation Criteria */}
-      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
-        <div className="px-5 py-4 border-b border-gray-800">
-          <h2 className="text-sm font-semibold text-white">Section M — Evaluation Criteria Alignment</h2>
-          <p className="text-xs text-gray-500 mt-1">
+      <div className="overflow-hidden rounded-xl border border-border bg-card/50">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Section M — Evaluation Criteria Alignment</h2>
+          <p className="text-xs text-muted-foreground mt-1">
             How win themes map to RFP evaluation factors
           </p>
         </div>
         {evalCriteria.length === 0 ? (
           <div className="px-5 py-8 text-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               No evaluation factors assigned to win themes yet. Add evaluation factors to your win themes to see alignment.
             </p>
           </div>
@@ -234,35 +234,35 @@ export default async function StrategyPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-800 bg-gray-900/80">
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <tr className="border-b border-border bg-card/80">
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Evaluation Factor
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 text-center">
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
                     Aligned Themes
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Coverage
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Theme Details
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800/50">
+              <tbody className="divide-y divide-border/50">
                 {evalCriteria.map((ec) => (
-                  <tr key={ec.factor} className="transition-colors hover:bg-gray-800/30">
-                    <td className="px-4 py-3 text-sm font-medium text-[#00E5FA]">
+                  <tr key={ec.factor} className="transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3 text-sm font-medium text-primary">
                       {ec.factor}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="inline-block rounded-full bg-[#00E5FA]/10 px-2.5 py-0.5 text-xs font-semibold text-[#00E5FA]">
+                      <span className="inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                         {ec.count}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-16 rounded-full bg-gray-800">
+                        <div className="h-2 w-16 rounded-full bg-muted">
                           <div
                             className={`h-2 rounded-full ${
                               ec.count >= 3
@@ -274,12 +274,12 @@ export default async function StrategyPage() {
                             style={{ width: `${Math.min(ec.count * 33, 100)}%` }}
                           />
                         </div>
-                        <span className="text-[10px] text-gray-500">
+                        <span className="text-[10px] text-muted-foreground">
                           {ec.count >= 3 ? 'Strong' : ec.count >= 2 ? 'Moderate' : 'Weak'}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 max-w-xs truncate" title={ec.themes.join('; ')}>
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-xs truncate" title={ec.themes.join('; ')}>
                       {ec.themes.slice(0, 2).join('; ')}
                       {ec.themes.length > 2 && ` +${ec.themes.length - 2} more`}
                     </td>
@@ -291,7 +291,7 @@ export default async function StrategyPage() {
         )}
       </div>
 
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-muted-foreground">
         Showing {themeList.length} win theme{themeList.length !== 1 ? 's' : ''}, {discList.length} discriminator{discList.length !== 1 ? 's' : ''}, and {evalCriteria.length} evaluation factor{evalCriteria.length !== 1 ? 's' : ''}.
       </p>
     </div>

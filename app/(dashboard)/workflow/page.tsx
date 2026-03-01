@@ -66,27 +66,27 @@ export default async function WorkflowPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Workflow Board</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Workflow Board</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage proposal sections across color team stages.
         </p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Draft</p>
-          <p className="mt-1 text-xl font-bold text-gray-300">{draftCount}</p>
+        <div className="rounded-xl border border-border bg-card/50 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Draft</p>
+          <p className="mt-1 text-xl font-bold text-muted-foreground">{draftCount}</p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="rounded-xl border border-border bg-card/50 p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-blue-400">In Review</p>
           <p className="mt-1 text-xl font-bold text-blue-300">{reviewCount}</p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="rounded-xl border border-border bg-card/50 p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-amber-400">Revision</p>
           <p className="mt-1 text-xl font-bold text-amber-300">{revisionCount}</p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="rounded-xl border border-border bg-card/50 p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-emerald-400">Final</p>
           <p className="mt-1 text-xl font-bold text-emerald-300">{finalCount}</p>
         </div>

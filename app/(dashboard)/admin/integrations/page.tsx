@@ -28,8 +28,8 @@ export default async function AdminIntegrationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Integration Management</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Integration Management</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Configure and monitor external service integrations.
         </p>
       </div>
@@ -39,14 +39,14 @@ export default async function AdminIntegrationsPage() {
           <Link
             key={item.href}
             href={item.href}
-            className="group flex items-start gap-3 rounded-xl border border-gray-800 bg-gray-900/50 p-5 hover:border-cyan/40 transition-colors"
+            className="group flex items-start gap-3 rounded-xl border border-border bg-card/50 p-5 hover:border-cyan/40 transition-colors"
           >
             <span className="text-2xl">{item.icon}</span>
             <div>
-              <h3 className="text-sm font-semibold text-white group-hover:text-cyan transition-colors">
+              <h3 className="text-sm font-semibold text-foreground group-hover:text-cyan transition-colors">
                 {item.label}
               </h3>
-              <p className="mt-0.5 text-xs text-gray-500">{item.desc}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{item.desc}</p>
             </div>
           </Link>
         ))}

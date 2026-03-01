@@ -58,7 +58,7 @@ export default async function ContractsPage({ params }: ContractsPageProps) {
         ]}
       />
       <div>
-        <h1 className="text-2xl font-bold text-white">Contract Scanner</h1>
+        <h1 className="text-2xl font-bold text-foreground">Contract Scanner</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {opportunity.title} — {items.length} clause{items.length !== 1 ? 's' : ''} tracked
         </p>

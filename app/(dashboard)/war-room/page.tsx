@@ -50,8 +50,8 @@ export default async function WarRoomHubPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">War Rooms</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">War Rooms</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Active proposal war rooms. Select an opportunity to enter its war room.
         </p>
       </div>
@@ -69,14 +69,14 @@ export default async function WarRoomHubPage() {
             <Link
               key={opp.id}
               href={`/war-room/${opp.id}`}
-              className="group rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-3 hover:border-cyan/40 transition-colors"
+              className="group rounded-xl border border-border bg-card/50 p-5 space-y-3 hover:border-cyan/40 transition-colors"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-white group-hover:text-cyan transition-colors">
+                  <h3 className="text-sm font-semibold text-foreground group-hover:text-cyan transition-colors">
                     {opp.title}
                   </h3>
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {opp.agency ?? 'No agency'}
                   </p>
                 </div>
@@ -94,7 +94,7 @@ export default async function WarRoomHubPage() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
+              <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
                 {opp.status && (
                   <span
                     className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusColor(opp.status)}`}

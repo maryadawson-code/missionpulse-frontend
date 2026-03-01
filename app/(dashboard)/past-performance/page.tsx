@@ -59,20 +59,20 @@ export default async function PastPerformancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Past Performance Library</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Past Performance Library</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Track contract history, CPARS ratings, and relevance for future proposals.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Records</p>
-          <p className="mt-1 text-lg font-bold text-white">{items.length}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Records</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{items.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Value</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Value</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {totalValue > 0
               ? new Intl.NumberFormat('en-US', {
                   style: 'currency',
@@ -82,12 +82,12 @@ export default async function PastPerformancePage() {
               : '—'}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Avg Relevance</p>
-          <p className="mt-1 text-lg font-bold text-white">{avgRelevance}%</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Avg Relevance</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{avgRelevance}%</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Exceptional</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Exceptional</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">
             {items.filter(
               (r) =>
@@ -110,12 +110,12 @@ export default async function PastPerformancePage() {
           {items.map((rec) => (
             <div
               key={rec.id}
-              className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-2"
+              className="rounded-xl border border-border bg-card/50 p-5 space-y-2"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3 className="text-sm font-semibold text-foreground">
                       {rec.contract_title}
                     </h3>
                     {rec.cpars_rating && (
@@ -127,7 +127,7 @@ export default async function PastPerformancePage() {
                     )}
                   </div>
                   {rec.client_agency && (
-                    <p className="mt-0.5 text-xs text-gray-400">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {rec.client_agency}
                       {rec.contract_number && ` · ${rec.contract_number}`}
                     </p>
@@ -149,12 +149,12 @@ export default async function PastPerformancePage() {
               </div>
 
               {rec.description && (
-                <p className="text-xs text-gray-400 line-clamp-2">
+                <p className="text-xs text-muted-foreground line-clamp-2">
                   {rec.description}
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-4 text-[10px] text-gray-500">
+              <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground">
                 {rec.contract_value && (
                   <span>
                     Value:{' '}

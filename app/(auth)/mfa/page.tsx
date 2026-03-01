@@ -107,14 +107,14 @@ export default function MFAPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#00050F] p-4">
-      <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900/50 p-8">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card/50 p-8">
         <div className="text-center mb-6">
-          <Shield className="mx-auto h-10 w-10 text-[#00E5FA]" />
-          <h1 className="mt-3 text-xl font-bold text-white">
+          <Shield className="mx-auto h-10 w-10 text-primary" />
+          <h1 className="mt-3 text-xl font-bold text-foreground">
             Multi-Factor Authentication
           </h1>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             {mode === 'loading' && 'Checking your security status...'}
             {mode === 'challenge' && 'Enter the code from your authenticator app'}
             {mode === 'enroll' && 'Add an extra layer of security to your account'}
@@ -131,7 +131,7 @@ export default function MFAPage() {
         {/* Loading */}
         {mode === 'loading' && (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-[#00E5FA]" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         )}
 
@@ -139,7 +139,7 @@ export default function MFAPage() {
         {mode === 'challenge' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Enter 6-digit code
               </label>
               <input
@@ -151,7 +151,7 @@ export default function MFAPage() {
                 onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ''))}
                 onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
                 placeholder="000000"
-                className="w-full rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-center text-xl font-mono tracking-[0.5em] text-white placeholder-gray-600 outline-none focus:border-[#00E5FA]/50"
+                className="w-full rounded-lg border border-border bg-card/50 px-3 py-2 text-center text-xl font-mono tracking-[0.5em] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50"
               />
             </div>
 
@@ -172,11 +172,11 @@ export default function MFAPage() {
         {/* Enroll Step */}
         {mode === 'enroll' && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-gray-800 bg-gray-900/30 p-4">
-              <h3 className="text-sm font-medium text-white mb-2">
+            <div className="rounded-lg border border-border bg-card/30 p-4">
+              <h3 className="text-sm font-medium text-foreground mb-2">
                 How it works
               </h3>
-              <ol className="space-y-2 text-xs text-gray-400">
+              <ol className="space-y-2 text-xs text-muted-foreground">
                 <li>1. Install an authenticator app (Google Authenticator, Authy, 1Password)</li>
                 <li>2. Scan the QR code or enter the setup key manually</li>
                 <li>3. Enter the 6-digit code from the app to verify</li>
@@ -215,17 +215,17 @@ export default function MFAPage() {
             )}
 
             {secret && (
-              <div className="rounded-lg border border-gray-800 bg-gray-900/30 p-3">
-                <p className="text-xs text-gray-400 mb-1">
+              <div className="rounded-lg border border-border bg-card/30 p-3">
+                <p className="text-xs text-muted-foreground mb-1">
                   Or enter this key manually:
                 </p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 text-xs font-mono text-[#00E5FA] break-all">
+                  <code className="flex-1 text-xs font-mono text-primary break-all">
                     {secret}
                   </code>
                   <button
                     onClick={handleCopySecret}
-                    className="shrink-0 text-gray-400 hover:text-white"
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
                   >
                     {copied ? (
                       <Check className="h-4 w-4 text-emerald-400" />
@@ -238,7 +238,7 @@ export default function MFAPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Enter 6-digit code
               </label>
               <input
@@ -249,7 +249,7 @@ export default function MFAPage() {
                 onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ''))}
                 onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
                 placeholder="000000"
-                className="w-full rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-center text-xl font-mono tracking-[0.5em] text-white placeholder-gray-600 outline-none focus:border-[#00E5FA]/50"
+                className="w-full rounded-lg border border-border bg-card/50 px-3 py-2 text-center text-xl font-mono tracking-[0.5em] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50"
               />
             </div>
 
@@ -272,7 +272,7 @@ export default function MFAPage() {
           <div className="mt-4 text-center">
             <button
               onClick={() => router.push('/dashboard')}
-              className="text-xs text-gray-500 hover:text-gray-300"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               Skip for now
             </button>

@@ -53,7 +53,7 @@ export default async function DocumentsPage({ params }: DocumentsPageProps) {
         ]}
       />
       <div>
-        <h1 className="text-2xl font-bold text-white">Documents</h1>
+        <h1 className="text-2xl font-bold text-foreground">Documents</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {opportunity.title} — {(documents ?? []).length} document{(documents ?? []).length !== 1 ? 's' : ''}
         </p>

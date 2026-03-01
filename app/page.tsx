@@ -73,28 +73,28 @@ const TRUST_BADGES = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#00050F] text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
-      <nav className="border-b border-gray-800/50">
+      <nav className="border-b border-border/50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <Zap className="h-6 w-6 text-[#00E5FA]" />
+            <Zap className="h-6 w-6 text-primary" />
             <span className="text-lg font-bold">MissionPulse</span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
-            <a href="#features" className="text-sm text-gray-400 hover:text-white">Features</a>
-            <a href="#pricing" className="text-sm text-gray-400 hover:text-white">Pricing</a>
-            <Link href="/login" className="text-sm text-gray-400 hover:text-white">Log In</Link>
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground">Features</a>
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground">Pricing</a>
+            <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">Log In</Link>
             <Link
               href="/signup"
-              className="rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] hover:bg-[#00E5FA]/90"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               Get Started
             </Link>
           </div>
           <Link
             href="/login"
-            className="rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] hover:bg-[#00E5FA]/90 md:hidden"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 md:hidden"
           >
             Log In
           </Link>
@@ -103,16 +103,16 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#00E5FA]/5 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
         <div className="relative mx-auto max-w-4xl px-6 py-24 text-center md:py-32">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#00E5FA]/20 bg-[#00E5FA]/5 px-4 py-1.5">
-            <span className="text-xs font-medium text-[#00E5FA]">AI-Powered GovCon</span>
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5">
+            <span className="text-xs font-medium text-primary">AI-Powered GovCon</span>
           </div>
           <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
             Win More Federal Contracts.{' '}
-            <span className="text-[#00E5FA]">Faster.</span>
+            <span className="text-primary">Faster.</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-400">
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
             MissionPulse is the AI-powered proposal management platform built for
             government contractors. From capture to submission, our eight
             specialized AI agents accelerate every stage of the Shipley process.
@@ -120,14 +120,14 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
               href="/signup"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-8 py-3 text-base font-semibold text-[#00050F] hover:bg-[#00E5FA]/90"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90"
             >
               Start Free Pilot
               <ChevronRight className="h-4 w-4" />
             </Link>
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-8 py-3 text-base font-medium text-gray-300 hover:border-gray-500 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-8 py-3 text-base font-medium text-muted-foreground hover:border-border hover:text-foreground"
             >
               Sign In
             </Link>
@@ -136,7 +136,7 @@ export default function LandingPage() {
             {TRUST_BADGES.map((badge) => (
               <div
                 key={badge}
-                className="rounded-full border border-gray-700/50 bg-gray-900/50 px-4 py-1.5 text-xs text-gray-400"
+                className="rounded-full border border-border/50 bg-card/50 px-4 py-1.5 text-xs text-muted-foreground"
               >
                 {badge}
               </div>
@@ -146,13 +146,13 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="border-t border-gray-800/50 py-24">
+      <section id="features" className="border-t border-border/50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center">
             <h2 className="text-3xl font-bold">
               Everything You Need to Win
             </h2>
-            <p className="mt-4 text-gray-400">
+            <p className="mt-4 text-muted-foreground">
               Purpose-built for the federal proposal lifecycle
             </p>
           </div>
@@ -161,11 +161,11 @@ export default function LandingPage() {
             {FEATURES.map((feature) => (
               <div
                 key={feature.title}
-                className="rounded-xl border border-gray-800 bg-gray-900/30 p-6"
+                className="rounded-xl border border-border bg-card/30 p-6"
               >
-                <feature.icon className="h-8 w-8 text-[#00E5FA]" />
+                <feature.icon className="h-8 w-8 text-primary" />
                 <h3 className="mt-4 text-lg font-semibold">{feature.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-400">
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   {feature.description}
                 </p>
               </div>
@@ -175,13 +175,13 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="border-t border-gray-800/50 py-24">
+      <section id="pricing" className="border-t border-border/50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center">
             <h2 className="text-3xl font-bold">
               Simple, Transparent Pricing
             </h2>
-            <p className="mt-4 text-gray-400">
+            <p className="mt-4 text-muted-foreground">
               Start free, scale as you grow
             </p>
           </div>
@@ -192,26 +192,26 @@ export default function LandingPage() {
                 key={tier.name}
                 className={`rounded-xl border p-8 ${
                   tier.highlighted
-                    ? 'border-[#00E5FA]/50 bg-[#00E5FA]/5'
-                    : 'border-gray-800 bg-gray-900/30'
+                    ? 'border-primary/50 bg-primary/5'
+                    : 'border-border bg-card/30'
                 }`}
               >
                 {tier.highlighted && (
-                  <div className="mb-4 inline-block rounded-full bg-[#00E5FA]/10 px-3 py-1 text-xs font-medium text-[#00E5FA]">
+                  <div className="mb-4 inline-block rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                     Most Popular
                   </div>
                 )}
                 <h3 className="text-xl font-bold">{tier.name}</h3>
                 <div className="mt-2 flex items-baseline gap-1">
                   <span className="text-4xl font-bold">{tier.price}</span>
-                  <span className="text-gray-500">{tier.period}</span>
+                  <span className="text-muted-foreground">{tier.period}</span>
                 </div>
-                <p className="mt-2 text-sm text-gray-400">{tier.description}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{tier.description}</p>
 
                 <ul className="mt-6 space-y-3">
                   {tier.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
-                      <div className="h-1.5 w-1.5 rounded-full bg-[#00E5FA]" />
+                    <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary" />
                       {f}
                     </li>
                   ))}
@@ -221,8 +221,8 @@ export default function LandingPage() {
                   href="/signup"
                   className={`mt-8 block rounded-lg px-6 py-3 text-center text-sm font-medium ${
                     tier.highlighted
-                      ? 'bg-[#00E5FA] text-[#00050F] hover:bg-[#00E5FA]/90'
-                      : 'border border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'border border-border text-muted-foreground hover:border-border hover:text-foreground'
                   }`}
                 >
                   {tier.cta}
@@ -234,18 +234,18 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-gray-800/50 py-24">
+      <section className="border-t border-border/50 py-24">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <h2 className="text-3xl font-bold">
             Ready to Transform Your Proposal Process?
           </h2>
-          <p className="mt-4 text-gray-400">
+          <p className="mt-4 text-muted-foreground">
             Join government contractors who are winning more with AI-powered
             proposal management.
           </p>
           <Link
             href="/signup"
-            className="mt-8 inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-8 py-3 text-base font-semibold text-[#00050F] hover:bg-[#00E5FA]/90"
+            className="mt-8 inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90"
           >
             Start Your Free Pilot
             <ChevronRight className="h-4 w-4" />
@@ -254,22 +254,22 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800/50 py-12">
+      <footer className="border-t border-border/50 py-12">
         <div className="mx-auto max-w-7xl px-6">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-[#00E5FA]" />
+              <Zap className="h-5 w-5 text-primary" />
               <span className="font-semibold">MissionPulse</span>
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-muted-foreground">
                 by Mission Meets Tech, LLC
               </span>
             </div>
-            <div className="flex items-center gap-6 text-sm text-gray-500">
-              <a href="#features" className="hover:text-gray-300">Features</a>
-              <a href="#pricing" className="hover:text-gray-300">Pricing</a>
-              <Link href="/login" className="hover:text-gray-300">Log In</Link>
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <a href="#features" className="hover:text-foreground">Features</a>
+              <a href="#pricing" className="hover:text-foreground">Pricing</a>
+              <Link href="/login" className="hover:text-foreground">Log In</Link>
             </div>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-muted-foreground">
               &copy; {new Date().getFullYear()} Mission Meets Tech, LLC. All
               rights reserved.
             </p>

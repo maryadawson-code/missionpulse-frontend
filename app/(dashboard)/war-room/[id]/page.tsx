@@ -150,7 +150,7 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-2xl font-bold text-foreground">
               {opportunity.title}
             </h1>
             <span
@@ -208,7 +208,7 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
             className="rounded-md border border-border bg-surface px-4 py-3"
           >
             <dt className="text-xs text-slate">{label}</dt>
-            <dd className="text-sm font-medium text-white mt-0.5">{value}</dd>
+            <dd className="text-sm font-medium text-foreground mt-0.5">{value}</dd>
           </div>
         ))}
       </div>
@@ -217,7 +217,7 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
       <div className="flex flex-wrap gap-2">
         <a
           href={`/pipeline/${id}/edit`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-slate hover:text-white hover:border-cyan/30 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-slate hover:text-foreground hover:border-cyan/30 transition-colors"
         >
           ✏ Edit Opportunity
         </a>
@@ -253,7 +253,7 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
             >
               <span className="text-lg mt-0.5">{link.icon}</span>
               <div>
-                <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+                <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
                   {link.label}
                 </p>
                 <p className="text-xs text-slate mt-0.5">{link.desc}</p>
@@ -284,7 +284,7 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
             >
               <span className="text-lg mt-0.5">{link.icon}</span>
               <div>
-                <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+                <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
                   {link.label}
                 </p>
                 <p className="text-xs text-slate mt-0.5">{link.desc}</p>
@@ -319,16 +319,16 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
                 <div key={vol.id} className="space-y-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-foreground">
                         Vol {vol.volume_number}: {vol.volume_name}
                       </span>
                       {vol.status && (
-                        <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                           {vol.status}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       {vol.compliance_score != null && (
                         <span>
                           Compliance: {Math.round(vol.compliance_score)}%
@@ -340,7 +340,7 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
                     </div>
                   </div>
                   {vol.page_limit && vol.page_limit > 0 && (
-                    <div className="h-1.5 w-full rounded-full bg-gray-800">
+                    <div className="h-1.5 w-full rounded-full bg-muted">
                       <div
                         className={`h-1.5 rounded-full ${barColor} transition-all`}
                         style={{ width: `${pct}%` }}
@@ -364,19 +364,19 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
 
           {/* Reviewers Panel */}
           {colorReviewers.length > 0 && (
-            <div className="mt-4 border-t border-gray-800 pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                 Reviewers ({colorReviewers.length})
               </p>
               <div className="flex flex-wrap gap-2">
                 {colorReviewers.map((r) => (
                   <div
                     key={r.id}
-                    className="flex items-center gap-1.5 rounded-full border border-gray-800 bg-gray-900/50 px-2.5 py-1"
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-card/50 px-2.5 py-1"
                   >
-                    <span className="text-xs text-white">{r.user_name}</span>
+                    <span className="text-xs text-foreground">{r.user_name}</span>
                     {r.role && (
-                      <span className="text-[10px] text-gray-500">{r.role}</span>
+                      <span className="text-[10px] text-muted-foreground">{r.role}</span>
                     )}
                     {r.status && (
                       <span

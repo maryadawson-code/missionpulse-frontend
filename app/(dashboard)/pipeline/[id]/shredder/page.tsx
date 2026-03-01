@@ -73,7 +73,7 @@ export default async function ShredderPage({ params }: ShredderPageProps) {
         ]}
       />
       <div>
-        <h1 className="text-2xl font-bold text-white">RFP Shredder</h1>
+        <h1 className="text-2xl font-bold text-foreground">RFP Shredder</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {opportunity.title} — Upload and parse RFP documents to extract requirements
         </p>

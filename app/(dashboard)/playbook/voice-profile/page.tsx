@@ -38,8 +38,8 @@ export default async function VoiceProfilePage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Company Voice Profile</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Company Voice Profile</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Analyze your past proposals to extract your company&apos;s unique writing voice.
           AI-generated content will match your established tone and style.
         </p>

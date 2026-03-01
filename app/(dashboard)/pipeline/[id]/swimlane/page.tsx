@@ -77,7 +77,7 @@ export default async function SwimlanePage({ params }: SwimlanePageProps) {
         { label: 'Swimlane' },
       ]} />
       <div>
-        <h1 className="text-2xl font-bold text-white">Swimlane</h1>
+        <h1 className="text-2xl font-bold text-foreground">Swimlane</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {opportunity.title} — {(sections ?? []).length} section{(sections ?? []).length === 1 ? '' : 's'}
         </p>

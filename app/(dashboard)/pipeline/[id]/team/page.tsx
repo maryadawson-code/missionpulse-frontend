@@ -73,7 +73,7 @@ export default async function TeamPage({ params }: TeamPageProps) {
         ]}
       />
       <div>
-        <h1 className="text-2xl font-bold text-white">Team</h1>
+        <h1 className="text-2xl font-bold text-foreground">Team</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {opportunity.title} — {(assignments ?? []).length} member{(assignments ?? []).length === 1 ? '' : 's'}
         </p>

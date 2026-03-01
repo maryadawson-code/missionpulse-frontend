@@ -110,8 +110,8 @@ export default async function TimelinePage({
       label: 'Total Milestones',
       value: totalCount,
       icon: CalendarDays,
-      color: 'text-[#00E5FA]',
-      bgColor: 'bg-[#00E5FA]/10',
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
     },
     {
       label: 'Completed',
@@ -152,7 +152,7 @@ export default async function TimelinePage({
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-foreground">
             Proposal Timeline &mdash; {opportunity.title}
           </h1>
           <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
@@ -167,7 +167,7 @@ export default async function TimelinePage({
         <button
           type="button"
           disabled
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[#00E5FA]/30 bg-[#00E5FA]/10 px-4 py-2 text-sm font-medium text-[#00E5FA] transition-colors hover:bg-[#00E5FA]/20 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
           Add Milestone
@@ -190,7 +190,7 @@ export default async function TimelinePage({
                   <KpiIcon className={`h-4.5 w-4.5 ${kpi.color}`} />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                  <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
                   <p className="text-xs text-muted-foreground">{kpi.label}</p>
                 </div>
               </div>
@@ -202,7 +202,7 @@ export default async function TimelinePage({
       {/* Gantt Timeline Visualization */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-[#00E5FA]" />
+          <CalendarDays className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">
             Timeline
           </h2>
@@ -222,7 +222,7 @@ export default async function TimelinePage({
       {/* Milestone Detail List */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <Milestone className="h-4 w-4 text-[#00E5FA]" />
+          <Milestone className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">
             All Milestones
           </h2>

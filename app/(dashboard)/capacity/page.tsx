@@ -81,32 +81,32 @@ export default async function CapacityPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Resource Capacity</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Resource Capacity</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           View team allocation across opportunities and identify capacity
           constraints.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Allocations</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Allocations</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {totalAllocations}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Team Members</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Team Members</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {userEntries.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Confirmed</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Confirmed</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">{confirmed}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Over-Allocated</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Over-Allocated</p>
           <p className="mt-1 text-lg font-bold text-red-400">
             {overAllocated}
           </p>
@@ -130,14 +130,14 @@ export default async function CapacityPage() {
             return (
               <div
                 key={userId}
-                className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-3"
+                className="rounded-xl border border-border bg-card/50 p-5 space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3 className="text-sm font-semibold text-foreground">
                       {userMap[userId] ?? 'Unassigned'}
                     </h3>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted-foreground">
                       {allocs.length} allocation
                       {allocs.length !== 1 ? 's' : ''}
                     </span>
@@ -152,7 +152,7 @@ export default async function CapacityPage() {
                 </div>
 
                 {/* Capacity Bar */}
-                <div className="h-2 w-full rounded-full bg-gray-800">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className={`h-2 rounded-full transition-all ${
                       isOver
@@ -170,19 +170,19 @@ export default async function CapacityPage() {
                   {allocs.map((a) => (
                     <div
                       key={a.id}
-                      className="flex items-center justify-between rounded px-2 py-1 text-xs bg-gray-800/30"
+                      className="flex items-center justify-between rounded px-2 py-1 text-xs bg-muted/30"
                     >
-                      <span className="text-gray-300">
+                      <span className="text-muted-foreground">
                         {a.opportunity_id
                           ? oppMap[a.opportunity_id] ?? 'Unknown Opp'
                           : 'General'}
                         {a.role_on_opportunity && (
-                          <span className="ml-1 text-gray-500">
+                          <span className="ml-1 text-muted-foreground">
                             ({a.role_on_opportunity})
                           </span>
                         )}
                       </span>
-                      <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                         {a.allocation_percentage != null && (
                           <span>{a.allocation_percentage}%</span>
                         )}

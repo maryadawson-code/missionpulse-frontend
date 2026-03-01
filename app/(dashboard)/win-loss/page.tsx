@@ -68,37 +68,37 @@ export default async function WinLossPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Win/Loss Analysis</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Win/Loss Analysis</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Track outcomes, analyze patterns, and build a searchable lessons
           learned repository.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Records</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Records</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {winLossItems.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Wins</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Wins</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">{wins}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Losses</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Losses</p>
           <p className="mt-1 text-lg font-bold text-red-400">{losses}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Win Rate</p>
-          <p className="mt-1 text-lg font-bold text-white">{winRate}%</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Win Rate</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{winRate}%</p>
         </div>
       </div>
 
       {/* Win/Loss Records */}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Outcomes
         </h2>
         {winLossItems.length === 0 ? (
@@ -112,7 +112,7 @@ export default async function WinLossPage() {
             {winLossItems.map((rec) => (
               <div
                 key={rec.id}
-                className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-2"
+                className="rounded-xl border border-border bg-card/50 p-5 space-y-2"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
@@ -124,12 +124,12 @@ export default async function WinLossPage() {
                       </span>
                     )}
                     {rec.fiscal_year != null && (
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-muted-foreground">
                         FY{rec.fiscal_year}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                     {rec.contract_value && (
                       <span>
                         {new Intl.NumberFormat('en-US', {
@@ -152,17 +152,17 @@ export default async function WinLossPage() {
                 </div>
 
                 {rec.competitor_winner && (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     Winner: {rec.competitor_winner}
                   </p>
                 )}
 
                 {rec.win_themes && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Win Themes
                     </p>
-                    <p className="text-xs text-gray-300">
+                    <p className="text-xs text-muted-foreground">
                       {String(rec.win_themes)}
                     </p>
                   </div>
@@ -170,10 +170,10 @@ export default async function WinLossPage() {
 
                 {rec.loss_reasons && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Loss Reasons
                     </p>
-                    <p className="text-xs text-gray-300">
+                    <p className="text-xs text-muted-foreground">
                       {String(rec.loss_reasons)}
                     </p>
                   </div>
@@ -181,10 +181,10 @@ export default async function WinLossPage() {
 
                 {rec.lessons_learned && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Lessons Learned
                     </p>
-                    <p className="text-xs text-gray-300">
+                    <p className="text-xs text-muted-foreground">
                       {rec.lessons_learned}
                     </p>
                   </div>
@@ -197,7 +197,7 @@ export default async function WinLossPage() {
 
       {/* Lessons Learned Library */}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Lessons Learned Library ({lessonItems.length})
         </h2>
         {lessonItems.length === 0 ? (
@@ -207,16 +207,16 @@ export default async function WinLossPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-800 rounded-xl border border-gray-800 bg-gray-900/50">
+          <div className="divide-y divide-border rounded-xl border border-border bg-card/50">
             {lessonItems.map((lesson) => (
               <div key={lesson.id} className="p-4 space-y-1">
                 <div className="flex items-start justify-between">
-                  <h3 className="text-sm font-medium text-white">
+                  <h3 className="text-sm font-medium text-foreground">
                     {lesson.title}
                   </h3>
                   <div className="flex items-center gap-2">
                     {lesson.category && (
-                      <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                         {lesson.category}
                       </span>
                     )}
@@ -228,7 +228,7 @@ export default async function WinLossPage() {
                   </div>
                 </div>
                 {lesson.description && (
-                  <p className="text-xs text-gray-400">{lesson.description}</p>
+                  <p className="text-xs text-muted-foreground">{lesson.description}</p>
                 )}
                 {lesson.recommendation && (
                   <p className="text-xs text-emerald-400/80 bg-emerald-500/5 rounded p-2">

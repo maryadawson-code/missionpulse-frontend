@@ -92,7 +92,7 @@ function statusColor(status: string | null): string {
     case 'draft':
       return 'bg-slate-500/20 text-slate-300'
     default:
-      return 'bg-gray-500/20 text-gray-300'
+      return 'bg-gray-500/20 text-muted-foreground'
   }
 }
 
@@ -114,15 +114,15 @@ export function PricingPageClient({
   return (
     <div className="space-y-6">
       {/* Tab Bar */}
-      <div className="flex gap-1 border-b border-gray-800">
+      <div className="flex gap-1 border-b border-border">
         {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab
-                ? 'border-b-2 border-[#00E5FA] text-[#00E5FA]'
-                : 'text-gray-400 hover:text-gray-200'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {tab}
@@ -133,42 +133,42 @@ export function PricingPageClient({
       {/* Models Tab */}
       {activeTab === 'Models' && (
         <>
-          <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
-            <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+          <div className="overflow-hidden rounded-xl border border-border bg-card/50">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-white">Pricing Models</h2>
-                <p className="text-xs text-gray-500 mt-1">Contract pricing structures and cost volumes</p>
+                <h2 className="text-sm font-semibold text-foreground">Pricing Models</h2>
+                <p className="text-xs text-muted-foreground mt-1">Contract pricing structures and cost volumes</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500">Total Modeled Value</p>
-                <p className="text-lg font-bold font-mono text-[#00E5FA]">{formatCurrency(totalValue)}</p>
+                <p className="text-xs text-muted-foreground">Total Modeled Value</p>
+                <p className="text-lg font-bold font-mono text-primary">{formatCurrency(totalValue)}</p>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-800 bg-gray-900/80">
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Model Name</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Contract Type</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Version</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Total Price</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Direct Labor</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Period (mo)</th>
+                  <tr className="border-b border-border bg-card/80">
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Model Name</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contract Type</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Version</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Price</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Direct Labor</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Period (mo)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800/50">
+                <tbody className="divide-y divide-border/50">
                   {models.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                      <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
                         No pricing models created yet. Models will appear as cost volumes are developed.
                       </td>
                     </tr>
                   ) : (
                     models.map((model) => (
-                      <tr key={model.id} className="transition-colors hover:bg-gray-800/30">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-200">{model.name}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                      <tr key={model.id} className="transition-colors hover:bg-muted/30">
+                        <td className="px-4 py-3 text-sm font-medium text-foreground">{model.name}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                           {(model.contract_type ?? 'FFP').replace(/_/g, ' ')}
                         </td>
                         <td className="px-4 py-3">
@@ -176,10 +176,10 @@ export function PricingPageClient({
                             {(model.status ?? 'draft').replace(/_/g, ' ')}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{model.version ?? '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-200">{formatCurrency(model.total_price)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-300">{formatCurrency(model.total_direct_labor)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{model.base_period_months ?? '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">{model.version ?? '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-foreground">{formatCurrency(model.total_price)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-muted-foreground">{formatCurrency(model.total_direct_labor)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">{model.base_period_months ?? '—'}</td>
                       </tr>
                     ))
                   )}
@@ -189,43 +189,43 @@ export function PricingPageClient({
           </div>
 
           {/* Line Items */}
-          <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
-            <div className="px-5 py-4 border-b border-gray-800">
-              <h2 className="text-sm font-semibold text-white">Pricing Line Items</h2>
-              <p className="text-xs text-gray-500 mt-1">CLIN-level pricing with labor categories and rates</p>
+          <div className="overflow-hidden rounded-xl border border-border bg-card/50">
+            <div className="px-5 py-4 border-b border-border">
+              <h2 className="text-sm font-semibold text-foreground">Pricing Line Items</h2>
+              <p className="text-xs text-muted-foreground mt-1">CLIN-level pricing with labor categories and rates</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-800 bg-gray-900/80">
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">CLIN</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Description</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Labor Cat</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Qty</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Unit Price</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Proposed Rate</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Extended</th>
+                  <tr className="border-b border-border bg-card/80">
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">CLIN</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Labor Cat</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Qty</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Unit Price</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Proposed Rate</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Extended</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800/50">
+                <tbody className="divide-y divide-border/50">
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                      <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
                         No line items yet. Add CLINs and labor categories to build out pricing.
                       </td>
                     </tr>
                   ) : (
                     items.map((item) => (
-                      <tr key={item.id} className="transition-colors hover:bg-gray-800/30">
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-gray-300">{item.clin ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-200 max-w-xs truncate">{item.description}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{item.labor_category ?? '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-gray-400">
+                      <tr key={item.id} className="transition-colors hover:bg-muted/30">
+                        <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-muted-foreground">{item.clin ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm text-foreground max-w-xs truncate">{item.description}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">{item.labor_category ?? '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-muted-foreground">
                           {item.quantity ?? '—'} {item.unit ?? ''}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-gray-400">{formatRate(item.unit_price)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-gray-300">{formatRate(item.proposed_rate)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-200">{formatCurrency(item.extended_price)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-muted-foreground">{formatRate(item.unit_price)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-muted-foreground">{formatRate(item.proposed_rate)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-foreground">{formatCurrency(item.extended_price)}</td>
                       </tr>
                     ))
                   )}
@@ -234,7 +234,7 @@ export function PricingPageClient({
             </div>
           </div>
 
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-muted-foreground">
             {models.length} pricing model{models.length !== 1 ? 's' : ''}, {items.length} line item{items.length !== 1 ? 's' : ''}. Pricing data is classified CUI//SP-PROPIN.
           </p>
         </>
@@ -242,9 +242,9 @@ export function PricingPageClient({
 
       {/* BOE Tab */}
       {activeTab === 'BOE' && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h2 className="text-sm font-semibold text-white mb-1">Basis of Estimate</h2>
-          <p className="text-xs text-gray-500 mb-4">
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-1">Basis of Estimate</h2>
+          <p className="text-xs text-muted-foreground mb-4">
             Hours per labor category per period with rate assumptions and extended costs.
           </p>
           <BOETable entries={boeEntries} lcatMap={lcatMap} />
@@ -253,9 +253,9 @@ export function PricingPageClient({
 
       {/* LCAT Tab */}
       {activeTab === 'LCAT' && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h2 className="text-sm font-semibold text-white mb-1">Labor Category Rate Table</h2>
-          <p className="text-xs text-gray-500 mb-4">
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-1">Labor Category Rate Table</h2>
+          <p className="text-xs text-muted-foreground mb-4">
             Company-wide labor categories with billing rate ranges and GSA schedule mappings.
           </p>
           <LCATGrid categories={lcats} />
@@ -264,9 +264,9 @@ export function PricingPageClient({
 
       {/* Price-to-Win Tab */}
       {activeTab === 'Price-to-Win' && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h2 className="text-sm font-semibold text-white mb-1">Price-to-Win Analysis</h2>
-          <p className="text-xs text-gray-500 mb-4">
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-1">Price-to-Win Analysis</h2>
+          <p className="text-xs text-muted-foreground mb-4">
             Three pricing scenarios showing competitive positioning and win probability estimates.
           </p>
           <PriceToWinAnalysis ceiling={pipelineCeiling > 0 ? pipelineCeiling : null} />

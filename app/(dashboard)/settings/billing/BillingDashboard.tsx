@@ -75,8 +75,8 @@ export function BillingDashboard({
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Current Plan
             </p>
-            <p className="mt-1 text-xl font-bold text-white">{planName}</p>
-            <p className="text-sm text-gray-400">
+            <p className="mt-1 text-xl font-bold text-foreground">{planName}</p>
+            <p className="text-sm text-muted-foreground">
               {billingInterval === 'annual' ? 'Annual' : 'Monthly'} billing
               {currentPlan && (
                 <span>
@@ -91,7 +91,7 @@ export function BillingDashboard({
           {isExecutive && (
             <button
               onClick={() => setUpgradeOpen(true)}
-              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 transition-colors"
+              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-foreground hover:bg-cyan-500 transition-colors"
             >
               {currentPlanSlug ? 'Change Plan' : 'Subscribe'}
             </button>
@@ -102,8 +102,8 @@ export function BillingDashboard({
         {isExecutive && currentPlanSlug === 'enterprise' && (
           <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
             <div>
-              <p className="text-sm font-medium text-white">Auto-Overage Billing</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-medium text-foreground">Auto-Overage Billing</p>
+              <p className="text-xs text-muted-foreground">
                 Automatically charge overage rate instead of blocking AI features
               </p>
             </div>
@@ -111,7 +111,7 @@ export function BillingDashboard({
               onClick={handleOverageToggle}
               disabled={overageLoading}
               className={`relative h-6 w-11 rounded-full transition-colors ${
-                overageEnabled ? 'bg-cyan-600' : 'bg-gray-700'
+                overageEnabled ? 'bg-cyan-600' : 'bg-muted'
               }`}
             >
               <span
@@ -142,7 +142,7 @@ export function BillingDashboard({
       {/* Not executive notice */}
       {!isExecutive && (
         <div className="rounded-xl border border-border bg-card p-6 text-center">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Contact your administrator to manage billing and purchase tokens.
           </p>
         </div>

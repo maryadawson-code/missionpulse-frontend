@@ -66,24 +66,24 @@ export default async function PersonnelPage() {
     <div className="space-y-6">
       <CUIBanner marking="SP-PRVCY" />
       <div>
-        <h1 className="text-2xl font-bold text-white">Personnel</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Personnel</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage key personnel, clearances, availability, and resume tracking.
         </p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Total Personnel</p>
-          <p className="mt-2 text-2xl font-bold text-white">{people.length}</p>
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Personnel</p>
+          <p className="mt-2 text-2xl font-bold text-foreground">{people.length}</p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Cleared</p>
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Cleared</p>
           <p className="mt-2 text-2xl font-bold text-amber-400">{clearedCount}</p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Available</p>
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Available</p>
           <p className="mt-2 text-2xl font-bold text-emerald-400">
             {people.filter((p) => p.availability_status === 'available').length}
           </p>
@@ -96,34 +96,34 @@ export default async function PersonnelPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
+      <div className="overflow-hidden rounded-xl border border-border bg-card/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Name</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Title</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Clearance</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Availability</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Labor Cat</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Experience</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Current Project</th>
+              <tr className="border-b border-border bg-card/80">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Clearance</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Availability</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Labor Cat</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Experience</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current Project</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-border/50">
               {people.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No personnel records yet. Add key personnel to track clearances and availability.
                   </td>
                 </tr>
               ) : (
                 people.map((person) => (
-                  <tr key={person.id} className="transition-colors hover:bg-gray-800/30">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-200 whitespace-nowrap">
+                  <tr key={person.id} className="transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">
                       {person.last_name}, {person.first_name}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {person.title ?? '—'}
                     </td>
                     <td className="px-4 py-3">
@@ -136,13 +136,13 @@ export default async function PersonnelPage() {
                         {(person.availability_status ?? 'unknown').replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {person.labor_category ?? '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {person.years_experience != null ? `${person.years_experience} yr` : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500 max-w-[140px] truncate" title={person.current_project ?? ''}>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate" title={person.current_project ?? ''}>
                       {person.current_project ?? '—'}
                     </td>
                   </tr>
@@ -153,7 +153,7 @@ export default async function PersonnelPage() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-muted-foreground">
         Showing {people.length} personnel record{people.length !== 1 ? 's' : ''}. Personnel data is classified CUI//SP-PRVCY.
       </p>
     </div>

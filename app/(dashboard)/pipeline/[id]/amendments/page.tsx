@@ -85,29 +85,29 @@ export default async function AmendmentsPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">Amendment Tracker</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Amendment Tracker</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Track RFP amendments, response deadlines, and revision requirements for{' '}
           {opp.title}.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total</p>
-          <p className="mt-1 text-lg font-bold text-white">{items.length}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{items.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Pending</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Pending</p>
           <p className="mt-1 text-lg font-bold text-amber-400">{pending}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Overdue</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Overdue</p>
           <p className="mt-1 text-lg font-bold text-red-400">{overdue}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Needs Revision</p>
-          <p className="mt-1 text-lg font-bold text-white">{revisions}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Needs Revision</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{revisions}</p>
         </div>
       </div>
 
@@ -122,15 +122,15 @@ export default async function AmendmentsPage({
           {items.map((amend) => (
             <div
               key={amend.id}
-              className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-2"
+              className="rounded-xl border border-border bg-card/50 p-5 space-y-2"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-gray-500">
+                    <span className="text-xs font-mono text-muted-foreground">
                       #{amend.amendment_number}
                     </span>
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3 className="text-sm font-semibold text-foreground">
                       {amend.title}
                     </h3>
                     {amend.status && (
@@ -157,10 +157,10 @@ export default async function AmendmentsPage({
               </div>
 
               {amend.summary && (
-                <p className="text-xs text-gray-400">{amend.summary}</p>
+                <p className="text-xs text-muted-foreground">{amend.summary}</p>
               )}
 
-              <div className="flex flex-wrap items-center gap-4 text-[10px] text-gray-500">
+              <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground">
                 {amend.amendment_type && (
                   <span>Type: {amend.amendment_type}</span>
                 )}
@@ -200,7 +200,7 @@ export default async function AmendmentsPage({
                   {amend.sections_affected.map((section, i) => (
                     <span
                       key={i}
-                      className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-400"
+                      className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
                     >
                       {section}
                     </span>

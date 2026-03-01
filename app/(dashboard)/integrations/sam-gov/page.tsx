@@ -24,8 +24,8 @@ export default async function SamGovPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">SAM.gov Integration</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">SAM.gov Integration</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Search SAM.gov for federal opportunities and import them to your
           pipeline.
         </p>

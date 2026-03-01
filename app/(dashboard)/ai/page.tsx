@@ -71,53 +71,53 @@ export default async function AIPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">AI Assistant</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">AI Assistant</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           AI-powered chat for drafting proposal sections, analyzing requirements, and generating content.
         </p>
       </div>
 
       {/* Usage Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Conversations</p>
-          <p className="mt-2 text-2xl font-bold text-white">{chatList.length}</p>
-          <p className="mt-1 text-xs text-gray-500">chat sessions</p>
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Conversations</p>
+          <p className="mt-2 text-2xl font-bold text-foreground">{chatList.length}</p>
+          <p className="mt-1 text-xs text-muted-foreground">chat sessions</p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Interactions</p>
-          <p className="mt-2 text-2xl font-bold text-white">{interactionList.length}</p>
-          <p className="mt-1 text-xs text-gray-500">recent queries</p>
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Interactions</p>
+          <p className="mt-2 text-2xl font-bold text-foreground">{interactionList.length}</p>
+          <p className="mt-1 text-xs text-muted-foreground">recent queries</p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Tokens Used</p>
-          <p className="mt-2 text-2xl font-bold text-[#00E5FA]">{formatTokens(totalTokens)}</p>
-          <p className="mt-1 text-xs text-gray-500">input + output</p>
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tokens Used</p>
+          <p className="mt-2 text-2xl font-bold text-primary">{formatTokens(totalTokens)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">input + output</p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Avg Rating</p>
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Avg Rating</p>
           <p className="mt-2 text-2xl font-bold text-amber-400">{avgRating}</p>
-          <p className="mt-1 text-xs text-gray-500">{ratedInteractions.length} rated</p>
+          <p className="mt-1 text-xs text-muted-foreground">{ratedInteractions.length} rated</p>
         </div>
       </div>
 
       {/* Agent Usage Breakdown */}
       {agentMap.size > 0 && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">Agent Usage</h2>
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Agent Usage</h2>
           <div className="space-y-3">
             {Array.from(agentMap.entries())
               .sort((a, b) => b[1] - a[1])
               .map(([agent, count]) => (
                 <div key={agent} className="flex items-center gap-3">
-                  <span className="w-36 text-xs text-gray-400 truncate">{agent.replace(/_/g, ' ')}</span>
-                  <div className="flex-1 h-2 rounded-full bg-gray-800">
+                  <span className="w-36 text-xs text-muted-foreground truncate">{agent.replace(/_/g, ' ')}</span>
+                  <div className="flex-1 h-2 rounded-full bg-muted">
                     <div
-                      className="h-2 rounded-full bg-[#00E5FA]"
+                      className="h-2 rounded-full bg-primary"
                       style={{ width: `${Math.max(4, (count / interactionList.length) * 100)}%` }}
                     />
                   </div>
-                  <span className="w-8 text-right text-xs font-mono text-gray-400">{count}</span>
+                  <span className="w-8 text-right text-xs font-mono text-muted-foreground">{count}</span>
                 </div>
               ))}
           </div>
@@ -131,53 +131,53 @@ export default async function AIPage() {
       )}
 
       {/* Chat History */}
-      <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50">
-        <div className="px-5 py-4 border-b border-gray-800">
-          <h2 className="text-sm font-semibold text-white">Chat History</h2>
-          <p className="text-xs text-gray-500 mt-1">Recent AI-assisted conversations and drafting sessions</p>
+      <div className="overflow-hidden rounded-xl border border-border bg-card/50">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Chat History</h2>
+          <p className="text-xs text-muted-foreground mt-1">Recent AI-assisted conversations and drafting sessions</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Title</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Agent</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Messages</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Tokens</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Flags</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Last Updated</th>
+              <tr className="border-b border-border bg-card/80">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Agent</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Messages</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tokens</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Flags</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Last Updated</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-border/50">
               {chatList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No chat sessions yet. Start a conversation with the AI assistant to see history here.
                   </td>
                 </tr>
               ) : (
                 chatList.map((chat) => (
-                  <tr key={chat.id} className="transition-colors hover:bg-gray-800/30">
-                    <td className="px-4 py-3 text-sm text-gray-200 max-w-xs truncate">
+                  <tr key={chat.id} className="transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3 text-sm text-foreground max-w-xs truncate">
                       {chat.title ?? 'Untitled conversation'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {chat.agent_name.replace(/_/g, ' ')}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-muted-foreground">
                       {chat.message_count ?? 0}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-mono text-muted-foreground">
                       {formatTokens(chat.token_count)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       <span className="flex gap-1">
                         {chat.is_starred && <span title="Starred" className="text-amber-400">&#9733;</span>}
-                        {chat.is_archived && <span title="Archived" className="text-gray-500">&#128451;</span>}
+                        {chat.is_archived && <span title="Archived" className="text-muted-foreground">&#128451;</span>}
                         {!chat.is_starred && !chat.is_archived && '—'}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {formatDate(chat.updated_at)}
                     </td>
                   </tr>
@@ -188,7 +188,7 @@ export default async function AIPage() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-muted-foreground">
         Showing {chatList.length} conversation{chatList.length !== 1 ? 's' : ''} and {interactionList.length} recent interaction{interactionList.length !== 1 ? 's' : ''}.
       </p>
     </div>

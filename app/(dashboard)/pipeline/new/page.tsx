@@ -24,11 +24,11 @@ function Field({
   options?: { value: string; label: string }[]
 }) {
   const baseClasses =
-    'w-full rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-sm text-gray-200 placeholder-gray-500 outline-none transition-colors focus:border-[#00E5FA]/50 focus:ring-1 focus:ring-[#00E5FA]/25'
+    'w-full rounded-lg border border-border bg-card/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/25'
 
   return (
     <div>
-      <label htmlFor={name} className="block text-sm font-medium text-gray-300">
+      <label htmlFor={name} className="block text-sm font-medium text-muted-foreground">
         {label}
         {required && <span className="ml-1 text-red-400">*</span>}
       </label>
@@ -60,7 +60,7 @@ function Field({
           className={`${baseClasses} mt-1.5`}
         />
       )}
-      {helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>}
+      {helpText && <p className="mt-1 text-xs text-muted-foreground">{helpText}</p>}
     </div>
   )
 }
@@ -110,7 +110,7 @@ export default function NewOpportunityPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/pipeline"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Back to pipeline"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -118,16 +118,16 @@ export default function NewOpportunityPage() {
           </svg>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">New Opportunity</h1>
-          <p className="mt-1 text-sm text-gray-500">Add a new opportunity to your pipeline</p>
+          <h1 className="text-2xl font-bold text-foreground">New Opportunity</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Add a new opportunity to your pipeline</p>
         </div>
       </div>
 
       {/* Form */}
       <form action={handleSubmit} className="space-y-8">
         {/* ─── Basic Info ──────────────────────────────────────── */}
-        <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <section className="rounded-xl border border-border bg-card/50 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Basic Information
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -167,8 +167,8 @@ export default function NewOpportunityPage() {
         </section>
 
         {/* ─── Classification ──────────────────────────────────── */}
-        <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <section className="rounded-xl border border-border bg-card/50 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Classification
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -180,8 +180,8 @@ export default function NewOpportunityPage() {
         </section>
 
         {/* ─── Dates ───────────────────────────────────────────── */}
-        <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <section className="rounded-xl border border-border bg-card/50 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Key Dates
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -191,8 +191,8 @@ export default function NewOpportunityPage() {
         </section>
 
         {/* ─── Contacts ────────────────────────────────────────── */}
-        <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <section className="rounded-xl border border-border bg-card/50 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Point of Contact
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -207,13 +207,13 @@ export default function NewOpportunityPage() {
         <div className="flex items-center justify-end gap-3">
           <Link
             href="/pipeline"
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             Cancel
           </Link>
           <button
             type="submit"
-            className="rounded-lg bg-[#00E5FA] px-6 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90"
+            className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Create Opportunity
           </button>

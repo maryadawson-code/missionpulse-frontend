@@ -94,21 +94,21 @@ export default function EightAToolkitPage() {
       <TrackPageView event="eight_a_toolkit_view" />
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#00E5FA]/5 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
         <div className="relative mx-auto max-w-4xl px-6 py-24 text-center md:py-32">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#00E5FA]/20 bg-[#00E5FA]/5 px-4 py-1.5">
-            <Award className="h-3.5 w-3.5 text-[#00E5FA]" />
-            <span className="text-xs font-medium text-[#00E5FA]">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5">
+            <Award className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-primary">
               Built for 8(a) Small Businesses
             </span>
           </div>
 
           <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
             Win More 8(a) Contracts{' '}
-            <span className="text-[#00E5FA]">with AI</span>
+            <span className="text-primary">with AI</span>
           </h1>
 
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-400">
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
             MissionPulse gives 8(a) firms the same AI-powered proposal tools
             that large primes use — at a price designed for small business.
             Compliance automation, proposal generation, and pipeline management
@@ -120,33 +120,33 @@ export default function EightAToolkitPage() {
               href="/signup?plan=starter"
               event="pilot_signup_click"
               params={{ plan_tier: 'starter', source: '8a_toolkit_hero' }}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-8 py-3 text-base font-semibold text-[#00050F] hover:bg-[#00E5FA]/90"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90"
             >
               Start Your Free Pilot
               <ChevronRight className="h-4 w-4" />
             </TrackedCTA>
             <Link
               href="/plans"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-8 py-3 text-base font-medium text-gray-300 hover:border-gray-500 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-8 py-3 text-base font-medium text-muted-foreground hover:border-border hover:text-foreground"
             >
               View Pricing
             </Link>
           </div>
 
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="mt-4 text-sm text-muted-foreground">
             Starter plan: $149/mo — under $1,500/year annual
           </p>
         </div>
       </section>
 
       {/* Value props */}
-      <section className="border-t border-gray-800/50 py-24">
+      <section className="border-t border-border/50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center">
             <h2 className="text-3xl font-bold">
               Level the Playing Field
             </h2>
-            <p className="mt-4 text-gray-400">
+            <p className="mt-4 text-muted-foreground">
               Enterprise-grade proposal intelligence, built for 8(a) budgets
             </p>
           </div>
@@ -155,11 +155,11 @@ export default function EightAToolkitPage() {
             {VALUE_PROPS.map((prop) => (
               <div
                 key={prop.title}
-                className="rounded-xl border border-gray-800 bg-gray-900/30 p-6"
+                className="rounded-xl border border-border bg-card/30 p-6"
               >
-                <prop.icon className="h-8 w-8 text-[#00E5FA]" />
+                <prop.icon className="h-8 w-8 text-primary" />
                 <h3 className="mt-4 text-lg font-semibold">{prop.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-400">
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   {prop.description}
                 </p>
               </div>
@@ -169,7 +169,7 @@ export default function EightAToolkitPage() {
       </section>
 
       {/* Social proof */}
-      <section className="border-t border-gray-800/50 py-24">
+      <section className="border-t border-border/50 py-24">
         <div className="mx-auto max-w-5xl px-6">
           <h2 className="text-center text-3xl font-bold">
             Trusted by 8(a) Firms
@@ -178,16 +178,16 @@ export default function EightAToolkitPage() {
             {TESTIMONIALS.map((t, i) => (
               <div
                 key={i}
-                className="rounded-xl border border-gray-800 bg-gray-900/30 p-6"
+                className="rounded-xl border border-border bg-card/30 p-6"
               >
-                <p className="text-sm leading-relaxed text-gray-300">
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   &ldquo;{t.quote}&rdquo;
                 </p>
-                <div className="mt-4 border-t border-gray-800 pt-4">
-                  <p className="text-sm font-medium text-gray-200">
+                <div className="mt-4 border-t border-border pt-4">
+                  <p className="text-sm font-medium text-foreground">
                     {t.name}
                   </p>
-                  <p className="text-xs text-gray-500">{t.company}</p>
+                  <p className="text-xs text-muted-foreground">{t.company}</p>
                 </div>
               </div>
             ))}
@@ -196,50 +196,50 @@ export default function EightAToolkitPage() {
       </section>
 
       {/* 8(a) specific benefits */}
-      <section className="border-t border-gray-800/50 py-24">
+      <section className="border-t border-border/50 py-24">
         <div className="mx-auto max-w-4xl px-6">
-          <div className="rounded-xl border border-[#00E5FA]/20 bg-gradient-to-r from-[#0F172A] to-[#00050F] p-8 md:p-12">
+          <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-card to-background p-8 md:p-12">
             <h2 className="text-2xl font-bold md:text-3xl">
               Why 8(a) Firms Choose MissionPulse
             </h2>
             <div className="mt-8 space-y-6">
               <div className="flex gap-4">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#00E5FA]/10 text-sm font-bold text-[#00E5FA]">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                   1
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-200">
+                  <h3 className="font-semibold text-foreground">
                     Under Micro-Purchase Threshold
                   </h3>
-                  <p className="mt-1 text-sm text-gray-400">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     All annual plans price below the $15,000 FAR 13.2 threshold
                     — no contracting officer approval needed.
                   </p>
                 </div>
               </div>
               <div className="flex gap-4">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#00E5FA]/10 text-sm font-bold text-[#00E5FA]">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                   2
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-200">
+                  <h3 className="font-semibold text-foreground">
                     CMMC-Ready from Day One
                   </h3>
-                  <p className="mt-1 text-sm text-gray-400">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     NIST 800-171 aligned architecture. CUI watermarking. Audit
                     logs. Don&apos;t wait for an assessment to get compliant.
                   </p>
                 </div>
               </div>
               <div className="flex gap-4">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#00E5FA]/10 text-sm font-bold text-[#00E5FA]">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                   3
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-200">
+                  <h3 className="font-semibold text-foreground">
                     30-Day Pilot — No Risk
                   </h3>
-                  <p className="mt-1 text-sm text-gray-400">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     Start with a 30-day pilot at 50% off. Full access to all
                     features. Pilot cost credited when you convert to annual.
                   </p>
@@ -251,12 +251,12 @@ export default function EightAToolkitPage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-gray-800/50 py-24">
+      <section className="border-t border-border/50 py-24">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <h2 className="text-3xl font-bold">
             Ready to Win More Set-Asides?
           </h2>
-          <p className="mt-4 text-gray-400">
+          <p className="mt-4 text-muted-foreground">
             Join 8(a) firms who are competing — and winning — with AI-powered
             proposal management.
           </p>
@@ -264,7 +264,7 @@ export default function EightAToolkitPage() {
             href="/signup?plan=starter"
             event="pilot_signup_click"
             params={{ plan_tier: 'starter', source: '8a_toolkit_cta' }}
-            className="mt-8 inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-8 py-3 text-base font-semibold text-[#00050F] hover:bg-[#00E5FA]/90"
+            className="mt-8 inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90"
           >
             Start Your Free Pilot
             <ChevronRight className="h-4 w-4" />

@@ -98,9 +98,9 @@ export default async function MatrixDetailPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">{matrix.matrix_name}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{matrix.matrix_name}</h1>
         {matrix.description && (
-          <p className="mt-1 text-sm text-gray-500">{matrix.description}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{matrix.description}</p>
         )}
       </div>
 
@@ -111,14 +111,14 @@ export default async function MatrixDetailPage({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-800">
+        <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-3 py-2 text-left font-medium text-gray-400">
+              <tr className="border-b border-border bg-card/80">
+                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                   Criteria
                 </th>
-                <th className="px-3 py-2 text-center font-medium text-gray-400 w-16">
+                <th className="px-3 py-2 text-center font-medium text-muted-foreground w-16">
                   Weight
                 </th>
                 <th className="px-3 py-2 text-center font-medium text-cyan w-20">
@@ -127,7 +127,7 @@ export default async function MatrixDetailPage({
                 {competitorItems.map((comp) => (
                   <th
                     key={comp.id}
-                    className="px-3 py-2 text-center font-medium text-gray-400 w-20"
+                    className="px-3 py-2 text-center font-medium text-muted-foreground w-20"
                   >
                     {comp.competitor_name}
                   </th>
@@ -138,17 +138,17 @@ export default async function MatrixDetailPage({
               {criteriaItems.map((c) => (
                 <tr
                   key={c.id}
-                  className="border-b border-gray-800/50 hover:bg-gray-800/20"
+                  className="border-b border-border/50 hover:bg-muted/20"
                 >
                   <td className="px-3 py-2">
-                    <div className="text-sm text-white">{c.criteria_name}</div>
+                    <div className="text-sm text-foreground">{c.criteria_name}</div>
                     {c.category && (
-                      <span className="text-[10px] text-gray-500">
+                      <span className="text-[10px] text-muted-foreground">
                         {c.category}
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-center text-gray-400">
+                  <td className="px-3 py-2 text-center text-muted-foreground">
                     {c.weight ?? 1}
                   </td>
                   <td className="px-3 py-2 text-center">
@@ -167,7 +167,7 @@ export default async function MatrixDetailPage({
                   {competitorItems.map((comp) => {
                     const score = scoreMap[comp.id]?.[c.id]
                     return (
-                      <td key={comp.id} className="px-3 py-2 text-center text-gray-300">
+                      <td key={comp.id} className="px-3 py-2 text-center text-muted-foreground">
                         {score ?? '—'}
                       </td>
                     )
@@ -175,8 +175,8 @@ export default async function MatrixDetailPage({
                 </tr>
               ))}
               {/* Totals Row */}
-              <tr className="border-t-2 border-gray-700 bg-gray-900/60">
-                <td className="px-3 py-2 font-semibold text-white">
+              <tr className="border-t-2 border-border bg-card/60">
+                <td className="px-3 py-2 font-semibold text-foreground">
                   Weighted Total
                 </td>
                 <td className="px-3 py-2" />
@@ -186,7 +186,7 @@ export default async function MatrixDetailPage({
                 {competitorItems.map((comp) => (
                   <td
                     key={comp.id}
-                    className="px-3 py-2 text-center font-bold text-gray-300"
+                    className="px-3 py-2 text-center font-bold text-muted-foreground"
                   >
                     {calcTotal(comp.id)}
                   </td>
@@ -200,25 +200,25 @@ export default async function MatrixDetailPage({
       {/* Competitor Profiles */}
       {competitorItems.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Competitor Profiles
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {competitorItems.map((comp) => (
               <div
                 key={comp.id}
-                className="rounded-xl border border-gray-800 bg-gray-900/50 p-4 space-y-2"
+                className="rounded-xl border border-border bg-card/50 p-4 space-y-2"
               >
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-white">
+                  <h3 className="text-sm font-semibold text-foreground">
                     {comp.competitor_name}
                   </h3>
                   {comp.competitor_type && (
-                    <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                       {comp.competitor_type}
                     </span>
                   )}
-                  <span className="ml-auto text-sm font-bold text-gray-400">
+                  <span className="ml-auto text-sm font-bold text-muted-foreground">
                     {calcTotal(comp.id)}
                   </span>
                 </div>
@@ -227,7 +227,7 @@ export default async function MatrixDetailPage({
                     <p className="text-[10px] font-semibold text-emerald-400">
                       Strengths
                     </p>
-                    <p className="text-xs text-gray-400">{comp.strengths}</p>
+                    <p className="text-xs text-muted-foreground">{comp.strengths}</p>
                   </div>
                 )}
                 {comp.weaknesses && (
@@ -235,7 +235,7 @@ export default async function MatrixDetailPage({
                     <p className="text-[10px] font-semibold text-red-400">
                       Weaknesses
                     </p>
-                    <p className="text-xs text-gray-400">{comp.weaknesses}</p>
+                    <p className="text-xs text-muted-foreground">{comp.weaknesses}</p>
                   </div>
                 )}
               </div>

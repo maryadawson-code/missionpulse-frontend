@@ -51,10 +51,10 @@ export default async function AIUsageAnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">
+        <h1 className="text-2xl font-bold text-foreground">
           AI Usage Analytics
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           Token costs by model, cost per proposal, agent distribution, and
           cache performance.
         </p>

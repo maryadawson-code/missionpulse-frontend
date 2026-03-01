@@ -87,8 +87,8 @@ export default async function PipelinePage({
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Pipeline</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Pipeline</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             {opps.length} opportunit{opps.length === 1 ? 'y' : 'ies'} in pipeline
           </p>
         </div>

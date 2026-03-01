@@ -211,8 +211,8 @@ export default async function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Analytics</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Pipeline metrics, win rate trends, and performance dashboards across
             your portfolio.
           </p>
@@ -223,7 +223,7 @@ export default async function AnalyticsPage() {
         >
           <span className="text-base">🤖</span>
           <div>
-            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+            <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
               AI Usage Analytics
             </p>
             <p className="text-[11px] text-slate">Token consumption &amp; cost breakdown</p>

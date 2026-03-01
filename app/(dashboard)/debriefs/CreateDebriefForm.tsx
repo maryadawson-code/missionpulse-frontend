@@ -77,17 +77,17 @@ export function CreateDebriefForm() {
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
+    <div className="rounded-xl border border-border bg-card/50 p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">Create Debrief</h3>
-        <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white">
+        <h3 className="text-sm font-semibold text-foreground">Create Debrief</h3>
+        <button onClick={() => setIsOpen(false)} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="text-xs text-gray-500">Opportunity Name *</label>
+          <label className="text-xs text-muted-foreground">Opportunity Name *</label>
           <input
             type="text"
             value={form.opportunity_name}
@@ -96,7 +96,7 @@ export function CreateDebriefForm() {
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Outcome</label>
+          <label className="text-xs text-muted-foreground">Outcome</label>
           <select
             value={form.outcome}
             onChange={(e) => updateField('outcome', e.target.value)}
@@ -108,7 +108,7 @@ export function CreateDebriefForm() {
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500">Debrief Type</label>
+          <label className="text-xs text-muted-foreground">Debrief Type</label>
           <select
             value={form.debrief_type}
             onChange={(e) => updateField('debrief_type', e.target.value)}
@@ -120,7 +120,7 @@ export function CreateDebriefForm() {
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500">Date</label>
+          <label className="text-xs text-muted-foreground">Date</label>
           <input
             type="date"
             value={form.debrief_date}
@@ -129,7 +129,7 @@ export function CreateDebriefForm() {
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Contract Value</label>
+          <label className="text-xs text-muted-foreground">Contract Value</label>
           <input
             type="number"
             value={form.contract_value}
@@ -141,7 +141,7 @@ export function CreateDebriefForm() {
       </div>
 
       <div>
-        <label className="text-xs text-gray-500">Notes</label>
+        <label className="text-xs text-muted-foreground">Notes</label>
         <textarea
           value={form.notes}
           onChange={(e) => updateField('notes', e.target.value)}
@@ -153,7 +153,7 @@ export function CreateDebriefForm() {
       {/* Strengths, Weaknesses, Lessons */}
       {(['strengths', 'weaknesses', 'lessons_learned'] as const).map((field) => (
         <div key={field}>
-          <label className="text-xs text-gray-500 capitalize">{field.replace(/_/g, ' ')}</label>
+          <label className="text-xs text-muted-foreground capitalize">{field.replace(/_/g, ' ')}</label>
           <div className="mt-1 space-y-1">
             {form[field].map((item, i) => (
               <input

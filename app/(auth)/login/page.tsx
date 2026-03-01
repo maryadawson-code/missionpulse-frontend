@@ -20,7 +20,7 @@ export default function LoginPage({
 
   return (
     <>
-      <h2 className="text-xl font-semibold text-white mb-6">Sign In</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-6">Sign In</h2>
       <LoginForm callbackError={callbackError} />
     </>
   )

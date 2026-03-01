@@ -44,7 +44,7 @@ export default async function EditOpportunityPage({
         ]}
       />
       <div>
-        <h1 className="text-2xl font-bold text-white">Edit Opportunity</h1>
+        <h1 className="text-2xl font-bold text-foreground">Edit Opportunity</h1>
         <p className="text-sm text-slate mt-1">{opportunity.title}</p>
       </div>
       <OpportunityForm mode="edit" opportunity={opportunity} />

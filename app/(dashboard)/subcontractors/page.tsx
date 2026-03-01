@@ -53,28 +53,28 @@ export default async function SubcontractorsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Subcontractor Registry</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Subcontractor Registry</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Track subcontractor credentials, capabilities, and NDA status.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total</p>
-          <p className="mt-1 text-lg font-bold text-white">{items.length}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{items.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Active</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Active</p>
           <p className="mt-1 text-lg font-bold text-emerald-400">{active}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">NDA Signed</p>
-          <p className="mt-1 text-lg font-bold text-white">{ndaSigned}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">NDA Signed</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{ndaSigned}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">TA Signed</p>
-          <p className="mt-1 text-lg font-bold text-white">{taSigned}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">TA Signed</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{taSigned}</p>
         </div>
       </div>
 
@@ -89,12 +89,12 @@ export default async function SubcontractorsPage() {
           {items.map((sub) => (
             <div
               key={sub.id}
-              className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-2"
+              className="rounded-xl border border-border bg-card/50 p-5 space-y-2"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-white">{sub.name}</h3>
+                    <h3 className="text-sm font-semibold text-foreground">{sub.name}</h3>
                     {sub.relationship_status && (
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${statusStyle(sub.relationship_status)}`}
@@ -123,7 +123,7 @@ export default async function SubcontractorsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4 text-[10px] text-gray-500">
+              <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground">
                 {sub.cage_code && <span>CAGE: {sub.cage_code}</span>}
                 {sub.duns_number && <span>DUNS: {sub.duns_number}</span>}
                 {sub.uei_number && <span>UEI: {sub.uei_number}</span>}
@@ -135,7 +135,7 @@ export default async function SubcontractorsPage() {
               </div>
 
               {sub.capabilities && (
-                <p className="text-xs text-gray-400 line-clamp-2">
+                <p className="text-xs text-muted-foreground line-clamp-2">
                   {sub.capabilities}
                 </p>
               )}

@@ -24,8 +24,8 @@ export default async function AIProvidersPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">AI Providers</h1>
-        <p className="mt-1 text-sm text-gray-400">
+        <h1 className="text-2xl font-bold text-foreground">AI Providers</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Configure and monitor AI provider connections. CUI-classified requests
           are automatically routed to FedRAMP-authorized providers.
         </p>

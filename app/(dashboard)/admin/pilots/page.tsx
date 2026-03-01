@@ -24,8 +24,8 @@ export default async function PilotsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Pilot Management</h1>
-        <p className="mt-1 text-sm text-gray-400">
+        <h1 className="text-2xl font-bold text-foreground">Pilot Management</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Monitor active pilots, view engagement scores, and manage conversions.
           Sorted by engagement score (highest conversion probability first).
         </p>

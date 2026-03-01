@@ -33,8 +33,8 @@ export default async function PlaybookPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Playbook</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Playbook</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Golden content library — past performance narratives, boilerplate
           sections, capability statements, and win themes.
         </p>
@@ -47,7 +47,7 @@ export default async function PlaybookPage() {
       >
         <span className="text-2xl">🎙</span>
         <div>
-          <p className="text-sm font-semibold text-white group-hover:text-cyan transition-colors">
+          <p className="text-sm font-semibold text-foreground group-hover:text-cyan transition-colors">
             Voice Profile &amp; AI Training
           </p>
           <p className="text-xs text-slate mt-0.5">

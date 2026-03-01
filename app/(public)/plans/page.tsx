@@ -24,10 +24,10 @@ export default function PricingPage() {
           <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
             Simple, Transparent Pricing
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-400">
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
             Start with a 30-day pilot at 50% off. Pilot cost credited on annual
             conversion. All annual plans price below the{' '}
-            <span className="text-[#00E5FA]">$15,000 micro-purchase threshold</span>.
+            <span className="text-primary">$15,000 micro-purchase threshold</span>.
           </p>
         </div>
 
@@ -43,15 +43,15 @@ export default function PricingPage() {
               (badge) => (
                 <div
                   key={badge}
-                  className="rounded-full border border-gray-700/50 bg-gray-900/50 px-4 py-1.5 text-xs text-gray-400"
+                  className="rounded-full border border-border/50 bg-card/50 px-4 py-1.5 text-xs text-muted-foreground"
                 >
                   {badge}
                 </div>
               )
             )}
           </div>
-          <p className="mt-6 text-sm text-gray-500">
-            Need a custom plan? <a href="mailto:sales@missionpulse.ai" className="text-[#00E5FA] hover:underline">Contact our sales team</a>.
+          <p className="mt-6 text-sm text-muted-foreground">
+            Need a custom plan? <a href="mailto:sales@missionpulse.ai" className="text-primary hover:underline">Contact our sales team</a>.
           </p>
         </div>
       </div>
