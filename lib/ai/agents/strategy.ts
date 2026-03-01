@@ -2,6 +2,7 @@
 
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
+import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 
 export async function runStrategyAgent(context: {
   title: string
@@ -27,11 +28,18 @@ Provide:
 
 For each item, include a brief "Because" explanation.`
 
+  const baseSystemPrompt =
+    'You are a GovCon strategy consultant specializing in Shipley methodology. Generate specific, actionable strategy recommendations. Avoid generic advice — tie everything to the specific opportunity details provided.'
+
+  const feedbackCtx = await buildFeedbackContext('strategy')
+  const systemPrompt = feedbackCtx
+    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
+    : baseSystemPrompt
+
   return aiRequest({
     taskType: 'strategy',
     prompt,
     opportunityId: context.opportunityId,
-    systemPrompt:
-      'You are a GovCon strategy consultant specializing in Shipley methodology. Generate specific, actionable strategy recommendations. Avoid generic advice — tie everything to the specific opportunity details provided.',
+    systemPrompt,
   })
 }

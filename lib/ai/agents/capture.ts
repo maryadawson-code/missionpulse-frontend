@@ -2,6 +2,7 @@
 
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
+import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 
 export async function runCaptureAnalysis(context: {
   title: string
@@ -30,11 +31,18 @@ Please provide:
 
 Format each section clearly with headers.`
 
+  const baseSystemPrompt =
+    'You are a senior GovCon capture manager with 20+ years of experience. Provide actionable, specific analysis based on the opportunity details. Be realistic about win probability.'
+
+  const feedbackCtx = await buildFeedbackContext('capture')
+  const systemPrompt = feedbackCtx
+    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
+    : baseSystemPrompt
+
   return aiRequest({
     taskType: 'capture',
     prompt,
     opportunityId: context.opportunityId,
-    systemPrompt:
-      'You are a senior GovCon capture manager with 20+ years of experience. Provide actionable, specific analysis based on the opportunity details. Be realistic about win probability.',
+    systemPrompt,
   })
 }

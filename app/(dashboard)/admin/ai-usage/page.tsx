@@ -4,9 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { TokenGauge } from '@/components/features/admin/TokenGauge'
 import { BurnRateProjection } from '@/components/features/admin/BurnRateProjection'
+import { AgentSatisfactionGrid } from '@/components/features/admin/AgentSatisfactionGrid'
 import { getCompanySubscription } from '@/lib/billing/plans'
 import { getTokenBalance } from '@/lib/billing/ledger'
 import { getBurnRateProjection } from '@/lib/billing/burn-rate'
+import { getAgentSatisfactionScores } from '@/lib/ai/feedback-context'
 import { Skeleton } from '@/components/ui/skeleton'
 
 const TokenUsageCharts = dynamic(
@@ -58,14 +60,13 @@ export default async function AIUsagePage() {
     .order('created_at', { ascending: false })
     .limit(500)
 
-  // Plan-aware data (if company has a subscription)
-  const subscription = companyId
-    ? await getCompanySubscription(companyId)
-    : null
-  const balance = companyId ? await getTokenBalance(companyId) : null
-  const burnRate = companyId
-    ? await getBurnRateProjection(companyId)
-    : null
+  // Plan-aware data + satisfaction scores (parallelized)
+  const [subscription, balance, burnRate, satisfactionScores] = await Promise.all([
+    companyId ? getCompanySubscription(companyId) : null,
+    companyId ? getTokenBalance(companyId) : null,
+    companyId ? getBurnRateProjection(companyId) : null,
+    companyId ? getAgentSatisfactionScores(companyId) : [],
+  ])
 
   const planName = subscription?.plan?.name ?? 'No Plan'
   const usagePercent = balance?.usage_percent ?? 0
@@ -100,6 +101,8 @@ export default async function AIUsagePage() {
           )}
         </div>
       )}
+
+      <AgentSatisfactionGrid scores={satisfactionScores ?? []} />
 
       <TokenUsageCharts
         entries={entries ?? []}

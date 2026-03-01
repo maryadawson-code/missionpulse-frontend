@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { aiRequest } from '@/lib/ai/pipeline'
 import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
+import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 
 interface ChatResult {
   success: boolean
@@ -37,19 +38,27 @@ export async function sendChatMessage(
   } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
-  // Store user message
-  await supabase.from('chat_messages').insert({
-    id: crypto.randomUUID(),
-    session_id: sessionId,
-    role: 'user',
-    content: message,
-  })
+  // Store user message + fetch feedback context in parallel (zero added latency)
+  const [, feedbackCtx] = await Promise.all([
+    supabase.from('chat_messages').insert({
+      id: crypto.randomUUID(),
+      session_id: sessionId,
+      role: 'user',
+      content: message,
+    }),
+    buildFeedbackContext(agentType ?? 'general'),
+  ])
 
   // Build context-aware system prompt based on selected agent
   const basePrompt = AGENT_SYSTEM_PROMPTS[agentType ?? 'general'] ?? AGENT_SYSTEM_PROMPTS.general
-  const systemPrompt = opportunityContext
+  let systemPrompt = opportunityContext
     ? `${basePrompt}\n\nThe user is currently viewing an opportunity. Here is the context:\n\n${opportunityContext}\n\nHelp the user with their question about this opportunity.`
     : basePrompt
+
+  // Append self-learning feedback context if available
+  if (feedbackCtx) {
+    systemPrompt = `${systemPrompt}\n\n${feedbackCtx.instructions}`
+  }
 
   // Run through AI pipeline
   const aiResponse = await aiRequest({

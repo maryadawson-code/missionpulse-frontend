@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Shield, Loader2, Copy, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -208,8 +209,7 @@ export default function MFAPage() {
             {qrCode && (
               <div className="flex justify-center">
                 <div className="rounded-lg bg-white p-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qrCode} alt="MFA QR Code" className="h-48 w-48" />
+                  <Image src={qrCode} alt="MFA QR Code" width={192} height={192} unoptimized className="h-48 w-48" />
                 </div>
               </div>
             )}

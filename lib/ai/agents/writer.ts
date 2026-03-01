@@ -3,6 +3,7 @@
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { getVoiceProfile, type VoiceProfile } from '@/lib/ai/voice-fingerprint'
+import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 
 /**
  * Run the Writer Agent with optional company voice profile.
@@ -59,13 +60,17 @@ Format: Write each paragraph separately, with a "Because:" line after it.`
   const baseSystemPrompt =
     'You are an expert government proposal writer following the Shipley methodology. Write compelling, compliant proposal content that directly addresses every requirement. Use specific, quantitative language. Avoid vague claims.'
 
+  // Build system prompt: base + voice profile + feedback context
+  const feedbackCtx = await buildFeedbackContext('writer')
+  const promptParts = [baseSystemPrompt]
+  if (voiceInstructions) promptParts.push(voiceInstructions)
+  if (feedbackCtx) promptParts.push(feedbackCtx.instructions)
+
   return aiRequest({
     taskType: 'writer',
     prompt,
     opportunityId: context.opportunityId,
-    systemPrompt: voiceInstructions
-      ? `${baseSystemPrompt}\n\n${voiceInstructions}`
-      : baseSystemPrompt,
+    systemPrompt: promptParts.join('\n\n'),
   })
 }
 
