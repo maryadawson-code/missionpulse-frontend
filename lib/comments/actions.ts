@@ -146,7 +146,7 @@ export async function getComments(sectionId: string): Promise<Comment[]> {
     .select('*')
     .eq('entity_type', 'proposal_section')
     .eq('entity_id', sectionId)
-    .in('action_type', ['comment_added', 'comment_reply', 'comment_resolved', 'comment_unresolve'])
+    .in('action_type', ['comment_added', 'comment_reply', 'comment_resolved', 'comment_unresolve', 'comment_edited', 'comment_deleted'])
     .order('created_at', { ascending: true })
 
   if (!entries || entries.length === 0) return []
@@ -182,6 +182,34 @@ export async function getComments(sectionId: string): Promise<Comment[]> {
       const target = commentMap.get(commentId)
       if (target) {
         target.resolved = actionType === 'comment_resolved'
+      }
+      continue
+    }
+
+    // Handle edit — update content on existing comment
+    if (actionType === 'comment_edited') {
+      const target = commentMap.get(commentId)
+      if (target) {
+        target.content = (metadata.content as string) ?? target.content
+        target.updatedAt = entry.created_at ?? target.updatedAt
+      }
+      continue
+    }
+
+    // Handle delete — remove from map and root/reply lists
+    if (actionType === 'comment_deleted') {
+      const target = commentMap.get(commentId)
+      if (target) {
+        if (target.parentId) {
+          const parent = commentMap.get(target.parentId)
+          if (parent) {
+            parent.replies = parent.replies.filter((r) => r.id !== commentId)
+          }
+        } else {
+          const idx = rootComments.findIndex((c) => c.id === commentId)
+          if (idx !== -1) rootComments.splice(idx, 1)
+        }
+        commentMap.delete(commentId)
       }
       continue
     }
@@ -253,6 +281,143 @@ export async function resolveComment(
     metadata: JSON.parse(JSON.stringify({
       comment_id: commentId,
       resolved,
+    })),
+  })
+
+  return { success: true }
+}
+
+/**
+ * Edit a comment (author only).
+ */
+export async function editComment(
+  sectionId: string,
+  commentId: string,
+  userId: string,
+  newContent: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, company_id')
+    .eq('id', userId)
+    .single()
+
+  if (!profile) return { success: false, error: 'User not found' }
+
+  const { data: section } = await supabase
+    .from('proposal_sections')
+    .select('opportunity_id, section_title')
+    .eq('id', sectionId)
+    .single()
+
+  // Verify the user is the original comment author by checking activity_feed
+  const { data: original } = await supabase
+    .from('activity_feed')
+    .select('user_id, metadata')
+    .eq('entity_id', sectionId)
+    .in('action_type', ['comment_added', 'comment_reply'])
+    .order('created_at', { ascending: true })
+
+  const isAuthor = original?.some((entry) => {
+    const meta = entry.metadata as Record<string, unknown> | null
+    return meta?.comment_id === commentId && entry.user_id === userId
+  })
+
+  if (!isAuthor) return { success: false, error: 'Only the comment author can edit' }
+
+  await supabase.from('activity_feed').insert({
+    action_type: 'comment_edited',
+    entity_type: 'proposal_section',
+    entity_id: sectionId,
+    entity_name: section?.section_title ?? '',
+    user_id: userId,
+    user_name: profile.full_name ?? 'Unknown',
+    company_id: profile.company_id ?? null,
+    opportunity_id: section?.opportunity_id ?? null,
+    description: newContent.slice(0, 200),
+    metadata: JSON.parse(JSON.stringify({
+      comment_id: commentId,
+      content: newContent,
+    })),
+  })
+
+  await supabase.from('audit_logs').insert({
+    action: 'comment_edited',
+    table_name: 'proposal_sections',
+    record_id: sectionId,
+    user_id: userId,
+    new_values: JSON.parse(JSON.stringify({
+      comment_id: commentId,
+      content: newContent.slice(0, 200),
+    })),
+  })
+
+  return { success: true }
+}
+
+/**
+ * Delete a comment (author only, soft-delete via activity_feed).
+ */
+export async function deleteComment(
+  sectionId: string,
+  commentId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, company_id')
+    .eq('id', userId)
+    .single()
+
+  if (!profile) return { success: false, error: 'User not found' }
+
+  const { data: section } = await supabase
+    .from('proposal_sections')
+    .select('opportunity_id, section_title')
+    .eq('id', sectionId)
+    .single()
+
+  // Verify author
+  const { data: original } = await supabase
+    .from('activity_feed')
+    .select('user_id, metadata')
+    .eq('entity_id', sectionId)
+    .in('action_type', ['comment_added', 'comment_reply'])
+    .order('created_at', { ascending: true })
+
+  const isAuthor = original?.some((entry) => {
+    const meta = entry.metadata as Record<string, unknown> | null
+    return meta?.comment_id === commentId && entry.user_id === userId
+  })
+
+  if (!isAuthor) return { success: false, error: 'Only the comment author can delete' }
+
+  await supabase.from('activity_feed').insert({
+    action_type: 'comment_deleted',
+    entity_type: 'proposal_section',
+    entity_id: sectionId,
+    entity_name: section?.section_title ?? '',
+    user_id: userId,
+    user_name: profile.full_name ?? 'Unknown',
+    company_id: profile.company_id ?? null,
+    opportunity_id: section?.opportunity_id ?? null,
+    description: 'Deleted comment',
+    metadata: JSON.parse(JSON.stringify({
+      comment_id: commentId,
+    })),
+  })
+
+  await supabase.from('audit_logs').insert({
+    action: 'comment_deleted',
+    table_name: 'proposal_sections',
+    record_id: sectionId,
+    user_id: userId,
+    new_values: JSON.parse(JSON.stringify({
+      comment_id: commentId,
     })),
   })
 

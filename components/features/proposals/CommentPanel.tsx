@@ -9,14 +9,21 @@ import {
   ChevronDown,
   ChevronRight,
   AtSign,
+  Pencil,
+  Trash2,
+  X,
+  Check,
 } from 'lucide-react'
 import {
   addComment,
   getComments,
   resolveComment,
+  editComment,
+  deleteComment,
   type Comment,
 } from '@/lib/comments/actions'
 import { addToast } from '@/components/ui/Toast'
+import { createClient } from '@/lib/supabase/client'
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -46,6 +53,37 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
   useEffect(() => {
     loadComments()
   }, [loadComments])
+
+  // Realtime subscription — reload comments on any change to this section
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`comments_${sectionId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'activity_feed' },
+        (payload) => {
+          const entry = payload.new as Record<string, unknown>
+          if (entry.entity_id !== sectionId) return
+          const actionType = entry.action_type as string
+          if (
+            actionType === 'comment_added' ||
+            actionType === 'comment_reply' ||
+            actionType === 'comment_edited' ||
+            actionType === 'comment_deleted' ||
+            actionType === 'comment_resolved' ||
+            actionType === 'comment_unresolve'
+          ) {
+            loadComments()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [sectionId, loadComments])
 
   const handleSubmit = async () => {
     if (!newComment.trim() || submitting) return
@@ -132,6 +170,32 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
                     )
                   )
                 }}
+                onEdit={(commentId, newContent) => {
+                  setComments((prev) =>
+                    prev.map((c) =>
+                      c.id === commentId
+                        ? { ...c, content: newContent, updatedAt: new Date().toISOString() }
+                        : {
+                            ...c,
+                            replies: c.replies.map((r) =>
+                              r.id === commentId
+                                ? { ...r, content: newContent, updatedAt: new Date().toISOString() }
+                                : r
+                            ),
+                          }
+                    )
+                  )
+                }}
+                onDelete={(commentId) => {
+                  setComments((prev) =>
+                    prev
+                      .filter((c) => c.id !== commentId)
+                      .map((c) => ({
+                        ...c,
+                        replies: c.replies.filter((r) => r.id !== commentId),
+                      }))
+                  )
+                }}
               />
             ))}
 
@@ -171,6 +235,32 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
                             prev.map((c) =>
                               c.id === comment.id ? { ...c, resolved } : c
                             )
+                          )
+                        }}
+                        onEdit={(commentId, newContent) => {
+                          setComments((prev) =>
+                            prev.map((c) =>
+                              c.id === commentId
+                                ? { ...c, content: newContent, updatedAt: new Date().toISOString() }
+                                : {
+                                    ...c,
+                                    replies: c.replies.map((r) =>
+                                      r.id === commentId
+                                        ? { ...r, content: newContent, updatedAt: new Date().toISOString() }
+                                        : r
+                                    ),
+                                  }
+                            )
+                          )
+                        }}
+                        onDelete={(commentId) => {
+                          setComments((prev) =>
+                            prev
+                              .filter((c) => c.id !== commentId)
+                              .map((c) => ({
+                                ...c,
+                                replies: c.replies.filter((r) => r.id !== commentId),
+                              }))
                           )
                         }}
                       />
@@ -221,6 +311,8 @@ function CommentThread({
   userName,
   onReply,
   onResolve,
+  onEdit,
+  onDelete,
 }: {
   comment: Comment
   sectionId: string
@@ -228,10 +320,14 @@ function CommentThread({
   userName: string
   onReply: (_reply: Comment) => void
   onResolve: (_resolved: boolean) => void
+  onEdit: (_commentId: string, _newContent: string) => void
+  onDelete: (_commentId: string) => void
 }) {
   const [replyText, setReplyText] = useState('')
   const [showReply, setShowReply] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
 
   const handleReply = async () => {
     if (!replyText.trim() || submitting) return
@@ -251,6 +347,32 @@ function CommentThread({
     const newResolved = !comment.resolved
     await resolveComment(sectionId, comment.id, userId, newResolved)
     onResolve(newResolved)
+  }
+
+  const handleEdit = async (commentId: string) => {
+    if (!editText.trim()) return
+    setSubmitting(true)
+    const result = await editComment(sectionId, commentId, userId, editText.trim())
+    if (result.success) {
+      onEdit(commentId, editText.trim())
+      setEditingId(null)
+      setEditText('')
+    } else {
+      addToast('error', result.error ?? 'Failed to edit')
+    }
+    setSubmitting(false)
+  }
+
+  const handleDelete = async (commentId: string) => {
+    setSubmitting(true)
+    const result = await deleteComment(sectionId, commentId, userId)
+    if (result.success) {
+      onDelete(commentId)
+      addToast('success', 'Comment deleted')
+    } else {
+      addToast('error', result.error ?? 'Failed to delete')
+    }
+    setSubmitting(false)
   }
 
   // Highlight @mentions in text
@@ -299,21 +421,49 @@ function CommentThread({
       </div>
 
       {/* Content */}
-      <p className="text-xs text-foreground leading-relaxed">
-        {renderContent(comment.content)}
-      </p>
+      {editingId === comment.id ? (
+        <div className="space-y-1.5">
+          <textarea
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            className="w-full resize-none rounded border border-border bg-card px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none"
+            rows={2}
+          />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleEdit(comment.id)}
+              disabled={submitting || !editText.trim()}
+              className="flex items-center gap-1 rounded bg-cyan-500 px-2 py-0.5 text-[10px] text-black hover:bg-cyan-400 disabled:opacity-50"
+            >
+              <Check className="h-3 w-3" />
+              Save
+            </button>
+            <button
+              onClick={() => { setEditingId(null); setEditText('') }}
+              className="flex items-center gap-1 rounded border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-foreground leading-relaxed">
+          {renderContent(comment.content)}
+        </p>
+      )}
 
       {/* Actions */}
       <div className="mt-2 flex items-center gap-3">
         <button
           onClick={() => setShowReply(!showReply)}
-          className="text-[10px] text-muted-foreground hover:text-muted-foreground"
+          className="text-[10px] text-muted-foreground hover:text-foreground"
         >
           Reply
         </button>
         <button
           onClick={handleResolve}
-          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground"
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
         >
           {comment.resolved ? (
             <>
@@ -327,6 +477,25 @@ function CommentThread({
             </>
           )}
         </button>
+        {comment.authorId === userId && !comment.resolved && (
+          <>
+            <button
+              onClick={() => { setEditingId(comment.id); setEditText(comment.content) }}
+              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit
+            </button>
+            <button
+              onClick={() => handleDelete(comment.id)}
+              disabled={submitting}
+              className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete
+            </button>
+          </>
+        )}
       </div>
 
       {/* Replies */}

@@ -4,6 +4,27 @@ All notable changes to MissionPulse are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.9.0] — 2026-03-01 (Production Completeness)
+
+### Added
+- Realtime comment streaming via Supabase `postgres_changes` subscription (CommentPanel)
+- Comment edit and delete with author-only enforcement and dual audit trail
+- Track changes persistence — AI suggestion accept/reject decisions logged to `activity_feed` + `audit_logs`
+- Launch gate ConfirmModal with destructive styling for No-Go decisions
+- Expandable gate decision history per Shipley gate
+- Cloud Binder conflict resolution — ConflictResolutionModal wired into CloudBinderPanel
+- `getConflictForDocument()` and `resolveDocumentConflict()` server actions
+- 11+ new unit tests across `tests/comments/` and `tests/track-changes/`
+
+### Fixed
+- Launch gate `gateName` hidden input always empty string — now syncs with selected gate via state
+- Gate decision history showed only latest decision per gate — now shows full history with expandable timeline
+
+### Changed
+- AIWriterPanel now accepts optional `sectionId` prop to enable track changes persistence
+- `recordGateDecision` action now writes to both `activity_feed` and `audit_logs` (was audit-only)
+- `getComments()` handles `comment_edited` and `comment_deleted` action types in tree-building
+
 ## [1.8.0] — 2026-03-01 (Scale Readiness)
 
 ### Added

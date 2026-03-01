@@ -23,11 +23,16 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { addToast } from '@/components/ui/Toast'
 import { SyncStatusBadge } from '@/components/features/sync/SyncStatusBadge'
+import { ConflictResolutionModal } from '@/components/features/sync/ConflictResolutionModal'
 import {
   assembleCloudBinder,
   getArtifactStatuses,
 } from '@/lib/utils/cloud-binder-assembly'
-import type { ArtifactStatus, SyncStatus } from '@/lib/types/sync'
+import {
+  getConflictForDocument,
+  resolveDocumentConflict,
+} from '@/app/(dashboard)/pipeline/[id]/launch/actions'
+import type { ArtifactStatus, SyncStatus, SyncConflict, ConflictResolution } from '@/lib/types/sync'
 
 // -- Props ------------------------------------------------------------------
 
@@ -83,6 +88,8 @@ export function CloudBinderPanel({
   const [loading, setLoading] = useState(true)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [activeConflict, setActiveConflict] = useState<SyncConflict | null>(null)
+  const [resolvingDocId, setResolvingDocId] = useState<string | null>(null)
 
   // Fetch artifact statuses on mount
   useEffect(() => {
@@ -121,6 +128,31 @@ export function CloudBinderPanel({
   const totalWords = artifacts.reduce((sum, a) => sum + a.wordCount, 0)
 
   const hasIssues = conflictCount > 0 || errorCount > 0
+
+  async function handleOpenConflict(documentId: string) {
+    setResolvingDocId(documentId)
+    const result = await getConflictForDocument(documentId)
+    if (result.conflict) {
+      setActiveConflict(result.conflict as SyncConflict)
+    } else {
+      addToast('error', result.error ?? 'No conflict found for this document')
+      setResolvingDocId(null)
+    }
+  }
+
+  async function handleResolveConflict(resolution: ConflictResolution) {
+    if (!activeConflict) return
+    const result = await resolveDocumentConflict(activeConflict.id, resolution as 'keep_mp' | 'keep_cloud' | 'merge')
+    if (result.success) {
+      addToast('success', 'Conflict resolved')
+      const statuses = await getArtifactStatuses(opportunityId)
+      setArtifacts(statuses)
+    } else {
+      addToast('error', result.error ?? 'Failed to resolve conflict')
+    }
+    setActiveConflict(null)
+    setResolvingDocId(null)
+  }
 
   function handleBuild() {
     startTransition(async () => {
@@ -328,11 +360,34 @@ export function CloudBinderPanel({
                     Cloud synced
                   </div>
                 )}
+
+                {artifact.syncStatus === 'conflict' && (
+                  <button
+                    onClick={() => handleOpenConflict(artifact.documentId)}
+                    disabled={resolvingDocId === artifact.documentId}
+                    className="mt-2 flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    Resolve Conflict
+                  </button>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Conflict Resolution Modal */}
+      {activeConflict && (
+        <ConflictResolutionModal
+          conflict={activeConflict}
+          onResolve={handleResolveConflict}
+          onClose={() => {
+            setActiveConflict(null)
+            setResolvingDocId(null)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -122,6 +122,7 @@ export function SectionEditorClient({
             rfpContext={rfpContext}
             playbookContent={[]}
             opportunityId={opportunityId}
+            sectionId={sectionId}
             onAcceptContent={handleAcceptContent}
           />
         </div>
