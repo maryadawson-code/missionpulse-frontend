@@ -4,7 +4,11 @@ import { useCallback, useState, useRef } from 'react'
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 
-import { processStoredFile, processStoredZip } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
+import {
+  createSignedUploadUrl,
+  processStoredFile,
+  processStoredZip,
+} from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
 import { addToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
@@ -60,7 +64,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         validFiles.map((f) => ({ name: f.name, status: 'uploading' }))
       )
 
-      // Create browser Supabase client for direct storage upload
+      // Browser Supabase client for uploadToSignedUrl
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -73,28 +77,41 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         const isZip = file.type === 'application/zip' || file.type === 'application/x-zip-compressed' || file.name.endsWith('.zip')
 
         try {
-          // Step 1: Upload file directly to Supabase Storage from browser
-          // This bypasses Vercel's 4.5MB serverless body limit
-          const storagePath = `rfp/${opportunityId}/${Date.now()}_${file.name}`
-          const { error: storageError } = await supabase.storage
-            .from('documents')
-            .upload(storagePath, file, {
-              contentType: file.type || 'application/octet-stream',
-              upsert: false,
-            })
-
-          if (storageError) {
+          // Step 1: Get a signed upload URL from server (admin client, bypasses RLS)
+          const urlResult = await createSignedUploadUrl(opportunityId, file.name)
+          if (!urlResult.success || !urlResult.data) {
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, status: 'error', message: `Storage upload failed: ${storageError.message}` }
+                  ? { ...s, status: 'error', message: urlResult.error ?? 'Failed to prepare upload' }
                   : s
               )
             )
             continue
           }
 
-          // Step 2: Call server action with only metadata (no file data)
+          const { token, storagePath } = urlResult.data
+
+          // Step 2: Upload directly to Supabase Storage using signed URL
+          // This bypasses both Vercel's 4.5MB limit and Storage RLS
+          const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .uploadToSignedUrl(storagePath, token, file, {
+              contentType: file.type || 'application/octet-stream',
+            })
+
+          if (uploadError) {
+            setFileStatuses((prev) =>
+              prev.map((s, idx) =>
+                idx === i
+                  ? { ...s, status: 'error', message: `Upload failed: ${uploadError.message}` }
+                  : s
+              )
+            )
+            continue
+          }
+
+          // Step 3: Call server action with only metadata (no file data)
           if (isZip) {
             const result = await processStoredZip(opportunityId, storagePath, file.name, file.size)
             setFileStatuses((prev) =>
@@ -127,7 +144,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
                       status: result.success ? 'success' : 'error',
                       message: result.success
                         ? 'Parsed successfully'
-                        : result.error ?? 'Upload failed',
+                        : result.error ?? 'Processing failed',
                     }
                   : s
               )

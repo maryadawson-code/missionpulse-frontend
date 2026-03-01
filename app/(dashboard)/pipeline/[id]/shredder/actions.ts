@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { extractPdfText } from '@/lib/utils/pdf-parser'
 import { extractDocxText } from '@/lib/utils/docx-parser'
 import { extractXlsxText } from '@/lib/utils/xlsx-text-extractor'
@@ -58,8 +59,38 @@ function mimeFromExt(ext: string): string {
   }
 }
 
+// ─── Generate a signed upload URL (bypasses Storage RLS) ────────
+// Client calls this first, then uploads directly to the signed URL.
+
+export async function createSignedUploadUrl(
+  opportunityId: string,
+  fileName: string
+): Promise<ActionResult<{ token: string; storagePath: string }>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Not authenticated' }
+
+    const admin = createAdminClient()
+    const storagePath = `rfp/${opportunityId}/${Date.now()}_${fileName}`
+
+    const { data, error } = await admin.storage
+      .from('documents')
+      .createSignedUploadUrl(storagePath)
+
+    if (error || !data) {
+      return { success: false, error: `Failed to create upload URL: ${error?.message ?? 'unknown'}` }
+    }
+
+    return { success: true, data: { token: data.token, storagePath } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create upload URL'
+    return { success: false, error: message }
+  }
+}
+
 // ─── Process a single file already uploaded to Storage ──────────
-// The client uploads directly to Supabase Storage (bypasses Vercel body limit),
+// The client uploads via signed URL (bypasses Vercel body limit + Storage RLS),
 // then calls this action with only metadata to extract text and create records.
 
 export async function processStoredFile(
@@ -77,8 +108,9 @@ export async function processStoredFile(
     } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
-    // Download from storage for text extraction
-    const { data: blob, error: downloadError } = await supabase.storage
+    // Download from storage for text extraction (admin client bypasses RLS)
+    const admin = createAdminClient()
+    const { data: blob, error: downloadError } = await admin.storage
       .from('documents')
       .download(storagePath)
 
@@ -154,8 +186,9 @@ export async function processStoredZip(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
-    // Download ZIP from storage
-    const { data: blob, error: downloadError } = await supabase.storage
+    // Download ZIP from storage (admin client bypasses RLS)
+    const admin = createAdminClient()
+    const { data: blob, error: downloadError } = await admin.storage
       .from('documents')
       .download(storagePath)
 
@@ -190,9 +223,9 @@ export async function processStoredZip(
       const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase()
       const mimeType = mimeFromExt(ext)
 
-      // Upload extracted file to storage
+      // Upload extracted file to storage (admin bypasses RLS)
       const entryPath = `rfp/${opportunityId}/${Date.now()}_${fileName}`
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await admin.storage
         .from('documents')
         .upload(entryPath, entryBuffer, { contentType: mimeType, upsert: false })
 
@@ -247,7 +280,7 @@ export async function processStoredZip(
     }
 
     // Clean up the ZIP from storage (individual files are already stored)
-    await supabase.storage.from('documents').remove([storagePath])
+    await admin.storage.from('documents').remove([storagePath])
 
     revalidatePath(`/pipeline/${opportunityId}/shredder`)
     return {
@@ -281,7 +314,8 @@ export async function deleteRfpDocument(
     .single()
 
   if (doc?.storage_path) {
-    await supabase.storage.from('documents').remove([doc.storage_path])
+    const admin = createAdminClient()
+    await admin.storage.from('documents').remove([doc.storage_path])
   }
 
   const { error } = await supabase
