@@ -34,11 +34,11 @@ function typeBadgeClass(type: string): string {
     case 'deadline':
       return 'bg-red-500/20 text-red-300'
     case 'assignment':
-      return 'bg-[#00E5FA]/20 text-[#00E5FA]'
+      return 'bg-primary/20 text-primary'
     case 'ai_complete':
       return 'bg-purple-500/20 text-purple-300'
     default:
-      return 'bg-gray-500/20 text-gray-300'
+      return 'bg-muted text-muted-foreground'
   }
 }
 
@@ -86,7 +86,7 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="relative rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+        className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         aria-label="Notifications"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -104,14 +104,14 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-gray-800 bg-gray-900 shadow-xl">
-          <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-200">
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h3 className="text-sm font-semibold text-popover-foreground">
               Notifications{unreadCount > 0 ? ` (${unreadCount})` : ''}
             </h3>
             <Link
               href="/notifications"
-              className="text-xs text-[#00E5FA] hover:underline"
+              className="text-xs text-primary hover:underline"
               onClick={() => setOpen(false)}
             >
               View All
@@ -119,19 +119,19 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
           </div>
           <div className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-gray-500">
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
                 No notifications
               </p>
             ) : (
               items.map((item) => (
                 <div
                   key={item.id}
-                  className={`border-b border-gray-800/50 px-4 py-3 transition-colors last:border-0 hover:bg-gray-800/30 ${!item.is_read ? 'border-l-2 border-l-[#00E5FA]' : ''}`}
+                  className={`border-b border-border/50 px-4 py-3 transition-colors last:border-0 hover:bg-accent/30 ${!item.is_read ? 'border-l-2 border-l-primary' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <p className={`text-sm truncate ${!item.is_read ? 'font-semibold text-gray-200' : 'text-gray-400'}`}>
+                        <p className={`text-sm truncate ${!item.is_read ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                           {item.title}
                         </p>
                         <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${typeBadgeClass(item.notification_type)}`}>
@@ -139,14 +139,14 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
                         </span>
                       </div>
                       {item.message && (
-                        <p className="text-xs text-gray-500 truncate">{item.message}</p>
+                        <p className="text-xs text-muted-foreground truncate">{item.message}</p>
                       )}
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-gray-600">{timeAgo(item.created_at)}</span>
+                        <span className="text-[10px] text-muted-foreground">{timeAgo(item.created_at)}</span>
                         {item.link_url && (
                           <Link
                             href={item.link_url}
-                            className="text-[10px] text-[#00E5FA] hover:underline"
+                            className="text-[10px] text-primary hover:underline"
                             onClick={() => setOpen(false)}
                           >
                             {item.link_text ?? 'View'}
@@ -158,7 +158,7 @@ export function NotificationsDropdown({ items }: NotificationsDropdownProps) {
                       <button
                         onClick={() => handleMarkRead(item.id)}
                         disabled={isPending}
-                        className="shrink-0 rounded p-1 text-gray-500 hover:text-[#00E5FA]"
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:text-primary"
                         title="Mark as read"
                       >
                         <Check className="h-3.5 w-3.5" />

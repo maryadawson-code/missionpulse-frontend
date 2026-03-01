@@ -34,11 +34,11 @@ export default function DashboardHeader({ userEmail, notifications = [] }: Dashb
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-800 bg-[#00050F] px-4 md:px-6">
+    <header className="flex h-16 items-center justify-between border-b border-border bg-background px-4 md:px-6">
       {/* Search */}
       <form onSubmit={handleSearch} className="relative w-full max-w-md">
         <svg
-          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -55,7 +55,7 @@ export default function DashboardHeader({ userEmail, notifications = [] }: Dashb
           placeholder="Search opportunities, proposals..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-lg border border-gray-700 bg-gray-900/50 py-2 pl-10 pr-4 text-sm text-gray-200 placeholder-gray-500 outline-none transition-colors focus:border-[#00E5FA]/50 focus:ring-1 focus:ring-[#00E5FA]/25"
+          className="w-full rounded-lg border border-input bg-card/50 py-2 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/25"
         />
       </form>
 
@@ -65,11 +65,11 @@ export default function DashboardHeader({ userEmail, notifications = [] }: Dashb
 
         {/* User email + sign out */}
         <div className="flex items-center gap-3">
-          <span className="hidden text-xs text-gray-500 sm:inline">{userEmail}</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">{userEmail}</span>
           <button
             onClick={handleSignOut}
             type="button"
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             Sign out
           </button>

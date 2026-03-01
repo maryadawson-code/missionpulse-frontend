@@ -55,7 +55,7 @@ export function PresenceIndicator({
     <div className="relative">
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="flex items-center gap-2 rounded-lg border border-gray-800 px-3 py-1.5 text-xs hover:border-gray-700 transition-colors"
+        className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs hover:border-input transition-colors"
       >
         {connected ? (
           <Wifi className="h-3.5 w-3.5 text-emerald-400" />
@@ -69,7 +69,7 @@ export function PresenceIndicator({
             {otherUsers.slice(0, 3).map((u) => (
               <div
                 key={u.userId}
-                className="h-5 w-5 rounded-full border border-gray-900 bg-gray-700 flex items-center justify-center"
+                className="h-5 w-5 rounded-full border border-background bg-secondary flex items-center justify-center"
                 title={u.userName}
               >
                 {u.avatarUrl ? (
@@ -81,25 +81,25 @@ export function PresenceIndicator({
                     className="h-5 w-5 rounded-full object-cover"
                   />
                 ) : (
-                  <span className="text-[9px] font-medium text-gray-300">
+                  <span className="text-[9px] font-medium text-muted-foreground">
                     {u.userName.charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
             ))}
             {otherUsers.length > 3 && (
-              <div className="h-5 w-5 rounded-full border border-gray-900 bg-gray-600 flex items-center justify-center">
-                <span className="text-[9px] font-medium text-gray-300">
+              <div className="h-5 w-5 rounded-full border border-background bg-muted flex items-center justify-center">
+                <span className="text-[9px] font-medium text-muted-foreground">
                   +{otherUsers.length - 3}
                 </span>
               </div>
             )}
           </div>
         ) : (
-          <Users className="h-3.5 w-3.5 text-gray-500" />
+          <Users className="h-3.5 w-3.5 text-muted-foreground" />
         )}
 
-        <span className="text-gray-400">
+        <span className="text-muted-foreground">
           {totalOnline} online
         </span>
       </button>
@@ -111,22 +111,22 @@ export function PresenceIndicator({
             className="fixed inset-0 z-40"
             onClick={() => setShowDropdown(false)}
           />
-          <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-gray-800 bg-gray-900 p-2 shadow-xl">
-            <div className="mb-2 px-2 text-xs font-medium text-gray-500">
+          <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-border bg-popover p-2 shadow-xl">
+            <div className="mb-2 px-2 text-xs font-medium text-muted-foreground">
               People on this page
             </div>
 
             {users.length === 0 ? (
-              <p className="px-2 py-1 text-xs text-gray-600">No one online</p>
+              <p className="px-2 py-1 text-xs text-muted-foreground">No one online</p>
             ) : (
               <div className="space-y-1">
                 {users.map((u) => (
                   <div
                     key={u.userId}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-800"
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent"
                   >
                     <div className="relative">
-                      <div className="h-6 w-6 rounded-full bg-gray-700 flex items-center justify-center">
+                      <div className="h-6 w-6 rounded-full bg-secondary flex items-center justify-center">
                         {u.avatarUrl ? (
                           <Image
                             src={u.avatarUrl}
@@ -136,13 +136,13 @@ export function PresenceIndicator({
                             className="h-6 w-6 rounded-full object-cover"
                           />
                         ) : (
-                          <span className="text-[10px] font-medium text-gray-300">
+                          <span className="text-[10px] font-medium text-muted-foreground">
                             {u.userName.charAt(0).toUpperCase()}
                           </span>
                         )}
                       </div>
                       <div
-                        className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-gray-900 ${
+                        className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-background ${
                           u.status === 'editing'
                             ? 'bg-cyan-400'
                             : 'bg-emerald-400'
@@ -150,13 +150,13 @@ export function PresenceIndicator({
                       />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-white">
+                      <p className="truncate text-xs font-medium text-foreground">
                         {u.userName}
                         {u.userId === userId && (
-                          <span className="ml-1 text-gray-500">(you)</span>
+                          <span className="ml-1 text-muted-foreground">(you)</span>
                         )}
                       </p>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-[10px] text-muted-foreground">
                         {u.status === 'editing'
                           ? 'Editing a section'
                           : 'Viewing'}

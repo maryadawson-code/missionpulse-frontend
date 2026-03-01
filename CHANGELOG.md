@@ -4,6 +4,30 @@ All notable changes to MissionPulse are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] — 2026-03-01 (Launch Readiness)
+
+### Added
+- Light/dark theme support via `next-themes` with ThemeToggle in Sidebar
+- CSS variable infrastructure: light `:root` + `.dark` class for all shadcn/ui tokens
+- Storybook v10 with `@storybook/nextjs-vite`, 12 component stories (Button, Badge, DataTable, FormModal, ConfirmModal, StatusBadge, PhaseIndicator, ActivityLog, OpportunityCard, SectionCard, ErrorDisplay, Toast)
+- OpenAPI 3.1 specification (`docs/openapi.yaml`) documenting all 14 API routes
+- Bundle size tracking with `PERFORMANCE_BASELINE.md` and `npm run analyze`
+- E2E test expansion: API route auth gates, RBAC enforcement, accessibility axe-core scans, keyboard navigation
+- `SECURITY_AUDIT.md` with npm audit triage and NIST control mapping
+- JSON-LD structured data (`SoftwareApplication` + `Organization` schemas)
+- Request ID propagation via `x-request-id` header in structured logging
+
+### Changed
+- Replaced `xlsx` (SheetJS) with ExcelJS for reading — eliminates 7 HIGH vulnerabilities
+- `React.memo` on `OpportunityCard` and `SectionCard`; `useCallback` on drag handlers in `KanbanView` and `SwimlaneBoard`
+- Coverage thresholds raised: lines 30→35%, functions 25→30%, branches 20→25%
+- 9 layout components migrated from hardcoded dark colors to CSS variable tokens (Sidebar, DashboardHeader, NotificationsDropdown, SessionTimeoutGuard, PresenceIndicator, MobileNav, global-error, public layout, dashboard layout)
+- `as any` casts replaced with `as object` in test files (5 instances)
+
+### Security
+- xlsx package removed — 7 HIGH vulnerabilities eliminated at source
+- Remaining 9 HIGHs documented as non-actionable transitive dependencies (NIST RA-5)
+
 ## [1.6.0] — 2026-02-28 (Production Polish)
 
 ### Added

@@ -27,7 +27,7 @@ export default function PublicLayout({
   }, [pathname])
 
   return (
-    <div className="min-h-screen bg-[#00050F] text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* GA4 — public marketing pages only, not loaded on dashboard */}
       {GA4_ID && (
         <>
@@ -47,10 +47,10 @@ export default function PublicLayout({
       )}
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-gray-800/50 bg-[#00050F]/95 backdrop-blur-sm">
+      <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2">
-            <Zap className="h-6 w-6 text-[#00E5FA]" />
+            <Zap className="h-6 w-6 text-primary" />
             <span className="text-lg font-bold">MissionPulse</span>
           </Link>
 
@@ -62,8 +62,8 @@ export default function PublicLayout({
                 href={link.href}
                 className={`text-sm transition-colors ${
                   pathname === link.href
-                    ? 'text-[#00E5FA]'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {link.label}
@@ -71,13 +71,13 @@ export default function PublicLayout({
             ))}
             <Link
               href="/login"
-              className="text-sm text-gray-400 hover:text-white"
+              className="text-sm text-muted-foreground hover:text-foreground"
             >
               Log In
             </Link>
             <Link
               href="/signup"
-              className="rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] hover:bg-[#00E5FA]/90"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               Start Free Pilot
             </Link>
@@ -90,16 +90,16 @@ export default function PublicLayout({
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? (
-              <X className="h-6 w-6 text-gray-400" />
+              <X className="h-6 w-6 text-muted-foreground" />
             ) : (
-              <Menu className="h-6 w-6 text-gray-400" />
+              <Menu className="h-6 w-6 text-muted-foreground" />
             )}
           </button>
         </div>
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="border-t border-gray-800/50 px-6 py-4 md:hidden">
+          <div className="border-t border-border/50 px-6 py-4 md:hidden">
             <div className="flex flex-col gap-4">
               {NAV_LINKS.map((link) => (
                 <Link
@@ -108,25 +108,25 @@ export default function PublicLayout({
                   onClick={() => setMobileMenuOpen(false)}
                   className={`text-sm ${
                     pathname === link.href
-                      ? 'text-[#00E5FA]'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {link.label}
                 </Link>
               ))}
-              <div className="flex items-center gap-3 border-t border-gray-800/50 pt-4">
+              <div className="flex items-center gap-3 border-t border-border/50 pt-4">
                 <Link
                   href="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-sm text-gray-400 hover:text-white"
+                  className="text-sm text-muted-foreground hover:text-foreground"
                 >
                   Log In
                 </Link>
                 <Link
                   href="/signup"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] hover:bg-[#00E5FA]/90"
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
                   Start Free Pilot
                 </Link>
@@ -140,31 +140,31 @@ export default function PublicLayout({
       {children}
 
       {/* Footer */}
-      <footer className="border-t border-gray-800/50 py-12">
+      <footer className="border-t border-border/50 py-12">
         <div className="mx-auto max-w-7xl px-6">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-[#00E5FA]" />
+              <Zap className="h-5 w-5 text-primary" />
               <span className="font-semibold">MissionPulse</span>
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-muted-foreground">
                 by Mission Meets Tech, LLC
               </span>
             </div>
-            <div className="flex items-center gap-6 text-sm text-gray-500">
-              <Link href="/#features" className="hover:text-gray-300">
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <Link href="/#features" className="hover:text-foreground">
                 Features
               </Link>
-              <Link href="/plans" className="hover:text-gray-300">
+              <Link href="/plans" className="hover:text-foreground">
                 Pricing
               </Link>
-              <Link href="/8a-toolkit" className="hover:text-gray-300">
+              <Link href="/8a-toolkit" className="hover:text-foreground">
                 8(a) Toolkit
               </Link>
-              <Link href="/login" className="hover:text-gray-300">
+              <Link href="/login" className="hover:text-foreground">
                 Log In
               </Link>
             </div>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-muted-foreground">
               &copy; {new Date().getFullYear()} Mission Meets Tech, LLC. All
               rights reserved.
             </p>

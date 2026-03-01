@@ -67,7 +67,7 @@ export function SessionTimeoutGuard({ timeoutSeconds }: SessionTimeoutGuardProps
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70">
-      <div className="mx-4 w-full max-w-sm rounded-xl border border-amber-500/30 bg-gray-900 p-6 shadow-2xl">
+      <div className="mx-4 w-full max-w-sm rounded-xl border border-amber-500/30 bg-card p-6 shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
             <svg className="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -75,8 +75,8 @@ export function SessionTimeoutGuard({ timeoutSeconds }: SessionTimeoutGuardProps
             </svg>
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white">Session Expiring</h3>
-            <p className="text-xs text-gray-400">
+            <h3 className="text-sm font-semibold text-foreground">Session Expiring</h3>
+            <p className="text-xs text-muted-foreground">
               Your session will expire in 2 minutes due to inactivity.
             </p>
           </div>
@@ -84,13 +84,13 @@ export function SessionTimeoutGuard({ timeoutSeconds }: SessionTimeoutGuardProps
         <div className="flex items-center gap-2">
           <button
             onClick={() => resetTimers()}
-            className="flex-1 rounded-lg bg-[#00E5FA] px-4 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90"
+            className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Stay Logged In
           </button>
           <button
             onClick={handleSignOut}
-            className="flex-1 rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+            className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             Sign Out
           </button>

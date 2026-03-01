@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { RBACModule, ModulePermission } from '@/lib/types'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 // ─── Nav Item Config ────────────────────────────────────────────
 // Maps RBAC module keys to display labels, routes, and icons (SVG paths).
@@ -171,10 +172,10 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
       {/* Mobile hamburger button */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-700 bg-[#00050F] lg:hidden"
+        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background lg:hidden"
         aria-label="Open menu"
       >
-        <svg className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+        <svg className="h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
@@ -187,15 +188,15 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
         />
       )}
 
-    <aside className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-gray-800 bg-[#00050F] transition-transform lg:static lg:translate-x-0 ${
+    <aside className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-border bg-background transition-transform lg:static lg:translate-x-0 ${
       mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
     }`}>
       {/* Logo / Brand */}
-      <div className="flex h-16 items-center justify-between border-b border-gray-800 px-5">
+      <div className="flex h-16 items-center justify-between border-b border-border px-5">
         <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00E5FA]/10">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
           <svg
-            className="h-5 w-5 text-[#00E5FA]"
+            className="h-5 w-5 text-primary"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -209,13 +210,13 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             />
           </svg>
         </div>
-        <span className="text-sm font-semibold text-white tracking-wide">
+        <span className="text-sm font-semibold text-foreground tracking-wide">
           MissionPulse
         </span>
         </div>
         <button
           onClick={() => setMobileOpen(false)}
-          className="rounded p-1 text-gray-500 hover:text-gray-200 lg:hidden"
+          className="rounded p-1 text-muted-foreground hover:text-foreground lg:hidden"
           aria-label="Close menu"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -243,14 +244,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
                   <svg
                     className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
@@ -274,7 +275,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
           {/* Secondary (Analysis) section */}
           {secondary.length > 0 && (
             <li className="px-3 py-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Analysis</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Analysis</span>
             </li>
           )}
           {secondary.map((item) => {
@@ -292,14 +293,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
                   <svg
                     className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
@@ -323,7 +324,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
           {/* Resources section — visible if pipeline is visible */}
           {permissions['pipeline']?.shouldRender && (
             <li className="px-3 py-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Resources</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Resources</span>
             </li>
           )}
           {permissions['pipeline']?.shouldRender && [
@@ -346,14 +347,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
                   <svg
                     className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
@@ -372,7 +373,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
           {/* Admin section */}
           {admin.length > 0 && (
             <li className="px-3 py-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Admin</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Admin</span>
             </li>
           )}
           {admin.map((item) => {
@@ -390,14 +391,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
                   <svg
                     className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
@@ -421,7 +422,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
       </nav>
 
       {/* Bottom links — Notifications + Settings */}
-      <div className="border-t border-gray-800 px-3 py-2 space-y-1">
+      <div className="border-t border-border px-3 py-2 space-y-1">
         <Link
           href="/notifications"
           aria-current={pathname === '/notifications' ? 'page' : undefined}
@@ -429,14 +430,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
               pathname === '/notifications'
-                ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             }
           `}
         >
           <svg
             className={`h-5 w-5 flex-shrink-0 ${
-              pathname === '/notifications' ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+              pathname === '/notifications' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
             }`}
             fill="none"
             viewBox="0 0 24 24"
@@ -460,14 +461,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
               pathname === '/settings'
-                ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             }
           `}
         >
           <svg
             className={`h-5 w-5 flex-shrink-0 ${
-              pathname === '/settings' ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+              pathname === '/settings' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
             }`}
             fill="none"
             viewBox="0 0 24 24"
@@ -486,14 +487,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
               pathname === '/help'
-                ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             }
           `}
         >
           <svg
             className={`h-5 w-5 flex-shrink-0 ${
-              pathname === '/help' ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+              pathname === '/help' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
             }`}
             fill="none"
             viewBox="0 0 24 24"
@@ -508,9 +509,9 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
       </div>
 
       {/* User Footer */}
-      <div className="border-t border-gray-800 px-4 py-3">
+      <div className="border-t border-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-700 text-xs font-medium text-gray-300">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-medium text-muted-foreground">
             {userDisplayName
               ? userDisplayName
                   .split(' ')
@@ -521,13 +522,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               : '??'}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-gray-200">
+            <p className="truncate text-sm font-medium text-foreground">
               {userDisplayName ?? 'Unknown User'}
             </p>
-            <p className="truncate text-xs text-gray-500">
+            <p className="truncate text-xs text-muted-foreground">
               {userRole?.replace(/_/g, ' ') ?? 'No role'}
             </p>
           </div>
+          <ThemeToggle />
           <button
             onClick={async () => {
               const supabase = createBrowserClient(
@@ -538,7 +540,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               router.push('/login')
               router.refresh()
             }}
-            className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-red-400"
+            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-400"
             title="Sign out"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">

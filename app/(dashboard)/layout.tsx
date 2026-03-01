@@ -127,7 +127,7 @@ export default async function DashboardLayout({
       <SessionTimeoutGuard timeoutSeconds={sessionTimeout} />
       <GlobalSearch />
       <KeyboardShortcuts />
-      <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
+      <div className="flex h-screen overflow-hidden bg-background text-foreground">
         {/* Watermark overlay for external roles or CUI-forced roles */}
         {(isExternal || forceCUI) && <PartnerWatermark companyName={companyName} />}
 

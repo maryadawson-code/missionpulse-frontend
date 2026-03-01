@@ -22,7 +22,7 @@ export function MobileNav({ children }: MobileNavProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mr-3 rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-gray-200 lg:hidden"
+        className="mr-3 rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground lg:hidden"
         aria-label="Open menu"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">

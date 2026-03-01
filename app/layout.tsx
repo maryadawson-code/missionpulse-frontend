@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ToastContainer } from '@/components/ui/Toast'
 import { WebVitalsReporter } from '@/components/monitoring/WebVitalsReporter'
+import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -49,11 +50,53 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        name: 'MissionPulse',
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web',
+        description:
+          'AI-powered federal proposal management platform. RFP shredding, compliance tracking, pricing analysis, and team collaboration — built for government contractors.',
+        url: 'https://missionpulse.ai',
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'USD',
+          description: 'Free pilot available',
+        },
+        creator: {
+          '@type': 'Organization',
+          name: 'Mission Meets Tech, LLC',
+          url: 'https://missionpulse.ai',
+        },
+      },
+      {
+        '@type': 'Organization',
+        name: 'Mission Meets Tech, LLC',
+        url: 'https://missionpulse.ai',
+        logo: 'https://missionpulse.ai/logo.png',
+        description:
+          'Building AI-powered tools for government contractors to win more federal contracts.',
+      },
+    ],
+  }
+
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-[#00050F] text-white antialiased`}>
-        {children}
-        <ToastContainer />
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
+      <body className={`${inter.className} antialiased`}>
+        <ThemeProvider>
+          {children}
+          <ToastContainer />
+        </ThemeProvider>
         <WebVitalsReporter />
       </body>
     </html>
