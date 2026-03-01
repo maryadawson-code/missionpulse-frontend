@@ -17,12 +17,12 @@ function formatDate(dateStr: string | null): string {
 function statusBadge(status: string | null): string {
   switch (status) {
     case 'approved':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     case 'pending':
     case 'draft':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     case 'rejected':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     default:
       return 'bg-gray-500/20 text-muted-foreground'
   }
@@ -30,8 +30,8 @@ function statusBadge(status: string | null): string {
 
 function priorityBadge(priority: number | null): string {
   const p = priority ?? 3
-  if (p <= 1) return 'text-red-400'
-  if (p <= 2) return 'text-amber-400'
+  if (p <= 1) return 'text-red-600 dark:text-red-400'
+  if (p <= 2) return 'text-amber-600 dark:text-amber-400'
   return 'text-muted-foreground'
 }
 
@@ -95,7 +95,7 @@ export default async function StrategyPage() {
       </div>
 
       {(themesError || discError) && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
           Failed to load strategy data: {themesError?.message ?? discError?.message}
         </div>
       )}

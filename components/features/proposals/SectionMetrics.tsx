@@ -47,7 +47,7 @@ export function SectionMetrics({ content, currentPages, pageLimit }: SectionMetr
             <FileText className="h-3 w-3" />
             Est. Pages
           </span>
-          <span className={`text-sm font-mono ${isOverLimit ? 'text-red-400' : 'text-foreground'}`}>
+          <span className={`text-sm font-mono ${isOverLimit ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
             {estimatedPages}
             {limit > 0 && <span className="text-muted-foreground"> / {limit}</span>}
           </span>
@@ -69,7 +69,7 @@ export function SectionMetrics({ content, currentPages, pageLimit }: SectionMetr
               />
             </div>
             {isOverLimit && (
-              <p className="mt-1 text-[10px] text-red-400 font-medium">
+              <p className="mt-1 text-[10px] text-red-600 dark:text-red-400 font-medium">
                 Over page limit by {estimatedPages - limit} page{estimatedPages - limit !== 1 ? 's' : ''}
               </p>
             )}

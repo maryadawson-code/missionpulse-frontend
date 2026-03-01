@@ -87,7 +87,7 @@ export function AnalyticsDashboard({
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Win Rate
           </p>
-          <p className="mt-2 text-2xl font-bold text-emerald-400">
+          <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
             {kpis.winRate}%
           </p>
           <p className="mt-1 text-xs text-muted-foreground">

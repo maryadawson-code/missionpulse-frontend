@@ -22,17 +22,17 @@ export function ErrorDisplay({ error, reset, context }: ErrorDisplayProps) {
 
   return (
     <div className="flex min-h-[50vh] items-center justify-center">
-      <div className="rounded-lg border border-red-500/30 bg-red-950/20 p-8 max-w-md text-center">
+      <div className="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-950/20 p-8 max-w-md text-center">
         <h2 className="text-lg font-semibold text-foreground mb-2">
           {context ? `Failed to load ${context.replace('loading ', '')}` : 'Error'}
         </h2>
-        <p className="text-sm text-slate-400 mb-6">
+        <p className="text-sm text-muted-foreground mb-6">
           {process.env.NODE_ENV === 'development'
             ? error.message
             : productionMessage}
         </p>
         {process.env.NODE_ENV === 'development' && error.digest && (
-          <p className="text-xs text-slate-500 mb-4 font-mono">
+          <p className="text-xs text-muted-foreground mb-4 font-mono">
             Digest: {error.digest}
           </p>
         )}

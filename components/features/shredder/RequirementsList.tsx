@@ -204,11 +204,11 @@ function RequirementRow({
   const priorityColor = (p: string | null) => {
     switch (p) {
       case 'Critical':
-        return 'text-red-400'
+        return 'text-red-600 dark:text-red-400'
       case 'High':
-        return 'text-amber-400'
+        return 'text-amber-600 dark:text-amber-400'
       case 'Medium':
-        return 'text-blue-400'
+        return 'text-blue-600 dark:text-blue-400'
       case 'Low':
         return 'text-muted-foreground'
       default:

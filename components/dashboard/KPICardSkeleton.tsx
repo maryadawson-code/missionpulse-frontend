@@ -2,9 +2,9 @@
 export function KPICardSkeleton() {
   return (
     <div className="rounded-lg border border-border bg-surface p-6 animate-pulse">
-      <div className="h-4 w-24 rounded bg-slate-700 mb-3" />
-      <div className="h-8 w-32 rounded bg-slate-700 mb-2" />
-      <div className="h-3 w-20 rounded bg-slate-700" />
+      <div className="h-4 w-24 rounded bg-muted mb-3" />
+      <div className="h-8 w-32 rounded bg-muted mb-2" />
+      <div className="h-3 w-20 rounded bg-muted" />
     </div>
   )
 }

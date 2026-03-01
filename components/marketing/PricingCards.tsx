@@ -139,7 +139,7 @@ export function PricingCards() {
           Annual
         </span>
         {isAnnual && (
-          <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+          <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-600 dark:text-green-400">
             Save 17%
           </span>
         )}
@@ -189,7 +189,7 @@ export function PricingCards() {
             )}
 
             {isAnnual && plan.annualPrice < 15000 && (
-              <p className="mt-1 text-xs text-green-400">
+              <p className="mt-1 text-xs text-green-600 dark:text-green-400">
                 Below $15K micro-purchase threshold (FAR 13.2)
               </p>
             )}

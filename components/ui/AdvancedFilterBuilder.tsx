@@ -224,7 +224,7 @@ export function AdvancedFilterBuilder({
                 {/* Remove */}
                 <button
                   onClick={() => removeFilter(filter.id)}
-                  className="p-1 text-muted-foreground hover:text-red-400"
+                  className="p-1 text-muted-foreground hover:text-red-600 dark:text-red-400"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>

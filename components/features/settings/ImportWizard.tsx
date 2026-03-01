@@ -245,7 +245,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
                 step === s || (step === 'importing' && s === 'preview')
                   ? 'bg-primary/10 text-primary'
                   : (['upload', 'mapping', 'preview', 'complete'].indexOf(step === 'importing' ? 'preview' : step) > i)
-                    ? 'bg-emerald-500/10 text-emerald-400'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                     : 'bg-muted text-muted-foreground'
               }`}
             >
@@ -422,19 +422,19 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
               <p className="text-lg font-semibold text-foreground">{validation.summary.total}</p>
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
-            <div className="rounded-lg border border-emerald-900/50 bg-emerald-900/10 p-3 text-center">
-              <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-emerald-400" />
-              <p className="text-lg font-semibold text-emerald-400">{validation.summary.valid}</p>
+            <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/10 p-3 text-center">
+              <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">{validation.summary.valid}</p>
               <p className="text-xs text-muted-foreground">Valid</p>
             </div>
-            <div className="rounded-lg border border-yellow-900/50 bg-yellow-900/10 p-3 text-center">
-              <AlertTriangle className="mx-auto mb-1 h-4 w-4 text-yellow-400" />
-              <p className="text-lg font-semibold text-yellow-400">{validation.summary.warnings}</p>
+            <div className="rounded-lg border border-yellow-200 dark:border-yellow-900/50 bg-yellow-50 dark:bg-yellow-900/10 p-3 text-center">
+              <AlertTriangle className="mx-auto mb-1 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+              <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">{validation.summary.warnings}</p>
               <p className="text-xs text-muted-foreground">Warnings</p>
             </div>
-            <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-3 text-center">
-              <XCircle className="mx-auto mb-1 h-4 w-4 text-red-400" />
-              <p className="text-lg font-semibold text-red-400">{validation.summary.errors}</p>
+            <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 text-center">
+              <XCircle className="mx-auto mb-1 h-4 w-4 text-red-600 dark:text-red-400" />
+              <p className="text-lg font-semibold text-red-600 dark:text-red-400">{validation.summary.errors}</p>
               <p className="text-xs text-muted-foreground">Errors</p>
             </div>
           </div>
@@ -460,13 +460,13 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
                     <td className="px-3 py-2 text-muted-foreground">{record.index + 1}</td>
                     <td className="px-3 py-2">
                       {record.status === 'valid' && (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                       )}
                       {record.status === 'warning' && (
-                        <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />
+                        <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />
                       )}
                       {record.status === 'error' && (
-                        <XCircle className="h-3.5 w-3.5 text-red-400" />
+                        <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                       )}
                     </td>
                     {mappings.map((m) => (
@@ -476,7 +476,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
                     ))}
                     <td className="px-3 py-2">
                       {record.issues.length > 0 && (
-                        <span className={`text-xs ${record.status === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
+                        <span className={`text-xs ${record.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                           {record.issues[0].message}
                           {record.issues.length > 1 && ` (+${record.issues.length - 1})`}
                         </span>
@@ -497,8 +497,8 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
 
       {/* Step 4: Complete */}
       {step === 'complete' && (
-        <div className="rounded-xl border border-emerald-900/50 bg-emerald-900/10 p-8 text-center">
-          <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-400" />
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/10 p-8 text-center">
+          <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-600 dark:text-emerald-400" />
           <h2 className="text-xl font-semibold text-foreground">Import Complete</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Successfully imported {importedCount} {importType} records.
@@ -507,7 +507,7 @@ export function ImportWizard({ userId, companyId }: ImportWizardProps) {
           <div className="mt-6 flex items-center justify-center gap-3">
             <button
               onClick={handleUndo}
-              className="flex items-center gap-1.5 rounded-lg border border-red-900/50 px-4 py-2 text-sm text-red-400 hover:bg-red-900/10"
+              className="flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-900/50 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:bg-red-900/10"
             >
               <Undo2 className="h-4 w-4" />
               Undo Import (24hr window)

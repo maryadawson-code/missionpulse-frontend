@@ -2,12 +2,12 @@ export default function PipelineDetailLoading() {
   return (
     <div className="space-y-6 animate-pulse motion-reduce:animate-none" role="status" aria-busy="true" aria-label="Loading opportunity details">
       <div>
-        <div className="h-7 w-48 rounded bg-slate-700" />
-        <div className="h-4 w-72 rounded bg-slate-700 mt-2" />
+        <div className="h-7 w-48 rounded bg-muted" />
+        <div className="h-4 w-72 rounded bg-muted mt-2" />
       </div>
       <div className="flex gap-2">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-8 w-24 rounded bg-slate-700" />
+          <div key={i} className="h-8 w-24 rounded bg-muted" />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

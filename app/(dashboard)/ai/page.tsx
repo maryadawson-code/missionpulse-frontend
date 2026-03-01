@@ -96,7 +96,7 @@ export default async function AIPage() {
         </div>
         <div className="rounded-xl border border-border bg-card/50 p-5">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Avg Rating</p>
-          <p className="mt-2 text-2xl font-bold text-amber-400">{avgRating}</p>
+          <p className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">{avgRating}</p>
           <p className="mt-1 text-xs text-muted-foreground">{ratedInteractions.length} rated</p>
         </div>
       </div>
@@ -125,7 +125,7 @@ export default async function AIPage() {
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
           Failed to load AI data: {error.message}
         </div>
       )}
@@ -172,7 +172,7 @@ export default async function AIPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       <span className="flex gap-1">
-                        {chat.is_starred && <span title="Starred" className="text-amber-400">&#9733;</span>}
+                        {chat.is_starred && <span title="Starred" className="text-amber-600 dark:text-amber-400">&#9733;</span>}
                         {chat.is_archived && <span title="Archived" className="text-muted-foreground">&#128451;</span>}
                         {!chat.is_starred && !chat.is_archived && '—'}
                       </span>

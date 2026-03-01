@@ -6,13 +6,13 @@ function statusStyle(status: string | null): string {
   switch (status?.toLowerCase()) {
     case 'final':
     case 'submitted':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'review':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'draft':
-      return 'bg-blue-500/15 text-blue-300'
+      return 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -182,10 +182,10 @@ export default async function VolumesPage({
                     <div
                       className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${
                         vol.compliance_score >= 80
-                          ? 'bg-emerald-500/15 text-emerald-300'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                           : vol.compliance_score >= 50
-                            ? 'bg-amber-500/15 text-amber-300'
-                            : 'bg-red-500/15 text-red-300'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                            : 'bg-red-500/15 text-red-700 dark:text-red-300'
                       }`}
                     >
                       {Math.round(vol.compliance_score)}%

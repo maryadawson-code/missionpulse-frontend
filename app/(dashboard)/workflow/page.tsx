@@ -79,16 +79,16 @@ export default async function WorkflowPage() {
           <p className="mt-1 text-xl font-bold text-muted-foreground">{draftCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-card/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-blue-400">In Review</p>
-          <p className="mt-1 text-xl font-bold text-blue-300">{reviewCount}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400">In Review</p>
+          <p className="mt-1 text-xl font-bold text-blue-700 dark:text-blue-300">{reviewCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-card/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-amber-400">Revision</p>
-          <p className="mt-1 text-xl font-bold text-amber-300">{revisionCount}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">Revision</p>
+          <p className="mt-1 text-xl font-bold text-amber-700 dark:text-amber-300">{revisionCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-card/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-emerald-400">Final</p>
-          <p className="mt-1 text-xl font-bold text-emerald-300">{finalCount}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Final</p>
+          <p className="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-300">{finalCount}</p>
         </div>
       </div>
 

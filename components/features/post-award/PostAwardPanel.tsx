@@ -45,10 +45,10 @@ interface PostAwardPanelProps {
 }
 
 const OUTCOMES = [
-  { value: 'won', label: 'Won', icon: Trophy, color: 'text-emerald-400' },
-  { value: 'lost', label: 'Lost', icon: XCircle, color: 'text-red-400' },
+  { value: 'won', label: 'Won', icon: Trophy, color: 'text-emerald-600 dark:text-emerald-400' },
+  { value: 'lost', label: 'Lost', icon: XCircle, color: 'text-red-600 dark:text-red-400' },
   { value: 'no_bid', label: 'No Bid', icon: Ban, color: 'text-gray-400' },
-  { value: 'protest', label: 'Protest', icon: AlertTriangle, color: 'text-amber-400' },
+  { value: 'protest', label: 'Protest', icon: AlertTriangle, color: 'text-amber-600 dark:text-amber-400' },
 ]
 
 export function PostAwardPanel({

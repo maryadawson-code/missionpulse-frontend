@@ -44,11 +44,11 @@ interface ContractScannerProps {
 function riskColor(level: string | null): string {
   switch (level) {
     case 'High':
-      return 'bg-red-500/15 text-red-300 border-red-500/30'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30'
     case 'Medium':
-      return 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
     case 'Low':
-      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
     default:
       return 'bg-muted text-muted-foreground border-border'
   }
@@ -57,11 +57,11 @@ function riskColor(level: string | null): string {
 function complianceColor(status: string | null): string {
   switch (status) {
     case 'Compliant':
-      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
     case 'Review Needed':
-      return 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
     case 'Non-Compliant':
-      return 'bg-red-500/15 text-red-300 border-red-500/30'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30'
     default:
       return 'bg-muted text-muted-foreground border-border'
   }

@@ -109,9 +109,9 @@ function DeadlineRow({ opp }: { opp: Opportunity }) {
           <span
             className={`text-xs font-medium ${
               daysUntil <= 7
-                ? 'text-red-400'
+                ? 'text-red-600 dark:text-red-400'
                 : daysUntil <= 30
-                  ? 'text-amber-400'
+                  ? 'text-amber-600 dark:text-amber-400'
                   : 'text-muted-foreground'
             }`}
           >
@@ -232,11 +232,11 @@ export default async function DashboardPage() {
 
   const moduleShortcuts = [
     { label: 'Swimlane', href: '/pipeline', count: sectionsInReview ?? 0, desc: 'sections in review', iconPath: 'M4 6h16M4 10h16M4 14h16M4 18h16', color: 'text-primary' },
-    { label: 'Compliance', href: '/compliance', count: complianceGaps ?? 0, desc: 'items addressed', iconPath: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', color: 'text-emerald-400' },
-    { label: 'Contracts', href: '/pipeline', count: clausesNeedReview ?? 0, desc: 'need review', iconPath: 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3', color: 'text-amber-400' },
-    { label: 'Documents', href: '/documents', count: docsInReview ?? 0, desc: 'in review', iconPath: 'M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z', color: 'text-blue-400' },
-    { label: 'Notifications', href: '/notifications', count: unreadNotifications ?? 0, desc: 'unread', iconPath: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0', color: 'text-red-400' },
-    { label: 'AI Assistant', href: '/ai-chat', count: null, desc: 'Ask questions', iconPath: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', color: 'text-purple-400' },
+    { label: 'Compliance', href: '/compliance', count: complianceGaps ?? 0, desc: 'items addressed', iconPath: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', color: 'text-emerald-600 dark:text-emerald-400' },
+    { label: 'Contracts', href: '/pipeline', count: clausesNeedReview ?? 0, desc: 'need review', iconPath: 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3', color: 'text-amber-600 dark:text-amber-400' },
+    { label: 'Documents', href: '/documents', count: docsInReview ?? 0, desc: 'in review', iconPath: 'M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z', color: 'text-blue-600 dark:text-blue-400' },
+    { label: 'Notifications', href: '/notifications', count: unreadNotifications ?? 0, desc: 'unread', iconPath: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0', color: 'text-red-600 dark:text-red-400' },
+    { label: 'AI Assistant', href: '/ai-chat', count: null, desc: 'Ask questions', iconPath: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', color: 'text-purple-600 dark:text-purple-400' },
   ]
 
   // ─── Compute KPIs ───────────────────────────────────────────
@@ -426,7 +426,7 @@ export default async function DashboardPage() {
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
           Failed to load dashboard data: {error.message}
         </div>
       )}

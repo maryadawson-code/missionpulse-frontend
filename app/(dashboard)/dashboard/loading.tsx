@@ -2,8 +2,8 @@ export default function DashboardPageLoading() {
   return (
     <div className="space-y-8 animate-pulse motion-reduce:animate-none" role="status" aria-busy="true" aria-label="Loading dashboard">
       <div>
-        <div className="h-7 w-56 rounded bg-slate-700" />
-        <div className="h-4 w-40 rounded bg-slate-700 mt-2" />
+        <div className="h-7 w-56 rounded bg-muted" />
+        <div className="h-4 w-40 rounded bg-muted mt-2" />
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (

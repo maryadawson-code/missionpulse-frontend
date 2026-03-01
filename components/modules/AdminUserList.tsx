@@ -129,7 +129,7 @@ export function AdminUserList({ users }: AdminUserListProps) {
                     <span
                       className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${
                         u.status === 'active'
-                          ? 'bg-emerald-500/20 text-emerald-300'
+                          ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                           : 'bg-muted/20 text-muted-foreground'
                       }`}
                     >

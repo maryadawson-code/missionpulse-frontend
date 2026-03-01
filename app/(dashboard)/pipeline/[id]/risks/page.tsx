@@ -15,15 +15,15 @@ function impactStyle(impact: string | null): string {
   switch (impact?.toLowerCase()) {
     case 'critical':
     case 'very high':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     case 'high':
-      return 'bg-orange-500/15 text-orange-300'
+      return 'bg-orange-500/15 text-orange-700 dark:text-orange-300'
     case 'medium':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'low':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -32,14 +32,14 @@ function statusStyle(status: string | null): string {
     case 'mitigated':
     case 'resolved':
     case 'closed':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'active':
     case 'open':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     case 'monitoring':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -138,13 +138,13 @@ export default async function RisksPage({
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Active</p>
-          <p className="mt-1 text-lg font-bold text-red-400">
+          <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">
             {activeRisks.length}
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">High/Critical</p>
-          <p className="mt-1 text-lg font-bold text-amber-400">
+          <p className="mt-1 text-lg font-bold text-amber-600 dark:text-amber-400">
             {highRisks.length}
           </p>
         </div>
@@ -206,10 +206,10 @@ export default async function RisksPage({
                     <div
                       className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${
                         risk.risk_score >= 15
-                          ? 'bg-red-500/15 text-red-300'
+                          ? 'bg-red-500/15 text-red-700 dark:text-red-300'
                           : risk.risk_score >= 8
-                            ? 'bg-amber-500/15 text-amber-300'
-                            : 'bg-emerald-500/15 text-emerald-300'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                            : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                       }`}
                     >
                       {risk.risk_score}

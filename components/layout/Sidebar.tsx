@@ -132,8 +132,8 @@ const ADMIN_MODULES = ['admin', 'integrations', 'audit_log']
 
 // ─── CUI / Sensitivity Badges ───────────────────────────────────
 const CUI_BADGES: Record<string, { label: string; color: string }> = {
-  pricing: { label: 'CUI', color: 'bg-amber-500/20 text-amber-400' },
-  blackhat: { label: 'Private', color: 'bg-red-500/20 text-red-400' },
+  pricing: { label: 'CUI', color: 'bg-amber-500/20 text-amber-600 dark:text-amber-400' },
+  blackhat: { label: 'Private', color: 'bg-red-500/20 text-red-600 dark:text-red-400' },
 }
 
 // ─── Props ──────────────────────────────────────────────────────
@@ -540,7 +540,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               router.push('/login')
               router.refresh()
             }}
-            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-400"
+            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600 dark:text-red-400"
             title="Sign out"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">

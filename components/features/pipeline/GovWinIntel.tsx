@@ -92,7 +92,7 @@ export function GovWinIntel({
                   <Users className="h-3 w-3 text-muted-foreground" />
                   <span className="text-xs text-foreground">{comp.name}</span>
                   {comp.isIncumbent && (
-                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-400">
+                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
                       INCUMBENT
                     </span>
                   )}

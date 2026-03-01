@@ -128,7 +128,7 @@ export function IntegrationCards({ integrations }: IntegrationCardsProps) {
               </div>
               <div className="flex items-center gap-1.5">
                 <div
-                  className={`h-2 w-2 rounded-full ${connected ? statusIndicator(connected.status) : 'bg-gray-600'}`}
+                  className={`h-2 w-2 rounded-full ${connected ? statusIndicator(connected.status) : 'bg-gray-200 dark:bg-gray-600'}`}
                 />
                 <span className="text-[10px] text-muted-foreground">
                   {isConnected
@@ -157,7 +157,7 @@ export function IntegrationCards({ integrations }: IntegrationCardsProps) {
             )}
 
             {connected?.error_message && (
-              <p className="text-[10px] text-red-400 truncate" title={connected.error_message}>
+              <p className="text-[10px] text-red-600 dark:text-red-400 truncate" title={connected.error_message}>
                 {connected.error_message}
               </p>
             )}

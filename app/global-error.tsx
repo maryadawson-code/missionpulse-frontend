@@ -15,11 +15,11 @@ export default function GlobalError({
   }, [error])
 
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="bg-background text-foreground antialiased">
         <div className="flex min-h-screen items-center justify-center p-8">
           <div className="text-center space-y-4">
-            <h1 className="text-4xl font-bold text-red-400">
+            <h1 className="text-4xl font-bold text-red-600 dark:text-red-400">
               Something Went Wrong
             </h1>
             <p className="text-muted-foreground max-w-md mx-auto">

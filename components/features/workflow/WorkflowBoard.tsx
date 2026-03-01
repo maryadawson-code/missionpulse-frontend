@@ -46,8 +46,8 @@ function daysUntil(dateStr: string | null): string {
 function dueColor(dateStr: string | null): string {
   if (!dateStr) return 'text-muted-foreground'
   const diff = Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-  if (diff < 0) return 'text-red-400'
-  if (diff <= 3) return 'text-amber-400'
+  if (diff < 0) return 'text-red-600 dark:text-red-400'
+  if (diff <= 3) return 'text-amber-600 dark:text-amber-400'
   return 'text-muted-foreground'
 }
 

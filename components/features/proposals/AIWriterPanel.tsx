@@ -170,7 +170,7 @@ export function AIWriterPanel({
 
       {acceptedParagraphs.length > 0 && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-          <h4 className="mb-2 text-xs font-semibold text-emerald-400">
+          <h4 className="mb-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
             Accepted Content ({acceptedParagraphs.length} paragraph
             {acceptedParagraphs.length !== 1 ? 's' : ''})
           </h4>

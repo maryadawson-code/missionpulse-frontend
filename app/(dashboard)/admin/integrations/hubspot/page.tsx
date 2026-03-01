@@ -57,17 +57,17 @@ export default async function HubSpotMappingsPage() {
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Active</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">
             {activeMappings}
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Inbound</p>
-          <p className="mt-1 text-lg font-bold text-blue-400">{inbound}</p>
+          <p className="mt-1 text-lg font-bold text-blue-600 dark:text-blue-400">{inbound}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Outbound</p>
-          <p className="mt-1 text-lg font-bold text-amber-400">{outbound}</p>
+          <p className="mt-1 text-lg font-bold text-amber-600 dark:text-amber-400">{outbound}</p>
         </div>
       </div>
 
@@ -117,10 +117,10 @@ export default async function HubSpotMappingsPage() {
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
                           m.direction === 'inbound'
-                            ? 'bg-blue-500/15 text-blue-300'
+                            ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
                             : m.direction === 'outbound'
-                              ? 'bg-amber-500/15 text-amber-300'
-                              : 'bg-emerald-500/15 text-emerald-300'
+                              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                         }`}
                       >
                         {m.direction === 'inbound'
@@ -178,7 +178,7 @@ export default async function HubSpotMappingsPage() {
                       {log.sync_direction ?? 'Sync'}
                     </p>
                     {log.error_message && (
-                      <p className="text-[10px] text-red-400">
+                      <p className="text-[10px] text-red-600 dark:text-red-400">
                         {log.error_message}
                       </p>
                     )}

@@ -12,9 +12,9 @@ interface TeamWorkloadHeatmapProps {
 }
 
 function utilizationColor(pct: number): string {
-  if (pct >= 80) return 'bg-red-500/30 text-red-300'
-  if (pct >= 50) return 'bg-amber-500/30 text-amber-300'
-  if (pct > 0) return 'bg-emerald-500/30 text-emerald-300'
+  if (pct >= 80) return 'bg-red-500/30 text-red-700 dark:text-red-300'
+  if (pct >= 50) return 'bg-amber-500/30 text-amber-700 dark:text-amber-300'
+  if (pct > 0) return 'bg-emerald-500/30 text-emerald-700 dark:text-emerald-300'
   return 'bg-muted/50 text-muted-foreground'
 }
 
@@ -60,7 +60,7 @@ export function TeamWorkloadHeatmap({ members }: TeamWorkloadHeatmapProps) {
                 <td className="px-4 py-2.5 text-center text-sm text-muted-foreground">
                   {m.assignedOpps}
                 </td>
-                <td className="px-4 py-2.5 text-center text-sm text-amber-400">
+                <td className="px-4 py-2.5 text-center text-sm text-amber-600 dark:text-amber-400">
                   {m.sectionsInProgress}
                 </td>
                 <td className="px-4 py-2.5 text-center text-sm text-muted-foreground">

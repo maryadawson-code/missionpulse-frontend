@@ -31,8 +31,8 @@ export function DangerZone({ opportunityId, opportunityTitle }: DangerZoneProps)
   }
 
   return (
-    <div className="rounded-xl border border-red-900/50 bg-red-950/10 p-6">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-red-400">
+    <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/10 p-6">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">
         Danger Zone
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -43,13 +43,13 @@ export function DangerZone({ opportunityId, opportunityTitle }: DangerZoneProps)
         {!confirmOpen ? (
           <button
             onClick={() => setConfirmOpen(true)}
-            className="rounded-lg border border-red-800 bg-red-950/50 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
+            className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-700 dark:text-red-300"
           >
             Delete Opportunity
           </button>
         ) : (
-          <div className="space-y-3 rounded-lg border border-red-800 bg-red-950/30 p-4">
-            <p className="text-sm text-red-300">
+          <div className="space-y-3 rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4">
+            <p className="text-sm text-red-700 dark:text-red-300">
               This will permanently delete <strong>&quot;{opportunityTitle}&quot;</strong> and all
               associated sections, documents, and assignments.
             </p>
@@ -60,7 +60,7 @@ export function DangerZone({ opportunityId, opportunityTitle }: DangerZoneProps)
               type="text"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
-              className="w-full rounded-md border border-red-800 bg-red-950/50 px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-red-600"
+              className="w-full rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-red-600"
               placeholder="delete"
               autoFocus
             />

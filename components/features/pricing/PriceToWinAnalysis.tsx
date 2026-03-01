@@ -26,9 +26,9 @@ function formatCurrency(value: number | null): string {
 
 function probabilityColor(pct: number | null): string {
   if (pct === null) return 'text-muted-foreground'
-  if (pct >= 60) return 'text-emerald-400'
-  if (pct >= 40) return 'text-amber-400'
-  return 'text-red-400'
+  if (pct >= 60) return 'text-emerald-600 dark:text-emerald-400'
+  if (pct >= 40) return 'text-amber-600 dark:text-amber-400'
+  return 'text-red-600 dark:text-red-400'
 }
 
 const DEFAULT_SCENARIOS: Scenario[] = [
@@ -111,10 +111,10 @@ export function PriceToWinAnalysis({
                 <Icon
                   className={`h-4 w-4 ${
                     idx === 0
-                      ? 'text-emerald-400'
+                      ? 'text-emerald-600 dark:text-emerald-400'
                       : idx === 2
-                      ? 'text-red-400'
-                      : 'text-amber-400'
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-amber-600 dark:text-amber-400'
                   }`}
                 />
               </div>

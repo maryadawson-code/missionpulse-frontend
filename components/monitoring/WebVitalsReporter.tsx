@@ -9,9 +9,9 @@ import {
 } from '@/lib/monitoring/web-vitals'
 
 const RATING_COLORS: Record<string, string> = {
-  good: 'text-emerald-400',
-  'needs-improvement': 'text-amber-400',
-  poor: 'text-red-400',
+  good: 'text-emerald-600 dark:text-emerald-400',
+  'needs-improvement': 'text-amber-600 dark:text-amber-400',
+  poor: 'text-red-600 dark:text-red-400',
 }
 
 function formatValue(name: string, value: number): string {

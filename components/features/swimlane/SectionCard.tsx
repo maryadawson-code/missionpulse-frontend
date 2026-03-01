@@ -35,13 +35,13 @@ function formatDate(dateStr: string | null): string {
 function volumeColor(volume: string | null): string {
   switch (volume) {
     case 'Technical':
-      return 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+      return 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30'
     case 'Management':
-      return 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+      return 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
     case 'Past Performance':
-      return 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
     case 'Cost':
-      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
     default:
       return 'bg-muted text-muted-foreground'
   }

@@ -120,7 +120,7 @@ export function SectionLockControl({
 
   if (lockStatus.locked) {
     return (
-      <div className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
+      <div className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
         <Lock className="h-3.5 w-3.5" />
         Locked by {lockStatus.lockedBy}
       </div>

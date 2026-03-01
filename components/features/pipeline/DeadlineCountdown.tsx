@@ -30,12 +30,12 @@ export function DeadlineCountdown({ targetDate }: DeadlineCountdownProps) {
 
   // Color: green >7d, amber 2-7d, red <2d, pulsing red overdue
   const colorClass = overdue
-    ? 'text-red-400 animate-pulse'
+    ? 'text-red-600 dark:text-red-400 animate-pulse'
     : days >= 7
-      ? 'text-emerald-400'
+      ? 'text-emerald-600 dark:text-emerald-400'
       : days >= 2
-        ? 'text-amber-400'
-        : 'text-red-400'
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-red-600 dark:text-red-400'
 
   return (
     <div className="flex items-center gap-2">

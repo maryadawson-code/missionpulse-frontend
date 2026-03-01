@@ -35,28 +35,28 @@ const STATUS_MAP: Record<SyncStatus, StatusConfig> = {
   synced: {
     label: 'Synced',
     icon: Check,
-    style: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+    style: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
   },
   syncing: {
     label: 'Syncing',
     icon: Loader2,
-    style: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+    style: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
     iconClass: 'animate-spin',
   },
   conflict: {
     label: 'Conflict',
     icon: AlertTriangle,
-    style: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    style: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
   },
   error: {
     label: 'Error',
     icon: XCircle,
-    style: 'bg-red-500/15 text-red-300 border-red-500/30',
+    style: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',
   },
   idle: {
     label: 'Not Synced',
     icon: CloudOff,
-    style: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+    style: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30',
   },
 }
 

@@ -156,7 +156,7 @@ export function WorkBreakdownMatrix({
         <span className="h-3 w-px bg-border" />
         <span>{assigned} assigned</span>
         <span className="h-3 w-px bg-border" />
-        <span className="text-emerald-400">{completed} complete</span>
+        <span className="text-emerald-600 dark:text-emerald-400">{completed} complete</span>
       </div>
     )
   }

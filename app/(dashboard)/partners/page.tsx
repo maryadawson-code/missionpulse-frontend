@@ -6,15 +6,15 @@ function statusStyle(status: string | null): string {
   switch (status?.toLowerCase()) {
     case 'executed':
     case 'active':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'pending':
     case 'draft':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'expired':
     case 'terminated':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -84,11 +84,11 @@ export default async function PartnersPage() {
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Executed</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">{executed}</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{executed}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Pending</p>
-          <p className="mt-1 text-lg font-bold text-amber-400">
+          <p className="mt-1 text-lg font-bold text-amber-600 dark:text-amber-400">
             {agreementItems.filter(
               (a) => a.status === 'pending' || a.status === 'draft'
             ).length}

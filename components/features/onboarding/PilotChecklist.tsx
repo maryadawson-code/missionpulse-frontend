@@ -64,7 +64,7 @@ export function PilotChecklist({ companyId }: PilotChecklistProps) {
             href={step.href}
             className={`flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors ${
               step.completed
-                ? 'bg-green-900/10'
+                ? 'bg-green-50 dark:bg-green-900/10'
                 : 'bg-background/50 hover:bg-border/50'
             }`}
           >
@@ -78,7 +78,7 @@ export function PilotChecklist({ companyId }: PilotChecklistProps) {
             >
               {step.completed && (
                 <svg
-                  className="h-3 w-3 text-green-400"
+                  className="h-3 w-3 text-green-600 dark:text-green-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

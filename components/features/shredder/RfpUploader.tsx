@@ -3,7 +3,7 @@
 import { useCallback, useState, useRef } from 'react'
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
-import { uploadAndParseRfp } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
+import { uploadAndParseRfp, uploadAndParseZip } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
 import { addToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +16,8 @@ const ACCEPTED_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/msword',
   'text/plain',
+  'application/zip',
+  'application/x-zip-compressed',
 ]
 
 interface FileStatus {
@@ -53,26 +55,50 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         validFiles.map((f) => ({ name: f.name, status: 'uploading' }))
       )
 
+      let totalProcessed = 0
+
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i]
-        const formData = new FormData()
-        formData.append('file', file)
+        const isZip = file.type === 'application/zip' || file.type === 'application/x-zip-compressed' || file.name.endsWith('.zip')
 
         try {
-          const result = await uploadAndParseRfp(opportunityId, formData)
-          setFileStatuses((prev) =>
-            prev.map((s, idx) =>
-              idx === i
-                ? {
-                    ...s,
-                    status: result.success ? 'success' : 'error',
-                    message: result.success
-                      ? 'Parsed successfully'
-                      : result.error ?? 'Upload failed',
-                  }
-                : s
+          if (isZip) {
+            const formData = new FormData()
+            formData.append('file', file)
+            const result = await uploadAndParseZip(opportunityId, formData)
+            setFileStatuses((prev) =>
+              prev.map((s, idx) =>
+                idx === i
+                  ? {
+                      ...s,
+                      status: result.success ? 'success' : 'error',
+                      message: result.success
+                        ? `Extracted ${result.data?.count ?? 0} document${(result.data?.count ?? 0) !== 1 ? 's' : ''}`
+                        : result.error ?? 'ZIP processing failed',
+                    }
+                  : s
+              )
             )
-          )
+            if (result.success) totalProcessed += result.data?.count ?? 0
+          } else {
+            const formData = new FormData()
+            formData.append('file', file)
+            const result = await uploadAndParseRfp(opportunityId, formData)
+            setFileStatuses((prev) =>
+              prev.map((s, idx) =>
+                idx === i
+                  ? {
+                      ...s,
+                      status: result.success ? 'success' : 'error',
+                      message: result.success
+                        ? 'Parsed successfully'
+                        : result.error ?? 'Upload failed',
+                    }
+                  : s
+              )
+            )
+            if (result.success) totalProcessed++
+          }
         } catch {
           setFileStatuses((prev) =>
             prev.map((s, idx) =>
@@ -84,8 +110,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         }
       }
 
-      const successCount = validFiles.length
-      addToast('success', `Processed ${successCount} file${successCount > 1 ? 's' : ''}`)
+      addToast('success', `Processed ${totalProcessed} document${totalProcessed !== 1 ? 's' : ''}`)
       setIsUploading(false)
       if (inputRef.current) inputRef.current.value = ''
     },
@@ -140,7 +165,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.docx,.doc,.txt"
+          accept=".pdf,.docx,.doc,.txt,.zip"
           multiple
           onChange={handleInputChange}
           className="hidden"
@@ -172,7 +197,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
                   : 'Upload RFP Documents'}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                PDF, Word, or text files. Max 50MB each. Multiple files supported.
+                PDF, Word, text, or ZIP files (SAM.gov packages). Max 50MB each.
               </p>
             </div>
           </div>
@@ -191,10 +216,10 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
                 <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
               )}
               {fs.status === 'success' && (
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               )}
               {fs.status === 'error' && (
-                <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
               )}
               <span className="truncate text-foreground">{fs.name}</span>
               {fs.message && (

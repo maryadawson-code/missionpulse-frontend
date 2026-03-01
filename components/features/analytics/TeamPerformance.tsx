@@ -25,14 +25,14 @@ export function TeamPerformance({ members, avgCycleTime }: TeamPerformanceProps)
           <p className="text-[10px] text-muted-foreground">Team Members</p>
         </div>
         <div className="rounded-lg border border-border bg-muted/20 p-3 text-center">
-          <Clock className="mx-auto h-4 w-4 text-amber-400" />
+          <Clock className="mx-auto h-4 w-4 text-amber-600 dark:text-amber-400" />
           <p className="mt-1 text-lg font-bold text-foreground">
             {avgCycleTime !== null ? `${avgCycleTime}d` : '—'}
           </p>
           <p className="text-[10px] text-muted-foreground">Avg Cycle Time</p>
         </div>
         <div className="rounded-lg border border-border bg-muted/20 p-3 text-center">
-          <TrendingUp className="mx-auto h-4 w-4 text-emerald-400" />
+          <TrendingUp className="mx-auto h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           <p className="mt-1 text-lg font-bold text-foreground">
             {members.reduce((sum, m) => sum + m.activeOpps, 0)}
           </p>
@@ -87,9 +87,9 @@ export function TeamPerformance({ members, avgCycleTime }: TeamPerformanceProps)
                       <span
                         className={`text-sm font-medium ${
                           (m.winRate ?? 0) >= 50
-                            ? 'text-emerald-400'
+                            ? 'text-emerald-600 dark:text-emerald-400'
                             : (m.winRate ?? 0) >= 30
-                            ? 'text-amber-400'
+                            ? 'text-amber-600 dark:text-amber-400'
                             : 'text-muted-foreground'
                         }`}
                       >

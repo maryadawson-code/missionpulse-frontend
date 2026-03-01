@@ -124,7 +124,7 @@ export default function MFAPage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-900/50 bg-red-950/30 p-3 text-sm text-red-400">
+          <div className="mb-4 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-600 dark:text-red-400">
             {error}
           </div>
         )}
@@ -184,7 +184,7 @@ export default function MFAPage() {
               </ol>
             </div>
 
-            <p className="text-xs text-amber-400">
+            <p className="text-xs text-amber-600 dark:text-amber-400">
               MFA is required for accessing CUI-protected modules (Pricing, Strategy, Black Hat).
             </p>
 
@@ -228,7 +228,7 @@ export default function MFAPage() {
                     className="shrink-0 text-muted-foreground hover:text-foreground"
                   >
                     {copied ? (
-                      <Check className="h-4 w-4 text-emerald-400" />
+                      <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}

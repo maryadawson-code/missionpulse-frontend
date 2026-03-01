@@ -117,14 +117,14 @@ export function TokenGauge({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Remaining</p>
-            <p className="text-lg font-semibold text-emerald-400">
+            <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
               {formatTokens(remaining)}
             </p>
           </div>
           {purchased > 0 && (
             <div>
               <p className="text-xs text-muted-foreground">Purchased (add-on)</p>
-              <p className="text-sm font-medium text-cyan-400">
+              <p className="text-sm font-medium text-cyan-600 dark:text-cyan-400">
                 +{formatTokens(purchased)}
               </p>
             </div>

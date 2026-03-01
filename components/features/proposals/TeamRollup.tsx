@@ -71,16 +71,16 @@ function formatDeadlineShort(deadline: string | null): { label: string; urgency:
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
 
   if (diffDays < 0) {
-    return { label: `${Math.abs(diffDays)}d overdue`, urgency: 'text-red-400' }
+    return { label: `${Math.abs(diffDays)}d overdue`, urgency: 'text-red-600 dark:text-red-400' }
   }
   if (diffDays === 0) {
-    return { label: 'Due today', urgency: 'text-red-400' }
+    return { label: 'Due today', urgency: 'text-red-600 dark:text-red-400' }
   }
   if (diffDays <= 3) {
-    return { label: `${diffDays}d left`, urgency: 'text-amber-400' }
+    return { label: `${diffDays}d left`, urgency: 'text-amber-600 dark:text-amber-400' }
   }
   if (diffDays <= 7) {
-    return { label: `${diffDays}d left`, urgency: 'text-yellow-300' }
+    return { label: `${diffDays}d left`, urgency: 'text-yellow-700 dark:text-yellow-300' }
   }
   return { label: `${diffDays}d left`, urgency: 'text-muted-foreground' }
 }
@@ -214,22 +214,22 @@ export function TeamRollup({ assignments, teamMembers, sections: _sections }: Te
             {/* Status breakdown */}
             <div className="mt-3 flex flex-wrap gap-1.5">
               {summary.assignedCount > 0 && (
-                <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-300">
+                <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
                   {summary.assignedCount} assigned
                 </span>
               )}
               {summary.inProgressCount > 0 && (
-                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
                   {summary.inProgressCount} in progress
                 </span>
               )}
               {summary.reviewCount > 0 && (
-                <span className="inline-flex items-center rounded-full border border-purple-500/30 bg-purple-500/15 px-2 py-0.5 text-[10px] font-medium text-purple-300">
+                <span className="inline-flex items-center rounded-full border border-purple-500/30 bg-purple-500/15 px-2 py-0.5 text-[10px] font-medium text-purple-700 dark:text-purple-300">
                   {summary.reviewCount} review
                 </span>
               )}
               {summary.completeCount > 0 && (
-                <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
                   {summary.completeCount} complete
                 </span>
               )}

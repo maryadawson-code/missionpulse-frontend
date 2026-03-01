@@ -42,13 +42,13 @@ export function GoogleConfig({
               }`}
             >
               <Cloud
-                className={`h-5 w-5 ${isConnected ? 'text-emerald-400' : 'text-muted-foreground'}`}
+                className={`h-5 w-5 ${isConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}
               />
             </div>
             <div>
               <h2 className="font-semibold text-foreground">Google Workspace</h2>
               {isConnected ? (
-                <p className="text-sm text-emerald-400">
+                <p className="text-sm text-emerald-600 dark:text-emerald-400">
                   Connected as {userName ?? userEmail ?? 'Google User'}
                 </p>
               ) : (
@@ -59,7 +59,7 @@ export function GoogleConfig({
 
           <div className="flex items-center gap-3">
             {isConnected ? (
-              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             ) : (
               <XCircle className="h-5 w-5 text-muted-foreground" />
             )}

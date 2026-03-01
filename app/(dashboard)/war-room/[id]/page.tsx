@@ -134,11 +134,11 @@ export default async function WarRoomPage({ params }: WarRoomPageProps) {
   function statusColor(status: string | null): string {
     switch (status) {
       case 'Won':
-        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+        return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
       case 'Lost':
-        return 'bg-red-500/20 text-red-300 border-red-500/30'
+        return 'bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30'
       case 'No-Bid':
-        return 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+        return 'bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-500/30'
       default:
         return 'bg-cyan/10 text-cyan border-cyan/30'
     }

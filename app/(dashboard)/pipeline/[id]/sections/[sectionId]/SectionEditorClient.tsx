@@ -107,7 +107,7 @@ export function SectionEditorClient({
             className="w-full min-h-[400px] resize-y rounded-lg border border-border bg-card px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
           {content !== initialContent && (
-            <p className="mt-2 text-xs text-amber-400">Unsaved changes</p>
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Unsaved changes</p>
           )}
         </div>
 

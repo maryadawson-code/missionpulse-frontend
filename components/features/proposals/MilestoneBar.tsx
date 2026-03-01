@@ -103,7 +103,7 @@ export function MilestoneBar({ milestone }: MilestoneBarProps) {
             </span>
           )}
           {isOverdue && (
-            <span className="font-medium text-red-400">
+            <span className="font-medium text-red-600 dark:text-red-400">
               Overdue
             </span>
           )}

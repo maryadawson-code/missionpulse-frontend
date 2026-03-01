@@ -138,7 +138,7 @@ export function ProviderConfig() {
                       {p.name}
                     </h3>
                     {p.fedRamp && (
-                      <span className="rounded bg-green-900/30 px-2 py-0.5 text-[10px] font-medium text-green-400">
+                      <span className="rounded bg-green-900/30 px-2 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
                         FedRAMP
                       </span>
                     )}
@@ -148,7 +148,7 @@ export function ProviderConfig() {
                       </span>
                     )}
                     {p.isFallback && (
-                      <span className="rounded bg-yellow-900/30 px-2 py-0.5 text-[10px] font-medium text-yellow-400">
+                      <span className="rounded bg-yellow-900/30 px-2 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-400">
                         Fallback
                       </span>
                     )}
@@ -226,10 +226,10 @@ export function ProviderConfig() {
 
               {/* Configuration hint */}
               {!p.configured && (
-                <div className="mt-4 rounded bg-yellow-900/10 px-3 py-2">
-                  <p className="text-xs text-yellow-400/80">
+                <div className="mt-4 rounded bg-yellow-50 dark:bg-yellow-900/10 px-3 py-2">
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400/80">
                     Set{' '}
-                    <code className="text-yellow-400">
+                    <code className="text-yellow-600 dark:text-yellow-400">
                       {p.id === 'asksage'
                         ? 'ASKSAGE_API_KEY'
                         : p.id === 'anthropic'
@@ -279,7 +279,7 @@ export function ProviderConfig() {
               id="fallback-provider"
               value={selectedFallback}
               onChange={(e) => setSelectedFallback(e.target.value as ProviderId)}
-              className="rounded border border-border bg-card px-2 py-1 text-xs text-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+              className="rounded border border-border bg-card px-2 py-1 text-xs text-yellow-600 dark:text-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400"
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id} disabled={!p.configured || p.id === selectedPrimary}>
@@ -297,7 +297,7 @@ export function ProviderConfig() {
           </button>
           {configMessage && (
             <p
-              className={`text-xs ${configMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}
+              className={`text-xs ${configMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
             >
               {configMessage.text}
             </p>

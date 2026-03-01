@@ -6,17 +6,17 @@ function decisionStyle(decision: string | null): string {
   switch (decision?.toLowerCase()) {
     case 'go':
     case 'approved':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'conditional':
     case 'conditional_go':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'no_go':
     case 'rejected':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     case 'pending':
-      return 'bg-blue-500/15 text-blue-300'
+      return 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -100,11 +100,11 @@ export default async function GateReviewsPage({
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Go Decisions</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">{goCount}</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{goCount}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">No-Go</p>
-          <p className="mt-1 text-lg font-bold text-red-400">{noGoCount}</p>
+          <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">{noGoCount}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Latest pWin</p>
@@ -132,13 +132,13 @@ export default async function GateReviewsPage({
                 <div
                   className={`relative z-10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${
                     review.decision === 'go' || review.decision === 'approved'
-                      ? 'border-emerald-500 bg-emerald-500/15 text-emerald-300'
+                      ? 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                       : review.decision === 'no_go' ||
                           review.decision === 'rejected'
-                        ? 'border-red-500 bg-red-500/15 text-red-300'
+                        ? 'border-red-500 bg-red-500/15 text-red-700 dark:text-red-300'
                         : review.decision === 'conditional' ||
                             review.decision === 'conditional_go'
-                          ? 'border-amber-500 bg-amber-500/15 text-amber-300'
+                          ? 'border-amber-500 bg-amber-500/15 text-amber-700 dark:text-amber-300'
                           : 'border-gray-600 bg-muted text-muted-foreground'
                   }`}
                 >
@@ -220,10 +220,10 @@ export default async function GateReviewsPage({
                                   <span
                                     className={`rounded-full px-1.5 py-0.5 text-[10px] ${
                                       c.status === 'resolved'
-                                        ? 'bg-emerald-500/15 text-emerald-300'
+                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                                         : c.status === 'open'
-                                          ? 'bg-red-500/15 text-red-300'
-                                          : 'bg-slate-500/15 text-slate-300'
+                                          ? 'bg-red-500/15 text-red-700 dark:text-red-300'
+                                          : 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
                                     }`}
                                   >
                                     {c.status}
@@ -232,12 +232,12 @@ export default async function GateReviewsPage({
                               </div>
                             </div>
                             {c.recommendation && (
-                              <p className="text-[10px] text-emerald-400/80">
+                              <p className="text-[10px] text-emerald-600 dark:text-emerald-400/80">
                                 Rec: {c.recommendation}
                               </p>
                             )}
                             {c.response && (
-                              <p className="text-[10px] text-blue-300/80">
+                              <p className="text-[10px] text-blue-700 dark:text-blue-300/80">
                                 Response: {c.response}
                               </p>
                             )}

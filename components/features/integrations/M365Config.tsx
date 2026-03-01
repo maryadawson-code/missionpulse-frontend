@@ -76,7 +76,7 @@ export function M365Config({
                 {testStatus === 'testing' ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : testStatus === 'success' ? (
-                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                 ) : null}
                 Test
               </Button>
@@ -110,7 +110,7 @@ export function M365Config({
         )}
 
         {errorMessage && (
-          <p className="text-xs text-red-400 mt-2">Error: {errorMessage}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
         )}
 
         {!isConnected && (

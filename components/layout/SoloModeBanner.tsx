@@ -36,12 +36,12 @@ export function AIConfidenceWarning({
   return (
     <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 space-y-1">
       <div className="flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-amber-400" />
-        <span className="text-sm font-medium text-amber-300">
+        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
           Low AI Confidence: {confidence}%
         </span>
       </div>
-      <p className="text-xs text-amber-300/80">
+      <p className="text-xs text-amber-700 dark:text-amber-300/80">
         AI confidence is below 70%. Review these suggestions carefully before
         accepting. In Solo Mode, there is no second reviewer — you are the
         final authority.
@@ -49,7 +49,7 @@ export function AIConfidenceWarning({
       {riskFactors.length > 0 && (
         <ul className="mt-1 space-y-0.5">
           {riskFactors.map((rf, i) => (
-            <li key={i} className="text-xs text-amber-300/70">
+            <li key={i} className="text-xs text-amber-700 dark:text-amber-300/70">
               • {rf}
             </li>
           ))}

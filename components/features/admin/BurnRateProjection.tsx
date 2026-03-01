@@ -47,19 +47,19 @@ export function BurnRateProjection({
         </div>
         {willExhaust ? (
           isAtRisk ? (
-            <TrendingDown className="h-5 w-5 text-red-400" />
+            <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
           ) : (
-            <TrendingUp className="h-5 w-5 text-yellow-400" />
+            <TrendingUp className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
           )
         ) : (
-          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
         )}
       </div>
 
       <div className="mt-4">
         {willExhaust ? (
           <div>
-            <p className={`text-lg font-semibold ${isAtRisk ? 'text-red-400' : 'text-yellow-400'}`}>
+            <p className={`text-lg font-semibold ${isAtRisk ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
               {daysRemaining === 0
                 ? 'Limit reached'
                 : `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining`}
@@ -76,7 +76,7 @@ export function BurnRateProjection({
           </div>
         ) : (
           <div>
-            <p className="text-lg font-semibold text-emerald-400">
+            <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
               On track
             </p>
             <p className="mt-1 text-sm text-muted-foreground">

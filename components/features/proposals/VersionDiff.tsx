@@ -208,16 +208,16 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
             <span className="text-xs text-muted-foreground">Changes:</span>
           </div>
           <div className="flex items-center gap-1">
-            <Plus className="h-3 w-3 text-emerald-400" />
-            <span className="text-xs text-emerald-300">{stats.additions} added</span>
+            <Plus className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-xs text-emerald-700 dark:text-emerald-300">{stats.additions} added</span>
           </div>
           <div className="flex items-center gap-1">
-            <Minus className="h-3 w-3 text-red-400" />
-            <span className="text-xs text-red-300">{stats.deletions} removed</span>
+            <Minus className="h-3 w-3 text-red-600 dark:text-red-400" />
+            <span className="text-xs text-red-700 dark:text-red-300">{stats.deletions} removed</span>
           </div>
           <div className="flex items-center gap-1">
-            <PenLine className="h-3 w-3 text-amber-400" />
-            <span className="text-xs text-amber-300">{stats.modifications} modified</span>
+            <PenLine className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+            <span className="text-xs text-amber-700 dark:text-amber-300">{stats.modifications} modified</span>
           </div>
           <span className="text-xs text-muted-foreground ml-auto">
             {stats.unchanged} unchanged
@@ -306,7 +306,7 @@ export function VersionDiff({ documentId, opportunityId: _opportunityId }: Versi
         </div>
       ) : (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-          <p className="text-sm text-red-300">
+          <p className="text-sm text-red-700 dark:text-red-300">
             Could not compute diff. One or both versions may be unavailable.
           </p>
         </div>
@@ -335,25 +335,25 @@ function DiffBlockRow({ type, block }: DiffBlockRowProps) {
     addition: {
       bg: 'bg-emerald-500/8',
       borderColor: 'border-l-emerald-500',
-      textColor: 'text-emerald-300',
+      textColor: 'text-emerald-700 dark:text-emerald-300',
       prefix: '+',
-      prefixColor: 'text-emerald-400',
+      prefixColor: 'text-emerald-600 dark:text-emerald-400',
       label: 'Added',
     },
     deletion: {
       bg: 'bg-red-500/8',
       borderColor: 'border-l-red-500',
-      textColor: 'text-red-300',
+      textColor: 'text-red-700 dark:text-red-300',
       prefix: '-',
-      prefixColor: 'text-red-400',
+      prefixColor: 'text-red-600 dark:text-red-400',
       label: 'Removed',
     },
     modification: {
       bg: 'bg-amber-500/8',
       borderColor: 'border-l-amber-500',
-      textColor: 'text-amber-300',
+      textColor: 'text-amber-700 dark:text-amber-300',
       prefix: '~',
-      prefixColor: 'text-amber-400',
+      prefixColor: 'text-amber-600 dark:text-amber-400',
       label: 'Modified',
     },
   }

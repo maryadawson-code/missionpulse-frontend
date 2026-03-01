@@ -74,7 +74,7 @@ export function ConflictResolutionModal({
       <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-400" />
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             Sync Conflict Detected
           </DialogTitle>
           <DialogDescription>
@@ -102,7 +102,7 @@ export function ConflictResolutionModal({
           {/* Cloud version */}
           <div className="flex flex-col min-h-0">
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/50 rounded-t-md">
-              <Cloud className="h-4 w-4 text-blue-400" />
+              <Cloud className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <span className="text-sm font-medium">Cloud Version</span>
               {conflict.cloud_version.source && (
                 <span className="text-xs text-muted-foreground">
@@ -169,17 +169,17 @@ function DiffPanel({ lines }: { lines: DiffLine[] }) {
           </span>
           <span className="shrink-0 w-4 text-center select-none">
             {line.type === 'addition' && (
-              <span className="text-emerald-400">+</span>
+              <span className="text-emerald-600 dark:text-emerald-400">+</span>
             )}
             {line.type === 'deletion' && (
-              <span className="text-red-400">-</span>
+              <span className="text-red-600 dark:text-red-400">-</span>
             )}
           </span>
           <span
             className={cn(
               'flex-1 whitespace-pre-wrap break-all',
-              line.type === 'addition' && 'text-emerald-300',
-              line.type === 'deletion' && 'text-red-300 line-through opacity-70'
+              line.type === 'addition' && 'text-emerald-700 dark:text-emerald-300',
+              line.type === 'deletion' && 'text-red-700 dark:text-red-300 line-through opacity-70'
             )}
           >
             {line.content || '\u00A0'}

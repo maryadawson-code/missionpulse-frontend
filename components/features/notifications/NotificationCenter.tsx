@@ -32,11 +32,11 @@ interface NotificationCenterProps {
 function priorityBadge(priority: string | null) {
   switch (priority) {
     case 'urgent':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     case 'high':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     case 'normal':
-      return 'bg-blue-500/20 text-blue-300'
+      return 'bg-blue-500/20 text-blue-700 dark:text-blue-300'
     default:
       return 'bg-gray-500/20 text-gray-300'
   }
@@ -45,13 +45,13 @@ function priorityBadge(priority: string | null) {
 function typeBadge(type: string) {
   switch (type) {
     case 'gate_approval':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     case 'deadline':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     case 'assignment':
       return 'bg-primary/20 text-primary'
     case 'ai_complete':
-      return 'bg-purple-500/20 text-purple-300'
+      return 'bg-purple-500/20 text-purple-700 dark:text-purple-300'
     default:
       return 'bg-gray-500/20 text-gray-300'
   }
@@ -223,7 +223,7 @@ export function NotificationCenter({
                   <button
                     onClick={() => handleDismiss(n.id)}
                     disabled={isPending}
-                    className="rounded p-1 text-muted-foreground hover:text-red-400"
+                    className="rounded p-1 text-muted-foreground hover:text-red-600 dark:text-red-400"
                     title="Dismiss"
                   >
                     <Trash2 className="h-4 w-4" />

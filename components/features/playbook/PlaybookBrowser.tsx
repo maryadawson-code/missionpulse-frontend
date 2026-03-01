@@ -319,7 +319,7 @@ export function PlaybookBrowser({ entries }: PlaybookBrowserProps) {
                             <Star
                               className={`h-3.5 w-3.5 ${
                                 star <= entry.effectiveness_score
-                                  ? 'fill-amber-400 text-amber-400'
+                                  ? 'fill-amber-400 text-amber-600 dark:text-amber-400'
                                   : 'text-muted-foreground'
                               }`}
                             />

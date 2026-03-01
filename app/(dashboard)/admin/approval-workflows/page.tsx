@@ -89,7 +89,7 @@ export default async function ApprovalWorkflowsPage() {
                         {(wf.workflow_type ?? 'general').replace(/_/g, ' ')}
                       </span>
                       {wf.is_active === false && (
-                        <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-300">
+                        <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-300">
                           Inactive
                         </span>
                       )}

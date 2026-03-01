@@ -117,12 +117,12 @@ export function SamGovSearch() {
                       </span>
                     )}
                     {opp.setAside && (
-                      <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300">
+                      <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300">
                         {opp.setAside}
                       </span>
                     )}
                     {opp.responseDeadLine && (
-                      <span className="text-xs text-amber-400">
+                      <span className="text-xs text-amber-600 dark:text-amber-400">
                         Due: {new Date(opp.responseDeadLine).toLocaleDateString()}
                       </span>
                     )}

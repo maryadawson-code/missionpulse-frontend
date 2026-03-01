@@ -29,24 +29,24 @@ const thresholdConfig = {
   warning: {
     icon: AlertTriangle,
     bgClass: 'bg-yellow-900/30 border-yellow-700/50',
-    textClass: 'text-yellow-300',
+    textClass: 'text-yellow-700 dark:text-yellow-300',
     show: true,
   },
   urgent: {
     icon: AlertTriangle,
     bgClass: 'bg-orange-900/30 border-orange-700/50',
-    textClass: 'text-orange-300',
+    textClass: 'text-orange-700 dark:text-orange-300',
     show: true,
   },
   soft_block: {
     icon: XCircle,
     bgClass: 'bg-red-900/30 border-red-700/50',
-    textClass: 'text-red-300',
+    textClass: 'text-red-700 dark:text-red-300',
     show: true,
   },
   hard_block: {
     icon: XCircle,
-    bgClass: 'bg-red-900/50 border-red-500/50',
+    bgClass: 'bg-red-50 dark:bg-red-900/50 border-red-500/50',
     textClass: 'text-red-200',
     show: true,
   },

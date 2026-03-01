@@ -7,16 +7,16 @@ function statusStyle(status: string | null): string {
   switch (status?.toLowerCase()) {
     case 'final':
     case 'approved':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'review':
     case 'in_review':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'draft':
-      return 'bg-blue-500/15 text-blue-300'
+      return 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
     case 'revision':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -101,7 +101,7 @@ export default async function SectionsHubPage({
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Completed</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">
             {completed}
           </p>
         </div>

@@ -100,10 +100,10 @@ export default async function OralsPage({ params }: Props) {
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
                           q.difficulty === 'hard'
-                            ? 'bg-red-500/15 text-red-300'
+                            ? 'bg-red-500/15 text-red-700 dark:text-red-300'
                             : q.difficulty === 'medium'
-                              ? 'bg-amber-500/15 text-amber-300'
-                              : 'bg-emerald-500/15 text-emerald-300'
+                              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                         }`}
                       >
                         {q.difficulty}

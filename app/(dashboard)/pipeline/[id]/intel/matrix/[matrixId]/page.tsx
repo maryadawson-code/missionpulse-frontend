@@ -155,10 +155,10 @@ export default async function MatrixDetailPage({
                     <span
                       className={`font-bold ${
                         (c.our_score ?? 0) >= 4
-                          ? 'text-emerald-400'
+                          ? 'text-emerald-600 dark:text-emerald-400'
                           : (c.our_score ?? 0) >= 3
-                            ? 'text-amber-400'
-                            : 'text-red-400'
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-red-600 dark:text-red-400'
                       }`}
                     >
                       {c.our_score ?? '—'}
@@ -224,7 +224,7 @@ export default async function MatrixDetailPage({
                 </div>
                 {comp.strengths && (
                   <div>
-                    <p className="text-[10px] font-semibold text-emerald-400">
+                    <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                       Strengths
                     </p>
                     <p className="text-xs text-muted-foreground">{comp.strengths}</p>
@@ -232,7 +232,7 @@ export default async function MatrixDetailPage({
                 )}
                 {comp.weaknesses && (
                   <div>
-                    <p className="text-[10px] font-semibold text-red-400">
+                    <p className="text-[10px] font-semibold text-red-600 dark:text-red-400">
                       Weaknesses
                     </p>
                     <p className="text-xs text-muted-foreground">{comp.weaknesses}</p>

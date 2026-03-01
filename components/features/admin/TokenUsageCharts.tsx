@@ -167,7 +167,7 @@ export function TokenUsageCharts({
             Budget Remaining
           </p>
           <p
-            className={`mt-2 text-2xl font-bold ${budgetPct > 75 ? 'text-red-400' : 'text-emerald-400'}`}
+            className={`mt-2 text-2xl font-bold ${budgetPct > 75 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}
           >
             {formatCost(budgetRemaining)}
           </p>

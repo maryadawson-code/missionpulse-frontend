@@ -368,19 +368,19 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
                   <p className="text-lg font-semibold text-foreground">{bulkValidation.summary.total}</p>
                   <p className="text-xs text-muted-foreground">Total</p>
                 </div>
-                <div className="rounded-lg border border-emerald-900/50 bg-emerald-900/10 p-3 text-center">
-                  <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-emerald-400" />
-                  <p className="text-lg font-semibold text-emerald-400">{bulkValidation.summary.valid}</p>
+                <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/10 p-3 text-center">
+                  <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">{bulkValidation.summary.valid}</p>
                   <p className="text-xs text-muted-foreground">Valid</p>
                 </div>
-                <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-3 text-center">
-                  <XCircle className="mx-auto mb-1 h-4 w-4 text-red-400" />
-                  <p className="text-lg font-semibold text-red-400">{bulkValidation.summary.errors}</p>
+                <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 text-center">
+                  <XCircle className="mx-auto mb-1 h-4 w-4 text-red-600 dark:text-red-400" />
+                  <p className="text-lg font-semibold text-red-600 dark:text-red-400">{bulkValidation.summary.errors}</p>
                   <p className="text-xs text-muted-foreground">Errors</p>
                 </div>
-                <div className="rounded-lg border border-yellow-900/50 bg-yellow-900/10 p-3 text-center">
-                  <AlertTriangle className="mx-auto mb-1 h-4 w-4 text-yellow-400" />
-                  <p className="text-lg font-semibold text-yellow-400">{bulkValidation.summary.duplicates}</p>
+                <div className="rounded-lg border border-yellow-200 dark:border-yellow-900/50 bg-yellow-50 dark:bg-yellow-900/10 p-3 text-center">
+                  <AlertTriangle className="mx-auto mb-1 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                  <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">{bulkValidation.summary.duplicates}</p>
                   <p className="text-xs text-muted-foreground">Duplicates</p>
                 </div>
               </div>
@@ -404,16 +404,16 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
                         <tr key={record.index}>
                           <td className="px-3 py-2 text-muted-foreground">{record.index + 1}</td>
                           <td className="px-3 py-2">
-                            {record.status === 'valid' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
-                            {record.status === 'duplicate' && <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />}
-                            {record.status === 'error' && <XCircle className="h-3.5 w-3.5 text-red-400" />}
+                            {record.status === 'valid' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
+                            {record.status === 'duplicate' && <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />}
+                            {record.status === 'error' && <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />}
                           </td>
                           <td className="px-3 py-2 text-foreground">{record.email}</td>
                           <td className="px-3 py-2 text-foreground">{record.fullName}</td>
                           <td className="px-3 py-2 text-foreground">{record.role.replace(/_/g, ' ')}</td>
                           <td className="px-3 py-2">
                             {record.issues.length > 0 && (
-                              <span className={record.status === 'error' ? 'text-red-400' : 'text-yellow-400'}>
+                              <span className={record.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}>
                                 {record.issues.join(', ')}
                               </span>
                             )}
@@ -454,7 +454,7 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
       {/* Pending invitations */}
       {invitations.filter((i) => i.status === 'pending').length > 0 && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-          <h4 className="text-xs font-semibold text-amber-400 mb-2">
+          <h4 className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-2">
             Pending Invitations
           </h4>
           <div className="space-y-1">
@@ -545,7 +545,7 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
                     <span
                       className={`rounded-md px-2 py-0.5 text-xs font-medium ${
                         u.status === 'active'
-                          ? 'bg-emerald-500/20 text-emerald-400'
+                          ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                           : 'bg-muted text-muted-foreground'
                       }`}
                     >
@@ -593,7 +593,7 @@ export function UserManagement({ users, invitations }: UserManagementProps) {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 text-xs text-muted-foreground hover:text-emerald-400"
+                          className="h-7 text-xs text-muted-foreground hover:text-emerald-600 dark:text-emerald-400"
                           onClick={() => handleReactivate(u.id)}
                           disabled={isPending}
                         >

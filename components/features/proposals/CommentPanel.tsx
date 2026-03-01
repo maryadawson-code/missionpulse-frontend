@@ -489,7 +489,7 @@ function CommentThread({
             <button
               onClick={() => handleDelete(comment.id)}
               disabled={submitting}
-              className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 disabled:opacity-50"
+              className="flex items-center gap-1 text-[10px] text-red-600 dark:text-red-400 hover:text-red-700 dark:text-red-300 disabled:opacity-50"
             >
               <Trash2 className="h-3 w-3" />
               Delete

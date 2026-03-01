@@ -10,11 +10,11 @@ function clearanceColor(level: string | null): string {
     case 'TS/SCI':
     case 'Top Secret':
     case 'TS':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     case 'Secret':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     case 'Confidential':
-      return 'bg-blue-500/20 text-blue-300'
+      return 'bg-blue-500/20 text-blue-700 dark:text-blue-300'
     case 'Public Trust':
       return 'bg-gray-500/20 text-gray-300'
     default:
@@ -25,13 +25,13 @@ function clearanceColor(level: string | null): string {
 function availabilityColor(status: string | null): string {
   switch (status) {
     case 'available':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     case 'partially_available':
     case 'partial':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     case 'unavailable':
     case 'deployed':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     default:
       return 'bg-gray-500/20 text-gray-300'
   }
@@ -80,18 +80,18 @@ export default async function PersonnelPage() {
         </div>
         <div className="rounded-xl border border-border bg-card/50 p-5">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Cleared</p>
-          <p className="mt-2 text-2xl font-bold text-amber-400">{clearedCount}</p>
+          <p className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">{clearedCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-card/50 p-5">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Available</p>
-          <p className="mt-2 text-2xl font-bold text-emerald-400">
+          <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
             {people.filter((p) => p.availability_status === 'available').length}
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
           Failed to load personnel: {error.message}
         </div>
       )}

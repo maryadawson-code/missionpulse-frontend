@@ -16,14 +16,14 @@ function confidenceStyle(level: string | null): string {
   switch (level?.toLowerCase()) {
     case 'high':
     case 'confirmed':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'medium':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'low':
     case 'rumor':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -107,7 +107,7 @@ export default async function IntelPage({
                 )}
                 <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
                   {m.status && (
-                    <span className="rounded-full bg-slate-500/15 px-2 py-0.5 text-slate-300">
+                    <span className="rounded-full bg-slate-500/15 px-2 py-0.5 text-slate-700 dark:text-slate-300">
                       {m.status}
                     </span>
                   )}

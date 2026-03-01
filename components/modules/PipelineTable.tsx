@@ -58,15 +58,15 @@ function formatDate(dateStr: string | null): string {
 
 function pwinColor(pwin: number | null): string {
   const v = pwin ?? 50
-  if (v >= 70) return 'text-emerald-400'
-  if (v >= 40) return 'text-amber-400'
-  return 'text-red-400'
+  if (v >= 70) return 'text-emerald-600 dark:text-emerald-400'
+  if (v >= 40) return 'text-amber-600 dark:text-amber-400'
+  return 'text-red-600 dark:text-red-400'
 }
 
 function phaseColor(phase: string | null): string {
   const p = phase ?? 'Gate 1'
-  if (p.includes('5') || p.includes('6')) return 'bg-emerald-500/20 text-emerald-300'
-  if (p.includes('3') || p.includes('4')) return 'bg-amber-500/20 text-amber-300'
+  if (p.includes('5') || p.includes('6')) return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+  if (p.includes('3') || p.includes('4')) return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
   return 'bg-muted/20 text-muted-foreground'
 }
 
@@ -470,7 +470,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
                         </a>
                         <button
                           onClick={() => setDeleteTarget(opp.id)}
-                          className="text-xs text-slate hover:text-red-400 transition-colors"
+                          className="text-xs text-slate hover:text-red-600 dark:text-red-400 transition-colors"
                         >
                           Delete
                         </button>

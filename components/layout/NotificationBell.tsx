@@ -145,7 +145,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
                         <button
                           onClick={() => handleDismiss(n.id)}
                           disabled={isPending}
-                          className="text-[10px] text-muted-foreground hover:text-red-400"
+                          className="text-[10px] text-muted-foreground hover:text-red-600 dark:text-red-400"
                         >
                           Dismiss
                         </button>

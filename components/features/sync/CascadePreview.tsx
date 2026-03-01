@@ -69,7 +69,7 @@ export function CascadePreview({
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15">
-          <Zap className="h-4.5 w-4.5 text-amber-400" />
+          <Zap className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-foreground">
@@ -91,8 +91,8 @@ export function CascadePreview({
         </div>
       ) : error ? (
         <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-          <p className="text-sm text-red-300">{error}</p>
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-lg border border-border bg-card/30 px-4 py-6 text-center">
@@ -108,7 +108,7 @@ export function CascadePreview({
         <>
           {/* Affected count badge */}
           <div className="mb-3 flex items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-300 border border-amber-500/30">
+            <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300 border border-amber-500/30">
               {items.length} document{items.length !== 1 ? 's' : ''} affected
             </span>
             {items[0]?.ruleDescription && (
@@ -173,7 +173,7 @@ export function CascadePreview({
                   </div>
 
                   <div className="bg-background px-3 py-2.5">
-                    <span className="text-xs text-red-300/70 break-all line-clamp-2">
+                    <span className="text-xs text-red-700 dark:text-red-300/70 break-all line-clamp-2">
                       {formatValue(item.currentValue)}
                     </span>
                   </div>
@@ -181,7 +181,7 @@ export function CascadePreview({
                   <div className="bg-background px-3 py-2.5">
                     <div className="flex items-start gap-1">
                       <ArrowRight className="h-3 w-3 shrink-0 text-cyan mt-0.5" />
-                      <span className="text-xs text-emerald-300 break-all line-clamp-2">
+                      <span className="text-xs text-emerald-700 dark:text-emerald-300 break-all line-clamp-2">
                         {formatValue(item.newValue)}
                       </span>
                     </div>

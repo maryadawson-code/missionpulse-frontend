@@ -139,9 +139,9 @@ export function SalesforceConfig({
               {testResult.status === 'testing' ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : testResult.status === 'success' ? (
-                <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
               ) : testResult.status === 'error' ? (
-                <XCircle className="h-3 w-3 text-red-400" />
+                <XCircle className="h-3 w-3 text-red-600 dark:text-red-400" />
               ) : null}
               Test
             </Button>
@@ -164,7 +164,7 @@ export function SalesforceConfig({
         {testResult.message && (
           <p
             className={`text-xs mt-2 ${
-              testResult.status === 'success' ? 'text-emerald-400' : 'text-red-400'
+              testResult.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
             }`}
           >
             {testResult.message}
@@ -184,7 +184,7 @@ export function SalesforceConfig({
         )}
 
         {errorMessage && (
-          <p className="text-xs text-red-400 mt-2">Error: {errorMessage}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
         )}
 
         {!isConnected && (

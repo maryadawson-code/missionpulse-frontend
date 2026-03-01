@@ -60,19 +60,19 @@ describe('OpportunityCard', () => {
   it('applies emerald color for pwin >= 70', () => {
     render(<OpportunityCard opportunity={{ ...baseOpportunity, pwin: 70 }} />)
     const pwinEl = screen.getByText('70%')
-    expect(pwinEl.className).toContain('text-emerald-400')
+    expect(pwinEl.className).toContain('text-emerald-600 dark:text-emerald-400')
   })
 
   it('applies amber color for pwin >= 40 and < 70', () => {
     render(<OpportunityCard opportunity={{ ...baseOpportunity, pwin: 50 }} />)
     const pwinEl = screen.getByText('50%')
-    expect(pwinEl.className).toContain('text-amber-400')
+    expect(pwinEl.className).toContain('text-amber-600 dark:text-amber-400')
   })
 
   it('applies red color for pwin < 40', () => {
     render(<OpportunityCard opportunity={{ ...baseOpportunity, pwin: 20 }} />)
     const pwinEl = screen.getByText('20%')
-    expect(pwinEl.className).toContain('text-red-400')
+    expect(pwinEl.className).toContain('text-red-600 dark:text-red-400')
   })
 
   it('renders due date when provided', () => {

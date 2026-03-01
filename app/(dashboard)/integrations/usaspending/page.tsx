@@ -55,11 +55,11 @@ export default async function USAspendingPage() {
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Authentication</p>
-          <p className="mt-1 text-sm font-medium text-emerald-400">No API key required</p>
+          <p className="mt-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">No API key required</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Status</p>
-          <p className="mt-1 text-sm font-medium text-cyan-400">Active</p>
+          <p className="mt-1 text-sm font-medium text-cyan-600 dark:text-cyan-400">Active</p>
         </div>
       </div>
     </div>

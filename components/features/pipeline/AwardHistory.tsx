@@ -71,7 +71,7 @@ export function AwardHistory({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-cyan-400" />
+          <Trophy className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
           <h3 className="font-semibold text-foreground">Award History</h3>
           <span className="text-xs text-muted-foreground">via USAspending.gov</span>
         </div>
@@ -97,7 +97,7 @@ export function AwardHistory({
 
       {/* Error */}
       {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-3 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 text-sm text-red-600 dark:text-red-400">
           {error}
         </div>
       )}
@@ -128,7 +128,7 @@ export function AwardHistory({
                       <span className="text-sm font-medium text-foreground truncate">
                         {award.recipientName}
                       </span>
-                      <span className="shrink-0 rounded bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-400">
+                      <span className="shrink-0 rounded bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-600 dark:text-cyan-400">
                         {formatCurrency(award.totalObligation)}
                       </span>
                     </div>
@@ -207,7 +207,7 @@ export function AwardHistory({
                 <span className="text-sm font-medium text-foreground">{rel.primeName}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">{rel.contractCount} contracts</span>
-                  <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">
+                  <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(rel.totalAmount)}
                   </span>
                 </div>

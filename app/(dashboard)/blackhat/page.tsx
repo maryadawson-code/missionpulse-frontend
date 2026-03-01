@@ -10,11 +10,11 @@ function threatColor(level: string | null): string {
   switch (level) {
     case 'high':
     case 'critical':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     case 'medium':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     case 'low':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     default:
       return 'bg-gray-500/20 text-muted-foreground'
   }
@@ -58,7 +58,7 @@ export default async function BlackhatPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
           Failed to load competitors: {error.message}
         </div>
       )}

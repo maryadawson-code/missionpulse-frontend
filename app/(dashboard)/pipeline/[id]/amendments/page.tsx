@@ -6,14 +6,14 @@ function statusStyle(status: string | null): string {
   switch (status?.toLowerCase()) {
     case 'completed':
     case 'incorporated':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'in_progress':
     case 'pending':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'overdue':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -21,13 +21,13 @@ function impactStyle(level: string | null): string {
   switch (level?.toLowerCase()) {
     case 'critical':
     case 'high':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     case 'medium':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'low':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -99,11 +99,11 @@ export default async function AmendmentsPage({
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Pending</p>
-          <p className="mt-1 text-lg font-bold text-amber-400">{pending}</p>
+          <p className="mt-1 text-lg font-bold text-amber-600 dark:text-amber-400">{pending}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Overdue</p>
-          <p className="mt-1 text-lg font-bold text-red-400">{overdue}</p>
+          <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">{overdue}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Needs Revision</p>
@@ -148,7 +148,7 @@ export default async function AmendmentsPage({
                       </span>
                     )}
                     {amend.requires_revision && (
-                      <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-300">
+                      <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-300">
                         Revision Required
                       </span>
                     )}
@@ -179,7 +179,7 @@ export default async function AmendmentsPage({
                       new Date(amend.response_due) < new Date() &&
                       amend.status !== 'completed' &&
                       amend.status !== 'incorporated'
-                        ? 'text-red-400 font-medium'
+                        ? 'text-red-600 dark:text-red-400 font-medium'
                         : ''
                     }
                   >

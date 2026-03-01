@@ -6,15 +6,15 @@ function statusStyle(status: string | null): string {
   switch (status?.toLowerCase()) {
     case 'active':
     case 'approved':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'pending':
     case 'under_review':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'inactive':
     case 'disqualified':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -66,7 +66,7 @@ export default async function SubcontractorsPage() {
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Active</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">{active}</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{active}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">NDA Signed</p>
@@ -103,7 +103,7 @@ export default async function SubcontractorsPage() {
                       </span>
                     )}
                     {sub.past_performance_rating && (
-                      <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-300">
+                      <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
                         {sub.past_performance_rating}
                       </span>
                     )}
@@ -111,12 +111,12 @@ export default async function SubcontractorsPage() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   {sub.nda_signed && (
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
                       NDA
                     </span>
                   )}
                   {sub.teaming_agreement && (
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
                       TA
                     </span>
                   )}

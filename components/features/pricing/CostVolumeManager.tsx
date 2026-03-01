@@ -209,7 +209,7 @@ export function CostVolumeManager({
                   {(vol.contract_type ?? 'FFP').replace(/_/g, ' ')} |{' '}
                   {vol.base_period_months ?? 12} months |{' '}
                   <span
-                    className={`${vol.status === 'approved' ? 'text-emerald-400' : 'text-amber-400'}`}
+                    className={`${vol.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}
                   >
                     {vol.status ?? 'draft'}
                   </span>

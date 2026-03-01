@@ -306,7 +306,7 @@ export default async function CollaborationPage({
                           </span>
                         )}
                         {typeof entry.details.status_change === 'string' && (
-                          <span className="inline-block rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-300">
+                          <span className="inline-block rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-700 dark:text-blue-300">
                             {entry.details.status_change}
                           </span>
                         )}
@@ -360,11 +360,11 @@ export default async function CollaborationPage({
                         {tool.name}
                       </p>
                       {isActive ? (
-                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30">
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-slate-500/15 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 border border-slate-500/30">
+                        <span className="inline-flex items-center rounded-full bg-slate-500/15 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground border border-slate-500/30">
                           Inactive
                         </span>
                       )}

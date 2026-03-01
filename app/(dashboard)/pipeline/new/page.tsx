@@ -30,7 +30,7 @@ function Field({
     <div>
       <label htmlFor={name} className="block text-sm font-medium text-muted-foreground">
         {label}
-        {required && <span className="ml-1 text-red-400">*</span>}
+        {required && <span className="ml-1 text-red-600 dark:text-red-400">*</span>}
       </label>
       {type === 'textarea' ? (
         <textarea

@@ -102,7 +102,7 @@ export function InlineEditField({
               disabled={isPending}
             />
           )}
-          <button onClick={save} disabled={isPending} className="p-1 text-emerald-400 hover:text-emerald-300" aria-label={`Save ${label}`}>
+          <button onClick={save} disabled={isPending} className="p-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:text-emerald-300" aria-label={`Save ${label}`}>
             {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
           </button>
           <button onClick={cancel} disabled={isPending} className="p-1 text-muted-foreground hover:text-foreground" aria-label={`Cancel editing ${label}`}>

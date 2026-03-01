@@ -83,19 +83,19 @@ export function OpportunityComplianceTable({
                 <td className="px-4 py-3 text-center">
                   <span
                     className={`text-xs font-medium ${
-                      opp.notStarted > 0 ? 'text-red-400' : 'text-muted-foreground'
+                      opp.notStarted > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
                     }`}
                   >
                     {opp.notStarted}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-center text-xs text-amber-400">
+                <td className="px-4 py-3 text-center text-xs text-amber-600 dark:text-amber-400">
                   {opp.inProgress}
                 </td>
-                <td className="px-4 py-3 text-center text-xs text-emerald-400">
+                <td className="px-4 py-3 text-center text-xs text-emerald-600 dark:text-emerald-400">
                   {opp.addressed}
                 </td>
-                <td className="px-4 py-3 text-center text-xs text-blue-400">
+                <td className="px-4 py-3 text-center text-xs text-blue-600 dark:text-blue-400">
                   {opp.verified}
                 </td>
                 <td className="px-4 py-3">
@@ -115,10 +115,10 @@ export function OpportunityComplianceTable({
                     <span
                       className={`text-xs font-semibold ${
                         opp.pct >= 80
-                          ? 'text-emerald-400'
+                          ? 'text-emerald-600 dark:text-emerald-400'
                           : opp.pct >= 50
-                            ? 'text-amber-400'
-                            : 'text-red-400'
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-red-600 dark:text-red-400'
                       }`}
                     >
                       {opp.pct}%

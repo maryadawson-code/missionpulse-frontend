@@ -34,16 +34,16 @@ function reviewTypeColor(type: string): string {
   switch (type.toLowerCase()) {
     case 'pink':
     case 'pink_team':
-      return 'bg-pink-500/15 text-pink-300 border-pink-500/30'
+      return 'bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30'
     case 'green':
     case 'green_team':
-      return 'bg-green-500/15 text-green-300 border-green-500/30'
+      return 'bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/30'
     case 'red':
     case 'red_team':
-      return 'bg-red-500/15 text-red-300 border-red-500/30'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30'
     case 'gold':
     case 'gold_team':
-      return 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
+      return 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30'
     default:
       return 'bg-gray-500/15 text-gray-300 border-gray-500/30'
   }
@@ -53,9 +53,9 @@ function severityIcon(severity: string | null) {
   switch (severity) {
     case 'critical':
     case 'major':
-      return <AlertTriangle className="h-3 w-3 text-red-400" />
+      return <AlertTriangle className="h-3 w-3 text-red-600 dark:text-red-400" />
     case 'minor':
-      return <AlertTriangle className="h-3 w-3 text-amber-400" />
+      return <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
     default:
       return <MessageSquare className="h-3 w-3 text-muted-foreground" />
   }
@@ -64,11 +64,11 @@ function severityIcon(severity: string | null) {
 function severityBadge(severity: string | null): string {
   switch (severity) {
     case 'critical':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     case 'major':
-      return 'bg-orange-500/15 text-orange-300'
+      return 'bg-orange-500/15 text-orange-700 dark:text-orange-300'
     case 'minor':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     default:
       return 'bg-gray-500/15 text-gray-300'
   }
@@ -103,7 +103,7 @@ export function ColorTeamFeedback({ reviews }: ColorTeamFeedbackProps) {
         <span>{reviews.length} review{reviews.length !== 1 ? 's' : ''}</span>
         <span>{totalFindings} finding{totalFindings !== 1 ? 's' : ''}</span>
         {openFindings > 0 && (
-          <span className="text-amber-400">{openFindings} open</span>
+          <span className="text-amber-600 dark:text-amber-400">{openFindings} open</span>
         )}
       </div>
 
@@ -134,7 +134,7 @@ export function ColorTeamFeedback({ reviews }: ColorTeamFeedbackProps) {
                   <span className="text-[10px] text-muted-foreground">{review.lead_reviewer_name}</span>
                 )}
                 {openCount > 0 && (
-                  <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
                     {openCount} open
                   </span>
                 )}
@@ -162,7 +162,7 @@ export function ColorTeamFeedback({ reviews }: ColorTeamFeedbackProps) {
                               </span>
                             )}
                             {finding.status === 'resolved' && (
-                              <CheckCircle className="h-3 w-3 shrink-0 text-emerald-400" />
+                              <CheckCircle className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
                             )}
                           </div>
                           {finding.recommendation && (

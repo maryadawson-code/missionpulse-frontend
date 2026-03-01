@@ -19,11 +19,11 @@ interface StaffingRequirementsTabProps {
 function statusConfig(status: string) {
   switch (status) {
     case 'filled':
-      return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', icon: CheckCircle, label: 'Filled' }
+      return { color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/15', icon: CheckCircle, label: 'Filled' }
     case 'pending':
-      return { color: 'text-amber-400', bg: 'bg-amber-500/15', icon: AlertTriangle, label: 'Pending' }
+      return { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/15', icon: AlertTriangle, label: 'Pending' }
     default:
-      return { color: 'text-red-400', bg: 'bg-red-500/15', icon: AlertTriangle, label: 'Unfilled' }
+      return { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/15', icon: AlertTriangle, label: 'Unfilled' }
   }
 }
 
@@ -49,13 +49,13 @@ export function StaffingRequirementsTab({ requirements }: StaffingRequirementsTa
           <p className="text-[10px] text-muted-foreground">Total Positions</p>
         </div>
         <div className="rounded-lg border border-border bg-muted/20 p-3 text-center">
-          <CheckCircle className="mx-auto h-4 w-4 text-emerald-400" />
-          <p className="mt-1 text-lg font-bold text-emerald-400">{filled}</p>
+          <CheckCircle className="mx-auto h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{filled}</p>
           <p className="text-[10px] text-muted-foreground">Filled</p>
         </div>
         <div className="rounded-lg border border-border bg-muted/20 p-3 text-center">
-          <AlertTriangle className="mx-auto h-4 w-4 text-red-400" />
-          <p className="mt-1 text-lg font-bold text-red-400">{unfilled + pending}</p>
+          <AlertTriangle className="mx-auto h-4 w-4 text-red-600 dark:text-red-400" />
+          <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">{unfilled + pending}</p>
           <p className="text-[10px] text-muted-foreground">Gaps</p>
         </div>
       </div>
@@ -123,7 +123,7 @@ export function StaffingRequirementsTab({ requirements }: StaffingRequirementsTa
                     </td>
                     <td className="px-4 py-2.5">
                       {req.clearanceRequired ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-amber-400">
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
                           <Shield className="h-3 w-3" />
                           {req.clearanceRequired}
                         </span>

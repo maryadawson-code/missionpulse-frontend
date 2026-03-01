@@ -191,7 +191,7 @@ export function CloudBinderPanel({
               download
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30',
-                'bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300',
+                'bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300',
                 'transition-colors hover:bg-emerald-500/20'
               )}
             >
@@ -225,10 +225,10 @@ export function CloudBinderPanel({
             className={cn(
               'mt-1 text-xl font-bold',
               syncHealth >= 80
-                ? 'text-emerald-400'
+                ? 'text-emerald-600 dark:text-emerald-400'
                 : syncHealth >= 50
-                  ? 'text-amber-400'
-                  : 'text-red-400'
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400'
             )}
           >
             {loading ? '--' : `${syncHealth}%`}
@@ -257,7 +257,7 @@ export function CloudBinderPanel({
           <p
             className={cn(
               'mt-1 text-xl font-bold',
-              hasIssues ? 'text-amber-400' : 'text-emerald-400'
+              hasIssues ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
             )}
           >
             {loading ? '--' : conflictCount + errorCount}
@@ -268,16 +268,16 @@ export function CloudBinderPanel({
       {/* Warnings */}
       {!loading && hasIssues && (
         <div className="border-b border-border px-5 py-3">
-          <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 space-y-1.5">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-1.5">
             {conflictCount > 0 && (
-              <div className="flex items-center gap-2 text-xs text-amber-300">
+              <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 {conflictCount} artifact{conflictCount !== 1 ? 's' : ''} with
                 sync conflicts -- resolve before building binder
               </div>
             )}
             {errorCount > 0 && (
-              <div className="flex items-center gap-2 text-xs text-red-300">
+              <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-300">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 {errorCount} artifact{errorCount !== 1 ? 's' : ''} with sync
                 errors
@@ -311,11 +311,11 @@ export function CloudBinderPanel({
                 className={cn(
                   'rounded-lg border p-3 transition-colors',
                   artifact.syncStatus === 'error'
-                    ? 'border-red-500/30 bg-red-950/10'
+                    ? 'border-red-500/30 bg-red-50 dark:bg-red-950/10'
                     : artifact.syncStatus === 'conflict'
-                      ? 'border-amber-500/30 bg-amber-950/10'
+                      ? 'border-amber-500/30 bg-amber-50 dark:bg-amber-950/10'
                       : artifact.syncStatus === 'syncing'
-                        ? 'border-blue-500/30 bg-blue-950/10'
+                        ? 'border-blue-500/30 bg-blue-50 dark:bg-blue-950/10'
                         : 'border-border bg-background'
                 )}
               >
@@ -355,7 +355,7 @@ export function CloudBinderPanel({
                 </div>
 
                 {artifact.syncStatus === 'synced' && (
-                  <div className="mt-2 flex items-center gap-1 text-[10px] text-emerald-400">
+                  <div className="mt-2 flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="h-3 w-3" />
                     Cloud synced
                   </div>
@@ -365,7 +365,7 @@ export function CloudBinderPanel({
                   <button
                     onClick={() => handleOpenConflict(artifact.documentId)}
                     disabled={resolvingDocId === artifact.documentId}
-                    className="mt-2 flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                    className="mt-2 flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
                   >
                     <AlertTriangle className="h-3 w-3" />
                     Resolve Conflict

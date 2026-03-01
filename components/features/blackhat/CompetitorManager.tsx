@@ -32,11 +32,11 @@ function threatColor(level: string | null): string {
   switch (level) {
     case 'high':
     case 'critical':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     case 'medium':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     case 'low':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     default:
       return 'bg-gray-500/20 text-gray-300'
   }
@@ -81,7 +81,7 @@ export function CompetitorManager({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Shield className="h-5 w-5 text-red-400" />
+          <Shield className="h-5 w-5 text-red-600 dark:text-red-400" />
           <h3 className="text-sm font-semibold text-foreground">
             Competitor Profiles ({competitors.length})
           </h3>
@@ -222,7 +222,7 @@ export function CompetitorManager({
                   {comp.name}
                 </h4>
                 {comp.incumbent && (
-                  <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-medium text-blue-300">
+                  <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
                     INCUMBENT
                   </span>
                 )}
@@ -263,7 +263,7 @@ export function CompetitorManager({
                       e.stopPropagation()
                       setConfirmDelete(comp.id)
                     }}
-                    className="text-muted-foreground hover:text-red-400"
+                    className="text-muted-foreground hover:text-red-600 dark:text-red-400"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -276,7 +276,7 @@ export function CompetitorManager({
               <div className="border-t border-border px-5 py-4 space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <h5 className="text-xs font-semibold uppercase text-emerald-400 mb-2">
+                    <h5 className="text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-400 mb-2">
                       Strengths
                     </h5>
                     {comp.strengths && comp.strengths.length > 0 ? (
@@ -286,7 +286,7 @@ export function CompetitorManager({
                             key={i}
                             className="text-xs text-muted-foreground flex items-start gap-1.5"
                           >
-                            <span className="text-emerald-400 mt-0.5">+</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 mt-0.5">+</span>
                             {s}
                           </li>
                         ))}
@@ -298,7 +298,7 @@ export function CompetitorManager({
                     )}
                   </div>
                   <div>
-                    <h5 className="text-xs font-semibold uppercase text-red-400 mb-2">
+                    <h5 className="text-xs font-semibold uppercase text-red-600 dark:text-red-400 mb-2">
                       Weaknesses
                     </h5>
                     {comp.weaknesses && comp.weaknesses.length > 0 ? (
@@ -308,7 +308,7 @@ export function CompetitorManager({
                             key={i}
                             className="text-xs text-muted-foreground flex items-start gap-1.5"
                           >
-                            <span className="text-red-400 mt-0.5">-</span>
+                            <span className="text-red-600 dark:text-red-400 mt-0.5">-</span>
                             {w}
                           </li>
                         ))}
@@ -323,7 +323,7 @@ export function CompetitorManager({
 
                 {comp.likely_strategy && (
                   <div>
-                    <h5 className="text-xs font-semibold uppercase text-amber-400 mb-1">
+                    <h5 className="text-xs font-semibold uppercase text-amber-600 dark:text-amber-400 mb-1">
                       Likely Strategy
                     </h5>
                     <p className="text-xs text-muted-foreground">
@@ -345,7 +345,7 @@ export function CompetitorManager({
 
                 {comp.ghost_themes && comp.ghost_themes.length > 0 && (
                   <div>
-                    <h5 className="text-xs font-semibold uppercase text-purple-400 mb-1">
+                    <h5 className="text-xs font-semibold uppercase text-purple-600 dark:text-purple-400 mb-1">
                       Ghost Win Themes
                     </h5>
                     <ul className="space-y-1">

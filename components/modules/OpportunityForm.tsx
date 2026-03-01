@@ -94,7 +94,7 @@ export function OpportunityForm({ opportunity, mode }: OpportunityFormProps) {
   const selectClass =
     'w-full rounded-md border border-border bg-navy px-3 py-2 text-sm text-foreground focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan disabled:opacity-50'
   const labelClass = 'block text-sm font-medium text-slate mb-1'
-  const errorClass = 'text-xs text-red-400 mt-1'
+  const errorClass = 'text-xs text-red-600 dark:text-red-400 mt-1'
 
   return (
     <form action={handleSubmit} className="space-y-8 max-w-3xl">
@@ -107,7 +107,7 @@ export function OpportunityForm({ opportunity, mode }: OpportunityFormProps) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label htmlFor="title" className={labelClass}>
-              Title <span className="text-red-400">*</span>
+              Title <span className="text-red-600 dark:text-red-400">*</span>
             </label>
             <input
               id="title"

@@ -129,11 +129,11 @@ export function ComplianceMatrix({
         const p = row.getValue('priority') as string | null
         const color =
           p === 'Critical'
-            ? 'text-red-400'
+            ? 'text-red-600 dark:text-red-400'
             : p === 'High'
-              ? 'text-amber-400'
+              ? 'text-amber-600 dark:text-amber-400'
               : p === 'Medium'
-                ? 'text-blue-400'
+                ? 'text-blue-600 dark:text-blue-400'
                 : 'text-muted-foreground'
         return <span className={`text-xs font-medium ${color}`}>{p ?? 'Medium'}</span>
       },

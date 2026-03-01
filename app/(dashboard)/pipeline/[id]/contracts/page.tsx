@@ -72,15 +72,15 @@ export default async function ContractsPage({ params }: ContractsPageProps) {
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Compliant</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-400">{compliant}</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{compliant}</p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Review Needed</p>
-          <p className="mt-1 text-2xl font-bold text-amber-400">{reviewNeeded}</p>
+          <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{reviewNeeded}</p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">High Risk</p>
-          <p className="mt-1 text-2xl font-bold text-red-400">{highRisk}</p>
+          <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">{highRisk}</p>
         </div>
       </div>
 

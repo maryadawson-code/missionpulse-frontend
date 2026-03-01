@@ -158,7 +158,7 @@ export default async function OpportunityPricingPage({ params }: Props) {
                     <td className="px-2 py-1.5 text-muted-foreground">
                       {odc.period ?? '—'}
                       {odc.recurring && (
-                        <span className="ml-1 rounded bg-blue-500/15 px-1 py-0.5 text-[10px] text-blue-300">
+                        <span className="ml-1 rounded bg-blue-500/15 px-1 py-0.5 text-[10px] text-blue-700 dark:text-blue-300">
                           recurring
                         </span>
                       )}

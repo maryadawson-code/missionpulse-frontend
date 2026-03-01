@@ -73,7 +73,7 @@ export function ProviderHealthCard() {
               />
               <span className="text-sm text-muted-foreground">{p.name}</span>
               {p.fedRamp && (
-                <span className="rounded bg-green-900/30 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
+                <span className="rounded bg-green-900/30 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
                   FedRAMP
                 </span>
               )}
@@ -88,10 +88,10 @@ export function ProviderHealthCard() {
                   <span
                     className={`text-xs font-medium ${
                       p.status === 'healthy'
-                        ? 'text-green-400'
+                        ? 'text-green-600 dark:text-green-400'
                         : p.status === 'degraded'
-                          ? 'text-yellow-400'
-                          : 'text-red-400'
+                          ? 'text-yellow-600 dark:text-yellow-400'
+                          : 'text-red-600 dark:text-red-400'
                     }`}
                   >
                     {statusLabel(p.status)}

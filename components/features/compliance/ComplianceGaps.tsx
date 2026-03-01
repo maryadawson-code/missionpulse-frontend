@@ -74,18 +74,18 @@ export function ComplianceGaps({ gaps, opportunities }: ComplianceGapsProps) {
               {displayed.map((gap) => {
                 const priorityColor =
                   gap.priority === 'Critical'
-                    ? 'text-red-400'
+                    ? 'text-red-600 dark:text-red-400'
                     : gap.priority === 'High'
-                      ? 'text-amber-400'
+                      ? 'text-amber-600 dark:text-amber-400'
                       : gap.priority === 'Medium'
-                        ? 'text-blue-400'
+                        ? 'text-blue-600 dark:text-blue-400'
                         : 'text-muted-foreground'
 
                 return (
                   <tr key={gap.id} className="transition-colors hover:bg-card/50">
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1.5">
-                        <AlertTriangle className="h-3 w-3 text-amber-400" />
+                        <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                         <span className="font-mono text-xs font-semibold text-primary">
                           {gap.reference}
                         </span>

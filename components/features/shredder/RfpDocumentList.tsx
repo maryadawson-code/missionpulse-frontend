@@ -102,12 +102,12 @@ export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListPro
 
                 <div className="flex items-center gap-2">
                   {isProcessed ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                       <CheckCircle2 className="h-3 w-3" />
                       Parsed
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
                       <AlertCircle className="h-3 w-3" />
                       {doc.upload_status ?? 'Unknown'}
                     </span>

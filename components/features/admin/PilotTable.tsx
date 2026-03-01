@@ -22,9 +22,9 @@ function formatDate(iso: string): string {
 }
 
 function engagementColor(score: number): string {
-  if (score >= 70) return 'text-green-400'
-  if (score >= 40) return 'text-yellow-400'
-  return 'text-red-400'
+  if (score >= 70) return 'text-green-600 dark:text-green-400'
+  if (score >= 40) return 'text-yellow-600 dark:text-yellow-400'
+  return 'text-red-600 dark:text-red-400'
 }
 
 function statusBadge(status: PilotInfo['status']) {
@@ -37,13 +37,13 @@ function statusBadge(status: PilotInfo['status']) {
       )
     case 'expired':
       return (
-        <span className="rounded bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-400">
+        <span className="rounded bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
           Expired
         </span>
       )
     case 'converted':
       return (
-        <span className="rounded bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-400">
+        <span className="rounded bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400">
           Converted
         </span>
       )
@@ -171,9 +171,9 @@ export function PilotTable() {
                 <span
                   className={`font-mono font-medium ${
                     pilot.daysRemaining <= 5
-                      ? 'text-red-400'
+                      ? 'text-red-600 dark:text-red-400'
                       : pilot.daysRemaining <= 10
-                        ? 'text-yellow-400'
+                        ? 'text-yellow-600 dark:text-yellow-400'
                         : 'text-muted-foreground'
                   }`}
                 >
@@ -217,7 +217,7 @@ export function PilotTable() {
                     <button
                       onClick={() => handleConvert(pilot.companyId)}
                       disabled={actionLoading === pilot.companyId}
-                      className="rounded bg-green-900/30 px-2 py-1 text-xs text-green-400 hover:bg-green-900/50 disabled:opacity-50"
+                      className="rounded bg-green-900/30 px-2 py-1 text-xs text-green-600 dark:text-green-400 hover:bg-green-900/50 disabled:opacity-50"
                     >
                       Convert
                     </button>
@@ -227,7 +227,7 @@ export function PilotTable() {
                   <button
                     onClick={() => handleConvert(pilot.companyId)}
                     disabled={actionLoading === pilot.companyId}
-                    className="rounded bg-green-900/30 px-2 py-1 text-xs text-green-400 hover:bg-green-900/50 disabled:opacity-50"
+                    className="rounded bg-green-900/30 px-2 py-1 text-xs text-green-600 dark:text-green-400 hover:bg-green-900/50 disabled:opacity-50"
                   >
                     Convert
                   </button>

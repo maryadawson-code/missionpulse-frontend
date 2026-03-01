@@ -16,10 +16,10 @@ export function GapReport({ report }: GapReportProps) {
 
   const scoreColor =
     summary.overallComplianceScore >= 80
-      ? 'text-emerald-400'
+      ? 'text-emerald-600 dark:text-emerald-400'
       : summary.overallComplianceScore >= 50
-        ? 'text-yellow-400'
-        : 'text-red-400'
+        ? 'text-yellow-600 dark:text-yellow-400'
+        : 'text-red-600 dark:text-red-400'
 
   return (
     <div className="space-y-4">
@@ -40,12 +40,12 @@ export function GapReport({ report }: GapReportProps) {
           <p className="text-lg font-semibold text-foreground">{report.totalRequirements}</p>
           <p className="text-xs text-muted-foreground">Requirements</p>
         </div>
-        <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-3 text-center">
-          <p className="text-lg font-semibold text-red-400">{summary.unassignedRequirements}</p>
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 text-center">
+          <p className="text-lg font-semibold text-red-600 dark:text-red-400">{summary.unassignedRequirements}</p>
           <p className="text-xs text-muted-foreground">Unassigned</p>
         </div>
-        <div className="rounded-lg border border-yellow-900/50 bg-yellow-900/10 p-3 text-center">
-          <p className="text-lg font-semibold text-yellow-400">{summary.emptySections}</p>
+        <div className="rounded-lg border border-yellow-200 dark:border-yellow-900/50 bg-yellow-50 dark:bg-yellow-900/10 p-3 text-center">
+          <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">{summary.emptySections}</p>
           <p className="text-xs text-muted-foreground">Empty Sections</p>
         </div>
         <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
@@ -56,9 +56,9 @@ export function GapReport({ report }: GapReportProps) {
 
       {/* Gap list */}
       {gaps.length === 0 ? (
-        <div className="rounded-lg border border-emerald-900/50 bg-emerald-900/10 p-4 text-center">
-          <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-emerald-400" />
-          <p className="text-sm text-emerald-400">All requirements mapped. No gaps detected.</p>
+        <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/10 p-4 text-center">
+          <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+          <p className="text-sm text-emerald-600 dark:text-emerald-400">All requirements mapped. No gaps detected.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -76,16 +76,16 @@ export function GapReport({ report }: GapReportProps) {
 function GapItem({ gap }: { gap: ComplianceGap }) {
   const icon =
     gap.type === 'unassigned_requirement' ? (
-      <FileQuestion className="h-4 w-4 text-red-400" />
+      <FileQuestion className="h-4 w-4 text-red-600 dark:text-red-400" />
     ) : gap.type === 'empty_section' ? (
-      <FileX className="h-4 w-4 text-yellow-400" />
+      <FileX className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
     ) : (
       <Link2Off className="h-4 w-4 text-muted-foreground" />
     )
 
   const severityBadge = {
-    high: 'bg-red-500/10 text-red-400 border-red-900/50',
-    medium: 'bg-yellow-500/10 text-yellow-400 border-yellow-900/50',
+    high: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50',
+    medium: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900/50',
     low: 'bg-gray-500/10 text-muted-foreground border-border',
   }
 
@@ -104,8 +104,8 @@ function GapItem({ gap }: { gap: ComplianceGap }) {
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{gap.description}</p>
           <div className="mt-2 flex items-start gap-1.5">
-            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-cyan-400/60" />
-            <p className="text-xs text-cyan-400/80">{gap.suggestedFix}</p>
+            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-cyan-600 dark:text-cyan-400/60" />
+            <p className="text-xs text-cyan-600 dark:text-cyan-400/80">{gap.suggestedFix}</p>
           </div>
         </div>
       </div>

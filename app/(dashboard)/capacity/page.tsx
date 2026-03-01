@@ -103,11 +103,11 @@ export default async function CapacityPage() {
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Confirmed</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">{confirmed}</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{confirmed}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Over-Allocated</p>
-          <p className="mt-1 text-lg font-bold text-red-400">
+          <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">
             {overAllocated}
           </p>
         </div>
@@ -144,7 +144,7 @@ export default async function CapacityPage() {
                   </div>
                   <span
                     className={`text-sm font-bold ${
-                      isOver ? 'text-red-400' : 'text-emerald-400'
+                      isOver ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
                     }`}
                   >
                     {totalPct}%
@@ -190,11 +190,11 @@ export default async function CapacityPage() {
                           <span>{a.hours_per_week}h/wk</span>
                         )}
                         {a.is_confirmed ? (
-                          <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">
+                          <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-300">
                             confirmed
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-amber-300">
+                          <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-amber-700 dark:text-amber-300">
                             pending
                           </span>
                         )}

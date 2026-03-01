@@ -66,11 +66,11 @@ interface LaunchControlProps {
 function decisionIcon(decision: string) {
   switch (decision) {
     case 'go':
-      return <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+      return <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
     case 'no_go':
-      return <XCircle className="h-4 w-4 text-red-400" />
+      return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
     case 'conditional':
-      return <AlertTriangle className="h-4 w-4 text-amber-400" />
+      return <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
     default:
       return <Clock className="h-4 w-4 text-muted-foreground" />
   }
@@ -79,11 +79,11 @@ function decisionIcon(decision: string) {
 function decisionColor(decision: string) {
   switch (decision) {
     case 'go':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     case 'no_go':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     case 'conditional':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     default:
       return 'bg-gray-500/20 text-gray-300'
   }
@@ -202,7 +202,7 @@ export function LaunchControl({
             </p>
           </div>
           <p
-            className={`mt-2 text-2xl font-bold ${complianceStats.percentage >= 100 ? 'text-emerald-400' : complianceStats.percentage >= 80 ? 'text-amber-400' : 'text-red-400'}`}
+            className={`mt-2 text-2xl font-bold ${complianceStats.percentage >= 100 ? 'text-emerald-600 dark:text-emerald-400' : complianceStats.percentage >= 80 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}
           >
             {complianceStats.percentage}%
           </p>
@@ -219,7 +219,7 @@ export function LaunchControl({
             </p>
           </div>
           <p
-            className={`mt-2 text-2xl font-bold ${opportunity.pwin >= 70 ? 'text-emerald-400' : opportunity.pwin >= 40 ? 'text-amber-400' : 'text-red-400'}`}
+            className={`mt-2 text-2xl font-bold ${opportunity.pwin >= 70 ? 'text-emerald-600 dark:text-emerald-400' : opportunity.pwin >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}
           >
             {opportunity.pwin}%
           </p>
@@ -236,7 +236,7 @@ export function LaunchControl({
             </p>
           </div>
           <p
-            className={`mt-2 text-2xl font-bold ${daysUntilDue === null ? 'text-muted-foreground' : daysUntilDue <= 2 ? 'text-red-400' : daysUntilDue <= 7 ? 'text-amber-400' : 'text-foreground'}`}
+            className={`mt-2 text-2xl font-bold ${daysUntilDue === null ? 'text-muted-foreground' : daysUntilDue <= 2 ? 'text-red-600 dark:text-red-400' : daysUntilDue <= 7 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}
           >
             {daysUntilDue !== null ? `${daysUntilDue}d` : '—'}
           </p>
@@ -272,16 +272,16 @@ export function LaunchControl({
 
       {/* Warnings */}
       {hasWarnings && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-4 space-y-2">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2">
           {complianceStats.percentage < 100 && (
-            <div className="flex items-center gap-2 text-sm text-amber-300">
+            <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
               <AlertTriangle className="h-4 w-4" />
               {complianceStats.total - complianceStats.verified} compliance
               requirements not yet verified
             </div>
           )}
           {daysUntilDue !== null && daysUntilDue <= 2 && (
-            <div className="flex items-center gap-2 text-sm text-red-300">
+            <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
               <AlertTriangle className="h-4 w-4" />
               Deadline in {daysUntilDue} day{daysUntilDue !== 1 ? 's' : ''}!
             </div>
@@ -498,9 +498,9 @@ export function LaunchControl({
         <div className="px-5 py-4 space-y-2">
           <div className="flex items-center gap-2">
             {complianceStats.percentage >= 100 ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <XCircle className="h-4 w-4 text-red-400" />
+              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             )}
             <span className="text-sm text-foreground">
               All SHALLs mapped to sections
@@ -511,9 +511,9 @@ export function LaunchControl({
           </div>
           <div className="flex items-center gap-2">
             {sectionStats && sectionStats.total > 0 && sectionStats.final === sectionStats.total ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <XCircle className="h-4 w-4 text-red-400" />
+              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             )}
             <span className="text-sm text-foreground">
               All sections in &quot;final&quot; status
@@ -524,9 +524,9 @@ export function LaunchControl({
           </div>
           <div className="flex items-center gap-2">
             {gateDecisions.some((g) => g.gateNumber === 6 && g.decision === 'go') ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <XCircle className="h-4 w-4 text-red-400" />
+              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             )}
             <span className="text-sm text-foreground">
               Gate 6 (Submit/No-Submit) approved
@@ -538,8 +538,8 @@ export function LaunchControl({
         {binderResult && (
           <div className="border-t border-border px-5 py-4">
             <div className="flex items-center gap-2 mb-3">
-              <Download className="h-4 w-4 text-emerald-400" />
-              <span className="text-sm font-medium text-emerald-300">
+              <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                 Binder Assembled Successfully
               </span>
             </div>

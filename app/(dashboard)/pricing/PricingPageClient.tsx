@@ -85,12 +85,12 @@ function statusColor(status: string | null): string {
   switch (status) {
     case 'approved':
     case 'final':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     case 'in_review':
     case 'review':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     case 'draft':
-      return 'bg-slate-500/20 text-slate-300'
+      return 'bg-slate-500/20 text-slate-700 dark:text-slate-300'
     default:
       return 'bg-gray-500/20 text-muted-foreground'
   }

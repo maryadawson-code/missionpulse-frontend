@@ -210,17 +210,17 @@ describe('ComplianceMatrix', () => {
       />
     )
 
-    // Critical -> text-red-400
+    // Critical -> text-red-600 dark:text-red-400
     const criticalEl = screen.getByText('Critical')
-    expect(criticalEl.className).toContain('text-red-400')
+    expect(criticalEl.className).toContain('text-red-600 dark:text-red-400')
 
-    // High -> text-amber-400
+    // High -> text-amber-600 dark:text-amber-400
     const highEl = screen.getByText('High')
-    expect(highEl.className).toContain('text-amber-400')
+    expect(highEl.className).toContain('text-amber-600 dark:text-amber-400')
 
-    // Medium -> text-blue-400
+    // Medium -> text-blue-600 dark:text-blue-400
     const mediumEl = screen.getByText('Medium')
-    expect(mediumEl.className).toContain('text-blue-400')
+    expect(mediumEl.className).toContain('text-blue-600 dark:text-blue-400')
 
     // Low -> text-muted-foreground
     const lowEl = screen.getByText('Low')

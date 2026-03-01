@@ -21,12 +21,12 @@ function statusIcon(status: string) {
   switch (status) {
     case 'healthy':
     case 'configured':
-      return <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+      return <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
     case 'degraded':
-      return <AlertTriangle className="h-5 w-5 text-amber-400" />
+      return <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
     case 'unhealthy':
     case 'not_configured':
-      return <XCircle className="h-5 w-5 text-red-400" />
+      return <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
     default:
       return <AlertTriangle className="h-5 w-5 text-muted-foreground" />
   }
@@ -49,9 +49,9 @@ function statusColor(status: string): string {
 
 function latencyColor(ms: number | undefined): string {
   if (ms === undefined) return 'text-muted-foreground'
-  if (ms < 100) return 'text-emerald-400'
-  if (ms < 500) return 'text-amber-400'
-  return 'text-red-400'
+  if (ms < 100) return 'text-emerald-600 dark:text-emerald-400'
+  if (ms < 500) return 'text-amber-600 dark:text-amber-400'
+  return 'text-red-600 dark:text-red-400'
 }
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -95,7 +95,7 @@ export function SystemHealthDashboard() {
           ) : data ? (
             statusIcon(data.status)
           ) : (
-            <XCircle className="h-5 w-5 text-red-400" />
+            <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
           )}
           <div>
             <p className="text-sm font-semibold text-foreground">
@@ -124,7 +124,7 @@ export function SystemHealthDashboard() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-300">
+        <div className="rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-950/20 p-4 text-sm text-red-700 dark:text-red-300">
           {error}
         </div>
       )}
@@ -161,7 +161,7 @@ export function SystemHealthDashboard() {
                 {check.error && (
                   <div>
                     <dt className="text-xs text-muted-foreground mb-0.5">Error</dt>
-                    <dd className="text-xs text-red-300 break-words">
+                    <dd className="text-xs text-red-700 dark:text-red-300 break-words">
                       {check.error}
                     </dd>
                   </div>

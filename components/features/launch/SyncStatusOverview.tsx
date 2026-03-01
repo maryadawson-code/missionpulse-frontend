@@ -69,10 +69,10 @@ function formatRelativeTime(iso: string | null): string {
 }
 
 const HEALTH_RING_COLORS: Record<string, string> = {
-  excellent: 'text-emerald-400',
-  good: 'text-emerald-400',
-  warning: 'text-amber-400',
-  critical: 'text-red-400',
+  excellent: 'text-emerald-600 dark:text-emerald-400',
+  good: 'text-emerald-600 dark:text-emerald-400',
+  warning: 'text-amber-600 dark:text-amber-400',
+  critical: 'text-red-600 dark:text-red-400',
 }
 
 function getHealthLevel(percentage: number): string {
@@ -85,11 +85,11 @@ function getHealthLevel(percentage: number): string {
 function cardBorderClass(status: SyncStatus): string {
   switch (status) {
     case 'error':
-      return 'border-red-500/30 bg-red-950/10'
+      return 'border-red-500/30 bg-red-50 dark:bg-red-950/10'
     case 'conflict':
-      return 'border-amber-500/30 bg-amber-950/10'
+      return 'border-amber-500/30 bg-amber-50 dark:bg-amber-950/10'
     case 'syncing':
-      return 'border-blue-500/30 bg-blue-950/10'
+      return 'border-blue-500/30 bg-blue-50 dark:bg-blue-950/10'
     case 'synced':
       return 'border-emerald-500/20 bg-emerald-950/5'
     default:
@@ -263,8 +263,8 @@ export function SyncStatusOverview({
                     className={cn(
                       'text-2xl font-bold',
                       conflictCount + errorCount > 0
-                        ? 'text-amber-400'
-                        : 'text-emerald-400'
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-emerald-600 dark:text-emerald-400'
                     )}
                   >
                     {conflictCount + errorCount}
@@ -365,36 +365,36 @@ export function SyncStatusOverview({
               <div className="mt-3 flex items-center gap-1.5 border-t border-border/50 pt-2">
                 {artifact.syncStatus === 'synced' ? (
                   <>
-                    <ShieldCheck className="h-3 w-3 text-emerald-400" />
-                    <span className="text-[10px] text-emerald-400">
+                    <ShieldCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
                       In sync with cloud
                     </span>
                   </>
                 ) : artifact.syncStatus === 'conflict' ? (
                   <>
-                    <AlertOctagon className="h-3 w-3 text-amber-400" />
-                    <span className="text-[10px] text-amber-400">
+                    <AlertOctagon className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400">
                       Conflict detected -- needs resolution
                     </span>
                   </>
                 ) : artifact.syncStatus === 'error' ? (
                   <>
-                    <AlertOctagon className="h-3 w-3 text-red-400" />
-                    <span className="text-[10px] text-red-400">
+                    <AlertOctagon className="h-3 w-3 text-red-600 dark:text-red-400" />
+                    <span className="text-[10px] text-red-600 dark:text-red-400">
                       Sync error -- check connection
                     </span>
                   </>
                 ) : artifact.syncStatus === 'syncing' ? (
                   <>
-                    <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
-                    <span className="text-[10px] text-blue-400">
+                    <Loader2 className="h-3 w-3 animate-spin text-blue-600 dark:text-blue-400" />
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400">
                       Syncing in progress...
                     </span>
                   </>
                 ) : (
                   <>
-                    <Cloud className="h-3 w-3 text-slate-400" />
-                    <span className="text-[10px] text-slate-400">
+                    <Cloud className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground">
                       Not connected to cloud
                     </span>
                   </>

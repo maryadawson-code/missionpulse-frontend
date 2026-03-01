@@ -105,8 +105,8 @@ export default async function ProposalDetailPage({ params }: Props) {
 
   const STATUS_COLORS: Record<string, string> = {
     draft: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-    in_progress: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    submitted: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    in_progress: 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
+    submitted: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
   }
 
   return (

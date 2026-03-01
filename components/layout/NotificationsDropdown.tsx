@@ -30,13 +30,13 @@ const TYPE_LABELS: Record<string, string> = {
 function typeBadgeClass(type: string): string {
   switch (type) {
     case 'gate_approval':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     case 'deadline':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     case 'assignment':
       return 'bg-primary/20 text-primary'
     case 'ai_complete':
-      return 'bg-purple-500/20 text-purple-300'
+      return 'bg-purple-500/20 text-purple-700 dark:text-purple-300'
     default:
       return 'bg-muted text-muted-foreground'
   }

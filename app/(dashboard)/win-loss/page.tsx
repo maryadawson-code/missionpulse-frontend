@@ -6,17 +6,17 @@ function resultStyle(result: string | null): string {
   switch (result?.toLowerCase()) {
     case 'won':
     case 'win':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'lost':
     case 'loss':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     case 'no_bid':
     case 'no bid':
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
     case 'protest':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -84,11 +84,11 @@ export default async function WinLossPage() {
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Wins</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">{wins}</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{wins}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Losses</p>
-          <p className="mt-1 text-lg font-bold text-red-400">{losses}</p>
+          <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">{losses}</p>
         </div>
         <div className="rounded-lg border border-border bg-card/50 p-4">
           <p className="text-xs text-muted-foreground">Win Rate</p>
@@ -231,7 +231,7 @@ export default async function WinLossPage() {
                   <p className="text-xs text-muted-foreground">{lesson.description}</p>
                 )}
                 {lesson.recommendation && (
-                  <p className="text-xs text-emerald-400/80 bg-emerald-500/5 rounded p-2">
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400/80 bg-emerald-500/5 rounded p-2">
                     Recommendation: {lesson.recommendation}
                   </p>
                 )}

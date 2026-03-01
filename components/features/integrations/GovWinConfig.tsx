@@ -112,9 +112,9 @@ export function GovWinConfig({
                 {syncStatus === 'syncing' ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : syncStatus === 'success' ? (
-                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                 ) : syncStatus === 'error' ? (
-                  <XCircle className="h-3 w-3 text-red-400" />
+                  <XCircle className="h-3 w-3 text-red-600 dark:text-red-400" />
                 ) : (
                   <RefreshCw className="h-3 w-3" />
                 )}
@@ -150,7 +150,7 @@ export function GovWinConfig({
         )}
 
         {errorMessage && (
-          <p className="text-xs text-red-400 mt-2">Error: {errorMessage}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
         )}
 
         {!isConnected && (

@@ -58,9 +58,9 @@ export function PresenceIndicator({
         className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs hover:border-input transition-colors"
       >
         {connected ? (
-          <Wifi className="h-3.5 w-3.5 text-emerald-400" />
+          <Wifi className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
         ) : (
-          <WifiOff className="h-3.5 w-3.5 text-red-400" />
+          <WifiOff className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
         )}
 
         {/* Avatar stack */}

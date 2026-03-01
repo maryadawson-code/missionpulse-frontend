@@ -130,15 +130,15 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
   const statusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+        return <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
       case 'failed':
       case 'cancelled':
-        return <XCircle className="h-4 w-4 text-red-400" />
+        return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
       case 'training':
-        return <Loader2 className="h-4 w-4 text-cyan-400 animate-spin" />
+        return <Loader2 className="h-4 w-4 text-cyan-600 dark:text-cyan-400 animate-spin" />
       case 'queued':
       case 'validating':
-        return <Clock className="h-4 w-4 text-yellow-400" />
+        return <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />
     }
@@ -180,7 +180,7 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
           <h3 className="text-sm font-medium text-foreground mb-2">Latest Export</h3>
           <div className="grid grid-cols-3 gap-3 text-center">
             <div>
-              <p className="text-lg font-semibold text-cyan-400">{exportStats.totalExported}</p>
+              <p className="text-lg font-semibold text-cyan-600 dark:text-cyan-400">{exportStats.totalExported}</p>
               <p className="text-xs text-muted-foreground">Training pairs</p>
             </div>
             <div>
@@ -234,12 +234,12 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs ${
                         job.status === 'completed'
-                          ? 'bg-emerald-500/10 text-emerald-400'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                           : job.status === 'failed' || job.status === 'cancelled'
-                            ? 'bg-red-500/10 text-red-400'
+                            ? 'bg-red-500/10 text-red-600 dark:text-red-400'
                             : job.status === 'training'
-                              ? 'bg-cyan-500/10 text-cyan-400'
-                              : 'bg-yellow-500/10 text-yellow-400'
+                              ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
+                              : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
                       }`}
                     >
                       {job.status}
@@ -248,7 +248,7 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
                     {(job.status === 'queued' || job.status === 'training') && (
                       <button
                         onClick={() => handleCancel(job.id)}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-400"
+                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-600 dark:text-red-400"
                         title="Cancel job"
                       >
                         <Square className="h-3.5 w-3.5" />
@@ -275,8 +275,8 @@ export function FineTuneAdmin({ userId, companyId, initialJobs }: FineTuneAdminP
                 {/* Error */}
                 {job.error && (
                   <div className="mt-2 flex items-start gap-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 text-red-400" />
-                    <p className="text-xs text-red-400">{job.error}</p>
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 text-red-600 dark:text-red-400" />
+                    <p className="text-xs text-red-600 dark:text-red-400">{job.error}</p>
                   </div>
                 )}
               </div>

@@ -81,25 +81,25 @@ export function SpendingTrends({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-cyan-400" />
+          <BarChart3 className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
           <h3 className="font-semibold text-foreground">Spending Trends</h3>
           <span className="text-xs text-muted-foreground">5-Year History</span>
         </div>
         {sortedTrends.length >= 2 && (
           <div className="flex items-center gap-1">
             {overallTrend > 0 ? (
-              <TrendingUp className="h-4 w-4 text-emerald-400" />
+              <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             ) : overallTrend < 0 ? (
-              <TrendingDown className="h-4 w-4 text-red-400" />
+              <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
             ) : (
               <Minus className="h-4 w-4 text-muted-foreground" />
             )}
             <span
               className={`text-xs font-medium ${
                 overallTrend > 0
-                  ? 'text-emerald-400'
+                  ? 'text-emerald-600 dark:text-emerald-400'
                   : overallTrend < 0
-                    ? 'text-red-400'
+                    ? 'text-red-600 dark:text-red-400'
                     : 'text-muted-foreground'
               }`}
             >
@@ -123,7 +123,7 @@ export function SpendingTrends({
 
       {/* Error */}
       {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-3 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 text-sm text-red-600 dark:text-red-400">
           {error}
         </div>
       )}
@@ -170,9 +170,9 @@ export function SpendingTrends({
                       <span
                         className={`text-xs font-medium ${
                           yoyChange > 0
-                            ? 'text-emerald-400'
+                            ? 'text-emerald-600 dark:text-emerald-400'
                             : yoyChange < 0
-                              ? 'text-red-400'
+                              ? 'text-red-600 dark:text-red-400'
                               : 'text-muted-foreground'
                         }`}
                       >
