@@ -11,6 +11,9 @@ import * as Sentry from '@sentry/nextjs'
 
 const CUI_PATTERN = /\b(CUI|CONTROLLED|FOUO|NOFORN)\b/i
 
+// Re-export navigation hook for Next.js App Router performance tracing
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart
+
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,

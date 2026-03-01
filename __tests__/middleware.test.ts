@@ -205,7 +205,7 @@ describe('middleware', () => {
   // 9. Rate limiting: returns 429 when checkRateLimit returns { success: false }
   it('returns 429 when rate limit is exceeded', async () => {
     const { getTierForRoute, checkRateLimit } = await import('@/lib/security/rate-limiter')
-    vi.mocked(getTierForRoute).mockReturnValue('standard' as any)
+    vi.mocked(getTierForRoute).mockReturnValue('standard')
     vi.mocked(checkRateLimit).mockResolvedValue({
       success: false,
       limit: 30,
@@ -222,7 +222,7 @@ describe('middleware', () => {
   // 10. Rate limiting: passes through when checkRateLimit succeeds
   it('passes through when rate limit is not exceeded', async () => {
     const { getTierForRoute, checkRateLimit } = await import('@/lib/security/rate-limiter')
-    vi.mocked(getTierForRoute).mockReturnValue('standard' as any)
+    vi.mocked(getTierForRoute).mockReturnValue('standard')
     vi.mocked(checkRateLimit).mockResolvedValue({
       success: true,
       limit: 30,

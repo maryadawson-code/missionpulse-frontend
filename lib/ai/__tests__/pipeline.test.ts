@@ -95,7 +95,7 @@ function setupDefaultMocks() {
   } as any)
 
   // RBAC
-  vi.mocked(resolveRole).mockReturnValue('executive' as any)
+  vi.mocked(resolveRole).mockReturnValue('executive')
   vi.mocked(getAllowedAgents).mockReturnValue(ALL_AGENTS)
 
   // Token gate
@@ -106,9 +106,13 @@ function setupDefaultMocks() {
       consumed: 1000,
       allocated: 50000,
       purchased: 0,
+      overage_used: 0,
+      remaining: 49000,
       total_available: 50000,
       usage_percent: 2,
-    } as any,
+      period_start: '2026-02-01',
+      period_end: '2026-02-28',
+    },
     message: null,
     upgrade_cta: false,
     grace_period: false,

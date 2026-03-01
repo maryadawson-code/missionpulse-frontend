@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   test: {
     environment: 'jsdom',
+    typecheck: {
+      tsconfig: './tsconfig.test.json',
+    },
     include: ['**/*.test.ts', '**/*.test.tsx'],
     exclude: ['node_modules', '.next', 'tests/e2e/**', 'tests/sync/**', 'tests/collaboration/**'],
     setupFiles: ['./tests/setup.ts'],
@@ -22,9 +25,9 @@ export default defineConfig({
         '**/*.test.tsx',
       ],
       thresholds: {
-        lines: 4,
-        functions: 3,
-        branches: 2,
+        lines: 30,
+        functions: 25,
+        branches: 20,
       },
     },
   },
