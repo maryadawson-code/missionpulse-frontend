@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import Link from 'next/link'
 import type { Opportunity } from '@/lib/types'
 
@@ -36,7 +37,7 @@ function pwinColor(pwin: number | null): string {
   return 'text-red-400'
 }
 
-export function OpportunityCard({ opportunity }: OpportunityCardProps) {
+export const OpportunityCard = memo(function OpportunityCard({ opportunity }: OpportunityCardProps) {
   const { id, title, agency, ceiling, pwin, due_date } = opportunity
 
   return (
@@ -63,4 +64,4 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
       )}
     </Link>
   )
-}
+})

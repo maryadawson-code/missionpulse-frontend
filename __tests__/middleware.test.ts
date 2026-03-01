@@ -130,7 +130,7 @@ describe('middleware', () => {
           error: null,
         }),
       },
-    } as any)
+    } as object)
 
     const request = makeRequest('/dashboard')
     const response = await middleware(request)
@@ -158,7 +158,7 @@ describe('middleware', () => {
           error: null,
         }),
       },
-    } as any)
+    } as object)
 
     const request = makeRequest('/login')
     const response = await middleware(request)
@@ -190,7 +190,7 @@ describe('middleware', () => {
           error: null,
         }),
       },
-    } as any)
+    } as object)
 
     const request = makeRequest('/dashboard')
     const response = await middleware(request)
@@ -239,7 +239,7 @@ describe('middleware', () => {
           error: null,
         }),
       },
-    } as any)
+    } as object)
 
     const request = makeRequest('/api/some-endpoint')
     const response = await middleware(request)

@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 
@@ -46,7 +47,7 @@ function volumeColor(volume: string | null): string {
   }
 }
 
-export function SectionCard({ section, teamMembers, opportunityId }: SectionCardProps) {
+export const SectionCard = memo(function SectionCard({ section, teamMembers, opportunityId }: SectionCardProps) {
   const owner = teamMembers.find(
     (m) => m.assignee_email === section.writer_id || m.assignee_name === section.writer_id
   )
@@ -90,4 +91,4 @@ export function SectionCard({ section, teamMembers, opportunityId }: SectionCard
       </div>
     </Link>
   )
-}
+})

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import {
   DragDropContext,
   Droppable,
@@ -84,7 +84,7 @@ export function SwimlaneBoard({
     items: filtered.filter((s) => (s.status ?? 'draft') === col.id),
   }))
 
-  function handleDragEnd(result: DropResult) {
+  const handleDragEnd = useCallback(function handleDragEnd(result: DropResult) {
     if (!canEdit) return
     const { destination, draggableId } = result
     if (!destination) return
@@ -111,7 +111,7 @@ export function SwimlaneBoard({
         addToast('error', res.error ?? 'Failed to update status')
       }
     })
-  }
+  }, [canEdit, sections, opportunityId, startTransition])
 
   return (
     <div className="space-y-4">

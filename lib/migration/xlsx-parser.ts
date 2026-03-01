@@ -1,29 +1,29 @@
 /**
  * XLSX Parser for Data Migration
  *
- * Parses Excel files using SheetJS (xlsx) library.
+ * Parses Excel files using ExcelJS library (same library used for writing).
  * Converts spreadsheets to the same intermediate format as CSV parser.
  */
 'use server'
 
+import ExcelJS from 'exceljs'
 import type { ParsedCSV, ParseError } from './csv-parser'
 
 // ─── XLSX Parsing ────────────────────────────────────────────
 
 /**
  * Parse XLSX buffer into headers and rows.
- * Uses dynamic import of xlsx to keep bundle size down.
+ * Uses ExcelJS for reading (same package used by xlsx-engine for writing).
  */
 export async function parseXLSX(
   buffer: ArrayBuffer,
   sheetIndex = 0
 ): Promise<ParsedCSV & { sheetNames: string[] }> {
   try {
-    // Dynamic import — xlsx is only needed server-side during import
-    const XLSX = await import('xlsx')
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(new Uint8Array(buffer) as unknown as ArrayBuffer)
 
-    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' })
-    const sheetNames = workbook.SheetNames
+    const sheetNames = workbook.worksheets.map((ws) => ws.name)
 
     if (sheetNames.length === 0) {
       return {
@@ -35,26 +35,26 @@ export async function parseXLSX(
       }
     }
 
-    const sheetName = sheetNames[sheetIndex] ?? sheetNames[0]
-    const sheet = workbook.Sheets[sheetName]
+    const worksheet = workbook.worksheets[sheetIndex] ?? workbook.worksheets[0]
 
-    if (!sheet) {
+    if (!worksheet) {
       return {
         headers: [],
         rows: [],
         totalRows: 0,
-        errors: [{ row: 0, column: '', message: `Sheet "${sheetName}" not found` }],
+        errors: [{ row: 0, column: '', message: `Sheet at index ${sheetIndex} not found` }],
         sheetNames,
       }
     }
 
-    // Convert to JSON with header row
-    const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-      defval: '',
-      raw: false, // Return formatted strings
+    // Extract headers from first row
+    const headerRow = worksheet.getRow(1)
+    const headers: string[] = []
+    headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      headers[colNumber - 1] = String(cell.value ?? '')
     })
 
-    if (rawData.length === 0) {
+    if (headers.length === 0) {
       return {
         headers: [],
         rows: [],
@@ -64,32 +64,52 @@ export async function parseXLSX(
       }
     }
 
-    // Extract headers from first record's keys
-    const headers = Object.keys(rawData[0])
     const errors: ParseError[] = []
+    const rows: Record<string, string>[] = []
 
-    // Convert to string records
-    const rows: Record<string, string>[] = rawData.map((rawRow, i) => {
-      const row: Record<string, string> = {}
-      for (const header of headers) {
-        const value = rawRow[header]
+    // Iterate data rows (skip header row 1)
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return // skip header
+
+      const record: Record<string, string> = {}
+      for (let col = 0; col < headers.length; col++) {
+        const cell = row.getCell(col + 1)
+        const value = cell.value
+
         if (value === undefined || value === null) {
-          row[header] = ''
+          record[headers[col]] = ''
         } else if (value instanceof Date) {
-          row[header] = value.toISOString().split('T')[0]
+          record[headers[col]] = value.toISOString().split('T')[0]
+        } else if (typeof value === 'object' && 'result' in value) {
+          // ExcelJS formula result
+          record[headers[col]] = String(value.result ?? '')
+        } else if (typeof value === 'object' && 'richText' in value) {
+          // ExcelJS rich text
+          const richText = value as { richText: Array<{ text: string }> }
+          record[headers[col]] = richText.richText.map((t) => t.text).join('')
         } else {
-          row[header] = String(value)
+          record[headers[col]] = String(value)
         }
       }
 
       // Validate row has at least one non-empty field
-      const hasData = Object.values(row).some((v) => v.trim() !== '')
+      const hasData = Object.values(record).some((v) => v.trim() !== '')
       if (!hasData) {
-        errors.push({ row: i + 2, column: '', message: 'Empty row' })
+        errors.push({ row: rowNumber, column: '', message: 'Empty row' })
+      } else {
+        rows.push(record)
       }
+    })
 
-      return row
-    }).filter((row) => Object.values(row).some((v) => v.trim() !== ''))
+    if (rows.length === 0) {
+      return {
+        headers: [],
+        rows: [],
+        totalRows: 0,
+        errors: [{ row: 0, column: '', message: 'Sheet is empty' }],
+        sheetNames,
+      }
+    }
 
     return { headers, rows, totalRows: rows.length, errors, sheetNames }
   } catch (err) {
@@ -112,9 +132,9 @@ export async function parseXLSX(
  */
 export async function getSheetNames(buffer: ArrayBuffer): Promise<string[]> {
   try {
-    const XLSX = await import('xlsx')
-    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array', bookSheets: true })
-    return workbook.SheetNames
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(new Uint8Array(buffer) as unknown as ArrayBuffer)
+    return workbook.worksheets.map((ws) => ws.name)
   } catch {
     return []
   }

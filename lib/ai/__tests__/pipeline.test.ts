@@ -92,7 +92,7 @@ function setupDefaultMocks() {
         }),
       }),
     }),
-  } as any)
+  } as object)
 
   // RBAC
   vi.mocked(resolveRole).mockReturnValue('executive')

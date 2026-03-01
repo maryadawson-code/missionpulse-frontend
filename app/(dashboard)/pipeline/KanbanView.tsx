@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useCallback, useTransition } from 'react'
 import {
   DragDropContext,
   Droppable,
@@ -34,7 +34,7 @@ export function KanbanView({ opportunities, canEdit = true }: KanbanViewProps) {
     items: opportunities.filter((o) => (o.phase ?? 'Gate 1') === phase),
   }))
 
-  function handleDragEnd(result: DropResult) {
+  const handleDragEnd = useCallback(function handleDragEnd(result: DropResult) {
     if (!canEdit) return
     const { destination, draggableId } = result
     if (!destination) return
@@ -51,7 +51,7 @@ export function KanbanView({ opportunities, canEdit = true }: KanbanViewProps) {
         addToast('error', res.error ?? 'Failed to update phase')
       }
     })
-  }
+  }, [canEdit, opportunities, startTransition])
 
   return (
     <div className="relative">
