@@ -1,0 +1,549 @@
+openapi: 3.1.0
+info:
+  title: MissionPulse API
+  version: 1.7.0
+  description: |
+    MissionPulse API for GovCon proposal management.
+    All authenticated endpoints require a valid Supabase JWT session cookie.
+    Admin endpoints additionally require admin role RBAC permissions.
+  contact:
+    name: Mission Meets Tech, LLC
+    email: support@missionmeetstech.com
+
+servers:
+  - url: https://missionpulse.vercel.app
+    description: Production
+  - url: http://localhost:3000
+    description: Local development
+
+components:
+  securitySchemes:
+    supabaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT token (passed via session cookie or Authorization header)
+    cronSecret:
+      type: http
+      scheme: bearer
+      description: CRON_SECRET bearer token for scheduled job authentication
+    stripeSignature:
+      type: apiKey
+      in: header
+      name: stripe-signature
+      description: Stripe webhook signature for payload verification
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+      required:
+        - error
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+      required:
+        - status
+        - timestamp
+        - version
+
+    DetailedHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+              latency_ms:
+                type: number
+              error:
+                type: string
+
+    MetricsResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        performance:
+          type: object
+          description: p50/p95/p99 performance summaries
+        queries:
+          type: object
+          description: Database query statistics
+        cache:
+          type: object
+          description: Semantic cache hit/miss metrics
+      required:
+        - timestamp
+        - performance
+        - queries
+        - cache
+
+    NewsletterSubscribeRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: Subscriber email address
+        source:
+          type: string
+          default: website
+          description: Subscription source identifier
+      required:
+        - email
+
+    NewsletterUnsubscribeRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+        - email
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    CronDailyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        expired_pilots:
+          type: integer
+          description: Number of pilot subscriptions expired
+        engagement_updated:
+          type: integer
+          description: Number of pilot engagement scores recalculated
+        ran_at:
+          type: string
+          format: date-time
+      required:
+        - success
+        - expired_pilots
+        - engagement_updated
+        - ran_at
+
+    StripeWebhookResponse:
+      type: object
+      properties:
+        received:
+          type: boolean
+
+    SectionVersion:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        user_name:
+          type: string
+        details:
+          type: object
+
+security:
+  - supabaseAuth: []
+
+paths:
+  /api/health:
+    get:
+      summary: Public health check
+      description: Returns basic health status for uptime monitors and load balancers. No authentication required.
+      operationId: getHealth
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+        '503':
+          description: Service is degraded or unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+          headers:
+            Retry-After:
+              schema:
+                type: string
+                example: '30'
+
+  /api/health/detailed:
+    get:
+      summary: Detailed health check (admin only)
+      description: Returns full subsystem health report with latency and error details. Requires admin role.
+      operationId: getDetailedHealth
+      tags: [Health]
+      responses:
+        '200':
+          description: Detailed health report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealthResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions (admin required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/metrics:
+    get:
+      summary: Performance metrics (admin only)
+      description: Returns p50/p95/p99 metrics for instrumented operations, query stats, and cache metrics. Requires admin role.
+      operationId: getMetrics
+      tags: [Metrics]
+      responses:
+        '200':
+          description: Performance metrics report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions (admin required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/newsletter:
+    post:
+      summary: Subscribe to newsletter
+      description: Public endpoint. Subscribes an email to the newsletter. Re-subscribes if previously unsubscribed. Rate limited.
+      operationId: subscribeNewsletter
+      tags: [Newsletter]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsletterSubscribeRequest'
+      responses:
+        '200':
+          description: Successfully subscribed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid email or missing body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Unsubscribe from newsletter (GDPR)
+      description: Public endpoint. Marks email as unsubscribed. GDPR-compliant removal.
+      operationId: unsubscribeNewsletter
+      tags: [Newsletter]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsletterUnsubscribeRequest'
+      responses:
+        '200':
+          description: Successfully unsubscribed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/section-versions:
+    get:
+      summary: Section version history
+      description: Returns version history for a specific proposal section from activity log. Requires authentication.
+      operationId: getSectionVersions
+      tags: [Sections]
+      parameters:
+        - name: sectionId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The section ID to fetch versions for
+      responses:
+        '200':
+          description: Section version history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SectionVersion'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/cron/daily:
+    get:
+      summary: Daily cron job
+      description: |
+        Processes pilot expiry and engagement scoring. Authenticates via CRON_SECRET bearer token.
+        Not for user consumption — called by external scheduler (Vercel Cron, GitHub Actions).
+      operationId: runDailyCron
+      tags: [Cron]
+      security:
+        - cronSecret: []
+      responses:
+        '200':
+          description: Cron job completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CronDailyResponse'
+        '401':
+          description: Invalid or missing CRON_SECRET
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Processing error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/webhooks/stripe:
+    post:
+      summary: Stripe webhook handler
+      description: |
+        Processes Stripe events: checkout.session.completed, invoice.paid.
+        Validates Stripe webhook signature before processing.
+        Credits tokens and updates subscriptions.
+      operationId: handleStripeWebhook
+      tags: [Webhooks]
+      security:
+        - stripeSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Stripe event payload (see Stripe API docs)
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StripeWebhookResponse'
+        '400':
+          description: Missing signature or invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Processing error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/callback:
+    get:
+      summary: Supabase auth callback
+      description: |
+        Handles Supabase authentication callbacks for email confirmation, password reset,
+        and OAuth flows. Exchanges auth code for session and redirects.
+      operationId: handleAuthCallback
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: Auth code to exchange for session
+        - name: next
+          in: query
+          schema:
+            type: string
+            default: /dashboard
+          description: Redirect URL after successful auth
+      responses:
+        '302':
+          description: Redirect to next URL or error page
+
+  /api/integrations/salesforce/callback:
+    get:
+      summary: Salesforce OAuth callback
+      operationId: handleSalesforceCallback
+      tags: [Integrations]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to /admin/integrations with status
+
+  /api/integrations/slack/callback:
+    get:
+      summary: Slack OAuth callback
+      operationId: handleSlackCallback
+      tags: [Integrations]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to /admin/integrations with status
+
+  /api/integrations/m365/callback:
+    get:
+      summary: Microsoft 365 OAuth callback
+      operationId: handleM365Callback
+      tags: [Integrations]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to /admin/integrations with status
+
+  /api/integrations/govwin/callback:
+    get:
+      summary: GovWin OAuth callback
+      operationId: handleGovWinCallback
+      tags: [Integrations]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to /admin/integrations with status
+
+  /api/integrations/docusign/callback:
+    get:
+      summary: DocuSign OAuth callback
+      operationId: handleDocuSignCallback
+      tags: [Integrations]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to /admin/integrations with status
+
+  /api/integrations/google/callback:
+    get:
+      summary: Google Workspace OAuth callback
+      operationId: handleGoogleCallback
+      tags: [Integrations]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to /admin/integrations with status
