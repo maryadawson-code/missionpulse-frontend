@@ -7,6 +7,7 @@
  */
 'use server'
 
+import { createLogger } from '@/lib/logging/logger'
 import type { ClassificationLevel } from './types'
 import { AIError } from './types'
 import type {
@@ -134,10 +135,11 @@ export async function routedQuery(
     // If no fallback or CUI (can't fall back to non-FedRAMP), re-throw
     if (!route.fallback) throw primaryErr
 
-    console.warn(
-      `[ai-router] Primary provider ${route.provider.name} failed, falling back to ${route.fallback.name}:`,
-      primaryErr instanceof Error ? primaryErr.message : primaryErr
-    )
+    createLogger('ai-router').warn('Primary provider failed, falling back', {
+      primary: route.provider.name,
+      fallback: route.fallback.name,
+      error: primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
+    })
 
     return await route.fallback.query(request)
   }
