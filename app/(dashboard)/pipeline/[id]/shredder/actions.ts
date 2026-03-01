@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { extractPdfText } from '@/lib/utils/pdf-parser'
 import { extractDocxText } from '@/lib/utils/docx-parser'
+import { extractXlsxText } from '@/lib/utils/xlsx-text-extractor'
+import { extractPptxText } from '@/lib/utils/pptx-parser'
 import JSZip from 'jszip'
 import type { ActionResult } from '@/lib/types'
 
@@ -29,10 +31,14 @@ export async function uploadAndParseRfp(
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/msword',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-powerpoint',
     'text/plain',
   ]
   if (!allowedTypes.includes(file.type)) {
-    return { success: false, error: 'Unsupported file type. Upload PDF, DOCX, DOC, or TXT files.' }
+    return { success: false, error: 'Unsupported file type. Upload PDF, DOCX, XLSX, PPTX, or TXT files.' }
   }
 
   // Upload to Supabase Storage
@@ -64,6 +70,18 @@ export async function uploadAndParseRfp(
       file.type === 'application/msword'
     ) {
       const parsed = await extractDocxText(buffer)
+      extractedText = parsed.text
+    } else if (
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.type === 'application/vnd.ms-excel'
+    ) {
+      const parsed = await extractXlsxText(buffer)
+      extractedText = parsed.text
+    } else if (
+      file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+      file.type === 'application/vnd.ms-powerpoint'
+    ) {
+      const parsed = await extractPptxText(buffer)
       extractedText = parsed.text
     } else {
       // text/plain
@@ -121,7 +139,7 @@ export async function uploadAndParseRfp(
 
 // ─── ZIP Upload (SAM.gov packages) ────────────────────────────
 
-const EXTRACTABLE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt']
+const EXTRACTABLE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.txt']
 
 export async function uploadAndParseZip(
   opportunityId: string,
@@ -158,7 +176,7 @@ export async function uploadAndParseZip(
   })
 
   if (entries.length === 0) {
-    return { success: false, error: 'ZIP contains no supported documents (PDF, DOCX, DOC, TXT)' }
+    return { success: false, error: 'ZIP contains no supported documents (PDF, DOCX, XLSX, PPTX, TXT)' }
   }
 
   for (const [name, entry] of entries) {
@@ -171,6 +189,10 @@ export async function uploadAndParseZip(
     if (ext === '.pdf') mimeType = 'application/pdf'
     else if (ext === '.docx') mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     else if (ext === '.doc') mimeType = 'application/msword'
+    else if (ext === '.xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    else if (ext === '.xls') mimeType = 'application/vnd.ms-excel'
+    else if (ext === '.pptx') mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    else if (ext === '.ppt') mimeType = 'application/vnd.ms-powerpoint'
 
     // Upload to storage
     const storagePath = `rfp/${opportunityId}/${Date.now()}_${fileName}`
@@ -190,6 +212,12 @@ export async function uploadAndParseZip(
         extractedText = parsed.text
       } else if (ext === '.docx' || ext === '.doc') {
         const parsed = await extractDocxText(entryBuffer)
+        extractedText = parsed.text
+      } else if (ext === '.xlsx' || ext === '.xls') {
+        const parsed = await extractXlsxText(entryBuffer)
+        extractedText = parsed.text
+      } else if (ext === '.pptx' || ext === '.ppt') {
+        const parsed = await extractPptxText(entryBuffer)
         extractedText = parsed.text
       } else {
         extractedText = entryBuffer.toString('utf-8')

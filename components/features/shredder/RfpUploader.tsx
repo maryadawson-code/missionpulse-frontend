@@ -15,6 +15,10 @@ const ACCEPTED_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/msword',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-powerpoint',
   'text/plain',
   'application/zip',
   'application/x-zip-compressed',
@@ -165,7 +169,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.docx,.doc,.txt,.zip"
+          accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.zip"
           multiple
           onChange={handleInputChange}
           className="hidden"
@@ -197,7 +201,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
                   : 'Upload RFP Documents'}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                PDF, Word, text, or ZIP files (SAM.gov packages). Max 50MB each.
+                PDF, Word, Excel, PowerPoint, text, or ZIP (SAM.gov). Max 50MB each.
               </p>
             </div>
           </div>

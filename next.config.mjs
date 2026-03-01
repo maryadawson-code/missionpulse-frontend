@@ -11,6 +11,9 @@ const nextConfig = {
   poweredByHeader: false,
   experimental: {
     instrumentationHook: true,
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
   },
   images: {
     remotePatterns: [
