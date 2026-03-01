@@ -5,7 +5,7 @@
  * - Landing page pass-through with security headers
  * - Auth gate (unauthenticated -> redirect, authenticated -> pass-through)
  * - Auth-only route redirect (authenticated -> /dashboard)
- * - CSP nonce generation
+ * - CSP header generation
  * - Request ID correlation header
  * - Redis-backed rate limiting (429 on exceed)
  * - Missing env vars fallback
@@ -169,15 +169,17 @@ describe('middleware', () => {
     expect(new URL(location!).pathname).toBe('/dashboard')
   })
 
-  // 7. CSP header contains a nonce (unique per request)
-  it('includes a nonce in the Content-Security-Policy header', async () => {
+  // 7. CSP header uses unsafe-inline (no nonce — required for Next.js hydration)
+  it('includes unsafe-inline in CSP script-src without a nonce', async () => {
     const request = makeRequest('/')
     const response = await middleware(request)
 
     const csp = response.headers.get('Content-Security-Policy')
     expect(csp).toBeTruthy()
-    // CSP should contain nonce-<base64> pattern
-    expect(csp).toMatch(/nonce-[A-Za-z0-9+/=]+/)
+    // Must have unsafe-inline for Next.js inline scripts to work
+    expect(csp).toContain("'unsafe-inline'")
+    // Must NOT have a nonce (nonce causes CSP2+ to ignore unsafe-inline → blank pages)
+    expect(csp).not.toMatch(/nonce-[A-Za-z0-9+/=]+/)
   })
 
   // 8. Response has x-request-id header

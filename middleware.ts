@@ -30,22 +30,25 @@ function isLandingPage(pathname: string): boolean {
 }
 
 /**
- * Generate CSP header with per-request nonce.
+ * Generate CSP header (no nonce — unsafe-inline required for Next.js hydration).
  * Production: no 'unsafe-eval' (only needed for HMR in dev).
  * style-src keeps 'unsafe-inline' (required by Tailwind + shadcn).
  */
-function buildCsp(nonce: string): string {
+function buildCsp(): string {
   const isDev = process.env.NODE_ENV === 'development'
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://*.supabase.co'
   const sentryReportUri = process.env.SENTRY_CSP_REPORT_URI
 
+  // Note: 'unsafe-inline' is required for Next.js inline hydration scripts.
+  // Do NOT add a nonce — CSP Level 2+ ignores 'unsafe-inline' when a nonce
+  // is present, which blocks Next.js bootstrap scripts and causes blank pages.
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ''} 'unsafe-inline'`,
+    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${supabaseUrl}/storage/v1/object/public https://*.gravatar.com`,
     "font-src 'self' https://fonts.gstatic.com",
-    `connect-src 'self' ${supabaseUrl} https://api.asksage.ai https://api.sam.gov https://*.sentry.io`,
+    `connect-src 'self' ${supabaseUrl} https://api.asksage.ai https://api.sam.gov https://*.sentry.io wss://${supabaseUrl.replace('https://', '')}`,
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",
@@ -61,27 +64,24 @@ function buildCsp(nonce: string): string {
 }
 
 /**
- * Apply security headers (CSP + nonce) to a response.
+ * Apply security headers (CSP) to a response.
  */
-function applySecurityHeaders(response: NextResponse, nonce: string): void {
-  response.headers.set('Content-Security-Policy', buildCsp(nonce))
-  response.headers.set('x-nonce', nonce)
+function applySecurityHeaders(response: NextResponse): void {
+  response.headers.set('Content-Security-Policy', buildCsp())
 }
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  // Generate correlation ID and CSP nonce for this request
+  // Generate correlation ID for this request
   const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID()
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
   request.headers.set('x-request-id', requestId)
-  request.headers.set('x-nonce', nonce)
 
   // Landing page is public for everyone
   if (isLandingPage(pathname)) {
     const response = NextResponse.next()
     response.headers.set('x-request-id', requestId)
-    applySecurityHeaders(response, nonce)
+    applySecurityHeaders(response)
     return response
   }
 
@@ -196,7 +196,7 @@ export async function middleware(request: NextRequest) {
   }
 
   response.headers.set('x-request-id', requestId)
-  applySecurityHeaders(response, nonce)
+  applySecurityHeaders(response)
   return response
 }
 
