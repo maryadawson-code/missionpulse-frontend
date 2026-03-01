@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 const RfpUploader = dynamic(
   () => import('@/components/features/shredder/RfpUploader').then((m) => m.RfpUploader),
   {
+    ssr: false,
     loading: () => <Skeleton className="h-40 w-full" />,
   }
 )
