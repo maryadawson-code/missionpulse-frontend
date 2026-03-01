@@ -103,11 +103,12 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
             )
             if (result.success) totalProcessed++
           }
-        } catch {
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Upload failed — file may be too large for server'
           setFileStatuses((prev) =>
             prev.map((s, idx) =>
               idx === i
-                ? { ...s, status: 'error', message: 'Unexpected error' }
+                ? { ...s, status: 'error', message }
                 : s
             )
           )
