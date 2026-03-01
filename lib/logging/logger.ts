@@ -20,6 +20,7 @@ interface LogEntry {
   message: string
   module: string
   correlationId?: string
+  requestId?: string
   [key: string]: unknown
 }
 
@@ -59,6 +60,10 @@ function formatEntry(
   }
 
   if (meta) {
+    // Extract requestId from meta before redaction
+    if (meta.requestId && typeof meta.requestId === 'string') {
+      entry.requestId = meta.requestId
+    }
     Object.assign(entry, redactMeta(meta))
   }
 
