@@ -6,6 +6,7 @@ import { Send, Loader2, Bot, User, Sparkles, BookOpen, Search, X, Copy, Check } 
 import { Button } from '@/components/ui/button'
 import { addToast } from '@/components/ui/Toast'
 import { AgentAttribution } from './AgentAttribution'
+import { FeedbackButtons } from './FeedbackButtons'
 import { PromptChips } from './PromptChips'
 import {
   sendChatMessage,
@@ -23,6 +24,7 @@ interface ChatMessage {
   model?: string
   confidence?: 'high' | 'medium' | 'low'
   agentType?: string
+  dbMessageId?: string
 }
 
 interface ExistingMessage {
@@ -69,6 +71,7 @@ export function SmartChatInterface({
       id: m.id,
       role: m.role as 'user' | 'assistant',
       content: m.content,
+      dbMessageId: m.id,
     }))
   )
   const [input, setInput] = useState('')
@@ -160,6 +163,7 @@ export function SmartChatInterface({
           model: result.model,
           confidence: result.confidence,
           agentType: agent,
+          dbMessageId: result.messageId,
         }
         setMessages((prev) => [...prev, assistantMsg])
       } else {
@@ -311,11 +315,22 @@ export function SmartChatInterface({
                 {msg.content}
               </div>
               {msg.role === 'assistant' && (
-                <AgentAttribution
-                  agentType={msg.agentType ?? 'general'}
-                  model={msg.model}
-                  confidence={msg.confidence}
-                />
+                <>
+                  <AgentAttribution
+                    agentType={msg.agentType ?? 'general'}
+                    model={msg.model}
+                    confidence={msg.confidence}
+                  />
+                  {msg.dbMessageId && sessionId && (
+                    <FeedbackButtons
+                      messageId={msg.dbMessageId}
+                      sessionId={sessionId}
+                      agentType={msg.agentType ?? 'general'}
+                      model={msg.model}
+                      confidence={msg.confidence}
+                    />
+                  )}
+                </>
               )}
             </div>
 

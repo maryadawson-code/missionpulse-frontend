@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.9.0] — 2026-03-01 (Production Completeness)
 
 ### Added
+- AI Feedback System — thumbs up/down on AI chat responses with optimistic UI, toggle behavior, and accessibility (`FeedbackButtons` component)
+- `submitAIFeedback` server action with triple-write: `chat_messages.metadata` (inline), `activity_feed` (user-visible), `audit_logs` (NIST AU-9)
+- Feedback integrated into both SmartChatInterface and ChatPanel chat interfaces
+- `sendChatMessage` now returns `messageId` for targeting feedback on specific responses
+- 5 new unit tests for feedback server action (`tests/ai-chat/feedback-actions.test.ts`)
 - Realtime comment streaming via Supabase `postgres_changes` subscription (CommentPanel)
 - Comment edit and delete with author-only enforcement and dual audit trail
 - Track changes persistence — AI suggestion accept/reject decisions logged to `activity_feed` + `audit_logs`

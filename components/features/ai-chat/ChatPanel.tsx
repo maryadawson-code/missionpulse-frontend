@@ -6,6 +6,7 @@ import { Send, Loader2, Bot, User, Sparkles, BookOpen, Search, X, Copy } from 'l
 import { Button } from '@/components/ui/button'
 import { addToast } from '@/components/ui/Toast'
 import { ConfidenceBadge } from '@/components/features/ai/ConfidenceBadge'
+import { FeedbackButtons } from './FeedbackButtons'
 import {
   sendChatMessage,
   createChatSession,
@@ -18,6 +19,7 @@ interface ChatMessage {
   content: string
   model?: string
   confidence?: 'high' | 'medium' | 'low'
+  dbMessageId?: string
 }
 
 interface ExistingMessage {
@@ -64,6 +66,7 @@ export function ChatPanel({
       id: m.id,
       role: m.role as 'user' | 'assistant',
       content: m.content,
+      dbMessageId: m.id,
     }))
   )
   const [input, setInput] = useState('')
@@ -155,6 +158,7 @@ export function ChatPanel({
           content: result.response,
           model: result.model,
           confidence: result.confidence,
+          dbMessageId: result.messageId,
         }
         setMessages((prev) => [...prev, assistantMsg])
       } else {
@@ -264,6 +268,15 @@ export function ChatPanel({
                     <span className="text-[10px] text-muted-foreground">
                       {msg.model} via AskSage
                     </span>
+                  )}
+                  {msg.dbMessageId && sessionId && (
+                    <FeedbackButtons
+                      messageId={msg.dbMessageId}
+                      sessionId={sessionId}
+                      agentType={selectedAgent}
+                      model={msg.model}
+                      confidence={msg.confidence}
+                    />
                   )}
                 </div>
               )}

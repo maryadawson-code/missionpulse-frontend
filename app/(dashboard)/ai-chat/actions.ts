@@ -9,6 +9,7 @@ interface ChatResult {
   response?: string
   model?: string
   confidence?: 'high' | 'medium' | 'low'
+  messageId?: string
   error?: string
 }
 
@@ -59,8 +60,9 @@ export async function sendChatMessage(
   })
 
   // Store assistant message
+  const assistantMessageId = crypto.randomUUID()
   await supabase.from('chat_messages').insert({
-    id: crypto.randomUUID(),
+    id: assistantMessageId,
     session_id: sessionId,
     role: 'assistant',
     content: aiResponse.content,
@@ -81,6 +83,7 @@ export async function sendChatMessage(
     response: aiResponse.content,
     model: aiResponse.model_used,
     confidence: aiResponse.confidence as 'high' | 'medium' | 'low',
+    messageId: assistantMessageId,
   }
 }
 
