@@ -108,7 +108,11 @@ export async function getCompanySubscription(
     .eq('company_id', companyId)
     .single()
 
-  if (error || !sub) return null
+  if (error || !sub) {
+    // Auto-provision: workspace provisioning sets companies.subscription_tier
+    // but doesn't create a company_subscriptions row. Bridge the gap.
+    return autoProvisionSubscription(supabase, companyId)
+  }
 
   const plan = await getPlanById(sub.plan_id as string)
 
@@ -174,6 +178,79 @@ export async function upsertCompanySubscription(params: {
 
   if (error) return { success: false, error: error.message }
   return { success: true }
+}
+
+// ─── Auto-Provision ─────────────────────────────────────────
+
+/**
+ * Bridge the gap between workspace provisioning (companies.subscription_tier)
+ * and the billing system (company_subscriptions). When a company has a tier
+ * but no subscription row, auto-create one from the matching plan.
+ */
+async function autoProvisionSubscription(
+  supabase: ReturnType<typeof createClient>,
+  companyId: string
+): Promise<CompanySubscription | null> {
+  try {
+    // Check if company has a subscription_tier set
+    const { data: company } = await supabase
+      .from('companies')
+      .select('subscription_tier')
+      .eq('id', companyId)
+      .single()
+
+    const tier = (company?.subscription_tier as string) ?? 'starter'
+
+    // Find the plan matching this tier
+    const { data: planRow } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('slug', tier)
+      .eq('is_active', true)
+      .single()
+
+    if (!planRow) return null
+
+    const plan = mapPlan(planRow)
+    const now = new Date()
+    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+
+    // Create the subscription row
+    const { data: newSub, error } = await supabase
+      .from('company_subscriptions')
+      .insert({
+        company_id: companyId,
+        plan_id: plan.id,
+        status: 'active',
+        billing_interval: 'monthly',
+        current_period_start: periodStart.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+        stripe_subscription_id: null,
+        stripe_customer_id: null,
+        auto_overage_enabled: false,
+      })
+      .select()
+      .single()
+
+    if (error || !newSub) return null
+
+    return {
+      id: newSub.id as string,
+      company_id: newSub.company_id as string,
+      plan_id: newSub.plan_id as string,
+      status: 'active',
+      billing_interval: 'monthly',
+      current_period_start: periodStart.toISOString(),
+      current_period_end: periodEnd.toISOString(),
+      stripe_subscription_id: null,
+      stripe_customer_id: null,
+      auto_overage_enabled: false,
+      plan,
+    }
+  } catch {
+    return null
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
