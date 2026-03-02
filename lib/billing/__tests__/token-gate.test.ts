@@ -92,7 +92,7 @@ describe('checkTokenGate()', () => {
     const result = await checkTokenGate('company-1')
     expect(result.allowed).toBe(true)
     expect(result.threshold).toBe('info')
-    expect(result.message).toContain('50%')
+    expect(result.message).toBeNull()
   })
 
   it('allows with warning at 75% usage and shows upgrade CTA', async () => {

@@ -96,7 +96,7 @@ describe('GET /api/health', () => {
     const body = await res.json()
 
     const keys = Object.keys(body)
-    expect(keys).toEqual(['status', 'timestamp', 'version', 'checks'])
+    expect(keys).toEqual(['status', 'timestamp', 'version', 'checks', 'features'])
     expect(body.checks).toHaveProperty('database')
     expect(body.checks).toHaveProperty('auth')
   })
