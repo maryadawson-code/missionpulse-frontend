@@ -5,11 +5,13 @@ import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
 
 // ─── Helper: extract PDF text using pdfjs-dist directly ─────
-// eval('require') bypasses webpack's static analysis so Node.js
-// loads the legacy build (no DOMMatrix) instead of the browser build.
+// eval('require') bypasses webpack module resolution, which otherwise
+// resolves pdfjs-dist to its browser build (causing "DOMMatrix is not
+// defined"). Native require() loads the Node.js-compatible legacy build.
 async function extractPdfTextInline(buffer: Buffer): Promise<string> {
   // eslint-disable-next-line no-eval
-  const pdfjsLib = eval('require')('pdfjs-dist/legacy/build/pdf.mjs')
+  const nativeRequire = eval('require') as NodeRequire
+  const pdfjsLib = nativeRequire('pdfjs-dist/legacy/build/pdf.mjs') as typeof import('pdfjs-dist/legacy/build/pdf.mjs')
   const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise
 
   try {

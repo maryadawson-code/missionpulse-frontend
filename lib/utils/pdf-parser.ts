@@ -14,10 +14,12 @@ export async function extractPdfText(buffer: Buffer): Promise<ParsedPDF> {
     throw new Error('File exceeds maximum size of 50MB')
   }
 
-  // eval('require') bypasses webpack's static analysis so Node.js
-  // loads the legacy build (no DOMMatrix) instead of the browser build.
+  // eval('require') bypasses webpack module resolution, which otherwise
+  // resolves pdfjs-dist to its browser build (causing "DOMMatrix is not
+  // defined"). Native require() loads the Node.js-compatible legacy build.
   // eslint-disable-next-line no-eval
-  const pdfjsLib = eval('require')('pdfjs-dist/legacy/build/pdf.mjs')
+  const nativeRequire = eval('require') as NodeRequire
+  const pdfjsLib = nativeRequire('pdfjs-dist/legacy/build/pdf.mjs') as typeof import('pdfjs-dist/legacy/build/pdf.mjs')
 
   const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise
 
