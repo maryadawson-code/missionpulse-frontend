@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 
 interface RfpUploaderProps {
   opportunityId: string
-  onUploadComplete?: (documentIds: string[]) => void
+  onUploadComplete?: (_documentIds: string[]) => void
 }
 
 const ACCEPTED_TYPES = [

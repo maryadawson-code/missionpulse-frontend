@@ -364,13 +364,11 @@ export async function shredDocument(
         .from('rfp_documents')
         .update({ upload_status: 'shred_failed' })
         .eq('id', documentId)
-      // Surface the real error from the AI pipeline
-      return {
-        success: false,
-        error: response.content.startsWith('AI processing failed:')
-          ? response.content.replace('AI processing failed: ', '')
-          : 'AI service unavailable — check API key configuration or try again later.',
-      }
+      // Surface the ACTUAL error from the AI pipeline — don't swallow it
+      const errorMsg = response.content.startsWith('AI processing failed: ')
+        ? response.content.replace('AI processing failed: ', '')
+        : response.content
+      return { success: false, error: errorMsg }
     }
 
     // Parse requirements from AI response

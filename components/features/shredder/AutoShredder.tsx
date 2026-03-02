@@ -65,7 +65,9 @@ export function AutoShredder({ documentIds, opportunityId, onComplete }: AutoShr
         // Stop early on systemic failure (AI unavailable, auth, etc.)
         const isSystemic = result.error?.includes('unavailable') ||
           result.error?.includes('token limit') ||
-          result.error?.includes('Not authenticated')
+          result.error?.includes('Not authenticated') ||
+          result.error?.includes('subscription') ||
+          result.error?.includes('role does not have access')
         if (isSystemic || consecutiveFailures >= 3) {
           // Mark remaining as failed with same error
           const remainingIds = documentIds.slice(i + 1)
