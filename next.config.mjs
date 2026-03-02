@@ -14,6 +14,7 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
+    serverComponentsExternalPackages: ['pdfjs-dist'],
   },
   images: {
     remotePatterns: [
