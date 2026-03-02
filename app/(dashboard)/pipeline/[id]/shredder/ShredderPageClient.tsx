@@ -37,14 +37,16 @@ export function ShredderPageClient({ opportunityId, documents }: ShredderPageCli
     router.refresh()
   }, [router])
 
-  // Documents with status 'processed' that haven't been shredded yet
-  const unshredded = documents.filter(
-    (d) => d.upload_status === 'processed' && (d.extracted_text?.length ?? 0) >= 50
+  // Documents eligible for shredding: parsed but not yet shredded, or previously failed
+  const shreddable = documents.filter(
+    (d) =>
+      (d.upload_status === 'processed' || d.upload_status === 'shred_failed') &&
+      (d.extracted_text?.length ?? 0) >= 50
   )
 
   const handleShredAll = useCallback(() => {
-    setPendingShredIds(unshredded.map((d) => d.id))
-  }, [unshredded])
+    setPendingShredIds(shreddable.map((d) => d.id))
+  }, [shreddable])
 
   return (
     <>
@@ -62,11 +64,11 @@ export function ShredderPageClient({ opportunityId, documents }: ShredderPageCli
         />
       )}
 
-      {unshredded.length > 0 && pendingShredIds.length === 0 && (
+      {shreddable.length > 0 && pendingShredIds.length === 0 && (
         <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
           <Sparkles className="h-4 w-4 text-primary shrink-0" />
           <p className="text-sm text-muted-foreground flex-1">
-            {unshredded.length} document{unshredded.length !== 1 ? 's' : ''} ready for AI requirements extraction.
+            {shreddable.length} document{shreddable.length !== 1 ? 's' : ''} ready for AI requirements extraction.
           </p>
           <Button size="sm" onClick={handleShredAll}>
             Shred All
