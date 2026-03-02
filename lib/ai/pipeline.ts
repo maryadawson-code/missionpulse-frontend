@@ -79,11 +79,10 @@ export async function aiRequest(
   }
 
   try {
-    // Step 1: Classify the request
-    const classification = await classifyRequest(
-      options.prompt,
-      options.context
-    )
+    // Step 1: Classify the request (skip scanner if caller provides override)
+    const classification = options.classificationOverride
+      ? { level: options.classificationOverride, reasons: ['caller-override'], patterns_matched: [] }
+      : await classifyRequest(options.prompt, options.context)
 
     // Step 2: Select model
     const modelSelection = await selectModel(
@@ -192,9 +191,12 @@ export async function aiRequest(
       log.error('Unexpected error', { error: err instanceof Error ? err.message : String(err) })
     }
 
+    const errorDetail = err instanceof AIError
+      ? `${err.code}: ${err.message}`
+      : err instanceof Error ? err.message : 'Unknown error'
+
     return {
-      content:
-        'AI processing is currently unavailable. Please try again later or complete this task manually.',
+      content: `AI processing failed: ${errorDetail}`,
       model_used: 'none',
       engine: 'asksage',
       confidence: 'low',

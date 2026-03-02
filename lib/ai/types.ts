@@ -58,6 +58,9 @@ export interface AIRequestOptions {
   maxTokens?: number
   temperature?: number
   opportunityId?: string
+  /** Skip content classification and use this level directly.
+   *  Use for known-public content (e.g., published solicitations). */
+  classificationOverride?: ClassificationLevel
 }
 
 export interface AIResponse<T = string> {

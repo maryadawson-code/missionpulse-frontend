@@ -43,5 +43,9 @@ Format as a numbered list with clear delimiters for each field.`
     prompt,
     opportunityId: context.opportunityId,
     systemPrompt,
+    // RFP/solicitation text is from published government sources — not CUI.
+    // Skip content scanner to avoid false OPSEC classification from terms
+    // like "TS/SCI", "FOUO", etc. that appear in public solicitations.
+    classificationOverride: 'UNCLASSIFIED',
   })
 }

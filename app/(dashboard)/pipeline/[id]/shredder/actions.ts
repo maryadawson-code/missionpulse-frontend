@@ -364,10 +364,11 @@ export async function shredDocument(
         .from('rfp_documents')
         .update({ upload_status: 'shred_failed' })
         .eq('id', documentId)
+      // Surface the real error from the AI pipeline
       return {
         success: false,
-        error: response.content.includes('token limit')
-          ? 'Monthly AI token limit reached. Upgrade your plan or try again next month.'
+        error: response.content.startsWith('AI processing failed:')
+          ? response.content.replace('AI processing failed: ', '')
           : 'AI service unavailable — check API key configuration or try again later.',
       }
     }
