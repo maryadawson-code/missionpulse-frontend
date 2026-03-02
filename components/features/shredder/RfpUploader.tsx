@@ -100,10 +100,15 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
 
           if (!uploadRes.ok) {
             const errBody = await uploadRes.json().catch(() => ({ message: 'Upload failed' }))
+            const rawError = errBody.message || errBody.error || 'Unknown error'
+            const isRLS = rawError.includes('row-level security') || rawError.includes('RLS')
+            const userMessage = isRLS
+              ? 'Storage not configured — admin must run storage setup (see docs)'
+              : `Upload failed: ${rawError}`
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, status: 'error', message: `Upload failed: ${errBody.message || errBody.error || 'Unknown error'}` }
+                  ? { ...s, status: 'error', message: userMessage }
                   : s
               )
             )
