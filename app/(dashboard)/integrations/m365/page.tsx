@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { M365Config } from '@/components/features/integrations/M365Config'
 
 export default async function M365Page() {
@@ -29,6 +30,7 @@ export default async function M365Page() {
     .single()
 
   const config = integration?.config as Record<string, unknown> | null
+  const available = await isProviderAvailable('m365')
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -42,6 +44,7 @@ export default async function M365Page() {
 
       <M365Config
         isConnected={integration?.status === 'active'}
+        isAvailable={available}
         userName={(config?.user_name as string) ?? null}
         lastSync={integration?.last_sync ?? null}
         errorMessage={integration?.error_message ?? null}

@@ -13,6 +13,7 @@ type Story = StoryObj<typeof meta>
 export const Connected: Story = {
   args: {
     isConnected: true,
+    isAvailable: true,
     userName: 'Mary Womack',
     userEmail: 'mary@missionmeetstech.com',
     lastSync: '2026-03-01T10:00:00Z',
@@ -23,6 +24,18 @@ export const Connected: Story = {
 export const Disconnected: Story = {
   args: {
     isConnected: false,
+    isAvailable: true,
+    userName: null,
+    userEmail: null,
+    lastSync: null,
+    canEdit: true,
+  },
+}
+
+export const ComingSoon: Story = {
+  args: {
+    isConnected: false,
+    isAvailable: false,
     userName: null,
     userEmail: null,
     lastSync: null,

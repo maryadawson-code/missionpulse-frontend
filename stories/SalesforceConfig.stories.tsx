@@ -13,6 +13,7 @@ type Story = StoryObj<typeof meta>
 export const Connected: Story = {
   args: {
     isConnected: true,
+    isAvailable: true,
     lastSync: '2026-03-01T10:00:00Z',
     errorMessage: null,
     instanceUrl: 'https://mmt.my.salesforce.com',
@@ -27,6 +28,18 @@ export const Connected: Story = {
 export const Disconnected: Story = {
   args: {
     isConnected: false,
+    isAvailable: true,
+    lastSync: null,
+    errorMessage: null,
+    instanceUrl: null,
+    fieldMappings: null,
+  },
+}
+
+export const ComingSoon: Story = {
+  args: {
+    isConnected: false,
+    isAvailable: false,
     lastSync: null,
     errorMessage: null,
     instanceUrl: null,

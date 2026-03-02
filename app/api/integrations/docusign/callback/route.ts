@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
 
   if (!code) {
     return NextResponse.redirect(
-      new URL('/admin/integrations?error=missing_code', request.url)
+      new URL('/integrations/docusign?error=missing_code', request.url)
     )
   }
 
@@ -30,11 +30,11 @@ export async function GET(request: NextRequest) {
 
   if (!result.success) {
     return NextResponse.redirect(
-      new URL(`/admin/integrations?error=${encodeURIComponent(result.error ?? 'docusign_auth_failed')}`, request.url)
+      new URL(`/integrations/docusign?error=${encodeURIComponent(result.error ?? 'docusign_auth_failed')}`, request.url)
     )
   }
 
   return NextResponse.redirect(
-    new URL('/admin/integrations?connected=docusign', request.url)
+    new URL('/integrations/docusign?connected=true', request.url)
   )
 }

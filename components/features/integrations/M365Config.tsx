@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import {
   Link2,
   Link2Off,
@@ -12,11 +12,13 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getAuthUrl, disconnectIntegration } from '@/app/(dashboard)/integrations/actions'
 
 // ─── Types ───────────────────────────────────────────────────
 
 interface M365ConfigProps {
   isConnected: boolean
+  isAvailable: boolean
   userName: string | null
   lastSync: string | null
   errorMessage: string | null
@@ -27,18 +29,36 @@ interface M365ConfigProps {
 
 export function M365Config({
   isConnected,
+  isAvailable,
   userName,
   lastSync,
   errorMessage,
   onedriveRoot,
 }: M365ConfigProps) {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
+  const [isPending, startTransition] = useTransition()
 
   function handleTestConnection() {
     setTestStatus('testing')
     setTimeout(() => {
       setTestStatus(isConnected ? 'success' : 'error')
     }, 1500)
+  }
+
+  function handleConnect() {
+    startTransition(async () => {
+      const { url } = await getAuthUrl('m365')
+      if (!url) return
+      const popup = window.open(url, 'm365-oauth', 'width=600,height=700')
+      if (!popup) window.location.href = url
+    })
+  }
+
+  function handleDisconnect() {
+    startTransition(async () => {
+      await disconnectIntegration('m365')
+      window.location.reload()
+    })
   }
 
   return (
@@ -81,19 +101,32 @@ export function M365Config({
                 Test
               </Button>
             )}
-            <Button variant={isConnected ? 'outline' : 'default'}>
-              {isConnected ? (
-                <>
-                  <Link2Off className="h-4 w-4" />
-                  Disconnect
-                </>
-              ) : (
-                <>
-                  <Link2 className="h-4 w-4" />
-                  Connect M365
-                </>
-              )}
-            </Button>
+            {isAvailable && (
+              <Button
+                variant={isConnected ? 'outline' : 'default'}
+                onClick={isConnected ? handleDisconnect : handleConnect}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isConnected ? (
+                  <>
+                    <Link2Off className="h-4 w-4" />
+                    Disconnect
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4" />
+                    Connect M365
+                  </>
+                )}
+              </Button>
+            )}
+            {!isAvailable && !isConnected && (
+              <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                Coming Soon
+              </span>
+            )}
           </div>
         </div>
 
@@ -113,16 +146,6 @@ export function M365Config({
           <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
         )}
 
-        {!isConnected && (
-          <div className="mt-4 rounded-lg border border-border bg-card/80 p-4">
-            <p className="text-xs text-muted-foreground">
-              Configure <code className="text-primary">M365_CLIENT_ID</code>,{' '}
-              <code className="text-primary">M365_CLIENT_SECRET</code>, and{' '}
-              <code className="text-primary">M365_TENANT_ID</code> in your
-              environment to enable Microsoft 365 integration.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Capabilities */}

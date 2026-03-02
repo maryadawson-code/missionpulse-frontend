@@ -1,20 +1,26 @@
 'use client'
 
+import { useTransition } from 'react'
 import {
   FileSignature,
   Shield,
   FileText,
   Users,
   CheckCircle2,
-  XCircle,
   Clock,
   AlertTriangle,
+  Link2,
+  Link2Off,
+  Loader2,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { getAuthUrl, disconnectIntegration } from '@/app/(dashboard)/integrations/actions'
 
 // ─── Types ───────────────────────────────────────────────────
 
 interface DocuSignConfigProps {
   isConnected: boolean
+  isAvailable: boolean
   userName: string | null
   environment: string
   lastSync: string | null
@@ -25,11 +31,29 @@ interface DocuSignConfigProps {
 
 export function DocuSignConfig({
   isConnected,
+  isAvailable,
   userName,
   environment,
   lastSync,
   canEdit,
 }: DocuSignConfigProps) {
+  const [isPending, startTransition] = useTransition()
+
+  function handleConnect() {
+    startTransition(async () => {
+      const { url } = await getAuthUrl('docusign')
+      if (!url) return
+      const popup = window.open(url, 'docusign-oauth', 'width=600,height=700')
+      if (!popup) window.location.href = url
+    })
+  }
+
+  function handleDisconnect() {
+    startTransition(async () => {
+      await disconnectIntegration('docusign')
+      window.location.reload()
+    })
+  }
   return (
     <div className="space-y-6">
       {/* Connection Status */}
@@ -64,32 +88,43 @@ export function DocuSignConfig({
             </div>
           </div>
 
-          {isConnected ? (
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          ) : (
-            <XCircle className="h-5 w-5 text-muted-foreground" />
-          )}
+          <div className="flex items-center gap-2">
+            {isConnected && (
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            )}
+            {isAvailable && canEdit && (
+              <Button
+                variant={isConnected ? 'outline' : 'default'}
+                onClick={isConnected ? handleDisconnect : handleConnect}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isConnected ? (
+                  <>
+                    <Link2Off className="h-4 w-4" />
+                    Disconnect
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4" />
+                    Connect DocuSign
+                  </>
+                )}
+              </Button>
+            )}
+            {!isAvailable && !isConnected && (
+              <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                Coming Soon
+              </span>
+            )}
+          </div>
         </div>
 
         {lastSync && (
           <p className="mt-3 text-xs text-muted-foreground">
             Last activity: {new Date(lastSync).toLocaleString()}
           </p>
-        )}
-
-        {!isConnected && canEdit && (
-          <div className="mt-4 rounded-lg border border-border bg-muted/50 p-4">
-            <p className="text-sm text-muted-foreground mb-3">
-              Connect DocuSign to enable e-signature routing for gate approvals, NDAs, and
-              teaming agreements.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Required environment variables:{' '}
-              <code className="text-primary">DOCUSIGN_CLIENT_ID</code>,{' '}
-              <code className="text-primary">DOCUSIGN_CLIENT_SECRET</code>,{' '}
-              <code className="text-primary">DOCUSIGN_REDIRECT_URI</code>
-            </p>
-          </div>
         )}
       </div>
 

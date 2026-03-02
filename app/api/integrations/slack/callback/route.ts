@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
 
   if (!code) {
     return NextResponse.redirect(
-      new URL('/admin/integrations?error=missing_code', request.url)
+      new URL('/integrations/slack?error=missing_code', request.url)
     )
   }
 
@@ -14,11 +14,11 @@ export async function GET(request: NextRequest) {
 
   if (!result.success) {
     return NextResponse.redirect(
-      new URL(`/admin/integrations?error=${encodeURIComponent(result.error ?? 'slack_auth_failed')}`, request.url)
+      new URL(`/integrations/slack?error=${encodeURIComponent(result.error ?? 'slack_auth_failed')}`, request.url)
     )
   }
 
   return NextResponse.redirect(
-    new URL('/admin/integrations?connected=slack', request.url)
+    new URL('/integrations/slack?connected=true', request.url)
   )
 }

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
 
   if (!code) {
     return NextResponse.redirect(
-      new URL('/admin/integrations?error=missing_code', request.url)
+      new URL('/integrations/salesforce?error=missing_code', request.url)
     )
   }
 
@@ -14,11 +14,11 @@ export async function GET(request: NextRequest) {
 
   if (!result.success) {
     return NextResponse.redirect(
-      new URL(`/admin/integrations?error=${encodeURIComponent(result.error ?? 'salesforce_auth_failed')}`, request.url)
+      new URL(`/integrations/salesforce?error=${encodeURIComponent(result.error ?? 'salesforce_auth_failed')}`, request.url)
     )
   }
 
   return NextResponse.redirect(
-    new URL('/admin/integrations?connected=salesforce', request.url)
+    new URL('/integrations/salesforce?connected=true', request.url)
   )
 }

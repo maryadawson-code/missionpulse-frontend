@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
 
   if (!code) {
     return NextResponse.redirect(
-      new URL('/admin/integrations?error=missing_code', request.url)
+      new URL('/integrations/govwin?error=missing_code', request.url)
     )
   }
 
@@ -14,11 +14,11 @@ export async function GET(request: NextRequest) {
 
   if (!result.success) {
     return NextResponse.redirect(
-      new URL(`/admin/integrations?error=${encodeURIComponent(result.error ?? 'govwin_auth_failed')}`, request.url)
+      new URL(`/integrations/govwin?error=${encodeURIComponent(result.error ?? 'govwin_auth_failed')}`, request.url)
     )
   }
 
   return NextResponse.redirect(
-    new URL('/admin/integrations?connected=govwin', request.url)
+    new URL('/integrations/govwin?connected=true', request.url)
   )
 }

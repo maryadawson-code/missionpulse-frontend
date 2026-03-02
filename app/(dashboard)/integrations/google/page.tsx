@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolveRole, getModulePermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { GoogleConfig } from '@/components/features/integrations/GoogleConfig'
 
 export default async function GoogleIntegrationPage() {
@@ -33,6 +34,7 @@ export default async function GoogleIntegrationPage() {
     .single()
 
   const config = integration?.config as Record<string, unknown> | null
+  const available = await isProviderAvailable('google')
 
   return (
     <div className="space-y-6">
@@ -45,6 +47,7 @@ export default async function GoogleIntegrationPage() {
 
       <GoogleConfig
         isConnected={integration?.status === 'active'}
+        isAvailable={available}
         userName={(config?.user_name as string) ?? null}
         userEmail={(config?.user_email as string) ?? null}
         lastSync={integration?.last_sync ?? null}

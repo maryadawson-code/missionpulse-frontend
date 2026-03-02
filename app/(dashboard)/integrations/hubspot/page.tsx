@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { HubSpotConfig } from '@/components/features/integrations/HubSpotConfig'
 
 export default async function HubSpotPage() {
@@ -28,6 +29,8 @@ export default async function HubSpotPage() {
     .eq('provider', 'hubspot')
     .single()
 
+  const available = await isProviderAvailable('hubspot')
+
   return (
     <div className="space-y-6">
       <div>
@@ -43,6 +46,7 @@ export default async function HubSpotPage() {
           integration?.status === 'active' ||
           integration?.status === 'connected'
         }
+        isAvailable={available}
         lastSync={integration?.last_sync ?? null}
         errorMessage={integration?.error_message ?? null}
       />

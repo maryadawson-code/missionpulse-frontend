@@ -1,5 +1,6 @@
 'use client'
 
+import { useTransition } from 'react'
 import {
   Cloud,
   Calendar,
@@ -7,14 +8,19 @@ import {
   FileText,
   Mail,
   CheckCircle2,
-  XCircle,
   ExternalLink,
+  Link2,
+  Link2Off,
+  Loader2,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { getAuthUrl, disconnectIntegration } from '@/app/(dashboard)/integrations/actions'
 
 // ─── Types ───────────────────────────────────────────────────
 
 interface GoogleConfigProps {
   isConnected: boolean
+  isAvailable: boolean
   userName: string | null
   userEmail: string | null
   lastSync: string | null
@@ -25,11 +31,29 @@ interface GoogleConfigProps {
 
 export function GoogleConfig({
   isConnected,
+  isAvailable,
   userName,
   userEmail,
   lastSync,
   canEdit,
 }: GoogleConfigProps) {
+  const [isPending, startTransition] = useTransition()
+
+  function handleConnect() {
+    startTransition(async () => {
+      const { url } = await getAuthUrl('google')
+      if (!url) return
+      const popup = window.open(url, 'google-oauth', 'width=600,height=700')
+      if (!popup) window.location.href = url
+    })
+  }
+
+  function handleDisconnect() {
+    startTransition(async () => {
+      await disconnectIntegration('google')
+      window.location.reload()
+    })
+  }
   return (
     <div className="space-y-6">
       {/* Connection Status */}
@@ -57,11 +81,35 @@ export function GoogleConfig({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {isConnected ? (
+          <div className="flex items-center gap-2">
+            {isConnected && (
               <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            ) : (
-              <XCircle className="h-5 w-5 text-muted-foreground" />
+            )}
+            {isAvailable && canEdit && (
+              <Button
+                variant={isConnected ? 'outline' : 'default'}
+                onClick={isConnected ? handleDisconnect : handleConnect}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isConnected ? (
+                  <>
+                    <Link2Off className="h-4 w-4" />
+                    Disconnect
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4" />
+                    Connect Google
+                  </>
+                )}
+              </Button>
+            )}
+            {!isAvailable && !isConnected && (
+              <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                Coming Soon
+              </span>
             )}
           </div>
         </div>
@@ -70,21 +118,6 @@ export function GoogleConfig({
           <p className="mt-3 text-xs text-muted-foreground">
             Last synced: {new Date(lastSync).toLocaleString()}
           </p>
-        )}
-
-        {!isConnected && canEdit && (
-          <div className="mt-4 rounded-lg border border-border bg-muted/50 p-4">
-            <p className="text-sm text-muted-foreground mb-3">
-              Connect to Google Workspace to enable Drive document storage, Calendar event push,
-              and Gmail notifications.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Required environment variables:{' '}
-              <code className="text-primary">GOOGLE_CLIENT_ID</code>,{' '}
-              <code className="text-primary">GOOGLE_CLIENT_SECRET</code>,{' '}
-              <code className="text-primary">GOOGLE_REDIRECT_URI</code>
-            </p>
-          </div>
         )}
       </div>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import {
   Link2,
   Link2Off,
@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getAuthUrl, disconnectIntegration } from '@/app/(dashboard)/integrations/actions'
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ interface FieldMapping {
 
 interface SalesforceConfigProps {
   isConnected: boolean
+  isAvailable: boolean
   lastSync: string | null
   errorMessage: string | null
   instanceUrl: string | null
@@ -59,6 +61,7 @@ const MP_LABELS: Record<string, string> = {
 
 export function SalesforceConfig({
   isConnected,
+  isAvailable,
   lastSync,
   errorMessage,
   instanceUrl,
@@ -69,6 +72,7 @@ export function SalesforceConfig({
     message?: string
   }>({ status: 'idle' })
   const [syncDirection, setSyncDirection] = useState<string>('Bidirectional')
+  const [isPending, startTransition] = useTransition()
 
   const mappings: FieldMapping[] = fieldMappings
     ? fieldMappings.map((m) => ({
@@ -90,6 +94,22 @@ export function SalesforceConfig({
         })
       }
     }, 1500)
+  }
+
+  function handleConnect() {
+    startTransition(async () => {
+      const { url } = await getAuthUrl('salesforce')
+      if (!url) return
+      const popup = window.open(url, 'salesforce-oauth', 'width=600,height=700')
+      if (!popup) window.location.href = url
+    })
+  }
+
+  function handleDisconnect() {
+    startTransition(async () => {
+      await disconnectIntegration('salesforce')
+      window.location.reload()
+    })
   }
 
   function directionIcon(dir: string) {
@@ -145,19 +165,32 @@ export function SalesforceConfig({
               ) : null}
               Test
             </Button>
-            <Button variant={isConnected ? 'outline' : 'default'}>
-              {isConnected ? (
-                <>
-                  <Link2Off className="h-4 w-4" />
-                  Disconnect
-                </>
-              ) : (
-                <>
-                  <Link2 className="h-4 w-4" />
-                  Connect Salesforce
-                </>
-              )}
-            </Button>
+            {isAvailable && (
+              <Button
+                variant={isConnected ? 'outline' : 'default'}
+                onClick={isConnected ? handleDisconnect : handleConnect}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isConnected ? (
+                  <>
+                    <Link2Off className="h-4 w-4" />
+                    Disconnect
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4" />
+                    Connect Salesforce
+                  </>
+                )}
+              </Button>
+            )}
+            {!isAvailable && !isConnected && (
+              <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                Coming Soon
+              </span>
+            )}
           </div>
         </div>
 
@@ -187,16 +220,6 @@ export function SalesforceConfig({
           <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
         )}
 
-        {!isConnected && (
-          <div className="mt-4 rounded-lg border border-border bg-card/80 p-4">
-            <p className="text-xs text-muted-foreground">
-              To connect Salesforce, configure <code className="text-primary">SALESFORCE_CLIENT_ID</code>,{' '}
-              <code className="text-primary">SALESFORCE_CLIENT_SECRET</code>, and{' '}
-              <code className="text-primary">SALESFORCE_REDIRECT_URI</code> in your
-              environment, then click Connect to start the OAuth flow.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Sync Direction */}

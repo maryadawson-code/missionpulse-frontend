@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { SlackConfig } from '@/components/features/integrations/SlackConfig'
 
 export default async function SlackPage() {
@@ -29,6 +30,7 @@ export default async function SlackPage() {
     .single()
 
   const config = integration?.config as Record<string, unknown> | null
+  const available = await isProviderAvailable('slack')
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -41,6 +43,7 @@ export default async function SlackPage() {
 
       <SlackConfig
         isConnected={integration?.status === 'active'}
+        isAvailable={available}
         teamName={(config?.team_name as string) ?? null}
         lastSync={integration?.last_sync ?? null}
         errorMessage={integration?.error_message ?? null}
