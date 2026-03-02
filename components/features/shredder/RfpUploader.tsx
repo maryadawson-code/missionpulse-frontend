@@ -2,8 +2,9 @@
 
 import { useCallback, useState, useRef } from 'react'
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+
 import {
-  createSignedUploadUrl,
+  getStorageUploadInfo,
   processStoredFile,
   processStoredZip,
 } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
@@ -69,35 +70,40 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         const isZip = file.type === 'application/zip' || file.type === 'application/x-zip-compressed' || file.name.endsWith('.zip')
 
         try {
-          // Step 1: Get a signed upload URL from server (admin client, bypasses RLS)
-          const urlResult = await createSignedUploadUrl(opportunityId, file.name)
-          if (!urlResult.success || !urlResult.data) {
+          // Step 1: Get user's access token and storage path from server
+          const info = await getStorageUploadInfo(opportunityId, file.name)
+          if (!info.success || !info.data) {
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, status: 'error', message: urlResult.error ?? 'Failed to prepare upload' }
+                  ? { ...s, status: 'error', message: info.error ?? 'Failed to prepare upload' }
                   : s
               )
             )
             continue
           }
 
-          const { signedUrl, storagePath } = urlResult.data
+          const { accessToken, storagePath, storageUrl } = info.data
 
-          // Step 2: Upload directly via fetch to signed URL
-          // Bypasses Vercel's 4.5MB limit, Supabase SDK, and Storage RLS entirely
-          const uploadRes = await fetch(signedUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          // Step 2: Upload directly to Supabase Storage REST API
+          // Uses the user's JWT — same auth as the server client that was working before.
+          // Bypasses Vercel's 4.5MB server action body limit.
+          const uploadUrl = `${storageUrl}/storage/v1/object/documents/${storagePath}`
+          const uploadRes = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': file.type || 'application/octet-stream',
+            },
             body: file,
           })
 
           if (!uploadRes.ok) {
-            const errText = await uploadRes.text().catch(() => 'Unknown error')
+            const errBody = await uploadRes.json().catch(() => ({ message: 'Upload failed' }))
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, status: 'error', message: `Upload failed: ${errText}` }
+                  ? { ...s, status: 'error', message: `Upload failed: ${errBody.message || errBody.error || 'Unknown error'}` }
                   : s
               )
             )
