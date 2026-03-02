@@ -9,6 +9,7 @@ import {
   getClassificationCeiling,
   getRoleDisplayName,
   getSessionTimeout,
+  filterPermissionsByTier,
 } from '@/lib/rbac/config'
 import Sidebar from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
@@ -20,6 +21,7 @@ import { SessionTimeoutGuard } from '@/components/layout/SessionTimeoutGuard'
 import { GlobalSearch } from '@/components/layout/GlobalSearch'
 import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
 import { SkipNav } from '@/components/layout/SkipNav'
+import { provisionWorkspace } from '@/lib/actions/workspace'
 import type { ModulePermission } from '@/lib/types'
 
 
@@ -45,6 +47,20 @@ export default async function DashboardLayout({
     .select('id, full_name, email, role, avatar_url, company_id')
     .eq('id', user.id)
     .single()
+
+  // ─── Auto-Provision Workspace (one-time for new users) ──────
+  if (profile && !profile.company_id) {
+    await provisionWorkspace()
+    // Re-fetch profile to get updated company_id and role
+    const { data: updatedProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, role, avatar_url, company_id')
+      .eq('id', user.id)
+      .single()
+    if (updatedProfile) {
+      Object.assign(profile, updatedProfile)
+    }
+  }
 
   // Default to 'partner' (most restrictive) if no profile or role found
   const userRole = profile?.role ?? 'partner'
@@ -98,6 +114,20 @@ export default async function DashboardLayout({
     // Non-critical
   }
 
+  // ─── Company Subscription Tier Lookup ───────────────────────
+  let subscriptionTier = 'starter'
+  if (profile?.company_id) {
+    const { data: company } = await supabase
+      .from('companies')
+      .select('subscription_tier')
+      .eq('id', profile.company_id)
+      .single()
+    subscriptionTier = company?.subscription_tier ?? 'starter'
+  }
+
+  // Apply tier-based module filtering on top of RBAC
+  permissions = filterPermissionsByTier(permissions, subscriptionTier)
+
   const isExternal = !isInternalRole(userRole)
   const companyName = profile?.full_name ?? user.email ?? 'External User'
   const forceCUI = hasForceCUIWatermark(userRole)
@@ -138,6 +168,7 @@ export default async function DashboardLayout({
             userDisplayName={profile?.full_name ?? user.email ?? null}
             userRole={userRole}
             unreadNotifications={unreadNotifications}
+            subscriptionTier={subscriptionTier}
           />
         </aside>
 
@@ -148,6 +179,7 @@ export default async function DashboardLayout({
             userDisplayName={profile?.full_name ?? user.email ?? null}
             userRole={userRole}
             unreadNotifications={unreadNotifications}
+            subscriptionTier={subscriptionTier}
           />
         </MobileNav>
 

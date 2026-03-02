@@ -118,9 +118,9 @@ export async function checkTokenGate(
   // Thresholds below 100% — allowed with appropriate message
   const messages: Record<string, string | null> = {
     normal: null,
-    info: '50% of monthly AI credits used.',
-    warning: '75% of monthly AI credits used. Consider upgrading your plan.',
-    urgent: '90% of monthly AI credits used. Limit approaching.',
+    info: null,
+    warning: "You're running low on tokens. Consider upgrading your plan or purchasing more.",
+    urgent: "You're almost out of tokens this month. Purchase more or upgrade your plan to keep using AI features.",
   }
 
   return {

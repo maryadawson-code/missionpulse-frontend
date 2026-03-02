@@ -1,160 +1,79 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
-import { X, ChevronRight, ChevronLeft, Rocket } from 'lucide-react'
-
+import { Rocket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { completeOnboarding } from '@/lib/utils/onboarding'
 
-const TOUR_STEPS = [
-  {
-    title: 'Welcome to MissionPulse',
-    description:
-      'Your AI-powered federal proposal management platform. Let\'s take a quick tour of the key features.',
-    href: '/',
-    icon: '🎯',
-  },
-  {
-    title: 'Pipeline',
-    description:
-      'Track all your opportunities through Shipley phases — from pre-RFP to submission. Create, sort, filter, and manage your entire pipeline.',
-    href: '/pipeline',
-    icon: '📊',
-  },
-  {
-    title: 'Create an Opportunity',
-    description:
-      'Add new opportunities manually or import from SAM.gov. Set agency, NAICS, ceiling, due dates, and let AI calculate your pWin.',
-    href: '/pipeline',
-    icon: '➕',
-  },
-  {
-    title: 'RFP Shredder',
-    description:
-      'Upload an RFP and extract requirements automatically. Build your compliance matrix with AI assistance — every SHALL and MUST statement captured.',
-    href: '/pipeline',
-    icon: '📄',
-  },
-  {
-    title: 'AI Assistant',
-    description:
-      'Ask questions about your opportunities, get strategy recommendations, draft proposal sections, and analyze competitors — all powered by AskSage.',
-    href: '/ai',
-    icon: '🤖',
-  },
-]
-
 interface GuidedTourProps {
   show: boolean
+  userName?: string | null
 }
 
-export function GuidedTour({ show }: GuidedTourProps) {
-  const [step, setStep] = useState(0)
+export function GuidedTour({ show, userName }: GuidedTourProps) {
   const [visible, setVisible] = useState(show)
   const [isPending, startTransition] = useTransition()
-  const router = useRouter()
 
   if (!visible) return null
 
-  const current = TOUR_STEPS[step]
-  const isLast = step === TOUR_STEPS.length - 1
-
-  function handleSkip() {
+  function handleDismiss() {
     startTransition(async () => {
       await completeOnboarding()
       setVisible(false)
     })
   }
 
-  function handleNext() {
-    if (isLast) {
-      startTransition(async () => {
-        await completeOnboarding()
-        setVisible(false)
-        router.push('/pipeline')
-      })
-    } else {
-      setStep((s) => s + 1)
-    }
-  }
-
-  function handlePrev() {
-    if (step > 0) setStep((s) => s - 1)
-  }
+  const greeting = userName ? `Welcome, ${userName.split(' ')[0]}!` : 'Welcome to MissionPulse!'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative mx-4 w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
-        {/* Close button */}
-        <button
-          onClick={handleSkip}
-          className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
-          disabled={isPending}
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        {/* Step indicator */}
-        <div className="mb-4 flex items-center gap-1.5">
-          {TOUR_STEPS.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                i <= step ? 'bg-primary' : 'bg-muted'
-              }`}
-            />
-          ))}
+      <div className="relative mx-4 w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-2xl">
+        {/* Icon */}
+        <div className="mb-5 flex justify-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+            <Rocket className="h-8 w-8 text-primary" />
+          </div>
         </div>
 
         {/* Content */}
         <div className="mb-6 text-center">
-          <div className="mb-3 text-4xl">{current.icon}</div>
-          <h2 className="text-lg font-bold text-foreground">{current.title}</h2>
-          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-            {current.description}
+          <h2 className="text-xl font-bold text-foreground">{greeting}</h2>
+          <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+            We&apos;ve set up a sample opportunity so you can see MissionPulse in action.
+            Here&apos;s what to do next:
           </p>
         </div>
 
-        {/* Step counter */}
-        <p className="mb-4 text-center text-xs text-muted-foreground">
-          Step {step + 1} of {TOUR_STEPS.length}
-        </p>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrev}
-            disabled={step === 0 || isPending}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </Button>
-
-          <button
-            onClick={handleSkip}
-            className="text-xs text-muted-foreground hover:text-foreground"
-            disabled={isPending}
-          >
-            Skip Tour
-          </button>
-
-          <Button size="sm" onClick={handleNext} disabled={isPending}>
-            {isLast ? (
-              <>
-                <Rocket className="h-4 w-4" />
-                Get Started
-              </>
-            ) : (
-              <>
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </>
-            )}
-          </Button>
+        {/* Inline checklist preview */}
+        <div className="mb-6 space-y-2.5">
+          {[
+            { label: 'Explore the sample opportunity', desc: 'See how pipeline tracking works' },
+            { label: 'Upload an RFP document', desc: 'Let the AI extract requirements' },
+            { label: 'Ask the AI a question', desc: 'Get instant proposal guidance' },
+            { label: 'Review your compliance matrix', desc: 'Track requirements coverage' },
+          ].map((item, i) => (
+            <div key={i} className="flex items-start gap-3 rounded-lg bg-muted/50 px-4 py-3">
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                {i + 1}
+              </span>
+              <div>
+                <p className="text-sm font-medium text-foreground">{item.label}</p>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
+
+        {/* Action */}
+        <Button
+          className="w-full"
+          size="lg"
+          onClick={handleDismiss}
+          disabled={isPending}
+        >
+          <Rocket className="mr-2 h-4 w-4" />
+          {isPending ? 'Getting started...' : "Let's Go"}
+        </Button>
       </div>
     </div>
   )

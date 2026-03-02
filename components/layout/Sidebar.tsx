@@ -148,9 +148,10 @@ interface SidebarProps {
   userDisplayName: string | null
   userRole: string | null
   unreadNotifications?: number
+  subscriptionTier?: string
 }
 
-export default function Sidebar({ permissions, userDisplayName, userRole, unreadNotifications = 0 }: SidebarProps) {
+export default function Sidebar({ permissions, userDisplayName, userRole, unreadNotifications = 0, subscriptionTier: _subscriptionTier }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)

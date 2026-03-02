@@ -1,47 +1,47 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import type { OnboardingProgress } from '@/lib/billing/onboarding'
-import { getOnboardingProgress } from '@/lib/billing/onboarding'
 
 interface PilotChecklistProps {
-  companyId: string
+  progress: OnboardingProgress
+  isSoloUser?: boolean
 }
 
-export function PilotChecklist({ companyId }: PilotChecklistProps) {
-  const [progress, setProgress] = useState<OnboardingProgress | null>(null)
+export function PilotChecklist({ progress: initialProgress, isSoloUser = false }: PilotChecklistProps) {
   const [dismissed, setDismissed] = useState(false)
 
-  const load = useCallback(async () => {
-    const data = await getOnboardingProgress(companyId)
-    setProgress(data)
-  }, [companyId])
+  // Filter out "invite_team" step for solo users
+  const steps = isSoloUser
+    ? initialProgress.steps.filter((s) => s.id !== 'invite_team')
+    : initialProgress.steps
 
-  useEffect(() => {
-    load()
-  }, [load])
+  const completedCount = steps.filter((s) => s.completed).length
+  const totalSteps = steps.length
+  const percentComplete = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0
+  const allComplete = completedCount === totalSteps
 
-  if (!progress || dismissed || progress.allComplete) return null
+  if (dismissed || allComplete) return null
 
   return (
     <div className="rounded-lg border border-primary/20 bg-gradient-to-r from-card to-background p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-base font-semibold text-foreground">
-            Pilot Checklist
+            Getting Started
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Complete these steps to get the most out of your 30-day pilot
+            Complete these steps to get the most out of MissionPulse
           </p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-primary">
-            {progress.completedCount}/{progress.totalSteps}
+            {completedCount}/{totalSteps}
           </span>
           <button
             onClick={() => setDismissed(true)}
-            className="text-xs text-muted-foreground hover:text-muted-foreground"
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
             Dismiss
           </button>
@@ -52,13 +52,13 @@ export function PilotChecklist({ companyId }: PilotChecklistProps) {
       <div className="mb-4 h-1.5 rounded-full bg-border">
         <div
           className="h-1.5 rounded-full bg-primary transition-all duration-500"
-          style={{ width: `${progress.percentComplete}%` }}
+          style={{ width: `${percentComplete}%` }}
         />
       </div>
 
       {/* Steps */}
       <div className="space-y-2">
-        {progress.steps.map((step) => (
+        {steps.map((step) => (
           <Link
             key={step.id}
             href={step.href}
@@ -123,7 +123,7 @@ export function PilotChecklist({ companyId }: PilotChecklistProps) {
         ))}
       </div>
 
-      {progress.completedCount === progress.totalSteps - 1 && (
+      {completedCount === totalSteps - 1 && (
         <p className="mt-3 text-center text-xs text-primary/80">
           Almost there! Complete the last step to finish onboarding.
         </p>

@@ -139,11 +139,11 @@ export function BillingDashboard({
       {/* Token packs */}
       {isExecutive && <TokenPackCards />}
 
-      {/* Not executive notice */}
+      {/* Non-executive notice */}
       {!isExecutive && (
         <div className="rounded-xl border border-border bg-card p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Contact your administrator to manage billing and purchase tokens.
+            Contact your team admin to upgrade your plan or purchase additional tokens.
           </p>
         </div>
       )}

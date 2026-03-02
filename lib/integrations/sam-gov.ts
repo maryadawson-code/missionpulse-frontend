@@ -24,6 +24,7 @@ export interface SamOpportunity {
 
 /**
  * Search SAM.gov for opportunities.
+ * Uses MissionPulse's shared API key (no per-user setup needed).
  * Falls back to sam_opportunities table if API key not configured.
  */
 export async function searchSamGov(params: {
@@ -33,6 +34,7 @@ export async function searchSamGov(params: {
   postedFrom?: string
   limit?: number
 }): Promise<{ results: SamOpportunity[]; fromApi: boolean }> {
+  // Use the platform-level SAM.gov key — no user setup required
   const apiKey = process.env.SAM_GOV_API_KEY
 
   // If API key is configured, call SAM.gov API
