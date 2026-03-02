@@ -33,6 +33,8 @@ export function AutoShredder({ documentIds, opportunityId, onComplete }: AutoShr
     if (startedRef.current) return
     startedRef.current = true
 
+    let consecutiveFailures = 0
+
     for (let i = 0; i < documentIds.length; i++) {
       const docId = documentIds[i]
 
@@ -55,6 +57,30 @@ export function AutoShredder({ documentIds, opportunityId, onComplete }: AutoShr
             : p
         )
       )
+
+      if (result.success) {
+        consecutiveFailures = 0
+      } else {
+        consecutiveFailures++
+        // Stop early on systemic failure (AI unavailable, auth, etc.)
+        const isSystemic = result.error?.includes('unavailable') ||
+          result.error?.includes('token limit') ||
+          result.error?.includes('Not authenticated')
+        if (isSystemic || consecutiveFailures >= 3) {
+          // Mark remaining as failed with same error
+          const remainingIds = documentIds.slice(i + 1)
+          if (remainingIds.length > 0) {
+            setProgress((prev) =>
+              prev.map((p) =>
+                remainingIds.includes(p.id)
+                  ? { ...p, status: 'failed', error: result.error ?? 'Skipped — earlier failure' }
+                  : p
+              )
+            )
+          }
+          break
+        }
+      }
     }
 
     setIsDone(true)

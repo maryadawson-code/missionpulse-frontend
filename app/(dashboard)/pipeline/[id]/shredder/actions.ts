@@ -358,6 +358,20 @@ export async function shredDocument(
       opportunityId,
     })
 
+    // Detect AI pipeline fallback (model_used === 'none' means the AI call failed)
+    if (response.model_used === 'none') {
+      await supabase
+        .from('rfp_documents')
+        .update({ upload_status: 'shred_failed' })
+        .eq('id', documentId)
+      return {
+        success: false,
+        error: response.content.includes('token limit')
+          ? 'Monthly AI token limit reached. Upgrade your plan or try again next month.'
+          : 'AI service unavailable — check API key configuration or try again later.',
+      }
+    }
+
     // Parse requirements from AI response
     const parsed = parseExtractedRequirements(response.content)
 
