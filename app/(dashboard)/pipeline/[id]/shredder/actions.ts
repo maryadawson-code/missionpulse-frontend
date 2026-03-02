@@ -4,13 +4,37 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
 
+// ─── Helper: extract PDF text using pdfjs-dist directly ─────
+// eval('require') bypasses webpack's static analysis so Node.js
+// loads the legacy build (no DOMMatrix) instead of the browser build.
+async function extractPdfTextInline(buffer: Buffer): Promise<string> {
+  // eslint-disable-next-line no-eval
+  const pdfjsLib = eval('require')('pdfjs-dist/legacy/build/pdf.mjs')
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise
+
+  try {
+    const pages: string[] = []
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i)
+      const content = await page.getTextContent()
+      const pageText = content.items
+        .filter((item: Record<string, unknown>) => 'str' in item)
+        .map((item: Record<string, unknown>) => item.str as string)
+        .join(' ')
+      pages.push(pageText)
+    }
+    return pages.join('\n')
+  } finally {
+    await doc.destroy()
+  }
+}
+
 // ─── Helper: extract text from a buffer based on MIME type ──────
 async function extractText(buffer: Buffer, mimeType: string): Promise<{ text: string; status: string }> {
   try {
     if (mimeType === 'application/pdf') {
-      const { extractPdfText } = await import('@/lib/utils/pdf-parser')
-      const parsed = await extractPdfText(buffer)
-      return { text: parsed.text, status: 'processed' }
+      const text = await extractPdfTextInline(buffer)
+      return { text, status: 'processed' }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       mimeType === 'application/msword'

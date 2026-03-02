@@ -14,9 +14,10 @@ export async function extractPdfText(buffer: Buffer): Promise<ParsedPDF> {
     throw new Error('File exceeds maximum size of 50MB')
   }
 
-  // Use pdfjs-dist legacy build directly — avoids @napi-rs/canvas native
-  // dependency that breaks inside Next.js webpack-bundled server actions.
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  // eval('require') bypasses webpack's static analysis so Node.js
+  // loads the legacy build (no DOMMatrix) instead of the browser build.
+  // eslint-disable-next-line no-eval
+  const pdfjsLib = eval('require')('pdfjs-dist/legacy/build/pdf.mjs')
 
   const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise
 
@@ -27,8 +28,8 @@ export async function extractPdfText(buffer: Buffer): Promise<ParsedPDF> {
       const page = await doc.getPage(i)
       const content = await page.getTextContent()
       const pageText = content.items
-        .filter((item) => 'str' in item)
-        .map((item) => (item as { str: string }).str)
+        .filter((item: Record<string, unknown>) => 'str' in item)
+        .map((item: Record<string, unknown>) => item.str as string)
         .join(' ')
       pages.push(pageText)
     }
