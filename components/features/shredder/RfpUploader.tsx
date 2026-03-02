@@ -4,9 +4,8 @@ import { useCallback, useState, useRef } from 'react'
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
 import {
-  getStorageUploadInfo,
-  processStoredFile,
-  processStoredZip,
+  uploadRfpFile,
+  uploadRfpZip,
 } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
 import { addToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
@@ -67,57 +66,17 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
 
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i]
-        const isZip = file.type === 'application/zip' || file.type === 'application/x-zip-compressed' || file.name.endsWith('.zip')
+        const isZip =
+          file.type === 'application/zip' ||
+          file.type === 'application/x-zip-compressed' ||
+          file.name.endsWith('.zip')
 
         try {
-          // Step 1: Get user's access token and storage path from server
-          const info = await getStorageUploadInfo(opportunityId, file.name)
-          if (!info.success || !info.data) {
-            setFileStatuses((prev) =>
-              prev.map((s, idx) =>
-                idx === i
-                  ? { ...s, status: 'error', message: info.error ?? 'Failed to prepare upload' }
-                  : s
-              )
-            )
-            continue
-          }
+          const formData = new FormData()
+          formData.append('file', file)
 
-          const { accessToken, storagePath, storageUrl } = info.data
-
-          // Step 2: Upload directly to Supabase Storage REST API
-          // Uses the user's JWT — same auth as the server client that was working before.
-          // Bypasses Vercel's 4.5MB server action body limit.
-          const uploadUrl = `${storageUrl}/storage/v1/object/documents/${storagePath}`
-          const uploadRes = await fetch(uploadUrl, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': file.type || 'application/octet-stream',
-            },
-            body: file,
-          })
-
-          if (!uploadRes.ok) {
-            const errBody = await uploadRes.json().catch(() => ({ message: 'Upload failed' }))
-            const rawError = errBody.message || errBody.error || 'Unknown error'
-            const isRLS = rawError.includes('row-level security') || rawError.includes('RLS')
-            const userMessage = isRLS
-              ? 'Storage not configured — admin must run storage setup (see docs)'
-              : `Upload failed: ${rawError}`
-            setFileStatuses((prev) =>
-              prev.map((s, idx) =>
-                idx === i
-                  ? { ...s, status: 'error', message: userMessage }
-                  : s
-              )
-            )
-            continue
-          }
-
-          // Step 3: Call server action with only metadata (no file data)
           if (isZip) {
-            const result = await processStoredZip(opportunityId, storagePath, file.name, file.size)
+            const result = await uploadRfpZip(opportunityId, formData)
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
@@ -133,13 +92,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
             )
             if (result.success) totalProcessed += result.data?.count ?? 0
           } else {
-            const result = await processStoredFile(
-              opportunityId,
-              storagePath,
-              file.name,
-              file.type,
-              file.size
-            )
+            const result = await uploadRfpFile(opportunityId, formData)
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
@@ -236,7 +189,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
                 Processing files...
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Uploading to storage and extracting text
+                Extracting text from documents
               </p>
             </div>
           </div>

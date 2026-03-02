@@ -1,14 +1,12 @@
 /**
  * Shredder Actions — Module integrity tests
  *
- * These tests verify that the shredder actions module loads correctly.
- * The primary risk is that top-level imports of heavy dependencies
- * (pdf-parse, exceljs, jszip) crash the entire module on Vercel's
- * serverless runtime. All parser imports must be lazy (dynamic import).
+ * Verifies that the shredder actions module loads correctly and all
+ * exports are available. Critical because top-level import failures
+ * crash the entire page.
  */
 import { describe, it, expect, vi } from 'vitest'
 
-// Mock server-only modules before any action imports
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
@@ -16,34 +14,24 @@ vi.mock('next/cache', () => ({
 
 describe('Shredder actions module', () => {
   it('can be imported without throwing', async () => {
-    // This is the critical test — if top-level imports of heavy
-    // dependencies like pdf-parse/exceljs/jszip fail, the import
-    // itself throws and all exports become undefined.
     const actions = await import(
       '@/app/(dashboard)/pipeline/[id]/shredder/actions'
     )
     expect(actions).toBeDefined()
   })
 
-  it('exports getStorageUploadInfo', async () => {
-    const { getStorageUploadInfo } = await import(
+  it('exports uploadRfpFile', async () => {
+    const { uploadRfpFile } = await import(
       '@/app/(dashboard)/pipeline/[id]/shredder/actions'
     )
-    expect(typeof getStorageUploadInfo).toBe('function')
+    expect(typeof uploadRfpFile).toBe('function')
   })
 
-  it('exports processStoredFile', async () => {
-    const { processStoredFile } = await import(
+  it('exports uploadRfpZip', async () => {
+    const { uploadRfpZip } = await import(
       '@/app/(dashboard)/pipeline/[id]/shredder/actions'
     )
-    expect(typeof processStoredFile).toBe('function')
-  })
-
-  it('exports processStoredZip', async () => {
-    const { processStoredZip } = await import(
-      '@/app/(dashboard)/pipeline/[id]/shredder/actions'
-    )
-    expect(typeof processStoredZip).toBe('function')
+    expect(typeof uploadRfpZip).toBe('function')
   })
 
   it('exports deleteRfpDocument', async () => {

@@ -5,9 +5,6 @@ import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
 
 // ─── Helper: extract text from a buffer based on MIME type ──────
-// Parser imports are lazy (dynamic import) so that heavy modules like
-// pdf-parse and exceljs don't crash the entire actions module on Vercel's
-// serverless runtime if they fail to load.
 async function extractText(buffer: Buffer, mimeType: string): Promise<{ text: string; status: string }> {
   try {
     if (mimeType === 'application/pdf') {
@@ -60,74 +57,34 @@ function mimeFromExt(ext: string): string {
   }
 }
 
-// ─── Get the user's access token for direct Storage API calls ───
-// Browser uses this token to upload directly to Supabase Storage REST API,
-// bypassing the Vercel 4.5MB server action body limit.
+// ─── Upload + process a single file ─────────────────────────────
+// File data comes in via FormData. Text is extracted on the server
+// and saved to rfp_documents. No Supabase Storage dependency.
 
-export async function getStorageUploadInfo(
+export async function uploadRfpFile(
   opportunityId: string,
-  fileName: string
-): Promise<ActionResult<{ accessToken: string; storagePath: string; storageUrl: string }>> {
-  try {
-    const supabase = await createClient()
-    // getSession() needed here (not getUser()) because we need the access_token
-    // to pass to the browser for direct Storage API uploads
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return { success: false, error: 'Not authenticated' }
-
-    const storagePath = `rfp/${opportunityId}/${Date.now()}_${fileName}`
-    const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-
-    return {
-      success: true,
-      data: { accessToken: session.access_token, storagePath, storageUrl },
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to prepare upload'
-    return { success: false, error: message }
-  }
-}
-
-// ─── Process a single file already uploaded to Storage ──────────
-// Browser uploads directly to Supabase Storage REST API using the user's JWT,
-// then calls this action with only metadata to extract text and create records.
-
-export async function processStoredFile(
-  opportunityId: string,
-  storagePath: string,
-  fileName: string,
-  fileType: string,
-  fileSize: number
+  formData: FormData
 ): Promise<ActionResult<{ documentId: string }>> {
   try {
     const supabase = await createClient()
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
-    // Download from storage for text extraction
-    const { data: blob, error: downloadError } = await supabase.storage
-      .from('documents')
-      .download(storagePath)
+    const file = formData.get('file') as File | null
+    if (!file) return { success: false, error: 'No file provided' }
 
-    if (downloadError || !blob) {
-      return { success: false, error: `Failed to read file: ${downloadError?.message ?? 'unknown'}` }
-    }
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const { text: extractedText, status: uploadStatus } = await extractText(buffer, file.type)
 
-    const buffer = Buffer.from(await blob.arrayBuffer())
-    const { text: extractedText, status: uploadStatus } = await extractText(buffer, fileType)
-
-    // Insert rfp_documents record
     const { data: doc, error: insertError } = await supabase
       .from('rfp_documents')
       .insert({
         opportunity_id: opportunityId,
-        file_name: fileName,
-        file_type: fileType,
-        file_size: fileSize,
-        storage_path: storagePath,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        storage_path: null,
         extracted_text: extractedText,
         upload_status: uploadStatus,
       })
@@ -138,7 +95,6 @@ export async function processStoredFile(
       return { success: false, error: `Failed to save document: ${insertError.message}` }
     }
 
-    // Activity log
     await supabase.from('activity_log').insert({
       action: 'upload_rfp',
       user_name: user.email ?? 'Unknown',
@@ -146,18 +102,17 @@ export async function processStoredFile(
         entity_type: 'rfp_document',
         entity_id: doc.id,
         opportunity_id: opportunityId,
-        file_name: fileName,
+        file_name: file.name,
         status: uploadStatus,
       },
     })
 
-    // Audit log (immutable)
     await supabase.from('audit_logs').insert({
       action: 'upload_rfp',
       user_id: user.id,
       entity_type: 'rfp_document',
       entity_id: doc.id,
-      details: { opportunity_id: opportunityId, file_name: fileName, upload_status: uploadStatus },
+      details: { opportunity_id: opportunityId, file_name: file.name, upload_status: uploadStatus },
     })
 
     revalidatePath(`/pipeline/${opportunityId}/shredder`)
@@ -168,15 +123,13 @@ export async function processStoredFile(
   }
 }
 
-// ─── Process a ZIP already uploaded to Storage ──────────────────
+// ─── Upload + process a ZIP file ────────────────────────────────
 
 const EXTRACTABLE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.txt']
 
-export async function processStoredZip(
+export async function uploadRfpZip(
   opportunityId: string,
-  storagePath: string,
-  zipFileName: string,
-  fileSize: number
+  formData: FormData
 ): Promise<ActionResult<{ count: number; fileNames: string[] }>> {
   try {
     const supabase = await createClient()
@@ -184,16 +137,10 @@ export async function processStoredZip(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
-    // Download ZIP from storage
-    const { data: blob, error: downloadError } = await supabase.storage
-      .from('documents')
-      .download(storagePath)
+    const file = formData.get('file') as File | null
+    if (!file) return { success: false, error: 'No file provided' }
 
-    if (downloadError || !blob) {
-      return { success: false, error: `Failed to read ZIP: ${downloadError?.message ?? 'unknown'}` }
-    }
-
-    const arrayBuffer = await blob.arrayBuffer()
+    const arrayBuffer = await file.arrayBuffer()
     const JSZip = (await import('jszip')).default
     let zip: InstanceType<typeof JSZip>
 
@@ -203,7 +150,6 @@ export async function processStoredZip(
       return { success: false, error: 'Invalid or corrupted ZIP file' }
     }
 
-    const processedFiles: string[] = []
     const entries = Object.entries(zip.files).filter(([name, entry]) => {
       if (entry.dir) return false
       if (name.startsWith('__MACOSX/') || name.startsWith('.')) return false
@@ -215,23 +161,16 @@ export async function processStoredZip(
       return { success: false, error: 'ZIP contains no supported documents (PDF, DOCX, XLSX, PPTX, TXT)' }
     }
 
+    const processedFiles: string[] = []
+
     for (const [name, entry] of entries) {
       const entryBuffer = Buffer.from(await entry.async('arraybuffer'))
       const fileName = name.includes('/') ? name.substring(name.lastIndexOf('/') + 1) : name
       const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase()
       const mimeType = mimeFromExt(ext)
 
-      // Upload extracted file to storage
-      const entryPath = `rfp/${opportunityId}/${Date.now()}_${fileName}`
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(entryPath, entryBuffer, { contentType: mimeType, upsert: false })
-
-      if (uploadError) continue
-
       const { text: extractedText, status: uploadStatus } = await extractText(entryBuffer, mimeType)
 
-      // Insert record
       const { data: doc } = await supabase
         .from('rfp_documents')
         .insert({
@@ -239,7 +178,7 @@ export async function processStoredZip(
           file_name: fileName,
           file_type: mimeType,
           file_size: entryBuffer.length,
-          storage_path: entryPath,
+          storage_path: null,
           extracted_text: extractedText,
           upload_status: uploadStatus,
         })
@@ -257,7 +196,7 @@ export async function processStoredZip(
             entity_id: doc.id,
             opportunity_id: opportunityId,
             file_name: fileName,
-            source: `zip:${zipFileName}`,
+            source: `zip:${file.name}`,
             status: uploadStatus,
           },
         })
@@ -270,15 +209,12 @@ export async function processStoredZip(
           details: {
             opportunity_id: opportunityId,
             file_name: fileName,
-            source_zip: zipFileName,
+            source_zip: file.name,
             upload_status: uploadStatus,
           },
         })
       }
     }
-
-    // Clean up the ZIP from storage (individual files are already stored)
-    await supabase.storage.from('documents').remove([storagePath])
 
     revalidatePath(`/pipeline/${opportunityId}/shredder`)
     return {
@@ -299,20 +235,18 @@ export async function deleteRfpDocument(
 ): Promise<ActionResult> {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
-  // Fetch storage path to delete file
   const { data: doc } = await supabase
     .from('rfp_documents')
     .select('storage_path, file_name')
     .eq('id', documentId)
     .single()
 
+  // Clean up Storage file if one exists (legacy uploads)
   if (doc?.storage_path) {
-    await supabase.storage.from('documents').remove([doc.storage_path])
+    await supabase.storage.from('documents').remove([doc.storage_path]).catch(() => {})
   }
 
   const { error } = await supabase
