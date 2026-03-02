@@ -24,7 +24,7 @@ export default async function ShredderLandingPage() {
     .single()
 
   const role = resolveRole(profile?.role)
-  if (!hasPermission(role, 'compliance', 'shouldRender')) return null
+  if (!hasPermission(role, 'pipeline', 'shouldRender')) return null
 
   // Fetch opportunities with their RFP document counts
   const { data: opportunities } = await supabase

@@ -46,7 +46,7 @@ export default async function ShredderPage({ params }: ShredderPageProps) {
     .single()
 
   const role = resolveRole(profile?.role)
-  if (!hasPermission(role, 'compliance', 'shouldRender')) return null
+  if (!hasPermission(role, 'pipeline', 'shouldRender')) return null
 
   // Verify opportunity exists (RLS-enforced)
   const { data: opportunity, error: oppError } = await supabase

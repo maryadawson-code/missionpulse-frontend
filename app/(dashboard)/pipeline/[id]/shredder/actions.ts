@@ -2,35 +2,37 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { extractPdfText } from '@/lib/utils/pdf-parser'
-import { extractDocxText } from '@/lib/utils/docx-parser'
-import { extractXlsxText } from '@/lib/utils/xlsx-text-extractor'
-import { extractPptxText } from '@/lib/utils/pptx-parser'
-import JSZip from 'jszip'
 import type { ActionResult } from '@/lib/types'
 
 // ─── Helper: extract text from a buffer based on MIME type ──────
+// Parser imports are lazy (dynamic import) so that heavy modules like
+// pdf-parse and exceljs don't crash the entire actions module on Vercel's
+// serverless runtime if they fail to load.
 async function extractText(buffer: Buffer, mimeType: string): Promise<{ text: string; status: string }> {
   try {
     if (mimeType === 'application/pdf') {
+      const { extractPdfText } = await import('@/lib/utils/pdf-parser')
       const parsed = await extractPdfText(buffer)
       return { text: parsed.text, status: 'processed' }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       mimeType === 'application/msword'
     ) {
+      const { extractDocxText } = await import('@/lib/utils/docx-parser')
       const parsed = await extractDocxText(buffer)
       return { text: parsed.text, status: 'processed' }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
       mimeType === 'application/vnd.ms-excel'
     ) {
+      const { extractXlsxText } = await import('@/lib/utils/xlsx-text-extractor')
       const parsed = await extractXlsxText(buffer)
       return { text: parsed.text, status: 'processed' }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
       mimeType === 'application/vnd.ms-powerpoint'
     ) {
+      const { extractPptxText } = await import('@/lib/utils/pptx-parser')
       const parsed = await extractPptxText(buffer)
       return { text: parsed.text, status: 'processed' }
     } else {
@@ -68,6 +70,8 @@ export async function getStorageUploadInfo(
 ): Promise<ActionResult<{ accessToken: string; storagePath: string; storageUrl: string }>> {
   try {
     const supabase = await createClient()
+    // getSession() needed here (not getUser()) because we need the access_token
+    // to pass to the browser for direct Storage API uploads
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return { success: false, error: 'Not authenticated' }
 
@@ -190,7 +194,8 @@ export async function processStoredZip(
     }
 
     const arrayBuffer = await blob.arrayBuffer()
-    let zip: JSZip
+    const JSZip = (await import('jszip')).default
+    let zip: InstanceType<typeof JSZip>
 
     try {
       zip = await JSZip.loadAsync(arrayBuffer)
