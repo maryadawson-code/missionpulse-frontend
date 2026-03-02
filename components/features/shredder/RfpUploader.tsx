@@ -2,8 +2,6 @@
 
 import { useCallback, useState, useRef } from 'react'
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react'
-import { createBrowserClient } from '@supabase/ssr'
-
 import {
   createSignedUploadUrl,
   processStoredFile,
@@ -64,12 +62,6 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
         validFiles.map((f) => ({ name: f.name, status: 'uploading' }))
       )
 
-      // Browser Supabase client for uploadToSignedUrl
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-
       let totalProcessed = 0
 
       for (let i = 0; i < validFiles.length; i++) {
@@ -90,21 +82,22 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
             continue
           }
 
-          const { token, storagePath } = urlResult.data
+          const { signedUrl, storagePath } = urlResult.data
 
-          // Step 2: Upload directly to Supabase Storage using signed URL
-          // This bypasses both Vercel's 4.5MB limit and Storage RLS
-          const { error: uploadError } = await supabase.storage
-            .from('documents')
-            .uploadToSignedUrl(storagePath, token, file, {
-              contentType: file.type || 'application/octet-stream',
-            })
+          // Step 2: Upload directly via fetch to signed URL
+          // Bypasses Vercel's 4.5MB limit, Supabase SDK, and Storage RLS entirely
+          const uploadRes = await fetch(signedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type || 'application/octet-stream' },
+            body: file,
+          })
 
-          if (uploadError) {
+          if (!uploadRes.ok) {
+            const errText = await uploadRes.text().catch(() => 'Unknown error')
             setFileStatuses((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, status: 'error', message: `Upload failed: ${uploadError.message}` }
+                  ? { ...s, status: 'error', message: `Upload failed: ${errText}` }
                   : s
               )
             )

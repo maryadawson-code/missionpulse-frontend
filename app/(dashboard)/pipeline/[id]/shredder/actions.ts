@@ -65,7 +65,7 @@ function mimeFromExt(ext: string): string {
 export async function createSignedUploadUrl(
   opportunityId: string,
   fileName: string
-): Promise<ActionResult<{ token: string; storagePath: string }>> {
+): Promise<ActionResult<{ signedUrl: string; storagePath: string }>> {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -82,7 +82,7 @@ export async function createSignedUploadUrl(
       return { success: false, error: `Failed to create upload URL: ${error?.message ?? 'unknown'}` }
     }
 
-    return { success: true, data: { token: data.token, storagePath } }
+    return { success: true, data: { signedUrl: data.signedUrl, storagePath } }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create upload URL'
     return { success: false, error: message }
