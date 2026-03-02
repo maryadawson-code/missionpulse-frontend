@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 
 interface RfpUploaderProps {
   opportunityId: string
+  onUploadComplete?: (documentIds: string[]) => void
 }
 
 const ACCEPTED_TYPES = [
@@ -33,7 +34,7 @@ interface FileStatus {
   message?: string
 }
 
-export function RfpUploader({ opportunityId }: RfpUploaderProps) {
+export function RfpUploader({ opportunityId, onUploadComplete }: RfpUploaderProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [fileStatuses, setFileStatuses] = useState<FileStatus[]>([])
@@ -63,6 +64,7 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
       )
 
       let totalProcessed = 0
+      const uploadedDocIds: string[] = []
 
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i]
@@ -90,7 +92,10 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
                   : s
               )
             )
-            if (result.success) totalProcessed += result.data?.count ?? 0
+            if (result.success) {
+              totalProcessed += result.data?.count ?? 0
+              if (result.data?.documentIds) uploadedDocIds.push(...result.data.documentIds)
+            }
           } else {
             const result = await uploadRfpFile(opportunityId, formData)
             setFileStatuses((prev) =>
@@ -106,7 +111,10 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
                   : s
               )
             )
-            if (result.success) totalProcessed++
+            if (result.success) {
+              totalProcessed++
+              if (result.data?.documentId) uploadedDocIds.push(result.data.documentId)
+            }
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Upload failed'
@@ -123,8 +131,13 @@ export function RfpUploader({ opportunityId }: RfpUploaderProps) {
       addToast('success', `Processed ${totalProcessed} document${totalProcessed !== 1 ? 's' : ''}`)
       setIsUploading(false)
       if (inputRef.current) inputRef.current.value = ''
+
+      // Trigger auto-shredding for all successfully uploaded documents
+      if (uploadedDocIds.length > 0 && onUploadComplete) {
+        onUploadComplete(uploadedDocIds)
+      }
     },
-    [opportunityId]
+    [opportunityId, onUploadComplete]
   )
 
   const handleDrop = useCallback(

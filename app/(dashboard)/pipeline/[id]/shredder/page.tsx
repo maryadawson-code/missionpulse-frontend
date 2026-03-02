@@ -1,30 +1,8 @@
 import { notFound } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
-import { Skeleton } from '@/components/ui/skeleton'
-
-const RfpUploader = dynamic(
-  () => import('@/components/features/shredder/RfpUploader').then((m) => m.RfpUploader),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="h-40 w-full" />,
-  }
-)
-
-const RfpDocumentList = dynamic(
-  () => import('@/components/features/shredder/RfpDocumentList').then((m) => m.RfpDocumentList),
-  {
-    loading: () => (
-      <div className="space-y-2">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
-      </div>
-    ),
-  }
-)
+import { ShredderPageClient } from './ShredderPageClient'
 
 interface ShredderPageProps {
   params: Promise<{ id: string }>
@@ -80,11 +58,9 @@ export default async function ShredderPage({ params }: ShredderPageProps) {
         </p>
       </div>
 
-      <RfpUploader opportunityId={id} />
-
-      <RfpDocumentList
-        documents={documents ?? []}
+      <ShredderPageClient
         opportunityId={id}
+        documents={documents ?? []}
       />
     </div>
   )

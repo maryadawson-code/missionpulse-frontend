@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
+import { runComplianceExtraction } from '@/lib/ai/agents/compliance'
+import { parseExtractedRequirements } from '@/lib/ai/agents/parsers'
 
 // ─── Helper: extract PDF text using pdfjs-dist directly ─────
 // pdfjs-dist is externalized via serverComponentsExternalPackages in
@@ -159,7 +161,7 @@ const EXTRACTABLE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx
 export async function uploadRfpZip(
   opportunityId: string,
   formData: FormData
-): Promise<ActionResult<{ count: number; fileNames: string[] }>> {
+): Promise<ActionResult<{ count: number; fileNames: string[]; documentIds: string[] }>> {
   try {
     const supabase = await createClient()
 
@@ -194,6 +196,7 @@ export async function uploadRfpZip(
     }
 
     const processedFiles: string[] = []
+    const documentIds: string[] = []
 
     for (const [name, entry] of entries) {
       const entryBuffer = Buffer.from(await entry.async('arraybuffer'))
@@ -219,6 +222,7 @@ export async function uploadRfpZip(
 
       if (doc) {
         processedFiles.push(fileName)
+        documentIds.push(doc.id)
 
         await supabase.from('activity_log').insert({
           action: 'upload_rfp',
@@ -251,7 +255,7 @@ export async function uploadRfpZip(
     revalidatePath(`/pipeline/${opportunityId}/shredder`)
     return {
       success: true,
-      data: { count: processedFiles.length, fileNames: processedFiles },
+      data: { count: processedFiles.length, fileNames: processedFiles, documentIds },
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'ZIP processing failed'
@@ -309,6 +313,153 @@ export async function deleteRfpDocument(
 
   revalidatePath(`/pipeline/${opportunityId}/shredder`)
   return { success: true }
+}
+
+// ─── Shred: AI extraction on a single document ──────────────────
+
+export async function shredDocument(
+  documentId: string,
+  opportunityId: string
+): Promise<ActionResult<{ requirementCount: number }>> {
+  try {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Not authenticated' }
+
+    // Fetch document text
+    const { data: doc, error: docError } = await supabase
+      .from('rfp_documents')
+      .select('id, extracted_text, file_name, upload_status')
+      .eq('id', documentId)
+      .single()
+
+    if (docError || !doc) {
+      return { success: false, error: 'Document not found' }
+    }
+
+    if (!doc.extracted_text || doc.extracted_text.length < 50) {
+      await supabase
+        .from('rfp_documents')
+        .update({ upload_status: 'shred_failed' })
+        .eq('id', documentId)
+      return { success: false, error: 'Insufficient extracted text (less than 50 characters)' }
+    }
+
+    // Mark as shredding
+    await supabase
+      .from('rfp_documents')
+      .update({ upload_status: 'shredding' })
+      .eq('id', documentId)
+
+    // Run AI extraction
+    const response = await runComplianceExtraction({
+      sourceText: doc.extracted_text.slice(0, 8000),
+      opportunityId,
+    })
+
+    // Parse requirements from AI response
+    const parsed = parseExtractedRequirements(response.content)
+
+    if (parsed.length === 0) {
+      await supabase
+        .from('rfp_documents')
+        .update({ upload_status: 'shred_failed' })
+        .eq('id', documentId)
+      return { success: false, error: 'AI could not extract any requirements from this document' }
+    }
+
+    // Get existing requirement count for REQ numbering
+    const { count: existingCount } = await supabase
+      .from('compliance_requirements')
+      .select('id', { count: 'exact', head: true })
+      .eq('opportunity_id', opportunityId)
+
+    const startIdx = (existingCount ?? 0) + 1
+
+    // Get user's company_id for the insert
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .single()
+
+    // Bulk insert requirements
+    const rows = parsed.map((req, i) => ({
+      opportunity_id: opportunityId,
+      company_id: profile?.company_id ?? null,
+      reference: `REQ-${String(startIdx + i).padStart(3, '0')}`,
+      requirement: req.requirement,
+      section: req.section || null,
+      priority: req.priority || 'Medium',
+      status: 'Not Started',
+      notes: `Auto-extracted from ${doc.file_name} | Confidence: ${req.confidence} | ${req.because}`,
+    }))
+
+    const { error: insertError } = await supabase
+      .from('compliance_requirements')
+      .insert(rows)
+
+    if (insertError) {
+      await supabase
+        .from('rfp_documents')
+        .update({ upload_status: 'shred_failed' })
+        .eq('id', documentId)
+      return { success: false, error: `Failed to save requirements: ${insertError.message}` }
+    }
+
+    // Mark as shredded
+    await supabase
+      .from('rfp_documents')
+      .update({ upload_status: 'shredded' })
+      .eq('id', documentId)
+
+    // Audit trail
+    await supabase.from('activity_log').insert({
+      action: 'shred_document',
+      user_name: user.email ?? 'Unknown',
+      details: {
+        entity_type: 'rfp_document',
+        entity_id: documentId,
+        opportunity_id: opportunityId,
+        file_name: doc.file_name,
+        requirements_extracted: parsed.length,
+      },
+    })
+
+    await supabase.from('audit_logs').insert({
+      action: 'shred_document',
+      user_id: user.id,
+      entity_type: 'rfp_document',
+      entity_id: documentId,
+      details: {
+        opportunity_id: opportunityId,
+        file_name: doc.file_name,
+        requirements_extracted: parsed.length,
+        model_used: response.model_used,
+        tokens_in: response.tokens_in,
+        tokens_out: response.tokens_out,
+      },
+    })
+
+    revalidatePath(`/pipeline/${opportunityId}/shredder`)
+    revalidatePath(`/pipeline/${opportunityId}/shredder/requirements`)
+    revalidatePath(`/pipeline/${opportunityId}/compliance`)
+
+    return { success: true, data: { requirementCount: parsed.length } }
+  } catch (err) {
+    // Attempt to mark failure
+    try {
+      const supabase = await createClient()
+      await supabase
+        .from('rfp_documents')
+        .update({ upload_status: 'shred_failed' })
+        .eq('id', documentId)
+    } catch { /* best-effort */ }
+
+    const message = err instanceof Error ? err.message : 'Shredding failed'
+    return { success: false, error: message }
+  }
 }
 
 // ─── Helper: ensure opportunity has company_id ──────────────────
