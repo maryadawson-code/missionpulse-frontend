@@ -75,11 +75,12 @@ export async function checkRedis(): Promise<CheckResult> {
   try {
     const redis = getRedis()
     if (!redis) {
+      // Redis is optional — the app gracefully degrades without it
+      // (rate limiting, caching return null). Not a health issue.
       return {
-        status: 'degraded',
+        status: 'healthy',
         latency_ms: Date.now() - start,
         last_checked: new Date().toISOString(),
-        error: 'Redis not configured',
       }
     }
     await redis.ping()

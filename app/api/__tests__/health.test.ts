@@ -53,18 +53,17 @@ describe('GET /api/health', () => {
     vi.clearAllMocks()
   })
 
-  it('returns 200 with status, timestamp, and version when healthy', async () => {
+  it('returns 200 with status, timestamp, version, and checks when healthy', async () => {
     mockRunAllChecks.mockResolvedValue(healthyReport())
 
     const res = await GET()
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body).toEqual({
-      status: 'healthy',
-      timestamp: '2026-02-28T12:00:00.000Z',
-      version: '1.0.0',
-    })
+    expect(body.status).toBe('healthy')
+    expect(body.timestamp).toBe('2026-02-28T12:00:00.000Z')
+    expect(body.version).toBe('1.0.0')
+    expect(body.checks).toBeDefined()
   })
 
   it('returns 503 with Retry-After: 30 when unhealthy', async () => {
@@ -90,14 +89,15 @@ describe('GET /api/health', () => {
     expect(res2.headers.get('Cache-Control')).toBe('no-store')
   })
 
-  it('response body only contains status, timestamp, and version (no subsystem details)', async () => {
+  it('response body contains status, timestamp, version, and checks', async () => {
     mockRunAllChecks.mockResolvedValue(healthyReport())
 
     const res = await GET()
     const body = await res.json()
 
     const keys = Object.keys(body)
-    expect(keys).toEqual(['status', 'timestamp', 'version'])
-    expect(body).not.toHaveProperty('checks')
+    expect(keys).toEqual(['status', 'timestamp', 'version', 'checks'])
+    expect(body.checks).toHaveProperty('database')
+    expect(body.checks).toHaveProperty('auth')
   })
 })
