@@ -71,6 +71,9 @@ export async function uploadRfpFile(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
 
+    // Ensure opportunity has company_id for RLS (fixes NULL company_id)
+    await ensureOpportunityCompanyId(supabase, opportunityId, user.id)
+
     const file = formData.get('file') as File | null
     if (!file) return { success: false, error: 'No file provided' }
 
@@ -136,6 +139,9 @@ export async function uploadRfpZip(
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
+
+    // Ensure opportunity has company_id for RLS (fixes NULL company_id)
+    await ensureOpportunityCompanyId(supabase, opportunityId, user.id)
 
     const file = formData.get('file') as File | null
     if (!file) return { success: false, error: 'No file provided' }
@@ -277,4 +283,35 @@ export async function deleteRfpDocument(
 
   revalidatePath(`/pipeline/${opportunityId}/shredder`)
   return { success: true }
+}
+
+// ─── Helper: ensure opportunity has company_id ──────────────────
+// If the opportunity's company_id is NULL (e.g. imported without one),
+// set it to the current user's company_id so RLS policies pass.
+
+async function ensureOpportunityCompanyId(
+  supabase: ReturnType<typeof createClient>,
+  opportunityId: string,
+  userId: string
+) {
+  const { data: opp } = await supabase
+    .from('opportunities')
+    .select('company_id')
+    .eq('id', opportunityId)
+    .single()
+
+  if (opp?.company_id) return // Already set
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .eq('id', userId)
+    .single()
+
+  if (!profile?.company_id) return // User has no company either
+
+  await supabase
+    .from('opportunities')
+    .update({ company_id: profile.company_id })
+    .eq('id', opportunityId)
 }
