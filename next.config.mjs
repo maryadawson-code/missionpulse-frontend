@@ -15,6 +15,9 @@ const nextConfig = {
       bodySizeLimit: '50mb',
     },
     serverComponentsExternalPackages: ['pdfjs-dist'],
+    outputFileTracingIncludes: {
+      '/pipeline/\\[id\\]/shredder': ['./node_modules/pdfjs-dist/**/*'],
+    },
   },
   images: {
     remotePatterns: [
