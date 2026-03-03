@@ -2838,6 +2838,100 @@ export type Database = {
           },
         ]
       }
+      coordination_log: {
+        Row: {
+          id: string
+          rule_id: string
+          trigger_document_id: string
+          company_id: string
+          affected_documents: Json
+          changes_applied: Json
+          status: string
+          error_message: string | null
+          executed_at: string
+        }
+        Insert: {
+          id?: string
+          rule_id: string
+          trigger_document_id: string
+          company_id: string
+          affected_documents?: Json
+          changes_applied?: Json
+          status?: string
+          error_message?: string | null
+          executed_at?: string
+        }
+        Update: {
+          id?: string
+          rule_id?: string
+          trigger_document_id?: string
+          company_id?: string
+          affected_documents?: Json
+          changes_applied?: Json
+          status?: string
+          error_message?: string | null
+          executed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coordination_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "coordination_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coordination_rules: {
+        Row: {
+          id: string
+          company_id: string
+          source_doc_type: string
+          source_field_path: string
+          target_doc_type: string
+          target_field_path: string
+          transform_type: string
+          is_active: boolean
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          source_doc_type: string
+          source_field_path: string
+          target_doc_type: string
+          target_field_path: string
+          transform_type?: string
+          is_active?: boolean
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          source_doc_type?: string
+          source_field_path?: string
+          target_doc_type?: string
+          target_field_path?: string
+          transform_type?: string
+          is_active?: boolean
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coordination_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_role_assignments: {
         Row: {
           assigned_at: string | null
@@ -3411,6 +3505,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           diff_from_previous: Json | null
+          diff_summary: Json | null
           document_id: string | null
           document_type: string
           file_size: number | null
@@ -3418,6 +3513,8 @@ export type Database = {
           id: string
           is_milestone: boolean | null
           opportunity_id: string | null
+          snapshot: Json | null
+          source: string | null
           version_label: string | null
           version_number: number
         }
@@ -3428,15 +3525,18 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           diff_from_previous?: Json | null
+          diff_summary?: Json | null
           document_id?: string | null
-          document_type: string
+          document_type?: string
           file_size?: number | null
           file_url?: string | null
           id?: string
           is_milestone?: boolean | null
           opportunity_id?: string | null
+          snapshot?: Json | null
+          source?: string | null
           version_label?: string | null
-          version_number: number
+          version_number?: number
         }
         Update: {
           changes_summary?: string | null
@@ -3445,6 +3545,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           diff_from_previous?: Json | null
+          diff_summary?: Json | null
           document_id?: string | null
           document_type?: string
           file_size?: number | null
@@ -3452,6 +3553,8 @@ export type Database = {
           id?: string
           is_milestone?: boolean | null
           opportunity_id?: string | null
+          snapshot?: Json | null
+          source?: string | null
           version_label?: string | null
           version_number?: number
         }
@@ -3468,6 +3571,62 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_sync_state: {
+        Row: {
+          id: string
+          document_id: string
+          company_id: string
+          cloud_provider: string
+          cloud_file_id: string
+          sync_status: string
+          last_sync_at: string | null
+          last_cloud_edit_at: string | null
+          last_mp_edit_at: string | null
+          cloud_web_url: string | null
+          metadata: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          document_id: string
+          company_id: string
+          cloud_provider: string
+          cloud_file_id: string
+          sync_status?: string
+          last_sync_at?: string | null
+          last_cloud_edit_at?: string | null
+          last_mp_edit_at?: string | null
+          cloud_web_url?: string | null
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          document_id?: string
+          company_id?: string
+          cloud_provider?: string
+          cloud_file_id?: string
+          sync_status?: string
+          last_sync_at?: string | null
+          last_cloud_edit_at?: string | null
+          last_mp_edit_at?: string | null
+          cloud_web_url?: string | null
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_sync_state_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -7975,52 +8134,73 @@ export type Database = {
       }
       proposal_milestones: {
         Row: {
+          actual_date: string | null
           calendar_id: string | null
           color: string | null
+          company_id: string | null
           completed_at: string | null
           created_at: string | null
+          created_by: string | null
           due_date: string | null
           due_time: string | null
           id: string
           milestone_name: string
           milestone_type: string | null
           notes: string | null
+          opportunity_id: string | null
           owner: string | null
           reminder_days: number | null
+          scheduled_date: string | null
           sort_order: number | null
           status: string | null
+          title: string | null
+          updated_at: string | null
         }
         Insert: {
+          actual_date?: string | null
           calendar_id?: string | null
           color?: string | null
+          company_id?: string | null
           completed_at?: string | null
           created_at?: string | null
-          due_date?: string | null
-          due_time?: string | null
-          id?: string
-          milestone_name: string
-          milestone_type?: string | null
-          notes?: string | null
-          owner?: string | null
-          reminder_days?: number | null
-          sort_order?: number | null
-          status?: string | null
-        }
-        Update: {
-          calendar_id?: string | null
-          color?: string | null
-          completed_at?: string | null
-          created_at?: string | null
+          created_by?: string | null
           due_date?: string | null
           due_time?: string | null
           id?: string
           milestone_name?: string
           milestone_type?: string | null
           notes?: string | null
+          opportunity_id?: string | null
           owner?: string | null
           reminder_days?: number | null
+          scheduled_date?: string | null
           sort_order?: number | null
           status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_date?: string | null
+          calendar_id?: string | null
+          color?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          due_time?: string | null
+          id?: string
+          milestone_name?: string
+          milestone_type?: string | null
+          notes?: string | null
+          opportunity_id?: string | null
+          owner?: string | null
+          reminder_days?: number | null
+          scheduled_date?: string | null
+          sort_order?: number | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -8028,6 +8208,20 @@ export type Database = {
             columns: ["calendar_id"]
             isOneToOne: false
             referencedRelation: "proposal_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_milestones_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_milestones_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
             referencedColumns: ["id"]
           },
         ]
@@ -9566,6 +9760,63 @@ export type Database = {
           },
         ]
       }
+      section_assignments: {
+        Row: {
+          id: string
+          section_id: string
+          assignee_id: string
+          company_id: string
+          volume: string | null
+          status: string
+          word_count: number | null
+          deadline: string | null
+          assigned_by: string | null
+          assigned_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          section_id: string
+          assignee_id: string
+          company_id: string
+          volume?: string | null
+          status?: string
+          word_count?: number | null
+          deadline?: string | null
+          assigned_by?: string | null
+          assigned_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          section_id?: string
+          assignee_id?: string
+          company_id?: string
+          volume?: string | null
+          status?: string
+          word_count?: number | null
+          deadline?: string | null
+          assigned_by?: string | null
+          assigned_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "section_assignments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "section_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       section_versions: {
         Row: {
           author_id: string | null
@@ -10253,6 +10504,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      sync_conflicts: {
+        Row: {
+          id: string
+          document_id: string
+          section_id: string | null
+          company_id: string
+          mp_version: Json
+          cloud_version: Json
+          resolution: string | null
+          resolved_by: string | null
+          resolved_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          document_id: string
+          section_id?: string | null
+          company_id: string
+          mp_version?: Json
+          cloud_version?: Json
+          resolution?: string | null
+          resolved_by?: string | null
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          document_id?: string
+          section_id?: string | null
+          company_id?: string
+          mp_version?: Json
+          cloud_version?: Json
+          resolution?: string | null
+          resolved_by?: string | null
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_conflicts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_comments: {
         Row: {

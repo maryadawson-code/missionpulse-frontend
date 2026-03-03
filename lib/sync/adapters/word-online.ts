@@ -8,7 +8,7 @@
  */
 'use server'
 
-import { createSyncClient } from '@/lib/supabase/sync-client'
+import { createClient } from '@/lib/supabase/server'
 import { refreshM365Token } from '@/lib/integrations/m365/auth'
 import type { ActionResult } from '@/lib/types'
 
@@ -25,7 +25,7 @@ const CUI_MARKERS = [
 // ─── Token Helper ─────────────────────────────────────────────
 
 async function getValidToken(companyId: string): Promise<string | null> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   const { data: integration } = await supabase
     .from('integrations')
@@ -148,7 +148,7 @@ export async function pushToWordOnline(
     }
 
     // Update sync timestamp in document_sync_state
-    const supabase = await createSyncClient()
+    const supabase = await createClient()
     await supabase
       .from('document_sync_state')
       .update({
@@ -210,7 +210,7 @@ export async function pullFromWordOnline(
     const sections = extractSections(rawContent)
 
     // Update sync state
-    const supabase = await createSyncClient()
+    const supabase = await createClient()
     await supabase
       .from('document_sync_state')
       .update({

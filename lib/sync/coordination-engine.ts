@@ -17,8 +17,8 @@
  */
 'use server'
 
-import { createSyncClient } from '@/lib/supabase/sync-client'
 import { createClient } from '@/lib/supabase/server'
+import type { Json } from '@/lib/supabase/database.types'
 import type { ActionResult } from '@/lib/types'
 import type {
   CoordinationRule,
@@ -137,8 +137,8 @@ export async function executeCoordination(
   triggerDocumentId: string,
   companyId: string
 ): Promise<ActionResult> {
-  const syncClient = createSyncClient()
-  const serverClient = createClient()
+  const syncClient = await createClient()
+  const serverClient = await createClient()
 
   // 1. Load the coordination rule
   const { data: rule, error: ruleError } = await syncClient
@@ -278,13 +278,13 @@ export async function executeCoordination(
       company_id: companyId,
       version_number: nextVersion,
       source: 'missionpulse',
-      snapshot: updatedSnapshot,
+      snapshot: updatedSnapshot as unknown as Json,
       diff_summary: {
         additions: 0,
         deletions: 0,
         modifications: 1,
         sections_changed: [typedRule.target_field_path],
-      },
+      } as unknown as Json,
     })
 
     affectedDocuments.push(docId)
@@ -343,7 +343,7 @@ export async function previewCascade(
   ruleId: string,
   newValue: unknown
 ): Promise<CascadePreviewItem[]> {
-  const syncClient = createSyncClient()
+  const syncClient = await createClient()
 
   // Load the rule
   const { data: rule, error: ruleError } = await syncClient
@@ -418,7 +418,7 @@ export async function previewCascade(
 export async function getActiveRules(
   companyId: string
 ): Promise<CoordinationRule[]> {
-  const syncClient = createSyncClient()
+  const syncClient = await createClient()
 
   const { data, error } = await syncClient
     .from('coordination_rules')
@@ -453,15 +453,15 @@ interface CoordinationLogParams {
  * Write a coordination log entry to track rule execution.
  */
 async function logCoordinationResult(
-  client: ReturnType<typeof createSyncClient>,
+  client: Awaited<ReturnType<typeof createClient>>,
   params: CoordinationLogParams
 ): Promise<void> {
   await client.from('coordination_log').insert({
     rule_id: params.ruleId,
     trigger_document_id: params.triggerDocumentId,
     company_id: params.companyId,
-    affected_documents: params.affectedDocuments,
-    changes_applied: params.changesApplied,
+    affected_documents: params.affectedDocuments as unknown as Json,
+    changes_applied: params.changesApplied as unknown as Json,
     status: params.status,
     error_message: params.errorMessage,
     executed_at: new Date().toISOString(),

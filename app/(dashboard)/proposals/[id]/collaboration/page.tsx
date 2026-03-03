@@ -20,7 +20,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { createSyncClient } from '@/lib/supabase/sync-client'
+
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 import { SyncStatusOverview } from '@/components/features/launch/SyncStatusOverview'
 import type { SyncStatus, DocumentSource } from '@/lib/types/sync'
@@ -195,7 +195,7 @@ export default async function CollaborationPage({
     }))
 
   // Fetch sync states to determine which tools are actively used
-  const syncClient = await createSyncClient()
+  const syncClient = await createClient()
   const { data: syncStates } = await syncClient
     .from('document_sync_state')
     .select('cloud_provider, sync_status, metadata')

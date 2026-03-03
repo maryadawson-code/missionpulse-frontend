@@ -19,7 +19,6 @@ import {
   Milestone,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { createSyncClient } from '@/lib/supabase/sync-client'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 import { GanttTimeline } from '@/components/features/proposals/GanttTimeline'
 import { MilestoneBar } from '@/components/features/proposals/MilestoneBar'
@@ -55,14 +54,14 @@ export default async function TimelinePage({
   if (oppError || !opportunity) notFound()
 
   // Fetch milestones from Phase J table
-  const syncClient = await createSyncClient()
+  const syncClient = await createClient()
   const { data: milestoneRows } = await syncClient
     .from('proposal_milestones')
     .select('*')
     .eq('opportunity_id', id)
     .order('scheduled_date', { ascending: true })
 
-  const milestones: ProposalMilestone[] = (milestoneRows ?? []) as ProposalMilestone[]
+  const milestones: ProposalMilestone[] = (milestoneRows ?? []) as unknown as ProposalMilestone[]
   const sorted = sortMilestones(milestones)
 
   // Collect unique creator IDs for display names

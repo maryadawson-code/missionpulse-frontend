@@ -13,7 +13,6 @@
  */
 'use server'
 
-import { createSyncClient } from '@/lib/supabase/sync-client'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
 import type { CoordinationRule, CoordinationTransform } from '@/lib/types/sync'
@@ -56,8 +55,8 @@ const VALID_TRANSFORMS = new Set<CoordinationTransform>([
 export async function createRule(
   data: Omit<CoordinationRule, 'id' | 'created_at' | 'updated_at'>
 ): Promise<ActionResult> {
-  const syncClient = createSyncClient()
-  const serverClient = createClient()
+  const syncClient = await createClient()
+  const serverClient = await createClient()
 
   // Authenticate
   const {
@@ -170,8 +169,8 @@ export async function updateRule(
     >
   >
 ): Promise<ActionResult> {
-  const syncClient = createSyncClient()
-  const serverClient = createClient()
+  const syncClient = await createClient()
+  const serverClient = await createClient()
 
   // Authenticate
   const {
@@ -258,8 +257,8 @@ export async function updateRule(
  * @param ruleId - The rule ID to deactivate
  */
 export async function deleteRule(ruleId: string): Promise<ActionResult> {
-  const syncClient = createSyncClient()
-  const serverClient = createClient()
+  const syncClient = await createClient()
+  const serverClient = await createClient()
 
   // Authenticate
   const {
@@ -319,7 +318,7 @@ export async function deleteRule(ruleId: string): Promise<ActionResult> {
 export async function getRulesByCompany(
   companyId: string
 ): Promise<CoordinationRule[]> {
-  const syncClient = createSyncClient()
+  const syncClient = await createClient()
 
   const { data, error } = await syncClient
     .from('coordination_rules')

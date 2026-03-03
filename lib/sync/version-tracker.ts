@@ -11,8 +11,8 @@
  */
 'use server'
 
-import { createSyncClient } from '@/lib/supabase/sync-client'
 import { createClient } from '@/lib/supabase/server'
+import type { Json } from '@/lib/supabase/database.types'
 import type { ActionResult } from '@/lib/types'
 import type { DocumentVersion, DiffResult } from '@/lib/types/sync'
 import { computeDiff, summarizeDiff } from './diff-engine'
@@ -35,8 +35,8 @@ export async function recordVersion(
   source: string,
   content: Record<string, unknown>
 ): Promise<ActionResult> {
-  const syncClient = createSyncClient()
-  const serverClient = createClient()
+  const syncClient = await createClient()
+  const serverClient = await createClient()
 
   // Authenticate
   const {
@@ -93,8 +93,8 @@ export async function recordVersion(
       company_id: companyId,
       version_number: nextVersionNumber,
       source,
-      snapshot: content,
-      diff_summary: diffSummary,
+      snapshot: content as unknown as Json,
+      diff_summary: diffSummary as unknown as Json,
       created_by: user?.id ?? null,
       created_at: new Date().toISOString(),
     })
@@ -119,7 +119,7 @@ export async function getVersionHistory(
   documentId: string,
   limit: number = 50
 ): Promise<DocumentVersion[]> {
-  const syncClient = createSyncClient()
+  const syncClient = await createClient()
 
   const { data, error } = await syncClient
     .from('document_versions')
@@ -147,7 +147,7 @@ export async function getVersionDiff(
   versionId1: string,
   versionId2: string
 ): Promise<DiffResult | null> {
-  const syncClient = createSyncClient()
+  const syncClient = await createClient()
 
   // Fetch both versions in parallel
   const [result1, result2] = await Promise.all([

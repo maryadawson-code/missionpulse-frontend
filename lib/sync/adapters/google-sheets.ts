@@ -8,7 +8,7 @@
  */
 'use server'
 
-import { createSyncClient } from '@/lib/supabase/sync-client'
+import { createClient } from '@/lib/supabase/server'
 import { refreshGoogleToken } from '@/lib/integrations/google/auth'
 import type { ActionResult } from '@/lib/types'
 
@@ -126,7 +126,7 @@ export async function pushToGoogleSheets(
     }
 
     // Update sync state
-    const supabase = await createSyncClient()
+    const supabase = await createClient()
     await supabase
       .from('document_sync_state')
       .update({
@@ -190,7 +190,7 @@ export async function pullFromGoogleSheets(
     })
 
     // Update sync state
-    const supabase = await createSyncClient()
+    const supabase = await createClient()
     await supabase
       .from('document_sync_state')
       .update({

@@ -13,7 +13,7 @@
 import JSZip from 'jszip'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { createSyncClient } from '@/lib/supabase/sync-client'
+import type { Json } from '@/lib/supabase/database.types'
 import type { ActionResult } from '@/lib/types'
 import type {
   ArtifactStatus,
@@ -84,7 +84,7 @@ export async function getArtifactStatuses(
   opportunityId: string
 ): Promise<ArtifactStatus[]> {
   const supabase = await createClient()
-  const syncClient = await createSyncClient()
+  const syncClient = await createClient()
 
   // Fetch all proposal sections for this opportunity
   const { data: sections, error: sectionsError } = await supabase
@@ -113,7 +113,7 @@ export async function getArtifactStatuses(
       cloud_provider: string | null
       last_cloud_edit_at: string | null
       last_mp_edit_at: string | null
-      metadata: Record<string, unknown> | null
+      metadata: Json | null
     }
   >()
   for (const state of syncStates ?? []) {
@@ -205,7 +205,7 @@ export async function assembleCloudBinder(
   let totalWordCount = 0
 
   // Fetch cloud web URLs for linked documents
-  const syncClient = await createSyncClient()
+  const syncClient = await createClient()
   const sectionIds = allSections.map((s) => s.id)
   const { data: syncStatesForUrls } = await syncClient
     .from('document_sync_state')

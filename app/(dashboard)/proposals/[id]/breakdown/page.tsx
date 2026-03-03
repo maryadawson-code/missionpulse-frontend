@@ -10,7 +10,7 @@
  */
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { createSyncClient } from '@/lib/supabase/sync-client'
+
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 import { WorkBreakdownMatrix } from '@/components/features/proposals/WorkBreakdownMatrix'
@@ -117,7 +117,7 @@ export default async function BreakdownPage({
   }))
 
   // Fetch section assignments (Phase J table)
-  const syncClient = await createSyncClient()
+  const syncClient = await createClient()
   const { data: assignmentRows } = await syncClient
     .from('section_assignments')
     .select('id, section_id, assignee_id, status, word_count, deadline')
