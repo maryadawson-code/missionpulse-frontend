@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { listPilots } from '@/lib/billing/pilots'
+import { calculateEngagement } from '@/lib/billing/engagement'
 import PilotAdminClient from './PilotAdminClient'
 
 export const metadata: Metadata = {
@@ -25,7 +26,18 @@ export default async function AdminPilotsPage() {
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'admin', 'canView')) redirect('/dashboard')
 
-  const pilots = await listPilots()
+  const rawPilots = await listPilots()
+
+  // Enrich with real engagement scores
+  const pilots = await Promise.all(
+    rawPilots.map(async (p) => {
+      if (p.status === 'pilot') {
+        const engagement = await calculateEngagement(p.companyId)
+        return { ...p, engagementScore: engagement.score }
+      }
+      return p
+    })
+  )
 
   // Fetch companies for create form
   const { data: companiesData } = await supabase

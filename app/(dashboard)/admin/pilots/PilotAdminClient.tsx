@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { createPilotAction, convertPilotAction } from './actions'
+import { EngagementGauge } from '@/components/features/admin/EngagementGauge'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -266,25 +267,10 @@ export default function PilotAdminClient({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-800">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            pilot.engagementScore > 70
-                              ? 'bg-emerald-500'
-                              : pilot.engagementScore > 40
-                                ? 'bg-amber-500'
-                                : 'bg-red-500'
-                          }`}
-                          style={{
-                            width: `${Math.min(100, pilot.engagementScore)}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        {pilot.engagementScore}
-                      </span>
-                    </div>
+                    <EngagementGauge
+                      score={pilot.engagementScore}
+                      companyName={pilot.companyName}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <span
