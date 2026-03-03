@@ -20,6 +20,32 @@ export function WorkspaceManager({ currentWorkspace }: WorkspaceManagerProps) {
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDomain, setNewDomain] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function handleCreate() {
+    if (!newName.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentCompanyId: currentWorkspace.id,
+          name: newName.trim(),
+          domain: newDomain.trim(),
+        }),
+      })
+      if (res.ok) {
+        setSaved(true)
+        setNewName('')
+        setNewDomain('')
+        setShowCreate(false)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -93,11 +119,16 @@ export function WorkspaceManager({ currentWorkspace }: WorkspaceManagerProps) {
               className="w-full max-w-md rounded-md border bg-background px-3 py-2 text-sm"
             />
           </div>
-          <div className="flex gap-2">
-            <Button disabled={!newName.trim()}>Create Workspace</Button>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleCreate} disabled={saving || !newName.trim()}>
+              {saving ? 'Creating...' : 'Create Workspace'}
+            </Button>
             <Button variant="outline" onClick={() => setShowCreate(false)}>
               Cancel
             </Button>
+            {saved && (
+              <span className="text-sm text-green-500">Workspace created</span>
+            )}
           </div>
         </div>
       )}

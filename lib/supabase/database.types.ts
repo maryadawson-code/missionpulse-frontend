@@ -1587,6 +1587,8 @@ export type Database = {
           created_by: string | null
           domain: string | null
           features: Json | null
+          footer_text: string | null
+          header_text: string | null
           id: string
           is_active: boolean | null
           logo_url: string | null
@@ -1605,6 +1607,8 @@ export type Database = {
           created_by?: string | null
           domain?: string | null
           features?: Json | null
+          footer_text?: string | null
+          header_text?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -1623,6 +1627,8 @@ export type Database = {
           created_by?: string | null
           domain?: string | null
           features?: Json | null
+          footer_text?: string | null
+          header_text?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -9845,6 +9851,50 @@ export type Database = {
           },
         ]
       }
+      sso_configurations: {
+        Row: {
+          id: string
+          company_id: string
+          entity_id: string
+          sso_url: string
+          certificate: string | null
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          entity_id: string
+          sso_url: string
+          certificate?: string | null
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          entity_id?: string
+          sso_url?: string
+          certificate?: string | null
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sso_configurations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stage_mappings: {
         Row: {
           created_at: string | null
@@ -11343,6 +11393,50 @@ export type Database = {
           weekly_hours_available?: number | null
         }
         Relationships: []
+      }
+      workspaces: {
+        Row: {
+          id: string
+          parent_company_id: string
+          name: string
+          domain: string | null
+          subscription_tier: string | null
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          parent_company_id: string
+          name: string
+          domain?: string | null
+          subscription_tier?: string | null
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          parent_company_id?: string
+          name?: string
+          domain?: string | null
+          subscription_tier?: string | null
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_parent_company_id_fkey"
+            columns: ["parent_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

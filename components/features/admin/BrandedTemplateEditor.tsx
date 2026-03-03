@@ -9,6 +9,7 @@ interface BrandedTemplateEditorProps {
   companyId: string
   companyName: string
   currentColor: string
+  currentLogoUrl: string
 }
 
 const TEMPLATE_TYPES = [
@@ -26,13 +27,14 @@ export function BrandedTemplateEditor({
   companyId,
   companyName,
   currentColor,
+  currentLogoUrl,
 }: BrandedTemplateEditorProps) {
   const [primaryColor, setPrimaryColor] = useState(currentColor)
   const [headerText, setHeaderText] = useState(companyName)
   const [footerText, setFooterText] = useState(
     `${companyName} — Confidential`
   )
-  const [logoUrl, setLogoUrl] = useState('')
+  const [logoUrl, setLogoUrl] = useState(currentLogoUrl)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 

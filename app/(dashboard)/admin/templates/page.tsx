@@ -24,7 +24,7 @@ export default async function BrandedTemplatesPage() {
   // Get company branding
   const { data: company } = await supabase
     .from('companies')
-    .select('name, primary_color')
+    .select('name, primary_color, logo_url')
     .eq('id', profile?.company_id ?? '')
     .single()
 
@@ -41,6 +41,7 @@ export default async function BrandedTemplatesPage() {
         companyId={profile?.company_id ?? ''}
         companyName={company?.name ?? ''}
         currentColor={company?.primary_color ?? '#00E5FA'}
+        currentLogoUrl={company?.logo_url ?? ''}
       />
     </div>
   )
