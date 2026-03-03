@@ -138,8 +138,8 @@ export async function createOpportunity(
   })
 
   // Activity log (user-visible)
-  await supabase.from('activity_log').insert({
-    action: 'created_opportunity',
+  await supabase.from('activity_feed').insert({
+    action_type: 'created_opportunity',
     entity_type: 'opportunity',
     entity_id: data.id,
     user_id: user.id,
@@ -225,8 +225,8 @@ export async function updateOpportunity(
     details: { title: update.title },
   })
 
-  await supabase.from('activity_log').insert({
-    action: 'updated_opportunity',
+  await supabase.from('activity_feed').insert({
+    action_type: 'updated_opportunity',
     entity_type: 'opportunity',
     entity_id: id,
     user_id: user.id,
@@ -271,8 +271,8 @@ export async function updateOpportunityPhase(
     details: { field: 'phase', new_value: phase },
   })
 
-  await supabase.from('activity_log').insert({
-    action: 'updated_opportunity_phase',
+  await supabase.from('activity_feed').insert({
+    action_type: 'updated_opportunity_phase',
     entity_type: 'opportunity',
     entity_id: id,
     user_id: user.id,
@@ -337,8 +337,8 @@ export async function deleteOpportunity(id: string): Promise<ActionResult> {
     details: { title: existing?.title ?? 'Unknown' },
   })
 
-  await supabase.from('activity_log').insert({
-    action: 'deleted_opportunity',
+  await supabase.from('activity_feed').insert({
+    action_type: 'deleted_opportunity',
     entity_type: 'opportunity',
     entity_id: id,
     user_id: user.id,

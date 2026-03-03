@@ -276,9 +276,9 @@ export async function createDeadlineAlerts(
   )
 
   for (const section of alertable) {
-    await supabase.from('activity_log').insert({
+    await supabase.from('activity_feed').insert({
       company_id: companyId,
-      action: 'deadline_risk_alert',
+      action_type: 'deadline_risk_alert',
       entity_type: 'opportunity',
       entity_id: section.opportunityId,
       description: `[${section.riskLevel.toUpperCase()}] ${section.sectionName} on "${section.opportunityTitle}" — ${section.daysBehind > 0 ? `${section.daysBehind} days behind` : 'at risk of slipping'}`,

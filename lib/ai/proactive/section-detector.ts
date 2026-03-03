@@ -197,9 +197,9 @@ export async function createGapAlerts(
   let alertsCreated = 0
 
   for (const gap of report.gaps) {
-    await supabase.from('activity_log').insert({
+    await supabase.from('activity_feed').insert({
       company_id: companyId,
-      action: 'compliance_gap_detected',
+      action_type: 'compliance_gap_detected',
       entity_type: 'opportunity',
       entity_id: report.opportunityId,
       description: `[${gap.severity.toUpperCase()}] ${gap.title} — ${gap.description.slice(0, 200)}`,

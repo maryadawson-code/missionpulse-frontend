@@ -68,9 +68,9 @@ Deno.serve(async (_req: Request) => {
       }
 
       if (riskLevel !== 'on_track') {
-        await supabase.from('activity_log').insert({
+        await supabase.from('activity_feed').insert({
           company_id: companyId,
-          action: 'deadline_risk_alert',
+          action_type: 'deadline_risk_alert',
           entity_type: 'opportunity',
           entity_id: opp.id,
           description: `[${riskLevel.toUpperCase()}] "${opp.title}" — ${daysRemaining > 0 ? `${daysRemaining} days remaining` : 'PAST DUE'}, ${completionPct}% complete`,
