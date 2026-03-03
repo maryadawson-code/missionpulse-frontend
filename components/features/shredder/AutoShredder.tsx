@@ -66,6 +66,7 @@ export function AutoShredder({ documentIds, opportunityId, onComplete }: AutoShr
         const isSystemic = result.error?.includes('unavailable') ||
           result.error?.includes('token limit') ||
           result.error?.includes('Not authenticated') ||
+          result.error?.includes('AUTH_ERROR') ||
           result.error?.includes('subscription') ||
           result.error?.includes('role does not have access')
         if (isSystemic || consecutiveFailures >= 3) {
