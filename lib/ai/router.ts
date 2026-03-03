@@ -103,19 +103,35 @@ export async function routeRequest(
   const primary = await getProviderById(primaryId)
   const fallback = await getProviderById(fallbackId)
 
+  const log = createLogger('ai-router')
+  log.info('Route selection', {
+    primaryId,
+    fallbackId,
+    primaryConfigured: primary?.isConfigured() ?? false,
+    fallbackConfigured: fallback?.isConfigured() ?? false,
+    allowedProviders: allowed.map((p) => `${p.id}(${p.isConfigured() ? 'yes' : 'no'})`),
+  })
+
   // Use configured primary, or first available
   const selectedPrimary =
     primary?.isConfigured() ? primary : allowed[0]
 
   // Only use a fallback if it's a DIFFERENT configured provider.
-  // When admin sets primary === fallback, respect that — no auto-discovery.
+  // When primary === fallback (admin config) OR when the configured fallback
+  // was promoted to primary (because original primary wasn't configured),
+  // do NOT auto-discover other providers as fallback.
   let selectedFallback: AIProvider | null = null
-  if (primaryId !== fallbackId) {
+  if (primaryId !== fallbackId && selectedPrimary.id !== fallback?.id) {
     selectedFallback =
       fallback?.isConfigured() && fallback.id !== selectedPrimary.id
         ? fallback
-        : allowed.find((p) => p.id !== selectedPrimary.id) ?? null
+        : null  // No auto-discovery — only use explicitly configured fallback
   }
+
+  log.info('Route result', {
+    primary: selectedPrimary.id,
+    fallback: selectedFallback?.id ?? 'none',
+  })
 
   return {
     provider: selectedPrimary,
