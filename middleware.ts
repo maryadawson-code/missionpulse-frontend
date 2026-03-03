@@ -8,7 +8,10 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/api/auth/callback', '/api/health', '/plans', '/8a-toolkit', '/api/newsletter', '/robots.txt', '/sitemap.xml']
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password', '/api/auth/callback', '/api/health', '/plans', '/8a-toolkit', '/api/newsletter', '/robots.txt', '/sitemap.xml']
+
+// Routes that authenticated users should NOT be redirected away from
+const AUTH_ACCESSIBLE_PUBLIC = new Set(['/plans', '/8a-toolkit', '/reset-password', '/api/auth/callback', '/api/health', '/api/newsletter', '/robots.txt', '/sitemap.xml'])
 
 // Simple in-memory rate limiter for auth endpoints
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -55,7 +58,6 @@ export async function middleware(request: NextRequest) {
 
   // If env vars are missing, let public routes through and block protected ones
   if (!supabaseUrl || !supabaseKey) {
-    const pathname = request.nextUrl.pathname
     const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route))
     if (!isPublicRoute) {
       const url = request.nextUrl.clone()
@@ -109,7 +111,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Authenticated user trying to access auth pages → send to dashboard
-  if (user && isPublicRoute && pathname !== '/api/auth/callback') {
+  // (but allow access to plans, 8a-toolkit, reset-password, etc.)
+  if (user && isPublicRoute && !AUTH_ACCESSIBLE_PUBLIC.has(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)

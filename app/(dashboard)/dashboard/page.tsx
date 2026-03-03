@@ -125,7 +125,7 @@ function DeadlineRow({ opp }: { opp: Opportunity }) {
 
 // ─── Dashboard Page ─────────────────────────────────────────────
 export default async function DashboardPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Author role redirect — authors land on their workflow page
   const { data: { user } } = await supabase.auth.getUser()
