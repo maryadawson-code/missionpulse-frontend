@@ -221,7 +221,8 @@ async function seedTeamAssignments() {
       const { error } = await supabase.from('opportunity_assignments').insert({
         id: randomUUID(),
         opportunity_id: oppId,
-        user_id: DEMO_USER_ID,
+        assignee_name: 'Demo User',
+        assignee_email: 'demo@missionpulse.ai',
         role,
       })
       if (error && !error.message.includes('duplicate')) {
