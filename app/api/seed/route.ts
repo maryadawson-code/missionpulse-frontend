@@ -1,13 +1,20 @@
 /**
  * Temporary API route to seed supporting data (v2 — fixed constraints).
- * Hit GET /api/seed while logged in to populate empty tables.
+ * Hit GET /api/seed?secret=<SEED_SECRET> while logged in to populate empty tables.
  * DELETE THIS FILE after seeding.
  */
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { randomUUID } from 'crypto'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Require SEED_SECRET to prevent accidental or unauthorized seeding
+  const secret = request.nextUrl.searchParams.get('secret')
+  const expectedSecret = process.env.SEED_SECRET
+  if (!expectedSecret || secret !== expectedSecret) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })

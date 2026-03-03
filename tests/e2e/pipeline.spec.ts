@@ -2,8 +2,8 @@
 import { test, expect } from '@playwright/test'
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000'
-const TEST_EMAIL = process.env.TEST_EMAIL ?? 'maryadawson@gmail.com'
-const TEST_PASSWORD = process.env.TEST_PASSWORD ?? 'Test123!!'
+const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? ''
+const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? ''
 
 test.describe('Pipeline Table (T-8)', () => {
   test.beforeEach(async ({ page }) => {
