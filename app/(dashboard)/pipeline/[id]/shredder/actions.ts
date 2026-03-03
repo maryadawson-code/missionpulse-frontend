@@ -398,16 +398,20 @@ export async function shredDocument(
       .single()
 
     // Bulk insert requirements
-    // DB CHECK constraint uses lowercase: critical, high, medium, low
+    // DB CHECK constraints use specific allowed values
     const VALID_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const
+    const VALID_SECTIONS = ['Technical', 'Management', 'Past Performance', 'Cost', 'Other'] as const
     const rows = parsed.map((req, i) => {
       const priorityLower = req.priority.toLowerCase()
+      const sectionValue = VALID_SECTIONS.includes(req.section as typeof VALID_SECTIONS[number])
+        ? req.section
+        : null
       return {
         opportunity_id: opportunityId,
         company_id: profile?.company_id ?? null,
         reference: `REQ-${String(startIdx + i).padStart(3, '0')}`,
         requirement: req.requirement,
-        section: req.section || null,
+        section: sectionValue,
         priority: VALID_PRIORITIES.includes(priorityLower as typeof VALID_PRIORITIES[number])
           ? priorityLower
           : 'medium',
