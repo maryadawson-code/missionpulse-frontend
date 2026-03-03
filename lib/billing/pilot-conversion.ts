@@ -12,7 +12,6 @@ import { createClient } from '@/lib/supabase/server'
 import { getTokenBalance } from './ledger'
 import { calculateEngagement } from './engagement'
 import { getOrCreateCustomer } from './stripe'
-import { getPlanBySlug } from './plans'
 import Stripe from 'stripe'
 
 // ─── Types ──────────────────────────────────────────────────

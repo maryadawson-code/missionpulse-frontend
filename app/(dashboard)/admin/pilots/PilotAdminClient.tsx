@@ -61,10 +61,6 @@ function formatDate(iso: string | null): string {
   })
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toLocaleString()}`
-}
-
 // ─── Component ──────────────────────────────────────────────
 
 export default function PilotAdminClient({
