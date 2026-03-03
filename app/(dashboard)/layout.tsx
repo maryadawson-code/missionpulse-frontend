@@ -15,6 +15,8 @@ import { MobileNav } from '@/components/layout/MobileNav'
 import DashboardHeader from '@/components/layout/DashboardHeader'
 import { PartnerWatermark } from '@/components/layout/PartnerWatermark'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
+import { PilotConversionBanner } from '@/components/features/billing/PilotConversionBanner'
+import { getPilotStatus } from '@/lib/billing/pilot-conversion'
 import { RoleProvider } from '@/lib/rbac/RoleContext'
 import { SessionTimeoutGuard } from '@/components/layout/SessionTimeoutGuard'
 import { GlobalSearch } from '@/components/layout/GlobalSearch'
@@ -97,6 +99,16 @@ export default async function DashboardLayout({
     // Non-critical
   }
 
+  // ─── Pilot Banner Status ────────────────────────────────────
+  let pilotStatus: Awaited<ReturnType<typeof getPilotStatus>> | null = null
+  if (profile?.company_id) {
+    try {
+      pilotStatus = await getPilotStatus(profile.company_id)
+    } catch {
+      // Non-critical
+    }
+  }
+
   const isExternal = !isInternalRole(userRole)
   const companyName = profile?.full_name ?? user.email ?? 'External User'
   const forceCUI = hasForceCUIWatermark(userRole)
@@ -154,6 +166,10 @@ export default async function DashboardLayout({
           <DashboardHeader userEmail={user.email ?? null} notifications={headerNotifications} />
 
           <main className="flex-1 overflow-y-auto p-6">
+            {/* Pilot conversion banner */}
+            {pilotStatus && (pilotStatus.showBanner || pilotStatus.showExpiredMessage) && (
+              <PilotConversionBanner status={pilotStatus} />
+            )}
             {/* Global CUI banner for forceCUIWatermark roles */}
             {cuiMarking && <CUIBanner marking={cuiMarking} className="mb-4" />}
             {children}
