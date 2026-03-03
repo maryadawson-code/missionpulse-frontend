@@ -15,7 +15,6 @@ import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 import { WorkBreakdownMatrix } from '@/components/features/proposals/WorkBreakdownMatrix'
 import { TeamRollup } from '@/components/features/proposals/TeamRollup'
-import type { SectionAssignment } from '@/lib/types/sync'
 
 // ─── Summary Card ────────────────────────────────────────────────
 

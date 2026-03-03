@@ -44,7 +44,7 @@ export function SSOConfigPanel({ companyId }: SSOConfigPanelProps) {
           <div className="flex justify-between">
             <span className="text-muted-foreground">ACS URL:</span>
             <code className="text-xs bg-muted px-2 py-0.5 rounded">
-              {typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback
+              {typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/callback
             </code>
           </div>
           <div className="flex justify-between">

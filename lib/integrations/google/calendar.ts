@@ -262,6 +262,8 @@ export async function listUpcomingEvents(
 
 // ─── Description Builders ────────────────────────────────────
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.ai'
+
 function buildGateReviewDescription(oppTitle: string, gateName: string): string {
   return `<b>MissionPulse Gate Review</b>
 
@@ -270,7 +272,7 @@ function buildGateReviewDescription(oppTitle: string, gateName: string): string 
 
 <i>This event was created by MissionPulse. Open the War Room for details.</i>
 
-<a href="https://missionpulse.io">Open MissionPulse</a>`
+<a href="${APP_URL}">Open MissionPulse</a>`
 }
 
 function buildColorTeamDescription(oppTitle: string, color: string): string {
@@ -281,7 +283,7 @@ function buildColorTeamDescription(oppTitle: string, color: string): string {
 
 <i>Prepare your assigned volumes for review. This event was created by MissionPulse.</i>
 
-<a href="https://missionpulse.io">Open MissionPulse</a>`
+<a href="${APP_URL}">Open MissionPulse</a>`
 }
 
 function buildDeadlineDescription(oppTitle: string, agency?: string): string {
@@ -292,5 +294,5 @@ ${agency ? `<b>Agency:</b> ${agency}` : ''}
 
 <b>⚠️ This is the final submission deadline.</b>
 
-<a href="https://missionpulse.io">Open MissionPulse</a>`
+<a href="${APP_URL}">Open MissionPulse</a>`
 }

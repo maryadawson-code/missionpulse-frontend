@@ -220,8 +220,6 @@ export default async function CollaborationPage({
     (s) => s === 'synced' || s === 'idle'
   ).length
   const totalSynced = allSyncStatuses.length
-  const overallHealth =
-    totalSynced > 0 ? Math.round((syncedCount / totalSynced) * 100) : 100
 
   return (
     <div className="space-y-6">

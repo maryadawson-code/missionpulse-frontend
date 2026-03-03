@@ -191,7 +191,8 @@ export async function processGateDecision(
 // ─── Block Kit Builders ─────────────────────────────────────
 
 function buildApprovalBlocks(request: GateApprovalRequest): unknown[] {
-  const link = `https://missionpulse.io/pipeline/${request.opportunityId}`
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.ai'
+  const link = `${baseUrl}/pipeline/${request.opportunityId}`
 
   return [
     {
