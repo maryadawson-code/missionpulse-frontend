@@ -53,7 +53,6 @@ export async function assembleBinder(
   const [
     { data: sections },
     { data: complianceReqs },
-    { data: teamMembers },
   ] = await Promise.all([
     supabase
       .from('proposal_sections')
@@ -63,10 +62,6 @@ export async function assembleBinder(
     supabase
       .from('compliance_requirements')
       .select('id, reference, requirement, section, priority, status')
-      .eq('opportunity_id', opportunityId),
-    supabase
-      .from('opportunity_assignments')
-      .select('assignee_name, role')
       .eq('opportunity_id', opportunityId),
   ])
 
