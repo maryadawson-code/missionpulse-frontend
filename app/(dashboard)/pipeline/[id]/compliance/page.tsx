@@ -51,9 +51,11 @@ export default async function CompliancePage({ params }: CompliancePageProps) {
     .eq('opportunity_id', id)
 
   const reqs = requirements ?? []
-  const addressed = reqs.filter(
-    (r) => r.status === 'Addressed' || r.status === 'Verified'
-  ).length
+  const normalizeStatus = (s: string | null) => s?.toLowerCase().replace(/ /g, '_') ?? ''
+  const addressed = reqs.filter((r) => {
+    const s = normalizeStatus(r.status)
+    return s === 'addressed' || s === 'verified'
+  }).length
   const progressPct = reqs.length > 0 ? Math.round((addressed / reqs.length) * 100) : 0
 
   return (
@@ -91,7 +93,7 @@ export default async function CompliancePage({ params }: CompliancePageProps) {
         <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
           <span>{addressed} addressed</span>
           <span>{reqs.length - addressed} remaining</span>
-          <span>{reqs.filter((r) => r.status === 'Verified').length} verified</span>
+          <span>{reqs.filter((r) => normalizeStatus(r.status) === 'verified').length} verified</span>
         </div>
       </div>
 

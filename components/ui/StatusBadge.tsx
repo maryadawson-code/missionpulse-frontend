@@ -20,11 +20,16 @@ const STATUS_STYLES: Record<string, string> = {
   Revision: 'bg-orange-100 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-500/30',
   Final: 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/30',
 
-  // Compliance statuses
+  // Compliance statuses (title-case legacy)
   'Not Started': 'bg-slate-100 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-500/30',
   'In Progress': 'bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-500/30',
   Addressed: 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30',
   Verified: 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/30',
+  // Compliance statuses (lowercase DB format)
+  not_started: 'bg-slate-100 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-500/30',
+  in_progress: 'bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-500/30',
+  addressed: 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30',
+  verified: 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/30',
 
   // Generic
   Pending: 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30',
@@ -39,6 +44,10 @@ const STATUS_LABELS: Record<string, string> = {
   green_review: 'Green Team',
   red_review: 'Red Team',
   final: 'Final',
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  addressed: 'Addressed',
+  verified: 'Verified',
 }
 
 const DEFAULT_STYLE = 'bg-muted text-muted-foreground border-border'

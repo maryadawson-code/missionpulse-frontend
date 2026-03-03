@@ -38,8 +38,8 @@ export async function createRequirement(
       reference: input.reference,
       requirement: input.requirement,
       section: input.section || null,
-      priority: input.priority || 'Medium',
-      status: 'Not Started',
+      priority: (input.priority || 'medium').toLowerCase(),
+      status: 'not_started',
       page_reference: input.page_reference || null,
       volume_reference: input.volume_reference || null,
     })
@@ -89,9 +89,15 @@ export async function updateRequirement(
   } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
+  // Normalize casing to match DB CHECK constraints
+  const normalizedUpdates = { ...updates }
+  if (normalizedUpdates.priority) {
+    normalizedUpdates.priority = normalizedUpdates.priority.toLowerCase()
+  }
+
   const { error } = await supabase
     .from('compliance_requirements')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...normalizedUpdates, updated_at: new Date().toISOString() })
     .eq('id', requirementId)
 
   if (error) return { success: false, error: error.message }
@@ -103,7 +109,7 @@ export async function updateRequirement(
       entity_type: 'compliance_requirement',
       entity_id: requirementId,
       opportunity_id: opportunityId,
-      updates,
+      updates: normalizedUpdates,
     },
   })
 
@@ -177,9 +183,15 @@ export async function bulkUpdateRequirements(
   } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
+  // Normalize casing to match DB CHECK constraints
+  const normalizedUpdates = { ...updates }
+  if (normalizedUpdates.priority) {
+    normalizedUpdates.priority = normalizedUpdates.priority.toLowerCase()
+  }
+
   const { error } = await supabase
     .from('compliance_requirements')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...normalizedUpdates, updated_at: new Date().toISOString() })
     .in('id', requirementIds)
 
   if (error) return { success: false, error: error.message }
@@ -191,7 +203,7 @@ export async function bulkUpdateRequirements(
       entity_type: 'compliance_requirement',
       opportunity_id: opportunityId,
       count: requirementIds.length,
-      updates,
+      updates: normalizedUpdates,
     },
   })
 
@@ -200,7 +212,7 @@ export async function bulkUpdateRequirements(
     user_id: user.id,
     entity_type: 'compliance_requirement',
     entity_id: opportunityId,
-    details: { opportunity_id: opportunityId, count: requirementIds.length, updates },
+    details: { opportunity_id: opportunityId, count: requirementIds.length, updates: normalizedUpdates },
   })
 
   revalidatePath(`/pipeline/${opportunityId}/shredder/requirements`)

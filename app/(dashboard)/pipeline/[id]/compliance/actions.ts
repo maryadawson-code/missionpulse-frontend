@@ -23,7 +23,7 @@ export async function updateComplianceStatus(
   }
 
   // Track verification
-  if (status === 'Verified') {
+  if (status.toLowerCase() === 'verified') {
     updates.verified_at = new Date().toISOString()
     updates.verified_by = user.id
   }

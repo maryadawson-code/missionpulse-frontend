@@ -19,8 +19,21 @@ import {
   assignComplianceReviewer,
 } from '@/app/(dashboard)/pipeline/[id]/compliance/actions'
 
-const STATUSES = ['Not Started', 'In Progress', 'Addressed', 'Verified'] as const
-const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'] as const
+// DB stores lowercase values; UI displays title-case labels
+const STATUSES = ['not_started', 'in_progress', 'addressed', 'verified'] as const
+const STATUS_LABELS: Record<string, string> = {
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  addressed: 'Addressed',
+  verified: 'Verified',
+}
+const PRIORITIES = ['critical', 'high', 'medium', 'low'] as const
+const PRIORITY_LABELS: Record<string, string> = {
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+}
 
 interface Requirement {
   id: string
@@ -127,15 +140,16 @@ export function ComplianceMatrix({
       header: 'Priority',
       cell: ({ row }) => {
         const p = row.getValue('priority') as string | null
+        const pLower = p?.toLowerCase()
         const color =
-          p === 'Critical'
+          pLower === 'critical'
             ? 'text-red-600 dark:text-red-400'
-            : p === 'High'
+            : pLower === 'high'
               ? 'text-amber-600 dark:text-amber-400'
-              : p === 'Medium'
+              : pLower === 'medium'
                 ? 'text-blue-600 dark:text-blue-400'
                 : 'text-muted-foreground'
-        return <span className={`text-xs font-medium ${color}`}>{p ?? 'Medium'}</span>
+        return <span className={`text-xs font-medium ${color}`}>{PRIORITY_LABELS[pLower ?? 'medium'] ?? p ?? 'Medium'}</span>
       },
       size: 80,
     },
@@ -197,12 +211,12 @@ export function ComplianceMatrix({
           {
             columnId: 'status',
             label: 'Status',
-            options: STATUSES.map((s) => ({ label: s, value: s })),
+            options: STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s })),
           },
           {
             columnId: 'priority',
             label: 'Priority',
-            options: PRIORITIES.map((p) => ({ label: p, value: p })),
+            options: PRIORITIES.map((p) => ({ label: PRIORITY_LABELS[p], value: p })),
           },
         ]}
         pageSize={25}
@@ -236,7 +250,7 @@ function StatusCell({
 
   return (
     <Select
-      value={requirement.status ?? 'Not Started'}
+      value={requirement.status?.toLowerCase().replace(/ /g, '_') ?? 'not_started'}
       onValueChange={handleChange}
       disabled={isPending}
     >
@@ -250,7 +264,7 @@ function StatusCell({
       <SelectContent>
         {STATUSES.map((s) => (
           <SelectItem key={s} value={s}>
-            {s}
+            {STATUS_LABELS[s]}
           </SelectItem>
         ))}
       </SelectContent>

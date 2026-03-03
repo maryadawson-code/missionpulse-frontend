@@ -27,15 +27,15 @@ export function ComplianceGaps({ gaps, opportunities }: ComplianceGapsProps) {
 
   // Show up to 20 most critical gaps, prioritized by priority level
   const priorityOrder: Record<string, number> = {
-    Critical: 0,
-    High: 1,
-    Medium: 2,
-    Low: 3,
+    critical: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
   }
 
   const sorted = [...gaps].sort((a, b) => {
-    const aP = priorityOrder[a.priority ?? 'Medium'] ?? 2
-    const bP = priorityOrder[b.priority ?? 'Medium'] ?? 2
+    const aP = priorityOrder[a.priority?.toLowerCase() ?? 'medium'] ?? 2
+    const bP = priorityOrder[b.priority?.toLowerCase() ?? 'medium'] ?? 2
     return aP - bP
   })
 
@@ -72,12 +72,13 @@ export function ComplianceGaps({ gaps, opportunities }: ComplianceGapsProps) {
             </thead>
             <tbody className="divide-y divide-border">
               {displayed.map((gap) => {
+                const pLower = gap.priority?.toLowerCase()
                 const priorityColor =
-                  gap.priority === 'Critical'
+                  pLower === 'critical'
                     ? 'text-red-600 dark:text-red-400'
-                    : gap.priority === 'High'
+                    : pLower === 'high'
                       ? 'text-amber-600 dark:text-amber-400'
-                      : gap.priority === 'Medium'
+                      : pLower === 'medium'
                         ? 'text-blue-600 dark:text-blue-400'
                         : 'text-muted-foreground'
 
@@ -108,7 +109,7 @@ export function ComplianceGaps({ gaps, opportunities }: ComplianceGapsProps) {
                     </td>
                     <td className="px-4 py-2">
                       <span className={`text-xs font-medium ${priorityColor}`}>
-                        {gap.priority ?? 'Medium'}
+                        {gap.priority ? gap.priority.charAt(0).toUpperCase() + gap.priority.slice(1) : 'Medium'}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">
