@@ -87,7 +87,7 @@ export const mockM365Token = {
 
 export const mockM365UserProfile = {
   displayName: 'Test User',
-  mail: 'test@missionpulse.io',
+  mail: 'test@missionpulse.ai',
 }
 
 export const mockOneDriveFile = {

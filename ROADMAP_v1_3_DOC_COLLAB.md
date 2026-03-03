@@ -369,7 +369,7 @@ Merge v2-development to main. Update user documentation covering document collab
 
 **Acceptance Criteria:**
 - [ ] v2-development merged to main via PR with full CI pass
-- [ ] Production deploy verified at missionpulse.io
+- [ ] Production deploy verified at missionpulse.ai
 - [ ] User docs updated: sync setup guide, cross-document coordination rules, cloud binder walkthrough
 - [ ] Release notes document: v1.3 changelog with screenshots
 - [ ] Video script: 3-minute walkthrough matching investor demo flow

@@ -782,11 +782,11 @@ Full regression suite covering all v1.1 + v1.2 features. Security audit of all n
 
 #### T-28.5 v1.2 Production Deploy + Documentation
 
-Merge v2-development to main. DNS cutover verification for missionpulse.io. Update user documentation. Release notes. Marketing changelog for customers.
+Merge v2-development to main. DNS cutover verification for missionpulse.ai. Update user documentation. Release notes. Marketing changelog for customers.
 
 **Acceptance Criteria:**
 - [ ] v2-development merged to main via PR with full CI pass
-- [ ] Production deploy verified at missionpulse.io
+- [ ] Production deploy verified at missionpulse.ai
 - [ ] User docs updated: new integrations, collaboration features, proactive AI
 - [ ] Release notes document: v1.2 changelog with screenshots
 - [ ] npm run build passes on main branch

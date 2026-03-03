@@ -68,14 +68,14 @@ export function createMockSupabaseClient() {
     }),
     auth: {
       getUser: async () => ({
-        data: { user: { id: 'test-user-id', email: 'test@missionpulse.io' } },
+        data: { user: { id: 'test-user-id', email: 'test@missionpulse.ai' } },
         error: null,
       }),
       getSession: async () => ({
         data: {
           session: {
             access_token: 'mock-access-token',
-            user: { id: 'test-user-id', email: 'test@missionpulse.io' },
+            user: { id: 'test-user-id', email: 'test@missionpulse.ai' },
           },
         },
         error: null,
@@ -179,7 +179,7 @@ export function createMockSupabaseClientWithData(
     },
     auth: {
       getUser: async () => ({
-        data: { user: { id: 'test-user-id', email: 'test@missionpulse.io' } },
+        data: { user: { id: 'test-user-id', email: 'test@missionpulse.ai' } },
         error: null,
       }),
     },
