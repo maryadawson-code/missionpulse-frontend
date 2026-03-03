@@ -64,17 +64,27 @@ export function ShredderPageClient({ opportunityId, documents }: ShredderPageCli
         />
       )}
 
-      {shreddable.length > 0 && pendingShredIds.length === 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
-          <Sparkles className="h-4 w-4 text-primary shrink-0" />
-          <p className="text-sm text-muted-foreground flex-1">
-            {shreddable.length} document{shreddable.length !== 1 ? 's' : ''} ready for AI requirements extraction.
-          </p>
-          <Button size="sm" onClick={handleShredAll}>
-            Shred All
-          </Button>
-        </div>
-      )}
+      {shreddable.length > 0 && pendingShredIds.length === 0 && (() => {
+        const retryCount = shreddable.filter((d) => d.upload_status === 'shred_failed').length
+        const freshCount = shreddable.length - retryCount
+        let label: string
+        if (retryCount === 0) {
+          label = `${shreddable.length} document${shreddable.length !== 1 ? 's' : ''} ready for AI requirements extraction.`
+        } else if (freshCount === 0) {
+          label = `${retryCount} document${retryCount !== 1 ? 's' : ''} ready to retry AI requirements extraction.`
+        } else {
+          label = `${freshCount} new + ${retryCount} retr${retryCount !== 1 ? 'ies' : 'y'} ready for AI requirements extraction.`
+        }
+        return (
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+            <Sparkles className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-sm text-muted-foreground flex-1">{label}</p>
+            <Button size="sm" onClick={handleShredAll}>
+              {retryCount > 0 && freshCount === 0 ? 'Retry All' : 'Shred All'}
+            </Button>
+          </div>
+        )
+      })()}
 
       <RfpDocumentList
         documents={documents}

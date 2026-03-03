@@ -107,7 +107,7 @@ export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListPro
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {formatFileSize(doc.file_size)} · {formatDate(doc.created_at)}
-                    {isProcessed && textLength > 0 && (
+                    {textLength > 0 && (
                       <> · {textLength.toLocaleString()} chars extracted</>
                     )}
                   </p>
