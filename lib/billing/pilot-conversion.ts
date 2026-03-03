@@ -11,6 +11,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { getTokenBalance } from './ledger'
 import { calculateEngagement } from './engagement'
+import { getOrCreateCustomer } from './stripe'
+import { getPlanBySlug } from './plans'
+import Stripe from 'stripe'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -164,4 +167,144 @@ export async function generateROIReport(
     daysActive,
     estimatedManualHours,
   }
+}
+
+// ─── Conversion Checkout ────────────────────────────────────
+
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured')
+  return new Stripe(key, { apiVersion: '2026-01-28.clover', typescript: true })
+}
+
+/**
+ * Create a Stripe Checkout session for pilot-to-annual conversion.
+ * Applies the pilot payment as a credit (coupon) on the annual subscription.
+ */
+export async function createConversionCheckout(params: {
+  companyId: string
+  companyName: string
+  email: string
+  successUrl: string
+  cancelUrl: string
+}): Promise<{ url: string | null; error?: string }> {
+  const supabase = await createClient()
+
+  // Get current subscription to find plan and pilot credit
+  const { data: sub } = await supabase
+    .from('company_subscriptions')
+    .select('plan_id, pilot_amount_cents, stripe_customer_id, status')
+    .eq('company_id', params.companyId)
+    .single()
+
+  if (!sub) return { url: null, error: 'No subscription found' }
+
+  const status = sub.status as string
+  if (status !== 'pilot' && status !== 'expired') {
+    return { url: null, error: 'Company is not in pilot or expired status' }
+  }
+
+  // Get plan for annual price ID
+  const planId = sub.plan_id as string
+  const { data: plan } = await supabase
+    .from('subscription_plans')
+    .select('slug, stripe_annual_price_id, annual_price')
+    .eq('id', planId)
+    .single()
+
+  if (!plan?.stripe_annual_price_id) {
+    return { url: null, error: 'No annual price configured for plan' }
+  }
+
+  // Get or create Stripe customer
+  const customerId = await getOrCreateCustomer({
+    company_id: params.companyId,
+    company_name: params.companyName,
+    email: params.email,
+    existing_customer_id: (sub.stripe_customer_id as string) ?? undefined,
+  })
+
+  const pilotCreditCents = (sub.pilot_amount_cents as number) ?? 0
+  const stripe = getStripe()
+
+  // If pilot credit exists, create a one-time coupon
+  let discounts: Stripe.Checkout.SessionCreateParams['discounts'] | undefined
+  if (pilotCreditCents > 0) {
+    const coupon = await stripe.coupons.create({
+      amount_off: pilotCreditCents,
+      currency: 'usd',
+      duration: 'once',
+      name: `Pilot credit — ${params.companyName}`,
+      max_redemptions: 1,
+    })
+    discounts = [{ coupon: coupon.id }]
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    customer: customerId,
+    mode: 'subscription',
+    line_items: [{ price: plan.stripe_annual_price_id as string, quantity: 1 }],
+    success_url: params.successUrl,
+    cancel_url: params.cancelUrl,
+    discounts,
+    metadata: {
+      company_id: params.companyId,
+      type: 'pilot_conversion',
+      pilot_credit_cents: String(pilotCreditCents),
+    },
+  })
+
+  return { url: session.url }
+}
+
+/**
+ * Handle successful pilot conversion (called from webhook).
+ * Transitions subscription from pilot/expired → active with pilot credit applied.
+ */
+export async function handleConversionSuccess(params: {
+  companyId: string
+  stripeSubscriptionId: string
+  stripeCustomerId: string
+  pilotCreditCents: number
+}): Promise<void> {
+  const supabase = await createClient()
+
+  const periodEnd = new Date()
+  periodEnd.setFullYear(periodEnd.getFullYear() + 1)
+
+  await supabase
+    .from('company_subscriptions')
+    .update({
+      status: 'active',
+      billing_interval: 'annual',
+      stripe_subscription_id: params.stripeSubscriptionId,
+      stripe_customer_id: params.stripeCustomerId,
+      pilot_converted: true,
+      pilot_credit_applied: params.pilotCreditCents > 0,
+      current_period_start: new Date().toISOString(),
+      current_period_end: periodEnd.toISOString(),
+    })
+    .eq('company_id', params.companyId)
+
+  // Update company Stripe fields
+  await supabase
+    .from('companies')
+    .update({
+      stripe_customer_id: params.stripeCustomerId,
+      stripe_subscription_id: params.stripeSubscriptionId,
+      subscription_tier: 'active',
+    })
+    .eq('id', params.companyId)
+
+  // Audit log
+  await supabase.from('audit_logs').insert({
+    action: 'pilot_converted',
+    user_id: '00000000-0000-0000-0000-000000000000',
+    table_name: 'company_subscriptions',
+    record_id: params.companyId,
+    new_values: {
+      pilot_credit_cents: params.pilotCreditCents,
+      stripe_subscription_id: params.stripeSubscriptionId,
+    },
+  })
 }

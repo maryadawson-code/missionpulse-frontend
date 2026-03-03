@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { generateROIReport } from '@/lib/billing/pilot-conversion'
 import Link from 'next/link'
+import { ConvertButton } from './ConvertButton'
 
 export const metadata: Metadata = {
   title: 'Pilot ROI Review — MissionPulse',
@@ -255,12 +256,7 @@ export default async function PilotReviewPage() {
             </p>
           )}
           <div className="mt-4 flex items-center justify-center gap-3">
-            <Link
-              href="/settings/billing"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FA] px-6 py-2.5 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90"
-            >
-              Upgrade Now
-            </Link>
+            <ConvertButton />
             <Link
               href="/dashboard"
               className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-6 py-2.5 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-800"

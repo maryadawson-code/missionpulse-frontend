@@ -15,6 +15,8 @@ import { getRecentActivity } from '@/lib/actions/audit'
 import { ActivityFeed } from '@/components/modules/ActivityFeed'
 import { TeamWorkloadHeatmap } from '@/components/features/dashboard/TeamWorkloadHeatmap'
 import { DashboardCustomizer } from '@/components/features/dashboard/DashboardCustomizer'
+import { getPilotStatus } from '@/lib/billing/pilot-conversion'
+import { PilotConversionBanner } from '@/components/features/billing/PilotConversionBanner'
 
 const WIDGET_DEFS = [
   { widget_type: 'kpi_cards', title: 'KPI Cards' },
@@ -132,7 +134,7 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, preferences')
+    .select('role, preferences, company_id')
     .eq('id', user.id)
     .single()
   const role = resolveRole(profile?.role)
@@ -141,6 +143,10 @@ export default async function DashboardPage() {
   // Redirect first-time users to onboarding
   const prefs = (profile?.preferences as Record<string, unknown>) ?? {}
   if (!prefs.onboarding_complete) redirect('/onboarding')
+
+  // Fetch pilot status for conversion banner
+  const companyId = profile?.company_id as string | null
+  const pilotStatus = companyId ? await getPilotStatus(companyId) : null
 
   // Fetch widget visibility preferences
   const { data: widgetRows } = await supabase
@@ -273,6 +279,11 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Pilot Conversion Banner */}
+      {pilotStatus && (pilotStatus.isPilot || pilotStatus.showExpiredMessage) && (
+        <PilotConversionBanner status={pilotStatus} />
+      )}
+
       {/* Page Title */}
       <div className="flex items-center justify-between">
         <div>
