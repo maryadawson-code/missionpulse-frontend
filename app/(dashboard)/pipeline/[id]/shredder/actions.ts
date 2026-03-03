@@ -398,25 +398,21 @@ export async function shredDocument(
       .single()
 
     // Bulk insert requirements
-    // DB CHECK constraints use specific allowed values
+    // DB CHECK constraints use specific allowed values — omit section to avoid constraint
+    // mismatches (users can set section manually; column is nullable)
     const VALID_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const
-    const VALID_SECTIONS = ['Technical', 'Management', 'Past Performance', 'Cost', 'Other'] as const
     const rows = parsed.map((req, i) => {
       const priorityLower = req.priority.toLowerCase()
-      const sectionValue = VALID_SECTIONS.includes(req.section as typeof VALID_SECTIONS[number])
-        ? req.section
-        : null
       return {
         opportunity_id: opportunityId,
         company_id: profile?.company_id ?? null,
         reference: `REQ-${String(startIdx + i).padStart(3, '0')}`,
         requirement: req.requirement,
-        section: sectionValue,
         priority: VALID_PRIORITIES.includes(priorityLower as typeof VALID_PRIORITIES[number])
           ? priorityLower
           : 'medium',
         status: 'not_started',
-        notes: `Auto-extracted from ${doc.file_name} | Confidence: ${req.confidence} | ${req.because}`,
+        notes: `Auto-extracted from ${doc.file_name} | Section: ${req.section} | Confidence: ${req.confidence} | ${req.because}`,
       }
     })
 
