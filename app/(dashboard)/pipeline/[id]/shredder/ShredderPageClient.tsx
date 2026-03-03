@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 
@@ -47,18 +47,6 @@ export function ShredderPageClient({ opportunityId, documents }: ShredderPageCli
   const handleShredAll = useCallback(() => {
     setPendingShredIds(shreddable.map((d) => d.id))
   }, [shreddable])
-
-  // Auto-trigger: start shredding on mount when eligible docs exist.
-  // Runs once per mount — after shredding completes, docs will be
-  // 'shredded' so they won't be in shreddable on the next render.
-  const autoTriggered = useRef(false)
-  useEffect(() => {
-    if (autoTriggered.current || pendingShredIds.length > 0) return
-    if (shreddable.length > 0) {
-      autoTriggered.current = true
-      setPendingShredIds(shreddable.map((d) => d.id))
-    }
-  }, [shreddable, pendingShredIds.length])
 
   return (
     <>
