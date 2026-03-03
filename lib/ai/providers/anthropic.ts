@@ -63,7 +63,6 @@ export async function createAnthropicProvider(): Promise<AIProvider> {
 
     async query(request: ProviderQueryRequest): Promise<ProviderQueryResponse> {
       const apiKey = getApiKey()
-      console.log(`[anthropic] API key: ${apiKey.slice(0, 12)}...${apiKey.slice(-4)} (len=${apiKey.length})`)
 
       if (!apiKey) {
         throw new AIError(
