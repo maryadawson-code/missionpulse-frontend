@@ -17,6 +17,7 @@ interface RfpDocument {
   upload_status: string | null
   created_at: string | null
   extracted_text: string | null
+  text_length: number
 }
 
 interface ShredderPageClientProps {
@@ -37,11 +38,17 @@ export function ShredderPageClient({ opportunityId, documents }: ShredderPageCli
     router.refresh()
   }, [router])
 
+  const handleRetryFailed = useCallback((failedIds: string[]) => {
+    // Reset with only the failed IDs — AutoShredder remounts via key change
+    setPendingShredIds(failedIds)
+  }, [])
+
   // Documents eligible for shredding: parsed but not yet shredded, or previously failed
+  // Uses server-computed text_length — does not depend on extracted_text serialization
   const shreddable = documents.filter(
     (d) =>
       (d.upload_status === 'processed' || d.upload_status === 'shred_failed') &&
-      (d.extracted_text?.length ?? 0) >= 50
+      d.text_length >= 50
   )
 
   const handleShredAll = useCallback(() => {
@@ -61,6 +68,7 @@ export function ShredderPageClient({ opportunityId, documents }: ShredderPageCli
           documentIds={pendingShredIds}
           opportunityId={opportunityId}
           onComplete={handleShredComplete}
+          onRetryFailed={handleRetryFailed}
         />
       )}
 

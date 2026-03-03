@@ -17,6 +17,7 @@ interface RfpDocument {
   upload_status: string | null
   created_at: string | null
   extracted_text: string | null
+  text_length: number
 }
 
 interface RfpDocumentListProps {
@@ -79,7 +80,7 @@ export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListPro
         {documents.map((doc) => {
           const isExpanded = expandedId === doc.id
           const isProcessed = doc.upload_status === 'processed'
-          const textLength = doc.extracted_text?.length ?? 0
+          const textLength = doc.text_length
 
           return (
             <div

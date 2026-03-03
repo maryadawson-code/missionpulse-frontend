@@ -42,6 +42,13 @@ export default async function ShredderPage({ params }: ShredderPageProps) {
     .eq('opportunity_id', id)
     .order('created_at', { ascending: false })
 
+  // Compute text_length on the server so client filter doesn't depend on
+  // full extracted_text serialization (which can be megabytes)
+  const docsWithLength = (documents ?? []).map((doc) => ({
+    ...doc,
+    text_length: doc.extracted_text?.length ?? 0,
+  }))
+
   return (
     <div className="space-y-6">
       <Breadcrumb
@@ -60,7 +67,7 @@ export default async function ShredderPage({ params }: ShredderPageProps) {
 
       <ShredderPageClient
         opportunityId={id}
-        documents={documents ?? []}
+        documents={docsWithLength}
       />
     </div>
   )

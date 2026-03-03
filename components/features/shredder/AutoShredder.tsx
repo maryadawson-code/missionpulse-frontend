@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Loader2, CheckCircle2, XCircle, Sparkles } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Sparkles, RotateCw } from 'lucide-react'
 
 import { shredDocument } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ interface AutoShredderProps {
   documentIds: string[]
   opportunityId: string
   onComplete: () => void
+  onRetryFailed?: (failedIds: string[]) => void
 }
 
 type DocStatus = 'pending' | 'shredding' | 'done' | 'failed'
@@ -22,7 +23,7 @@ interface DocProgress {
   error?: string
 }
 
-export function AutoShredder({ documentIds, opportunityId, onComplete }: AutoShredderProps) {
+export function AutoShredder({ documentIds, opportunityId, onComplete, onRetryFailed }: AutoShredderProps) {
   const [progress, setProgress] = useState<DocProgress[]>(() =>
     documentIds.map((id) => ({ id, status: 'pending' }))
   )
@@ -93,17 +94,20 @@ export function AutoShredder({ documentIds, opportunityId, onComplete }: AutoShr
     processAll()
   }, [processAll])
 
-  // Auto-dismiss after 5 seconds once done
-  useEffect(() => {
-    if (!isDone) return
-    const timer = setTimeout(onComplete, 5000)
-    return () => clearTimeout(timer)
-  }, [isDone, onComplete])
-
+  // Auto-dismiss after 5 seconds ONLY when all succeeded (no failures)
   const completedCount = progress.filter((p) => p.status === 'done').length
   const failedCount = progress.filter((p) => p.status === 'failed').length
   const totalReqs = progress.reduce((sum, p) => sum + (p.requirementCount ?? 0), 0)
   const currentIdx = progress.findIndex((p) => p.status === 'shredding')
+  const allSucceeded = isDone && failedCount === 0
+
+  useEffect(() => {
+    if (!allSucceeded) return
+    const timer = setTimeout(onComplete, 5000)
+    return () => clearTimeout(timer)
+  }, [allSucceeded, onComplete])
+
+  const failedIds = progress.filter((p) => p.status === 'failed').map((p) => p.id)
 
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
@@ -118,7 +122,8 @@ export function AutoShredder({ documentIds, opportunityId, onComplete }: AutoShr
 
       {failedCount > 0 && isDone && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          {failedCount} document{failedCount !== 1 ? 's' : ''} failed — see status badges below for details.
+          {failedCount} document{failedCount !== 1 ? 's' : ''} failed.
+          {onRetryFailed && ' Click "Retry Failed" to try again.'}
         </p>
       )}
 
@@ -161,14 +166,26 @@ export function AutoShredder({ documentIds, opportunityId, onComplete }: AutoShr
       </div>
 
       {isDone && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-xs"
-          onClick={onComplete}
-        >
-          Dismiss
-        </Button>
+        <div className="flex items-center gap-2">
+          {failedCount > 0 && onRetryFailed && (
+            <Button
+              size="sm"
+              className="text-xs"
+              onClick={() => onRetryFailed(failedIds)}
+            >
+              <RotateCw className="mr-1 h-3 w-3" />
+              Retry Failed ({failedCount})
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={onComplete}
+          >
+            Dismiss
+          </Button>
+        </div>
       )}
     </div>
   )
