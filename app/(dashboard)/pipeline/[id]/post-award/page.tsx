@@ -23,7 +23,7 @@ export default async function PostAwardPage({ params }: Props) {
     .single()
 
   const role = resolveRole(profile?.role)
-  if (!hasPermission(role, 'pipeline', 'shouldRender')) {
+  if (!hasPermission(role, 'proposals', 'shouldRender')) {
     return null
   }
 

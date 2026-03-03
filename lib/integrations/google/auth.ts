@@ -18,7 +18,7 @@ import { createClient } from '@/lib/supabase/server'
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? ''
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? ''
 const GOOGLE_REDIRECT_URI =
-  process.env.GOOGLE_REDIRECT_URI ?? 'https://missionpulse.io/api/integrations/google/callback'
+  process.env.GOOGLE_REDIRECT_URI ?? 'https://missionpulse.ai/api/integrations/google/callback'
 
 const SCOPES = [
   'openid',

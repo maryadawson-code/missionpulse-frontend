@@ -18,7 +18,7 @@ import { createClient } from '@/lib/supabase/server'
 const DOCUSIGN_CLIENT_ID = process.env.DOCUSIGN_CLIENT_ID ?? ''
 const DOCUSIGN_CLIENT_SECRET = process.env.DOCUSIGN_CLIENT_SECRET ?? ''
 const DOCUSIGN_REDIRECT_URI =
-  process.env.DOCUSIGN_REDIRECT_URI ?? 'https://missionpulse.io/api/integrations/docusign/callback'
+  process.env.DOCUSIGN_REDIRECT_URI ?? 'https://missionpulse.ai/api/integrations/docusign/callback'
 const DOCUSIGN_ACCOUNT_ID = process.env.DOCUSIGN_ACCOUNT_ID ?? ''
 
 // DocuSign environments
