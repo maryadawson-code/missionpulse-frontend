@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: 'Dashboard — MissionPulse',
 }
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole } from '@/lib/rbac/config'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { formatCurrencyCompact, formatPwin, phaseColor } from '@/lib/utils/formatters'
 import type { Opportunity } from '@/lib/types'
 import Link from 'next/link'
@@ -127,19 +127,16 @@ function DeadlineRow({ opp }: { opp: Opportunity }) {
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  // Author role redirect — authors land on their workflow page
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    const role = resolveRole(profile?.role)
-    if (role === 'author') {
-      redirect('/proposals')
-    }
-  }
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'dashboard', 'shouldRender')) redirect('/proposals')
 
   // Fetch widget visibility preferences
   const { data: widgetRows } = await supabase

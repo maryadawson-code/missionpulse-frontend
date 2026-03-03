@@ -18,6 +18,7 @@ import {
   Milestone,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 import { GanttTimeline } from '@/components/features/proposals/GanttTimeline'
 import { MilestoneBar } from '@/components/features/proposals/MilestoneBar'
@@ -42,6 +43,10 @@ export default async function TimelinePage({
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'proposals', 'shouldRender')) redirect('/dashboard')
 
   // Fetch opportunity
   const { data: opportunity, error: oppError } = await supabase

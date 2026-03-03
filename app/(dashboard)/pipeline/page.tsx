@@ -1,6 +1,7 @@
 // filepath: app/(dashboard)/pipeline/page.tsx
 
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -20,22 +21,19 @@ export default async function PipelinePage({
 }) {
   const supabase = await createClient()
 
-  // Resolve canEdit permission
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  let canEdit = false
-  let isExternal = false
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, email')
-      .eq('id', user.id)
-      .single()
-    const role = resolveRole(profile?.role)
-    canEdit = hasPermission(role, 'pipeline', 'canEdit')
-    isExternal = !isInternalRole(role)
-  }
+  if (!user) redirect('/login')
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, email')
+    .eq('id', user.id)
+    .single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'pipeline', 'shouldRender')) redirect('/dashboard')
+  const canEdit = hasPermission(role, 'pipeline', 'canEdit')
+  const isExternal = !isInternalRole(role)
 
   // ─── Fetch Opportunities ────────────────────────────────────
   // External roles (partner, subcontractor, consultant) only see assigned opportunities

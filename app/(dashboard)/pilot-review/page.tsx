@@ -3,6 +3,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { generateROIReport } from '@/lib/billing/pilot-conversion'
 import Link from 'next/link'
 
@@ -41,9 +42,12 @@ export default async function PilotReviewPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('company_id')
+    .select('role, company_id')
     .eq('id', user.id)
     .single()
+
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'admin', 'canView')) redirect('/dashboard')
 
   const companyId = profile?.company_id
   if (!companyId) redirect('/dashboard')
