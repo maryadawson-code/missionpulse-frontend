@@ -132,11 +132,15 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, preferences')
     .eq('id', user.id)
     .single()
   const role = resolveRole(profile?.role)
   if (!hasPermission(role, 'dashboard', 'shouldRender')) redirect('/proposals')
+
+  // Redirect first-time users to onboarding
+  const prefs = (profile?.preferences as Record<string, unknown>) ?? {}
+  if (!prefs.onboarding_complete) redirect('/onboarding')
 
   // Fetch widget visibility preferences
   const { data: widgetRows } = await supabase
