@@ -1,5 +1,13 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Shield, Cpu, BarChart3, Users, FileText, Lock, ChevronRight, Zap } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'MissionPulse — AI-Powered Federal Proposal Management',
+  description:
+    'Win more federal contracts with AI-powered proposal management. RFP shredding, compliance tracking, pricing analysis, and team collaboration — built for GovCon.',
+  alternates: { canonical: '/' },
+}
 
 const FEATURES = [
   {
