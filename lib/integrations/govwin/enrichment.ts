@@ -8,7 +8,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import {
-  searchGovWinOpportunities,
   getCompetitors,
   getAgencyIntel,
   type GovWinOpportunity,

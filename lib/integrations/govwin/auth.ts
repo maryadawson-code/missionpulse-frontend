@@ -17,12 +17,12 @@ const GOVWIN_BASE_URL =
 // ─── Types ───────────────────────────────────────────────────
 
 export class GovWinAuthError extends Error {
-  constructor(
-    message: string,
-    public readonly statusCode: number = 401
-  ) {
+  readonly statusCode: number
+
+  constructor(message: string, statusCode: number = 401) {
     super(message)
     this.name = 'GovWinAuthError'
+    this.statusCode = statusCode
   }
 }
 

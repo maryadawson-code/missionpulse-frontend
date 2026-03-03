@@ -40,7 +40,7 @@ export async function assembleBinder(
   // Fetch opportunity
   const { data: opp } = await supabase
     .from('opportunities')
-    .select('id, title, agency, ceiling, pwin, phase, company_id, status')
+    .select('id, title, agency, ceiling, pwin, phase, company_id, status, solicitation_number')
     .eq('id', opportunityId)
     .single()
 
@@ -49,17 +49,6 @@ export async function assembleBinder(
   const title = (opp.title as string) ?? 'Untitled'
   const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50)
   const dateStr = new Date().toISOString().split('T')[0]
-  const companyId = opp.company_id as string
-
-  // Fetch company name
-  const { data: company } = await supabase
-    .from('companies')
-    .select('name')
-    .eq('id', companyId)
-    .single()
-
-  const companyName = (company?.name as string) ?? 'Company'
-
   // Fetch related data
   const [
     { data: sections },
@@ -68,12 +57,12 @@ export async function assembleBinder(
   ] = await Promise.all([
     supabase
       .from('proposal_sections')
-      .select('id, title, content, section_number, status')
+      .select('id, section_title, content, section_number, status')
       .eq('opportunity_id', opportunityId)
       .order('section_number'),
     supabase
       .from('compliance_requirements')
-      .select('id, requirement_text, status, section_reference')
+      .select('id, reference, requirement, section, priority, status')
       .eq('opportunity_id', opportunityId),
     supabase
       .from('opportunity_assignments')
@@ -86,13 +75,13 @@ export async function assembleBinder(
   const files: Array<{ name: string; buffer: Buffer | Uint8Array }> = []
 
   // 1. Tech Volume
+  const solicitationNumber = (opp.solicitation_number as string) ?? ''
   const techData = buildTechVolumeData({
     opportunityTitle: title,
-    companyName,
+    solicitationNumber,
     sections: (sections ?? []).map((s) => ({
-      title: (s.title as string) ?? '',
+      title: (s.section_title as string) ?? '',
       content: (s.content as string) ?? '',
-      sectionNumber: (s.section_number as string) ?? '',
     })),
   })
   const techBuffer = await generateTechVolume(techData)
@@ -108,16 +97,14 @@ export async function assembleBinder(
   // 2. Compliance Matrix
   const complianceRows = buildComplianceRows(
     (complianceReqs ?? []).map((r) => ({
-      id: r.id as string,
-      text: (r.requirement_text as string) ?? '',
-      status: (r.status as string) ?? 'Not Addressed',
-      section: (r.section_reference as string) ?? '',
+      reference: r.reference ?? null,
+      requirement: r.requirement ?? null,
+      section: r.section ?? null,
+      priority: r.priority ?? null,
+      status: r.status ?? 'Not Addressed',
     }))
   )
-  const complianceBuffer = await generateComplianceMatrix({
-    opportunityTitle: title,
-    rows: complianceRows,
-  })
+  const complianceBuffer = await generateComplianceMatrix(complianceRows, title)
   const complianceFilename = `${safeTitle}_Compliance_Matrix_${dateStr}.xlsx`
   files.push({ name: complianceFilename, buffer: complianceBuffer })
   tocEntries.push({
@@ -129,10 +116,7 @@ export async function assembleBinder(
 
   // 3. Cost Model
   const costCLINs = buildCostModelCLINs([])
-  const costBuffer = await generateCostModel({
-    opportunityTitle: title,
-    clins: costCLINs,
-  })
+  const costBuffer = await generateCostModel(costCLINs, title)
   const costFilename = `${safeTitle}_Cost_Model_${dateStr}.xlsx`
   files.push({ name: costFilename, buffer: costBuffer })
   tocEntries.push({
@@ -144,24 +128,26 @@ export async function assembleBinder(
   })
 
   // 4. Gate Decision Deck
+  const compliancePct =
+    complianceReqs && complianceReqs.length > 0
+      ? Math.round(
+          (complianceReqs.filter((r) => r.status === 'Addressed').length /
+            complianceReqs.length) *
+            100
+        )
+      : 0
+
   const gateData = buildGateDecisionData({
     opportunityTitle: title,
     agency: (opp.agency as string) ?? '',
-    ceiling: (opp.ceiling as number) ?? 0,
+    gateName: `${(opp.phase as string) ?? 'Gate'} Review`,
+    gateNumber: 1,
+    decision: (opp.pwin as number) >= 50 ? 'go' : 'conditional',
     pwin: (opp.pwin as number) ?? 0,
-    phase: (opp.phase as string) ?? '',
-    compliancePct:
-      complianceReqs && complianceReqs.length > 0
-        ? Math.round(
-            (complianceReqs.filter(
-              (r) => (r.status as string) === 'Addressed'
-            ).length /
-              complianceReqs.length) *
-              100
-          )
-        : 0,
-    teamCount: teamMembers?.length ?? 0,
-    companyName,
+    complianceScore: compliancePct,
+    risks: [],
+    nextSteps: [],
+    decisionDate: dateStr,
   })
   const gateBuffer = await generateGateDecisionDeck(gateData)
   const gateFilename = `${safeTitle}_Gate_Decision_${dateStr}.pptx`
