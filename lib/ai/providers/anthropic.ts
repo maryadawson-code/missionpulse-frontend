@@ -16,11 +16,16 @@ import type {
 
 // ─── Config ──────────────────────────────────────────────────
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? ''
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1'
 
 const MAX_RETRIES = 2
 const BASE_DELAY_MS = 1000
+
+// Read the API key at call time — NOT at module load time.
+// Module-level constants can be stale in Next.js HMR/server-action contexts.
+function getApiKey(): string {
+  return process.env.ANTHROPIC_API_KEY ?? ''
+}
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -53,11 +58,14 @@ export async function createAnthropicProvider(): Promise<AIProvider> {
     isFedRAMPAuthorized: false,
 
     isConfigured() {
-      return Boolean(ANTHROPIC_API_KEY)
+      return Boolean(getApiKey())
     },
 
     async query(request: ProviderQueryRequest): Promise<ProviderQueryResponse> {
-      if (!ANTHROPIC_API_KEY) {
+      const apiKey = getApiKey()
+      console.log(`[anthropic] API key: ${apiKey.slice(0, 12)}...${apiKey.slice(-4)} (len=${apiKey.length})`)
+
+      if (!apiKey) {
         throw new AIError(
           'AUTH_ERROR',
           'Anthropic API key not configured',
@@ -74,7 +82,7 @@ export async function createAnthropicProvider(): Promise<AIProvider> {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': ANTHROPIC_API_KEY,
+              'x-api-key': apiKey,
               'anthropic-version': '2023-06-01',
             },
             body: JSON.stringify({
@@ -91,6 +99,7 @@ export async function createAnthropicProvider(): Promise<AIProvider> {
                 },
               ],
             }),
+            cache: 'no-store',
             signal: AbortSignal.timeout(60000),
           })
 
@@ -148,8 +157,9 @@ export async function createAnthropicProvider(): Promise<AIProvider> {
 
     async ping() {
       const start = Date.now()
+      const apiKey = getApiKey()
       try {
-        if (!ANTHROPIC_API_KEY) {
+        if (!apiKey) {
           return { ok: false, latencyMs: 0 }
         }
         // Anthropic doesn't have a health endpoint — send minimal request
@@ -157,7 +167,7 @@ export async function createAnthropicProvider(): Promise<AIProvider> {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': ANTHROPIC_API_KEY,
+            'x-api-key': apiKey,
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
@@ -165,6 +175,7 @@ export async function createAnthropicProvider(): Promise<AIProvider> {
             max_tokens: 1,
             messages: [{ role: 'user', content: 'ping' }],
           }),
+          cache: 'no-store',
           signal: AbortSignal.timeout(10000),
         })
         return { ok: response.ok, latencyMs: Date.now() - start }
