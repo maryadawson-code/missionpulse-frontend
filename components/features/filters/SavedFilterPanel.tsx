@@ -16,7 +16,7 @@ interface SavedFilter {
 interface SavedFilterPanelProps {
   savedFilters: SavedFilter[]
   currentFilters: Record<string, unknown>
-  onApply: (filters: Record<string, unknown>) => void
+  onApply: (_filters: Record<string, unknown>) => void
 }
 
 export function SavedFilterPanel({

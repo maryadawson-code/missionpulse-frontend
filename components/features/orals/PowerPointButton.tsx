@@ -16,7 +16,7 @@ interface PowerPointButtonProps {
 // ─── Component ───────────────────────────────────────────────
 
 export function PowerPointButton({
-  documentId,
+  documentId: _documentId,
   cloudFileId,
   className,
 }: PowerPointButtonProps) {

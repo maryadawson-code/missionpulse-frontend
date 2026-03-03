@@ -9,8 +9,8 @@ interface InlineEditFieldProps {
   fieldName: string
   type?: 'text' | 'number' | 'date' | 'textarea'
   canEdit: boolean
-  onSave: (fieldName: string, value: string) => Promise<{ success: boolean; error?: string }>
-  format?: (v: string | null | undefined) => string
+  onSave: (_fieldName: string, _value: string) => Promise<{ success: boolean; error?: string }>
+  format?: (_v: string | null | undefined) => string
 }
 
 export function InlineEditField({

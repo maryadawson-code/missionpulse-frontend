@@ -221,10 +221,10 @@ export default async function CollaborationPage({
   const allSyncStatuses = (syncStates ?? []).map(
     (s) => s.sync_status as SyncStatus
   )
-  const syncedCount = allSyncStatuses.filter(
+  const _syncedCount = allSyncStatuses.filter(
     (s) => s === 'synced' || s === 'idle'
   ).length
-  const totalSynced = allSyncStatuses.length
+  const _totalSynced = allSyncStatuses.length
 
   return (
     <div className="space-y-6">

@@ -57,10 +57,10 @@ export interface AIProvider {
   isConfigured(): boolean
 
   /** Send a query to the provider */
-  query(request: ProviderQueryRequest): Promise<ProviderQueryResponse>
+  query(_request: ProviderQueryRequest): Promise<ProviderQueryResponse>
 
   /** Generate embeddings (optional — not all providers support this) */
-  embed?(request: ProviderEmbedRequest): Promise<ProviderEmbedResponse>
+  embed?(_request: ProviderEmbedRequest): Promise<ProviderEmbedResponse>
 
   /** Quick connectivity check */
   ping(): Promise<{ ok: boolean; latencyMs: number }>

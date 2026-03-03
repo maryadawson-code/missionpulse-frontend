@@ -31,7 +31,7 @@ export default async function CapacityPage() {
 
   // Resolve user names
   const userIds = Array.from(new Set(items.map((a) => a.user_id).filter(Boolean))) as string[]
-  let userMap: Record<string, string> = {}
+  const userMap: Record<string, string> = {}
   if (userIds.length > 0) {
     const { data: users } = await supabase
       .from('profiles')
@@ -44,7 +44,7 @@ export default async function CapacityPage() {
 
   // Resolve opportunity names
   const oppIds = Array.from(new Set(items.map((a) => a.opportunity_id).filter(Boolean))) as string[]
-  let oppMap: Record<string, string> = {}
+  const oppMap: Record<string, string> = {}
   if (oppIds.length > 0) {
     const { data: opps } = await supabase
       .from('opportunities')

@@ -14,7 +14,7 @@ interface NotificationPref {
 
 interface NotificationPreferencesProps {
   preferences: NotificationPref[]
-  onSave: (prefs: NotificationPref[]) => Promise<{ success: boolean; error?: string }>
+  onSave: (_prefs: NotificationPref[]) => Promise<{ success: boolean; error?: string }>
 }
 
 const NOTIFICATION_TYPES = [

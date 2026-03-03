@@ -29,7 +29,7 @@ const LOCK_TTL_MS = 30 * 60 * 1000
  */
 export function joinLockChannel(
   opportunityId: string,
-  onUpdate: (locks: Map<string, SectionLock>) => void
+  onUpdate: (_locks: Map<string, SectionLock>) => void
 ): { channel: RealtimeChannel; cleanup: () => void } {
   const supabase = createClient()
   const channelName = `locks:opportunity:${opportunityId}`

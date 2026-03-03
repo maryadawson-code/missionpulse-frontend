@@ -4,7 +4,7 @@ import { AGENT_COLORS } from '@/lib/ai/intent-patterns'
 
 interface PromptChipsProps {
   prompts: { label: string; prompt: string; agent: string }[]
-  onSelect: (prompt: string) => void
+  onSelect: (_prompt: string) => void
   disabled?: boolean
 }
 

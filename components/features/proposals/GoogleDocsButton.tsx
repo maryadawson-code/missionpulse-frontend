@@ -16,7 +16,7 @@ interface GoogleDocsButtonProps {
 // ─── Component ───────────────────────────────────────────────
 
 export function GoogleDocsButton({
-  documentId,
+  documentId: _documentId,
   fileId,
   className,
 }: GoogleDocsButtonProps) {

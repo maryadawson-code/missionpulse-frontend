@@ -38,6 +38,7 @@ export function CommentPanel({ sectionId, userId, userName }: CommentPanelProps)
 
   useEffect(() => {
     loadComments()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionId])
 
   const loadComments = async () => {
@@ -226,8 +227,8 @@ function CommentThread({
   sectionId: string
   userId: string
   userName: string
-  onReply: (reply: Comment) => void
-  onResolve: (resolved: boolean) => void
+  onReply: (_reply: Comment) => void
+  onResolve: (_resolved: boolean) => void
 }) {
   const [replyText, setReplyText] = useState('')
   const [showReply, setShowReply] = useState(false)

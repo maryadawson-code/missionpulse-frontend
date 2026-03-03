@@ -37,6 +37,7 @@ export function SectionVersionHistory({
   useEffect(() => {
     if (!expanded) return
     loadVersions()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded, sectionId])
 
   async function loadVersions() {

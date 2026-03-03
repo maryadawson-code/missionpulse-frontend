@@ -28,7 +28,7 @@ interface EventParams {
 export function trackEvent(event: MarketingEvent, params?: EventParams): void {
   if (!GA4_ID || typeof window === 'undefined') return
 
-  const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void })
+  const gtag = (window as unknown as { gtag?: (..._args: unknown[]) => void })
     .gtag
   if (gtag) {
     gtag('event', event, params)
@@ -41,7 +41,7 @@ export function trackEvent(event: MarketingEvent, params?: EventParams): void {
 export function trackPageView(url: string): void {
   if (!GA4_ID || typeof window === 'undefined') return
 
-  const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void })
+  const gtag = (window as unknown as { gtag?: (..._args: unknown[]) => void })
     .gtag
   if (gtag) {
     gtag('config', GA4_ID, { page_path: url })

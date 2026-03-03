@@ -21,7 +21,7 @@ interface SectionLockProps {
   userName: string
   onLockAcquired?: () => void
   onLockReleased?: () => void
-  onLockBlocked?: (lockedBy: string) => void
+  onLockBlocked?: (_lockedBy: string) => void
 }
 
 // ─── Component ───────────────────────────────────────────────

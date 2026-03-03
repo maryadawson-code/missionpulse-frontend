@@ -9,7 +9,7 @@ interface FieldDef {
   fieldName: string
   value: string | null | undefined
   type?: 'text' | 'number' | 'date' | 'textarea'
-  format?: (v: string | null | undefined) => string
+  format?: (_v: string | null | undefined) => string
 }
 
 interface InlineEditFieldsProps {

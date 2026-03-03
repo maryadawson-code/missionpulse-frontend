@@ -16,7 +16,7 @@ interface ExcelOnlineButtonProps {
 // ─── Component ───────────────────────────────────────────────
 
 export function ExcelOnlineButton({
-  documentId,
+  documentId: _documentId,
   cloudFileId,
   className,
 }: ExcelOnlineButtonProps) {
