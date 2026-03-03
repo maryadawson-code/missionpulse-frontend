@@ -32,17 +32,9 @@ export default async function BloombergGovPage() {
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <h3 className="font-semibold">Connection Setup</h3>
-        <div>
-          <label className="text-sm font-medium block mb-1">API Key</label>
-          <input
-            type="password"
-            placeholder="Enter your Bloomberg Gov API key"
-            className="w-full max-w-md rounded-md border bg-background px-3 py-2 text-sm"
-            disabled
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Contact your Bloomberg Government account manager to obtain API credentials.
+        <p className="text-sm text-muted-foreground">
+          To connect, provide your Bloomberg Government API credentials in the Enterprise
+          admin panel. Contact your Bloomberg Gov account manager to obtain API access.
         </p>
       </div>
 

@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
-  Plus,
   Milestone,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -154,15 +153,6 @@ export default async function TimelinePage({
           </div>
         </div>
 
-        {/* Add Milestone placeholder button */}
-        <button
-          type="button"
-          disabled
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[#00E5FA]/30 bg-[#00E5FA]/10 px-4 py-2 text-sm font-medium text-[#00E5FA] transition-colors hover:bg-[#00E5FA]/20 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" />
-          Add Milestone
-        </button>
       </div>
 
       {/* Summary KPI Cards */}
