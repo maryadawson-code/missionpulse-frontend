@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
-import { IntegrationCards } from '@/components/features/integrations/IntegrationCards'
+import { IntegrationCards, INTEGRATION_COUNT } from '@/components/features/integrations/IntegrationCards'
 
 export default async function IntegrationsPage() {
   const supabase = await createClient()
@@ -73,7 +73,7 @@ export default async function IntegrationsPage() {
         </div>
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground">Available</p>
-          <p className="text-2xl font-bold">9</p>
+          <p className="text-2xl font-bold">{INTEGRATION_COUNT}</p>
         </div>
       </div>
 

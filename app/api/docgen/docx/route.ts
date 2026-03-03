@@ -4,12 +4,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 
-/** Extract a clean ArrayBuffer from a Node Buffer for Response body. */
+/** Create a clean ArrayBuffer copy from a Node Buffer for Response body. */
 function extractArrayBuffer(buf: Buffer): ArrayBuffer {
-  return buf.buffer.slice(
-    buf.byteOffset,
-    buf.byteOffset + buf.byteLength
-  ) as ArrayBuffer
+  const copy = new Uint8Array(buf.byteLength)
+  for (let i = 0; i < buf.byteLength; i++) copy[i] = buf[i]
+  return copy.buffer
 }
 
 export async function POST(request: NextRequest) {

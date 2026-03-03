@@ -81,7 +81,16 @@ const AVAILABLE_INTEGRATIONS = [
     href: '/integrations/usaspending',
     color: '#112e51',
   },
+  {
+    provider: 'bloomberg_gov',
+    name: 'Bloomberg Government',
+    description: 'Opportunity intelligence, competitive data, and market analytics',
+    href: '/integrations/bloomberg-gov',
+    color: '#1e3a5f',
+  },
 ]
+
+export const INTEGRATION_COUNT = AVAILABLE_INTEGRATIONS.length
 
 function statusIndicator(status: string | null) {
   switch (status) {
