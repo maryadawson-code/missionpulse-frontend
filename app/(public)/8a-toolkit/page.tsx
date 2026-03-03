@@ -16,7 +16,7 @@ import { TrackedCTA } from '@/components/marketing/TrackedCTA'
 export const metadata: Metadata = {
   title: '8(a) Toolkit — Win More Set-Aside Contracts | MissionPulse',
   description:
-    'AI-powered proposal management built for 8(a) small businesses. Compliance automation, proposal generation, pWin scoring, and more. Start your free pilot today.',
+    'AI-powered proposal management built for 8(a) small businesses. Compliance automation, proposal generation, pWin scoring, and more. Sign up free today.',
   openGraph: {
     title: 'MissionPulse 8(a) Toolkit — Win More Set-Aside Contracts',
     description:
@@ -118,11 +118,11 @@ export default function EightAToolkitPage() {
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <TrackedCTA
               href="/signup?plan=starter"
-              event="pilot_signup_click"
+              event="signup_click"
               params={{ plan_tier: 'starter', source: '8a_toolkit_hero' }}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90"
             >
-              Start Your Free Pilot
+              Get Started Free
               <ChevronRight className="h-4 w-4" />
             </TrackedCTA>
             <Link
@@ -237,11 +237,11 @@ export default function EightAToolkitPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">
-                    30-Day Pilot — No Risk
+                    30-Day Free Trial — No Risk
                   </h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Start with a 30-day pilot at 50% off. Full access to all
-                    features. Pilot cost credited when you convert to annual.
+                    Sign up and get 30 days free. Full access to all
+                    features. Cancel anytime — no credit card required to start.
                   </p>
                 </div>
               </div>
@@ -262,11 +262,11 @@ export default function EightAToolkitPage() {
           </p>
           <TrackedCTA
             href="/signup?plan=starter"
-            event="pilot_signup_click"
+            event="signup_click"
             params={{ plan_tier: 'starter', source: '8a_toolkit_cta' }}
             className="mt-8 inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90"
           >
-            Start Your Free Pilot
+            Get Started Free
             <ChevronRight className="h-4 w-4" />
           </TrackedCTA>
         </div>

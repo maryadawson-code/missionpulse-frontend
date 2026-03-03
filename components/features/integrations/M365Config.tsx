@@ -123,8 +123,8 @@ export function M365Config({
               </Button>
             )}
             {!isAvailable && !isConnected && (
-              <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                Coming Soon
+              <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs text-amber-600 dark:text-amber-400">
+                Not Configured
               </span>
             )}
           </div>
@@ -144,6 +144,12 @@ export function M365Config({
 
         {errorMessage && (
           <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
+        )}
+
+        {!isAvailable && !isConnected && (
+          <p className="text-xs text-muted-foreground mt-3">
+            Ask your workspace administrator to configure Microsoft 365 credentials in Settings.
+          </p>
         )}
 
       </div>

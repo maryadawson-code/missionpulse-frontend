@@ -25,7 +25,7 @@ const PLANS = [
       '500K tokens/month',
     ],
     highlighted: false,
-    cta: 'Start Free Pilot',
+    cta: 'Get Started',
   },
   {
     name: 'Professional',
@@ -46,7 +46,7 @@ const PLANS = [
       '2M tokens/month',
     ],
     highlighted: true,
-    cta: 'Start Free Pilot',
+    cta: 'Get Started',
   },
   {
     name: 'Enterprise',
@@ -211,7 +211,7 @@ export function PricingCards() {
             <Link
               href={plan.slug === 'enterprise' ? '/signup?plan=enterprise' : `/signup?plan=${plan.slug}`}
               onClick={() =>
-                trackEvent('pilot_signup_click', {
+                trackEvent('signup_click', {
                   plan_tier: plan.slug,
                   billing_interval: isAnnual ? 'annual' : 'monthly',
                   source: 'pricing_page',

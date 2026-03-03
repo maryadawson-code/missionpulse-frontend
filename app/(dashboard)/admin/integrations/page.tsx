@@ -10,7 +10,7 @@ interface IntegrationItem {
   desc: string
   icon: string
   tier: 'built_in' | 'one_click' | 'enterprise'
-  status?: 'active' | 'coming_soon'
+  status?: 'active'
 }
 
 const INTEGRATIONS: IntegrationItem[] = [
@@ -19,9 +19,9 @@ const INTEGRATIONS: IntegrationItem[] = [
   { href: '/ai-chat', label: 'AI Assistant', desc: 'Built-in proposal AI powered by AskSage', icon: '🤖', tier: 'built_in', status: 'active' },
   { href: '/settings/import', label: 'Data Import', desc: 'CSV/Excel import', icon: '📥', tier: 'built_in', status: 'active' },
 
-  // One-click — coming soon, OAuth-based
-  { href: '#', label: 'Slack', desc: 'Notifications and team updates', icon: '💬', tier: 'one_click', status: 'coming_soon' },
-  { href: '#', label: 'Google Workspace', desc: 'Drive, Docs, and Calendar sync', icon: '📧', tier: 'one_click', status: 'coming_soon' },
+  // One-click — OAuth-based
+  { href: '/integrations/slack', label: 'Slack', desc: 'Notifications and team updates', icon: '💬', tier: 'one_click', status: 'active' },
+  { href: '/integrations/google', label: 'Google Workspace', desc: 'Drive, Docs, and Calendar sync', icon: '📧', tier: 'one_click', status: 'active' },
 
   // Enterprise — requires enterprise plan
   { href: '/admin/integrations/hubspot', label: 'HubSpot / Salesforce', desc: 'CRM pipeline sync and field mappings', icon: '🔗', tier: 'enterprise' },
@@ -100,30 +100,31 @@ export default async function AdminIntegrationsPage() {
         </div>
       </section>
 
-      {/* One-click (Coming Soon) */}
+      {/* One-click OAuth integrations */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-          Coming Soon
+          One-Click
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {oneClick.map((item) => (
-            <div
+            <Link
               key={item.label}
-              className="flex items-start gap-3 rounded-xl border border-dashed border-border bg-card/30 p-5 opacity-70"
+              href={item.href}
+              className="group flex items-start gap-3 rounded-xl border border-border bg-card/50 p-5 hover:border-primary/40 transition-colors"
             >
               <span className="text-2xl">{item.icon}</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">
+                  <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
                     {item.label}
                   </h3>
-                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                    Coming Soon
+                  <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                    Available
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">{item.desc}</p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>

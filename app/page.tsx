@@ -41,7 +41,7 @@ const PRICING_TIERS = [
     period: '/mo',
     description: 'For solo consultants and small firms',
     features: ['5 active opportunities', 'Solo Mode AI assistance', 'SAM.gov integration', 'Basic compliance tracking', 'Email support', '500K tokens/month'],
-    cta: 'Start Free Pilot',
+    cta: 'Get Started',
     highlighted: false,
   },
   {
@@ -50,7 +50,7 @@ const PRICING_TIERS = [
     period: '/mo',
     description: 'For growing GovCon firms',
     features: ['25 active opportunities', 'Full AI agent suite (8 agents)', 'All integrations', 'Team collaboration (10 users)', 'Priority support', 'CUI-protected modules', '2M tokens/month'],
-    cta: 'Start Free Pilot',
+    cta: 'Get Started',
     highlighted: true,
   },
   {
@@ -122,7 +122,7 @@ export default function LandingPage() {
               href="/signup"
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90"
             >
-              Start Free Pilot
+              Get Started
               <ChevronRight className="h-4 w-4" />
             </Link>
             <Link
@@ -247,7 +247,7 @@ export default function LandingPage() {
             href="/signup"
             className="mt-8 inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90"
           >
-            Start Your Free Pilot
+            Get Started Free
             <ChevronRight className="h-4 w-4" />
           </Link>
         </div>

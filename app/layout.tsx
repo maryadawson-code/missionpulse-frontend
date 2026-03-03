@@ -65,7 +65,7 @@ export default function RootLayout({
           '@type': 'Offer',
           price: '0',
           priceCurrency: 'USD',
-          description: 'Free pilot available',
+          description: 'Free trial available',
         },
         creator: {
           '@type': 'Organization',

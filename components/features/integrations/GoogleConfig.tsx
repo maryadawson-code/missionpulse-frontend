@@ -107,8 +107,8 @@ export function GoogleConfig({
               </Button>
             )}
             {!isAvailable && !isConnected && (
-              <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                Coming Soon
+              <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs text-amber-600 dark:text-amber-400">
+                Not Configured
               </span>
             )}
           </div>
@@ -117,6 +117,12 @@ export function GoogleConfig({
         {lastSync && (
           <p className="mt-3 text-xs text-muted-foreground">
             Last synced: {new Date(lastSync).toLocaleString()}
+          </p>
+        )}
+
+        {!isAvailable && !isConnected && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Ask your workspace administrator to configure Google Workspace credentials in Settings.
           </p>
         )}
       </div>

@@ -79,7 +79,7 @@ export default function PublicLayout({
               href="/signup"
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
-              Start Free Pilot
+              Get Started
             </Link>
           </div>
 
@@ -128,7 +128,7 @@ export default function PublicLayout({
                   onClick={() => setMobileMenuOpen(false)}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
-                  Start Free Pilot
+                  Get Started
                 </Link>
               </div>
             </div>
