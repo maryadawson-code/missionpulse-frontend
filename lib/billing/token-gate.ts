@@ -45,13 +45,15 @@ export async function checkTokenGate(
 ): Promise<TokenGateResult> {
   const balance = await getTokenBalance(companyId)
 
-  // No balance → no subscription → block
+  // No balance → subscription provisioning gap. Allow with warning rather
+  // than hard-blocking: workspace provisioning creates companies but may
+  // not create company_subscriptions/token_ledger rows immediately.
   if (!balance) {
     return {
-      allowed: false,
-      threshold: 'hard_block',
+      allowed: true,
+      threshold: 'warning',
       balance: null,
-      message: 'No active subscription. Subscribe to enable AI features.',
+      message: 'Subscription not fully provisioned — running in trial mode.',
       upgrade_cta: true,
       grace_period: false,
     }
