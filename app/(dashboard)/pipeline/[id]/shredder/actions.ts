@@ -398,19 +398,23 @@ export async function shredDocument(
       .single()
 
     // Bulk insert requirements
-    const VALID_PRIORITIES = ['Critical', 'High', 'Medium', 'Low'] as const
-    const rows = parsed.map((req, i) => ({
-      opportunity_id: opportunityId,
-      company_id: profile?.company_id ?? null,
-      reference: `REQ-${String(startIdx + i).padStart(3, '0')}`,
-      requirement: req.requirement,
-      section: req.section || null,
-      priority: VALID_PRIORITIES.includes(req.priority as typeof VALID_PRIORITIES[number])
-        ? req.priority
-        : 'Medium',
-      status: 'Not Started',
-      notes: `Auto-extracted from ${doc.file_name} | Confidence: ${req.confidence} | ${req.because}`,
-    }))
+    // DB CHECK constraint uses lowercase: critical, high, medium, low
+    const VALID_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const
+    const rows = parsed.map((req, i) => {
+      const priorityLower = req.priority.toLowerCase()
+      return {
+        opportunity_id: opportunityId,
+        company_id: profile?.company_id ?? null,
+        reference: `REQ-${String(startIdx + i).padStart(3, '0')}`,
+        requirement: req.requirement,
+        section: req.section || null,
+        priority: VALID_PRIORITIES.includes(priorityLower as typeof VALID_PRIORITIES[number])
+          ? priorityLower
+          : 'medium',
+        status: 'not_started',
+        notes: `Auto-extracted from ${doc.file_name} | Confidence: ${req.confidence} | ${req.because}`,
+      }
+    })
 
     const { error: insertError } = await supabase
       .from('compliance_requirements')
