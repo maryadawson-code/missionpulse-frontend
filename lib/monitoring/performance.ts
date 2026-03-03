@@ -8,6 +8,8 @@
  */
 'use server'
 
+import { createClient } from '@/lib/supabase/server'
+
 // ─── Types ──────────────────────────────────────────────────
 
 export interface EndpointMetric {
@@ -97,14 +99,81 @@ export async function getPerformanceReport(): Promise<PerformanceReport> {
   }
 }
 
+function classifyHealth(p95: number): 'healthy' | 'degraded' | 'critical' {
+  if (p95 > 5000) return 'critical'
+  if (p95 > 2000) return 'degraded'
+  return 'healthy'
+}
+
 /**
- * Get recent performance metrics from the database for historical view.
- * Falls back to in-memory data when the performance_metrics table doesn't exist.
+ * Flush current in-memory metrics to the performance_metrics table.
+ * Call periodically (e.g., from a cron or after a batch of requests).
+ */
+export async function flushMetrics(): Promise<void> {
+  const report = await getPerformanceReport()
+  if (report.endpoints.length === 0) return
+
+  try {
+    const supabase = await createClient()
+    const now = new Date().toISOString()
+
+    const rows = report.endpoints.map((ep) => ({
+      metric_type: 'endpoint' as const,
+      name: ep.endpoint,
+      p50_ms: ep.p50,
+      p95_ms: ep.p95,
+      p99_ms: ep.p99,
+      avg_ms: ep.avgMs,
+      min_ms: 0,
+      max_ms: ep.maxMs,
+      sample_count: ep.sampleCount,
+      health_status: classifyHealth(ep.p95),
+      measured_at: now,
+    }))
+
+    await supabase.from('performance_metrics').insert(rows)
+  } catch (err) {
+    console.error('[perf] flushMetrics failed:', err)
+  }
+}
+
+/**
+ * Get historical performance metrics from the database.
+ * Falls back to in-memory data if no DB records exist.
  */
 export async function getHistoricalMetrics(
-  _days: number = 7
+  days: number = 7
 ): Promise<EndpointMetric[]> {
-  // performance_metrics table not yet provisioned — return in-memory data
-  const report = await getPerformanceReport()
-  return report.endpoints
+  try {
+    const supabase = await createClient()
+    const since = new Date()
+    since.setDate(since.getDate() - days)
+
+    const { data, error } = await supabase
+      .from('performance_metrics')
+      .select('name, p50_ms, p95_ms, p99_ms, avg_ms, max_ms, sample_count, measured_at')
+      .eq('metric_type', 'endpoint')
+      .gte('measured_at', since.toISOString())
+      .order('measured_at', { ascending: false })
+      .limit(200)
+
+    if (error || !data || data.length === 0) {
+      const report = await getPerformanceReport()
+      return report.endpoints
+    }
+
+    return data.map((row) => ({
+      endpoint: row.name,
+      p50: row.p50_ms,
+      p95: row.p95_ms,
+      p99: row.p99_ms,
+      sampleCount: row.sample_count,
+      avgMs: row.avg_ms,
+      maxMs: row.max_ms,
+      timestamp: row.measured_at,
+    }))
+  } catch {
+    const report = await getPerformanceReport()
+    return report.endpoints
+  }
 }

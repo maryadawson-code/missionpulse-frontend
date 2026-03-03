@@ -7358,6 +7358,57 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_metrics: {
+        Row: {
+          id: string
+          metric_type: string
+          name: string
+          p50_ms: number
+          p95_ms: number
+          p99_ms: number
+          avg_ms: number
+          min_ms: number
+          max_ms: number
+          sample_count: number
+          health_status: string
+          measured_at: string
+          created_at: string
+          metadata: Json | null
+        }
+        Insert: {
+          id?: string
+          metric_type: string
+          name: string
+          p50_ms: number
+          p95_ms: number
+          p99_ms: number
+          avg_ms: number
+          min_ms?: number
+          max_ms: number
+          sample_count: number
+          health_status: string
+          measured_at: string
+          created_at?: string
+          metadata?: Json | null
+        }
+        Update: {
+          id?: string
+          metric_type?: string
+          name?: string
+          p50_ms?: number
+          p95_ms?: number
+          p99_ms?: number
+          avg_ms?: number
+          min_ms?: number
+          max_ms?: number
+          sample_count?: number
+          health_status?: string
+          measured_at?: string
+          created_at?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       pricing_items: {
         Row: {
           basis_of_estimate: string | null

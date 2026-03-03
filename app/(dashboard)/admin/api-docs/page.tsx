@@ -7,73 +7,94 @@ import { resolveRole, hasPermission } from '@/lib/rbac/config'
 const API_ENDPOINTS = [
   {
     method: 'GET',
-    path: '/api/v1/opportunities',
-    description: 'List opportunities with filtering, sorting, and pagination',
-    auth: 'Bearer token',
-    params: 'page, per_page, status, phase, search',
+    path: '/api/health',
+    description: 'System health check — database, auth, and AI gateway status',
+    auth: 'None (public)',
+    params: 'None',
   },
   {
     method: 'GET',
-    path: '/api/v1/opportunities/:id',
-    description: 'Get opportunity detail with related entities',
-    auth: 'Bearer token',
-    params: 'include (sections, compliance, pricing)',
+    path: '/api/metrics',
+    description: 'Aggregated performance, query, and cache metrics',
+    auth: 'Session (admin role)',
+    params: 'None',
   },
   {
     method: 'POST',
-    path: '/api/v1/opportunities',
-    description: 'Create a new opportunity',
-    auth: 'Bearer token',
-    params: 'title, agency, naics_code, due_date, ...',
-  },
-  {
-    method: 'PATCH',
-    path: '/api/v1/opportunities/:id',
-    description: 'Update opportunity fields',
-    auth: 'Bearer token',
-    params: 'Any writable field',
-  },
-  {
-    method: 'GET',
-    path: '/api/v1/proposals/:id/sections',
-    description: 'List proposal sections with content',
-    auth: 'Bearer token',
-    params: 'include_content, status',
+    path: '/api/docgen/docx',
+    description: 'Generate DOCX documents (tech volume, key personnel, FAR risk memo)',
+    auth: 'Session (proposals.canView)',
+    params: 'type, opportunityId',
   },
   {
     method: 'POST',
-    path: '/api/v1/ai/query',
-    description: 'Execute an AI query against the pipeline',
-    auth: 'Bearer token',
-    params: 'prompt, agent_type, opportunity_id, classification',
-  },
-  {
-    method: 'GET',
-    path: '/api/v1/compliance/:opportunity_id',
-    description: 'Get compliance requirements for an opportunity',
-    auth: 'Bearer token',
-    params: 'status, priority',
-  },
-  {
-    method: 'GET',
-    path: '/api/v1/analytics/pipeline',
-    description: 'Pipeline analytics — win rate, value, phase distribution',
-    auth: 'Bearer token',
-    params: 'period (7d, 30d, 90d, 1y)',
+    path: '/api/docgen/xlsx',
+    description: 'Generate XLSX workbooks (compliance matrix, cost model, red team scorecard)',
+    auth: 'Session (proposals.canView)',
+    params: 'type, opportunityId',
   },
   {
     method: 'POST',
-    path: '/api/v1/docgen',
-    description: 'Generate a document (DOCX, XLSX, PPTX)',
-    auth: 'Bearer token',
-    params: 'type, opportunity_id, format',
+    path: '/api/docgen/pptx',
+    description: 'Generate PPTX decks (orals presentation, gate decision brief)',
+    auth: 'Session (proposals.canView)',
+    params: 'type, opportunityId',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/sso',
+    description: 'Upsert SAML SSO configuration for the organization',
+    auth: 'Session (admin.canEdit)',
+    params: 'companyId, entityId, ssoUrl, certificate',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/roles',
+    description: 'Create a custom RBAC role with module permissions',
+    auth: 'Session (admin.canEdit)',
+    params: 'companyId, name, description, permissions',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/workspaces',
+    description: 'Create a new workspace under the parent company',
+    auth: 'Session (admin.canEdit)',
+    params: 'parentCompanyId, name, domain',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/templates',
+    description: 'Update brand settings (color, logo, header/footer text)',
+    auth: 'Session (admin.canEdit)',
+    params: 'companyId, primaryColor, headerText, footerText, logoUrl',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/audit-retention',
+    description: 'Update audit log retention period (90 days to 7 years)',
+    auth: 'Session (admin.canEdit)',
+    params: 'companyId, retentionDays',
+  },
+  {
+    method: 'POST',
+    path: '/api/newsletter',
+    description: 'Subscribe an email to the newsletter list',
+    auth: 'None (public)',
+    params: 'email',
+  },
+  {
+    method: 'POST',
+    path: '/api/webhooks/stripe',
+    description: 'Stripe webhook receiver for subscription events',
+    auth: 'Stripe signature verification',
+    params: 'Stripe event payload',
   },
   {
     method: 'GET',
-    path: '/api/v1/token-usage',
-    description: 'Get current token balance and usage',
-    auth: 'Bearer token',
-    params: 'period_start, period_end',
+    path: '/api/section-versions',
+    description: 'List version history for a proposal section',
+    auth: 'Session',
+    params: 'sectionId',
   },
 ]
 
@@ -103,9 +124,10 @@ export default async function APIDocsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">REST API Documentation</h1>
+        <h1 className="text-2xl font-bold">API Reference</h1>
         <p className="text-sm text-muted-foreground">
-          MissionPulse REST API v1 — Enterprise plan required. All endpoints require Bearer token authentication.
+          MissionPulse internal API routes. All session-authenticated endpoints require an active
+          Supabase auth session. Admin endpoints enforce RBAC via role permissions.
         </p>
       </div>
 
@@ -114,11 +136,12 @@ export default async function APIDocsPage() {
         <h3 className="font-semibold mb-3">Authentication</h3>
         <div className="space-y-2 text-sm">
           <p className="text-muted-foreground">
-            All API requests require a Bearer token in the Authorization header.
-            Generate API keys in Settings &rarr; API Keys.
+            Most endpoints use Supabase session cookies for authentication.
+            Public endpoints (health, newsletter) require no auth.
+            Admin endpoints require <code className="bg-muted px-1 rounded">admin.canEdit</code> permission.
           </p>
           <div className="bg-muted rounded-md p-3 font-mono text-xs">
-            Authorization: Bearer mp_live_xxxxxxxxxxxx
+            Cookie: sb-access-token=...; sb-refresh-token=...
           </div>
         </div>
       </div>
@@ -132,12 +155,12 @@ export default async function APIDocsPage() {
             <p className="font-medium">100 req/min</p>
           </div>
           <div>
-            <p className="text-muted-foreground">AI Endpoints</p>
-            <p className="font-medium">20 req/min</p>
-          </div>
-          <div>
             <p className="text-muted-foreground">DocGen</p>
             <p className="font-medium">10 req/min</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Webhooks</p>
+            <p className="font-medium">No limit (signature-verified)</p>
           </div>
         </div>
       </div>
@@ -145,7 +168,7 @@ export default async function APIDocsPage() {
       {/* Endpoints table */}
       <div className="rounded-lg border">
         <div className="p-4 border-b">
-          <h3 className="font-semibold">Endpoints</h3>
+          <h3 className="font-semibold">Endpoints ({API_ENDPOINTS.length})</h3>
         </div>
         <div className="divide-y">
           {API_ENDPOINTS.map((ep, i) => (
@@ -163,9 +186,10 @@ export default async function APIDocsPage() {
                 <code className="text-sm font-mono">{ep.path}</code>
               </div>
               <p className="text-sm text-muted-foreground">{ep.description}</p>
-              <p className="text-xs text-muted-foreground">
-                Parameters: <code className="bg-muted px-1 rounded">{ep.params}</code>
-              </p>
+              <div className="flex gap-4 text-xs text-muted-foreground">
+                <span>Auth: <code className="bg-muted px-1 rounded">{ep.auth}</code></span>
+                <span>Params: <code className="bg-muted px-1 rounded">{ep.params}</code></span>
+              </div>
             </div>
           ))}
         </div>
@@ -175,21 +199,20 @@ export default async function APIDocsPage() {
       <div className="rounded-lg border bg-card p-6">
         <h3 className="font-semibold mb-3">Response Format</h3>
         <div className="bg-muted rounded-md p-4 font-mono text-xs whitespace-pre">
-{`{
-  "data": { ... },
-  "meta": {
-    "page": 1,
-    "per_page": 25,
-    "total": 142,
-    "request_id": "req_xxxx"
-  }
-}`}
+{`// Success
+{ "success": true, "id": "uuid" }
+
+// Error
+{ "error": "Description of what went wrong" }
+
+// DocGen routes return binary file downloads
+// Content-Disposition: attachment; filename="..."`}
         </div>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Full OpenAPI 3.0 specification available at /api/v1/openapi.json.
-        All responses follow JSON:API conventions. RBAC is enforced per-endpoint
+        All admin mutation endpoints write to both activity_log (user-visible) and
+        audit_logs (immutable compliance trail). RBAC is enforced per-endpoint
         matching the authenticated user&apos;s role permissions.
       </p>
     </div>
