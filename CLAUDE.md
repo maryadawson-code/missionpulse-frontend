@@ -109,3 +109,40 @@ Always output monitoring results as:
   "next_check": "ISO-8601"
 }
 ```
+
+---
+
+## SEO Intelligence Agent — Autonomous SEO Mode
+
+Runs alongside Sentinel. Audits public pages at missionpulse.ai, applies pre-approved
+technical fixes, tracks traffic via Plausible, and proposes copy changes via GitHub issues.
+
+### Schedule (offset from Sentinel to prevent conflicts)
+
+- Monday 2pm UTC: Weekly SEO audit + fixes (GitHub Actions)
+- 1st of month 2pm UTC: Deep run with full traffic correlation
+- Local launchd: Monday 8am local time (optional)
+
+### Agent Coordination with Sentinel
+
+- SEO agent commits to main with `seo:` prefix — Sentinel should not escalate these
+- SEO agent modifies only `seo-agent/knowledge/` and public page meta tags/schema
+- SEO agent never touches `app/`, `lib/`, `components/`, or infrastructure config
+- Both agents share a `main-branch-push` concurrency group to prevent simultaneous pushes
+- If SEO agent push fails and breaks CI, Sentinel treats it as L1 (advise, don't remediate)
+
+### SEO Agent Knowledge Base
+
+- `seo-agent/knowledge/strategy.md` — evolving GovCon SEO strategy
+- `seo-agent/knowledge/page-state.json` — page grades and schema state
+- `seo-agent/knowledge/learning-log.md` — run-by-run journal (agent reads before each run)
+- `seo-agent/knowledge/fix-log.json` — immutable fix history with traffic deltas
+- `seo-agent/knowledge/proposals-pending.md` — copy proposals awaiting approval
+
+### SEO Agent Boundaries
+
+- Budget cap: $1.00 per run
+- Turn cap: 30 turns per run
+- Auto-applies: schema, canonical tags, OG tags, alt text, sitemap entries, H1 fixes
+- Propose-only (via GitHub issue): title text, description text, body copy, layout changes
+- Never modifies: `_headers`, `_redirects`, `netlify.toml`, `.env`, auth, payments
