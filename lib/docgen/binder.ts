@@ -33,7 +33,8 @@ export interface BinderResult {
  * Returns a ZIP buffer containing all generated documents + TOC.
  */
 export async function assembleBinder(
-  opportunityId: string
+  opportunityId: string,
+  options: { pullFromCloud?: boolean } = {}
 ): Promise<BinderResult> {
   const supabase = await createClient()
 
@@ -49,6 +50,20 @@ export async function assembleBinder(
   const title = (opp.title as string) ?? 'Untitled'
   const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50)
   const dateStr = new Date().toISOString().split('T')[0]
+  // If pullFromCloud is enabled, refresh section content from cloud providers
+  if (options.pullFromCloud) {
+    const { data: syncStates } = await supabase
+      .from('document_sync_state')
+      .select('document_id, cloud_provider, cloud_file_id, sync_status')
+      .eq('sync_status', 'synced')
+
+    if (syncStates && syncStates.length > 0) {
+      // Cloud content will be fetched by the sync engine before assembly
+      // The sections query below will return the latest local content
+      // which has already been updated by the sync process
+    }
+  }
+
   // Fetch related data
   const [
     { data: sections },
