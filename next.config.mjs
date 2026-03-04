@@ -69,7 +69,11 @@ const nextConfig = {
 };
 
 export default withSentryConfig(analyzeBundles(nextConfig), {
+  org: process.env.SENTRY_ORG || 'mission-meets-tech',
+  project: process.env.SENTRY_PROJECT || 'missionpulse',
   silent: !process.env.CI,
+  widenClientFileUpload: true,
   hideSourceMaps: true,
+  disableLogger: true,
   tunnelRoute: '/monitoring',
 });

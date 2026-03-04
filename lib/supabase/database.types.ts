@@ -4436,6 +4436,39 @@ export type Database = {
           },
         ]
       }
+      health_snapshots: {
+        Row: {
+          created_at: string | null
+          deploy_count: number | null
+          error_count: number | null
+          health_status: string
+          id: string
+          response_time_ms: number | null
+          snapshot_date: string
+          subsystem_checks: Json
+        }
+        Insert: {
+          created_at?: string | null
+          deploy_count?: number | null
+          error_count?: number | null
+          health_status: string
+          id?: string
+          response_time_ms?: number | null
+          snapshot_date?: string
+          subsystem_checks?: Json
+        }
+        Update: {
+          created_at?: string | null
+          deploy_count?: number | null
+          error_count?: number | null
+          health_status?: string
+          id?: string
+          response_time_ms?: number | null
+          snapshot_date?: string
+          subsystem_checks?: Json
+        }
+        Relationships: []
+      }
       help_articles: {
         Row: {
           category: string
@@ -5891,6 +5924,45 @@ export type Database = {
           status?: string | null
           title?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      monitoring_events: {
+        Row: {
+          created_at: string | null
+          detail: Json | null
+          event_type: string
+          id: string
+          resolved: boolean | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          source: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          detail?: Json | null
+          event_type: string
+          id?: string
+          resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          source: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          detail?: Json | null
+          event_type?: string
+          id?: string
+          resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          source?: string
+          title?: string
         }
         Relationships: []
       }

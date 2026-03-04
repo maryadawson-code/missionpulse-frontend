@@ -1,0 +1,88 @@
+name: Sentinel Health Check
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run health check
+        id: health
+        env:
+          SITE_URL: https://missionpulse.ai
+          SUPABASE_URL: https://djuviwarqdvlbgcfuupa.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: be6df6a6-5c9d-4a96-9d97-592bbce9eaec
+        run: |
+          chmod +x scripts/sentinel-health-check.sh
+          set +e
+          RESULT=$(bash scripts/sentinel-health-check.sh --json --quiet 2>&1)
+          EXIT_CODE=$?
+          set -e
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESULT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Store health snapshot
+        if: always()
+        env:
+          SUPABASE_URL: https://djuviwarqdvlbgcfuupa.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          RESULT='${{ steps.health.outputs.result }}'
+          STATUS=$(echo "$RESULT" | jq -r '.status // "unknown"')
+          RESPONSE_TIME=$(echo "$RESULT" | jq -r '.response_time_ms // 0')
+          CHECKS=$(echo "$RESULT" | jq -c '.checks // {}')
+
+          curl -s -X POST "$SUPABASE_URL/rest/v1/health_snapshots" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates" \
+            -d "{\"snapshot_date\":\"$(date -u +%Y-%m-%d)\",\"health_status\":\"$STATUS\",\"response_time_ms\":$RESPONSE_TIME,\"subsystem_checks\":$CHECKS}"
+
+      - name: Create issue on critical failure
+        if: steps.health.outputs.exit_code == '2'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let result;
+            try {
+              result = JSON.parse(`${{ steps.health.outputs.result }}`);
+            } catch {
+              result = { status: 'parse_error', summary: 'Could not parse health check output' };
+            }
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              labels: 'sentinel-alert', state: 'open'
+            });
+            const title = `Sentinel: ${result.status} — ${result.summary || 'Health check failed'}`;
+            if (!existing.data.find(i => i.title === title)) {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, labels: ['sentinel-alert', 'critical'],
+                body: [
+                  '## Health Check Failed',
+                  '',
+                  `**Time:** ${new Date().toISOString()}`,
+                  `**Status:** ${result.status}`,
+                  '',
+                  '### Subsystem Results',
+                  '```json',
+                  JSON.stringify(result.checks, null, 2),
+                  '```',
+                ].join('\n')
+              });
+            }

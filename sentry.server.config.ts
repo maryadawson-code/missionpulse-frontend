@@ -10,11 +10,14 @@ import * as Sentry from '@sentry/nextjs'
 const CUI_PATTERN = /\b(CUI|CONTROLLED|FOUO|NOFORN)\b/i
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  enabled: !!process.env.SENTRY_DSN,
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  sampleRate: 1.0,
-  tracesSampleRate: 0.1,
+  tracesSampleRate: 0.3,
+
+  environment: process.env.NEXT_PUBLIC_SITE_URL?.includes('missionpulse.ai')
+    ? 'production'
+    : 'staging',
 
   beforeSend(event) {
     // Scrub CUI markers from breadcrumbs
