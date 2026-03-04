@@ -408,12 +408,10 @@ export async function shredDocument(
       .eq('id', documentId)
 
     // Run AI extraction
-    console.log(`[shredDocument] Starting AI extraction for ${doc.file_name} (${doc.extracted_text.length} chars)`)
     const response = await runComplianceExtraction({
       sourceText: doc.extracted_text.slice(0, 8000),
       opportunityId,
     })
-    console.log(`[shredDocument] AI response: model=${response.model_used}, tokens_in=${response.tokens_in}, tokens_out=${response.tokens_out}, classification=${response.classification}`)
 
     // Detect AI pipeline fallback (model_used === 'none' means the AI call failed)
     if (response.model_used === 'none') {

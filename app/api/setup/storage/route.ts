@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Execute the policy SQL via the REST API
-    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/`, {
+    const _res = await fetch(`${supabaseUrl}/rest/v1/rpc/`, {
       method: 'POST',
       headers: {
         apikey: serviceRoleKey,
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     // The RPC endpoint won't work for DDL. Use the pg_net extension or
     // just tell the user to run the SQL manually.
     // For now, try applying via the Supabase SQL execution endpoint
-    const sqlRes = await fetch(
+    const _sqlRes = await fetch(
       `${supabaseUrl}/rest/v1/`,
       {
         method: 'POST',

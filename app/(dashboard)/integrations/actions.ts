@@ -14,7 +14,8 @@ import { getSalesforceAuthUrl, disconnectSalesforce } from '@/lib/integrations/s
 import { getSlackAuthUrl, disconnectSlack } from '@/lib/integrations/slack/auth'
 import { getGoogleAuthUrl, disconnectGoogle } from '@/lib/integrations/google/auth'
 import { getDocuSignAuthUrl, disconnectDocuSign } from '@/lib/integrations/docusign/auth'
-import { getGovWinAuthUrl, disconnectGovWin } from '@/lib/integrations/govwin/client'
+import { getGovWinAuthUrl, disconnectGovWin, updateAlertFilters, type GovWinAlertFilters } from '@/lib/integrations/govwin/client'
+import { runGovWinSync } from '@/lib/integrations/govwin/sync'
 
 /**
  * Get the OAuth authorization URL for a given provider.
@@ -99,6 +100,52 @@ export async function disconnectIntegration(
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Disconnect failed',
+    }
+  }
+}
+
+/**
+ * Trigger a manual GovWin IQ sync.
+ */
+export async function syncGovWin(): Promise<{
+  success: boolean
+  newAlerts?: number
+  error?: string
+}> {
+  try {
+    const result = await runGovWinSync()
+    if (result.success) {
+      revalidatePath('/integrations/govwin')
+    }
+    return {
+      success: result.success,
+      newAlerts: result.newAlerts,
+      error: result.errors.length > 0 ? result.errors.join('; ') : undefined,
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Sync failed',
+    }
+  }
+}
+
+/**
+ * Save GovWin alert filter configuration.
+ */
+export async function saveGovWinFilters(
+  filters: GovWinAlertFilters
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await updateAlertFilters(filters)
+    if (result.success) {
+      revalidatePath('/integrations/govwin')
+    }
+    return result
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to save filters',
     }
   }
 }

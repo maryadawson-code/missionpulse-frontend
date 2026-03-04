@@ -15,7 +15,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getAuthUrl, disconnectIntegration } from '@/app/(dashboard)/integrations/actions'
+import { getAuthUrl, disconnectIntegration, syncGovWin, saveGovWinFilters } from '@/app/(dashboard)/integrations/actions'
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -81,10 +81,20 @@ export function GovWinConfig({
 
   function handleManualSync() {
     setSyncStatus('syncing')
-    // In production: calls runGovWinSync()
-    setTimeout(() => {
-      setSyncStatus(isConnected ? 'success' : 'error')
-    }, 2000)
+    startTransition(async () => {
+      const result = await syncGovWin()
+      setSyncStatus(result.success ? 'success' : 'error')
+    })
+  }
+
+  function handleSaveFilters() {
+    startTransition(async () => {
+      await saveGovWinFilters({
+        naicsCodes: naicsInput.split(',').map((s) => s.trim()).filter(Boolean),
+        agencies: agencyInput.split(',').map((s) => s.trim()).filter(Boolean),
+        minValue: minValueInput ? Number(minValueInput) : undefined,
+      })
+    })
   }
 
   function formatCurrency(value: number | null): string {
@@ -248,8 +258,13 @@ export function GovWinConfig({
             />
           </div>
           <div className="flex items-end">
-            <Button variant="outline" size="sm" disabled={!isConnected}>
-              <Search className="h-3 w-3" />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!isConnected || isPending}
+              onClick={handleSaveFilters}
+            >
+              {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
               Save Filters
             </Button>
           </div>
