@@ -11,8 +11,8 @@ import type { ModulePermission } from '@/lib/types'
 export async function isSoloMode(): Promise<boolean> {
   const supabase = await createClient()
 
-  // Try the DB function first
-  // TODO: verify after `supabase gen types` — is_user_solo_mode is not in database.types.ts
+  // Try the DB function first (RPC exists in DB but not yet in generated types;
+  // cast suppresses type error until next `supabase gen types` run)
   try {
     const { data } = await supabase.rpc('is_user_solo_mode' as never)
     if (typeof data === 'boolean') return data
