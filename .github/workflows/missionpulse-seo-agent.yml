@@ -1,0 +1,102 @@
+name: MissionPulse SEO Intelligence Agent
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'   # Every Monday 10am UTC
+    - cron: '0 10 1 * *'   # 1st of month — deeper run with full traffic correlation
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - audit-only
+
+permissions:
+  contents: write   # Agent commits knowledge base updates
+  issues: write     # Agent creates copy proposal issues
+
+jobs:
+  seo-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      PLAUSIBLE_API_KEY: ${{ secrets.PLAUSIBLE_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PROJECT_DIR: ${{ github.workspace }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure git for agent commits
+        run: |
+          git config user.name "MissionPulse SEO Agent"
+          git config user.email "seo-agent@missionpulse.ai"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y jq curl python3
+
+      - name: Run shell audit
+        run: |
+          chmod +x scripts/missionpulse-seo-agent.sh
+          bash scripts/missionpulse-seo-agent.sh --json > /tmp/missionpulse-seo-audit.json 2>&1 || true
+          cat /tmp/missionpulse-seo-audit.json
+
+      - name: Run SEO Intelligence Agent (Claude Code)
+        run: |
+          npm install -g @anthropic-ai/claude-code 2>/dev/null || true
+          chmod +x scripts/missionpulse-seo-runner.sh
+          PROJECT_DIR="${{ github.workspace }}" bash scripts/missionpulse-seo-runner.sh
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PLAUSIBLE_API_KEY: ${{ secrets.PLAUSIBLE_API_KEY }}
+
+      - name: Push agent commits
+        run: |
+          git push origin main || {
+            git fetch origin main
+            git rebase origin/main
+            git push origin main
+          }
+
+      - name: Upload run log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: seo-agent-run-${{ github.run_number }}
+          path: .seo-agent/logs/
+          retention-days: 30
+
+      - name: Post run summary
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let summary = '## MissionPulse SEO Agent Run\n\n';
+            try {
+              const state = JSON.parse(
+                fs.readFileSync('seo-agent/knowledge/page-state.json', 'utf8')
+              );
+              const grades = Object.entries(state.pages || {})
+                .map(([page, data]) => {
+                  const regression = data.regression ? ' ⚠️ REGRESSION' : '';
+                  return `| ${page} | ${data.grade || '?'} | ${data.last_grade || '?'} |${regression}`;
+                })
+                .join('\n');
+              summary += `**Run #${state.run_count}**\n\n`;
+              summary += `| Page | Grade | Previous |\n|------|-------|----------|\n${grades}\n\n`;
+              summary += `\n[View learning log](seo-agent/knowledge/learning-log.md)`;
+            } catch(e) {
+              summary += `Could not parse page state: ${e.message}\n`;
+            }
+            core.summary.addRaw(summary);
+            await core.summary.write();
