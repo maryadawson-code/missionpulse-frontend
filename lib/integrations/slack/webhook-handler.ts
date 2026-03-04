@@ -49,11 +49,11 @@ export interface WebhookResult {
 /**
  * Verify that a request came from Slack using the signing secret.
  */
-export function verifySlackSignature(
+export async function verifySlackSignature(
   timestamp: string,
   body: string,
   signature: string
-): boolean {
+): Promise<boolean> {
   if (!SLACK_SIGNING_SECRET) return false
 
   // Reject requests older than 5 minutes (replay protection)

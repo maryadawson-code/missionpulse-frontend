@@ -5,31 +5,38 @@
 
 import type { CostModelCLIN } from '../xlsx-engine'
 
-interface PricingRecord {
-  clin_number: string | null
-  clin_description: string | null
-  labor_categories: Array<{
-    title: string
-    quantity: number
-    hourly_rate: number
-    wrap_rate?: number
-  }> | null
+interface PricingItemRecord {
+  clin: string | null
+  description: string | null
+  labor_category: string | null
+  quantity: number | null
+  unit_price: number | null
+  proposed_rate: number | null
+  gsa_rate: number | null
 }
 
 /**
- * Map pricing records to export-ready CostModelCLINs.
+ * Map DB pricing_items rows to export-ready CostModelCLINs.
+ * Groups items by CLIN number.
  */
 export function buildCostModelCLINs(
-  records: PricingRecord[]
+  records: PricingItemRecord[]
 ): CostModelCLIN[] {
-  return records.map((r) => ({
-    clin_number: r.clin_number ?? 'TBD',
-    description: r.clin_description ?? '',
-    labor_categories: (r.labor_categories ?? []).map((lcat) => ({
-      lcat: lcat.title,
-      quantity: lcat.quantity,
-      rate: lcat.hourly_rate,
-      wrap_rate: lcat.wrap_rate,
+  const grouped = new Map<string, PricingItemRecord[]>()
+  for (const r of records) {
+    const key = r.clin ?? 'TBD'
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)!.push(r)
+  }
+
+  return Array.from(grouped.entries()).map(([clinNumber, items]) => ({
+    clin_number: clinNumber,
+    description: items[0]?.description ?? '',
+    labor_categories: items.map((item) => ({
+      lcat: item.labor_category ?? '',
+      quantity: item.quantity ?? 0,
+      rate: item.proposed_rate ?? item.unit_price ?? 0,
+      wrap_rate: item.gsa_rate ?? undefined,
     })),
   }))
 }

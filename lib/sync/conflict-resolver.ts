@@ -11,7 +11,7 @@
  */
 'use server'
 
-import { createSyncClient } from '@/lib/supabase/sync-client'
+import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
 import type { ConflictResolution, SyncConflict } from '@/lib/types/sync'
 
@@ -102,7 +102,7 @@ export async function resolveConflict(
     return { success: false, error: 'Cannot resolve with pending status' }
   }
 
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   // Fetch the conflict record
   const { data: conflict, error: fetchError } = await supabase
@@ -217,7 +217,7 @@ export async function createConflictRecord(
   mpVersion: SyncConflict['mp_version'],
   cloudVersion: SyncConflict['cloud_version']
 ): Promise<ActionResult<{ conflictId: string }>> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('sync_conflicts')

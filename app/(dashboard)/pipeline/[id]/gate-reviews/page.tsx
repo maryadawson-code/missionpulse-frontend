@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 
 function decisionStyle(decision: string | null): string {
@@ -32,6 +33,10 @@ export default async function GateReviewsPage({
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'workflow_board', 'shouldRender')) redirect('/dashboard')
 
   const { data: opp } = await supabase
     .from('opportunities')

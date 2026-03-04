@@ -16,8 +16,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-const ADMIN_EMAIL = 'maryadawson@gmail.com'
-const FROM_EMAIL = 'MissionPulse <notifications@missionpulse.io>'
+const ADMIN_EMAIL = Deno.env.get('ADMIN_NOTIFICATION_EMAIL') ?? 'admin@missionpulse.ai'
+const FROM_EMAIL = 'MissionPulse <notifications@missionpulse.ai>'
 
 // CORS headers
 const corsHeaders = {
@@ -247,7 +247,7 @@ function generateUserEmailHtml(request: AccessRequest): string {
     </div>
     <div class="footer">
       © 2026 Mission Meets Tech. CMMC 2.0 Compliant.<br>
-      <a href="https://missionpulse.io" style="color: #00E5FA;">missionpulse.io</a>
+      <a href="https://missionpulse.ai" style="color: #00E5FA;">missionpulse.ai</a>
     </div>
   </div>
 </body>

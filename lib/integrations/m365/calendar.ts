@@ -188,7 +188,8 @@ function buildEventBody(
   opportunityId: string,
   detail?: string
 ): string {
-  const link = `https://missionpulse.ai/pipeline/${opportunityId}`
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.ai'
+  const link = `${baseUrl}/pipeline/${opportunityId}`
   const detailLine = detail ? `<p><strong>Detail:</strong> ${detail}</p>` : ''
 
   const typeLabels: Record<CalendarEventType, string> = {

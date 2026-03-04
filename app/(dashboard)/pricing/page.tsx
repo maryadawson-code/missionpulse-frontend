@@ -1,6 +1,11 @@
 // filepath: app/(dashboard)/pricing/page.tsx
 
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+
+export const metadata: Metadata = {
+  title: 'Pricing Models — MissionPulse',
+}
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { CUIBanner } from '@/components/rbac/CUIBanner'

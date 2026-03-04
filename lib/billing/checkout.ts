@@ -76,7 +76,7 @@ export async function initiatePlanUpgrade(
     existing_customer_id: sub?.stripe_customer_id,
   })
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.io'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.ai'
 
   const result = await createSubscriptionCheckout({
     customer_id: customerId,
@@ -135,7 +135,7 @@ export async function purchaseTokenPack(
     existing_customer_id: sub?.stripe_customer_id,
   })
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.io'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://missionpulse.ai'
 
   const result = await createTokenPackCheckout({
     customer_id: customerId,

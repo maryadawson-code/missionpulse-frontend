@@ -10,27 +10,18 @@
  */
 
 import { redirect, notFound } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import {
   CalendarDays,
   CheckCircle2,
   Clock,
   AlertTriangle,
-  Plus,
   Milestone,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { createSyncClient } from '@/lib/supabase/sync-client'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
+import { GanttTimeline } from '@/components/features/proposals/GanttTimeline'
 import { MilestoneBar } from '@/components/features/proposals/MilestoneBar'
-import { Skeleton } from '@/components/ui/skeleton'
-
-const GanttTimeline = dynamic(
-  () => import('@/components/features/proposals/GanttTimeline').then((m) => m.GanttTimeline),
-  {
-    loading: () => <Skeleton className="h-48 w-full" />,
-  }
-)
 import {
   sortMilestones,
   formatDate,
@@ -53,6 +44,10 @@ export default async function TimelinePage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'proposals', 'shouldRender')) redirect('/dashboard')
+
   // Fetch opportunity
   const { data: opportunity, error: oppError } = await supabase
     .from('opportunities')
@@ -63,14 +58,14 @@ export default async function TimelinePage({
   if (oppError || !opportunity) notFound()
 
   // Fetch milestones from Phase J table
-  const syncClient = await createSyncClient()
+  const syncClient = await createClient()
   const { data: milestoneRows } = await syncClient
     .from('proposal_milestones')
     .select('*')
     .eq('opportunity_id', id)
     .order('scheduled_date', { ascending: true })
 
-  const milestones: ProposalMilestone[] = (milestoneRows ?? []) as ProposalMilestone[]
+  const milestones: ProposalMilestone[] = (milestoneRows ?? []) as unknown as ProposalMilestone[]
   const sorted = sortMilestones(milestones)
 
   // Collect unique creator IDs for display names
@@ -110,28 +105,28 @@ export default async function TimelinePage({
       label: 'Total Milestones',
       value: totalCount,
       icon: CalendarDays,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
+      color: 'text-[#00E5FA]',
+      bgColor: 'bg-[#00E5FA]/10',
     },
     {
       label: 'Completed',
       value: completedCount,
       icon: CheckCircle2,
-      color: 'text-emerald-600 dark:text-emerald-400',
+      color: 'text-emerald-400',
       bgColor: 'bg-emerald-500/10',
     },
     {
       label: 'Upcoming',
       value: upcomingCount,
       icon: Clock,
-      color: 'text-blue-600 dark:text-blue-400',
+      color: 'text-blue-400',
       bgColor: 'bg-blue-500/10',
     },
     {
       label: 'Overdue',
       value: overdueCount,
       icon: AlertTriangle,
-      color: overdueCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
+      color: overdueCount > 0 ? 'text-red-400' : 'text-muted-foreground',
       bgColor: overdueCount > 0 ? 'bg-red-500/10' : 'bg-muted/10',
     },
   ]
@@ -152,7 +147,7 @@ export default async function TimelinePage({
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-2xl font-bold text-white">
             Proposal Timeline &mdash; {opportunity.title}
           </h1>
           <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
@@ -163,15 +158,6 @@ export default async function TimelinePage({
           </div>
         </div>
 
-        {/* Add Milestone placeholder button */}
-        <button
-          type="button"
-          disabled
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" />
-          Add Milestone
-        </button>
       </div>
 
       {/* Summary KPI Cards */}
@@ -190,7 +176,7 @@ export default async function TimelinePage({
                   <KpiIcon className={`h-4.5 w-4.5 ${kpi.color}`} />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
+                  <p className="text-2xl font-bold text-white">{kpi.value}</p>
                   <p className="text-xs text-muted-foreground">{kpi.label}</p>
                 </div>
               </div>
@@ -202,7 +188,7 @@ export default async function TimelinePage({
       {/* Gantt Timeline Visualization */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-primary" />
+          <CalendarDays className="h-4 w-4 text-[#00E5FA]" />
           <h2 className="text-sm font-semibold text-foreground">
             Timeline
           </h2>
@@ -222,7 +208,7 @@ export default async function TimelinePage({
       {/* Milestone Detail List */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <Milestone className="h-4 w-4 text-primary" />
+          <Milestone className="h-4 w-4 text-[#00E5FA]" />
           <h2 className="text-sm font-semibold text-foreground">
             All Milestones
           </h2>

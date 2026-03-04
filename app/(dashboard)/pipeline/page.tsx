@@ -1,7 +1,7 @@
 // filepath: app/(dashboard)/pipeline/page.tsx
 
 import type { Metadata } from 'next'
-import dynamic from 'next/dynamic'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -9,27 +9,10 @@ export const metadata: Metadata = {
 }
 import { resolveRole, hasPermission, isInternalRole } from '@/lib/rbac/config'
 import { PipelineTable } from '@/components/modules/PipelineTable'
+import { KanbanView } from './KanbanView'
 import { ViewToggle } from './ViewToggle'
 import { CreateOpportunityButton } from './CreateOpportunityModal'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { Opportunity } from '@/lib/types'
-
-const KanbanView = dynamic(
-  () => import('./KanbanView').then((m) => m.KanbanView),
-  {
-    loading: () => (
-      <div className="grid grid-cols-6 gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="space-y-3">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        ))}
-      </div>
-    ),
-  }
-)
 
 export default async function PipelinePage({
   searchParams,
@@ -38,22 +21,19 @@ export default async function PipelinePage({
 }) {
   const supabase = await createClient()
 
-  // Resolve canEdit permission
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  let canEdit = false
-  let isExternal = false
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, email')
-      .eq('id', user.id)
-      .single()
-    const role = resolveRole(profile?.role)
-    canEdit = hasPermission(role, 'pipeline', 'canEdit')
-    isExternal = !isInternalRole(role)
-  }
+  if (!user) redirect('/login')
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, email')
+    .eq('id', user.id)
+    .single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'pipeline', 'shouldRender')) redirect('/dashboard')
+  const canEdit = hasPermission(role, 'pipeline', 'canEdit')
+  const isExternal = !isInternalRole(role)
 
   // ─── Fetch Opportunities ────────────────────────────────────
   // External roles (partner, subcontractor, consultant) only see assigned opportunities
@@ -87,8 +67,8 @@ export default async function PipelinePage({
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Pipeline</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold text-white">Pipeline</h1>
+          <p className="mt-1 text-sm text-gray-500">
             {opps.length} opportunit{opps.length === 1 ? 'y' : 'ies'} in pipeline
           </p>
         </div>
@@ -100,7 +80,7 @@ export default async function PipelinePage({
 
       {/* Error State */}
       {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
+        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
           Failed to load pipeline: {error.message}
         </div>
       )}

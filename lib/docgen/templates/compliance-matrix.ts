@@ -7,13 +7,13 @@ import type { ComplianceRow } from '../xlsx-engine'
 
 interface ComplianceRequirementRecord {
   reference: string | null
-  requirement_text: string | null
+  requirement: string | null
   section: string | null
   priority: string | null
   status: string | null
   assigned_to?: string | null
-  evidence_notes?: string | null
-  eval_factor?: string | null
+  notes?: string | null
+  volume_reference?: string | null
 }
 
 /**
@@ -24,13 +24,13 @@ export function buildComplianceRows(
 ): ComplianceRow[] {
   return records.map((r) => ({
     reference: r.reference ?? '',
-    requirement_text: r.requirement_text ?? '',
+    requirement_text: r.requirement ?? '',
     section: r.section ?? '',
     priority: normalizePriority(r.priority),
     status: r.status ?? 'not_started',
     assigned_to: r.assigned_to ?? undefined,
-    evidence: r.evidence_notes ?? undefined,
-    eval_factor: r.eval_factor ?? undefined,
+    evidence: r.notes ?? undefined,
+    eval_factor: r.volume_reference ?? undefined,
   }))
 }
 

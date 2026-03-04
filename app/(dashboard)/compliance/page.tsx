@@ -38,7 +38,7 @@ export default async function IronDomePage() {
   const { data: opportunities } = await supabase
     .from('opportunities')
     .select('id, title, status, phase, due_date')
-    .in('status', ['Active', 'active', null])
+    .or('status.in.(Active,active),status.is.null')
     .order('due_date', { ascending: true })
 
   const reqs = allReqs ?? []

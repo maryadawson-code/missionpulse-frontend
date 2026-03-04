@@ -9,19 +9,18 @@ import {
   getClassificationCeiling,
   getRoleDisplayName,
   getSessionTimeout,
-  filterPermissionsByTier,
 } from '@/lib/rbac/config'
 import Sidebar from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
 import DashboardHeader from '@/components/layout/DashboardHeader'
 import { PartnerWatermark } from '@/components/layout/PartnerWatermark'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
+import { PilotConversionBanner } from '@/components/features/billing/PilotConversionBanner'
+import { getPilotStatus } from '@/lib/billing/pilot-conversion'
 import { RoleProvider } from '@/lib/rbac/RoleContext'
 import { SessionTimeoutGuard } from '@/components/layout/SessionTimeoutGuard'
 import { GlobalSearch } from '@/components/layout/GlobalSearch'
 import { KeyboardShortcuts } from '@/components/layout/KeyboardShortcuts'
-import { SkipNav } from '@/components/layout/SkipNav'
-import { provisionWorkspace } from '@/lib/actions/workspace'
 import type { ModulePermission } from '@/lib/types'
 
 
@@ -30,7 +29,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // ─── Auth Gate ──────────────────────────────────────────────
   const {
@@ -47,20 +46,6 @@ export default async function DashboardLayout({
     .select('id, full_name, email, role, avatar_url, company_id')
     .eq('id', user.id)
     .single()
-
-  // ─── Auto-Provision Workspace (one-time for new users) ──────
-  if (profile && !profile.company_id) {
-    await provisionWorkspace()
-    // Re-fetch profile to get updated company_id and role
-    const { data: updatedProfile } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, role, avatar_url, company_id')
-      .eq('id', user.id)
-      .single()
-    if (updatedProfile) {
-      Object.assign(profile, updatedProfile)
-    }
-  }
 
   // Default to 'partner' (most restrictive) if no profile or role found
   const userRole = profile?.role ?? 'partner'
@@ -114,19 +99,15 @@ export default async function DashboardLayout({
     // Non-critical
   }
 
-  // ─── Company Subscription Tier Lookup ───────────────────────
-  let subscriptionTier = 'starter'
+  // ─── Pilot Banner Status ────────────────────────────────────
+  let pilotStatus: Awaited<ReturnType<typeof getPilotStatus>> | null = null
   if (profile?.company_id) {
-    const { data: company } = await supabase
-      .from('companies')
-      .select('subscription_tier')
-      .eq('id', profile.company_id)
-      .single()
-    subscriptionTier = company?.subscription_tier ?? 'starter'
+    try {
+      pilotStatus = await getPilotStatus(profile.company_id)
+    } catch {
+      // Non-critical
+    }
   }
-
-  // Apply tier-based module filtering on top of RBAC
-  permissions = filterPermissionsByTier(permissions, subscriptionTier)
 
   const isExternal = !isInternalRole(userRole)
   const companyName = profile?.full_name ?? user.email ?? 'External User'
@@ -153,24 +134,22 @@ export default async function DashboardLayout({
 
   return (
     <RoleProvider value={roleContextValue}>
-      <SkipNav />
       <SessionTimeoutGuard timeoutSeconds={sessionTimeout} />
       <GlobalSearch />
       <KeyboardShortcuts />
-      <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <div className="flex h-screen overflow-hidden bg-[#00050F] text-gray-100">
         {/* Watermark overlay for external roles or CUI-forced roles */}
         {(isExternal || forceCUI) && <PartnerWatermark companyName={companyName} />}
 
         {/* Sidebar — desktop: always visible; mobile: hidden */}
-        <aside className="hidden lg:flex" aria-label="Main navigation">
+        <div className="hidden md:flex">
           <Sidebar
             permissions={permissions}
             userDisplayName={profile?.full_name ?? user.email ?? null}
             userRole={userRole}
             unreadNotifications={unreadNotifications}
-            subscriptionTier={subscriptionTier}
           />
-        </aside>
+        </div>
 
         {/* Mobile nav drawer (hidden on desktop) */}
         <MobileNav>
@@ -179,7 +158,6 @@ export default async function DashboardLayout({
             userDisplayName={profile?.full_name ?? user.email ?? null}
             userRole={userRole}
             unreadNotifications={unreadNotifications}
-            subscriptionTier={subscriptionTier}
           />
         </MobileNav>
 
@@ -187,7 +165,11 @@ export default async function DashboardLayout({
         <div className="flex flex-1 flex-col overflow-hidden">
           <DashboardHeader userEmail={user.email ?? null} notifications={headerNotifications} />
 
-          <main id="main-content" className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto p-6">
+            {/* Pilot conversion banner */}
+            {pilotStatus && (pilotStatus.showBanner || pilotStatus.showExpiredMessage) && (
+              <PilotConversionBanner status={pilotStatus} />
+            )}
             {/* Global CUI banner for forceCUIWatermark roles */}
             {cuiMarking && <CUIBanner marking={cuiMarking} className="mb-4" />}
             {children}

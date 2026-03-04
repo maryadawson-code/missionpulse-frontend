@@ -20,7 +20,8 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { createSyncClient } from '@/lib/supabase/sync-client'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
+
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
 import { SyncStatusOverview } from '@/components/features/launch/SyncStatusOverview'
 import type { SyncStatus, DocumentSource } from '@/lib/types/sync'
@@ -91,12 +92,12 @@ const CONNECTED_TOOLS: ConnectedTool[] = [
 ]
 
 const TOOL_ICON_COLORS: Record<string, string> = {
-  W: 'bg-blue-600 text-foreground',
-  X: 'bg-green-600 text-foreground',
-  G: 'bg-blue-500 text-foreground',
-  S: 'bg-emerald-500 text-foreground',
-  P: 'bg-orange-500 text-foreground',
-  M: 'bg-primary/20 text-primary',
+  W: 'bg-blue-600 text-white',
+  X: 'bg-green-600 text-white',
+  G: 'bg-blue-500 text-white',
+  S: 'bg-emerald-500 text-white',
+  P: 'bg-orange-500 text-white',
+  M: 'bg-[#00E5FA]/20 text-[#00E5FA]',
 }
 
 // -- Helpers ----------------------------------------------------------------
@@ -147,11 +148,15 @@ export default async function CollaborationPage({
   const { id } = await params
   const supabase = await createClient()
 
-  // Auth check
+  // Auth + RBAC check
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'proposals', 'shouldRender')) redirect('/dashboard')
 
   // Fetch opportunity
   const { data: opportunity } = await supabase
@@ -195,7 +200,7 @@ export default async function CollaborationPage({
     }))
 
   // Fetch sync states to determine which tools are actively used
-  const syncClient = await createSyncClient()
+  const syncClient = await createClient()
   const { data: syncStates } = await syncClient
     .from('document_sync_state')
     .select('cloud_provider, sync_status, metadata')
@@ -216,12 +221,10 @@ export default async function CollaborationPage({
   const allSyncStatuses = (syncStates ?? []).map(
     (s) => s.sync_status as SyncStatus
   )
-  const syncedCount = allSyncStatuses.filter(
+  const _syncedCount = allSyncStatuses.filter(
     (s) => s === 'synced' || s === 'idle'
   ).length
-  const totalSynced = allSyncStatuses.length
-  const _overallHealth =
-    totalSynced > 0 ? Math.round((syncedCount / totalSynced) * 100) : 100
+  const _totalSynced = allSyncStatuses.length
 
   return (
     <div className="space-y-6">
@@ -236,7 +239,7 @@ export default async function CollaborationPage({
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h1 className="text-2xl font-bold text-white">
           Collaboration &mdash; {opportunity.title}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -248,7 +251,7 @@ export default async function CollaborationPage({
       {/* Section 1: Artifact Status Grid */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <FileText className="h-4 w-4 text-primary" />
+          <FileText className="h-4 w-4 text-[#00E5FA]" />
           <h2 className="text-sm font-semibold text-foreground">
             Artifact Sync Status
           </h2>
@@ -259,7 +262,7 @@ export default async function CollaborationPage({
       {/* Section 2: Activity Feed */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary" />
+          <Clock className="h-4 w-4 text-[#00E5FA]" />
           <h2 className="text-sm font-semibold text-foreground">
             Recent Activity
           </h2>
@@ -306,7 +309,7 @@ export default async function CollaborationPage({
                           </span>
                         )}
                         {typeof entry.details.status_change === 'string' && (
-                          <span className="inline-block rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-700 dark:text-blue-300">
+                          <span className="inline-block rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-300">
                             {entry.details.status_change}
                           </span>
                         )}
@@ -323,7 +326,7 @@ export default async function CollaborationPage({
       {/* Section 3: Tool Distribution */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <Wrench className="h-4 w-4 text-primary" />
+          <Wrench className="h-4 w-4 text-[#00E5FA]" />
           <h2 className="text-sm font-semibold text-foreground">
             Connected Tools
           </h2>
@@ -360,11 +363,11 @@ export default async function CollaborationPage({
                         {tool.name}
                       </p>
                       {isActive ? (
-                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30">
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-slate-500/15 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground border border-slate-500/30">
+                        <span className="inline-flex items-center rounded-full bg-slate-500/15 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 border border-slate-500/30">
                           Inactive
                         </span>
                       )}
@@ -377,7 +380,7 @@ export default async function CollaborationPage({
 
                 {/* Footer with link */}
                 {isActive && (
-                  <div className="mt-3 flex items-center gap-1 text-[10px] text-primary">
+                  <div className="mt-3 flex items-center gap-1 text-[10px] text-[#00E5FA]">
                     <ExternalLink className="h-3 w-3" />
                     <span>
                       Connected via {tool.source.replace(/_/g, ' ')}

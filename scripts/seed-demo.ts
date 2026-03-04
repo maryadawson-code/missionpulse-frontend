@@ -120,18 +120,18 @@ const DEMO_OPPORTUNITIES = [
 
 const COMPLIANCE_REQUIREMENTS = [
   // DHA
-  { opportunity_id: OPP_IDS.dha, reference: 'L.1.1', requirement_text: 'The contractor SHALL provide a cloud migration plan within 30 days of award.', section: 'Technical', priority: 'critical', status: 'addressed' },
-  { opportunity_id: OPP_IDS.dha, reference: 'L.1.2', requirement_text: 'The contractor SHALL maintain FedRAMP High authorization for all cloud services.', section: 'Technical', priority: 'critical', status: 'verified' },
-  { opportunity_id: OPP_IDS.dha, reference: 'L.2.1', requirement_text: 'The contractor SHALL ensure 99.99% uptime for all production systems.', section: 'Technical', priority: 'high', status: 'in_progress' },
-  { opportunity_id: OPP_IDS.dha, reference: 'M.1.1', requirement_text: 'The contractor SHALL provide a quality management plan per ISO 9001.', section: 'Management', priority: 'medium', status: 'not_started' },
+  { opportunity_id: OPP_IDS.dha, reference: 'L.1.1', requirement: 'The contractor SHALL provide a cloud migration plan within 30 days of award.', section: 'Technical', priority: 'critical', status: 'addressed' },
+  { opportunity_id: OPP_IDS.dha, reference: 'L.1.2', requirement: 'The contractor SHALL maintain FedRAMP High authorization for all cloud services.', section: 'Technical', priority: 'critical', status: 'verified' },
+  { opportunity_id: OPP_IDS.dha, reference: 'L.2.1', requirement: 'The contractor SHALL ensure 99.99% uptime for all production systems.', section: 'Technical', priority: 'high', status: 'in_progress' },
+  { opportunity_id: OPP_IDS.dha, reference: 'M.1.1', requirement: 'The contractor SHALL provide a quality management plan per ISO 9001.', section: 'Management', priority: 'medium', status: 'not_started' },
   // VA
-  { opportunity_id: OPP_IDS.va, reference: 'C.3.1', requirement_text: 'The contractor MUST implement FHIR R4 APIs for all data exchange.', section: 'Technical', priority: 'critical', status: 'in_progress' },
-  { opportunity_id: OPP_IDS.va, reference: 'C.3.2', requirement_text: 'The contractor SHALL ensure HL7 v2 backward compatibility.', section: 'Technical', priority: 'high', status: 'not_started' },
+  { opportunity_id: OPP_IDS.va, reference: 'C.3.1', requirement: 'The contractor MUST implement FHIR R4 APIs for all data exchange.', section: 'Technical', priority: 'critical', status: 'in_progress' },
+  { opportunity_id: OPP_IDS.va, reference: 'C.3.2', requirement: 'The contractor SHALL ensure HL7 v2 backward compatibility.', section: 'Technical', priority: 'high', status: 'not_started' },
   // CMS
-  { opportunity_id: OPP_IDS.cms, reference: 'PWS.2.1', requirement_text: 'The contractor SHALL develop ML models for Medicare fraud detection with >95% precision.', section: 'Technical', priority: 'critical', status: 'not_started' },
+  { opportunity_id: OPP_IDS.cms, reference: 'PWS.2.1', requirement: 'The contractor SHALL develop ML models for Medicare fraud detection with >95% precision.', section: 'Technical', priority: 'critical', status: 'not_started' },
   // BPA
-  { opportunity_id: OPP_IDS.bpa, reference: 'SOW.1.1', requirement_text: 'The contractor SHALL provide key personnel within 10 business days of task order award.', section: 'Management', priority: 'high', status: 'addressed' },
-  { opportunity_id: OPP_IDS.bpa, reference: 'SOW.1.2', requirement_text: 'The contractor SHALL maintain SAFe Agile certification for all Scrum Masters.', section: 'Management', priority: 'medium', status: 'verified' },
+  { opportunity_id: OPP_IDS.bpa, reference: 'SOW.1.1', requirement: 'The contractor SHALL provide key personnel within 10 business days of task order award.', section: 'Management', priority: 'high', status: 'addressed' },
+  { opportunity_id: OPP_IDS.bpa, reference: 'SOW.1.2', requirement: 'The contractor SHALL maintain SAFe Agile certification for all Scrum Masters.', section: 'Management', priority: 'medium', status: 'verified' },
 ]
 
 const CONTRACT_CLAUSES = [
@@ -221,7 +221,8 @@ async function seedTeamAssignments() {
       const { error } = await supabase.from('opportunity_assignments').insert({
         id: randomUUID(),
         opportunity_id: oppId,
-        user_id: DEMO_USER_ID,
+        assignee_name: 'Demo User',
+        assignee_email: 'demo@missionpulse.ai',
         role,
       })
       if (error && !error.message.includes('duplicate')) {

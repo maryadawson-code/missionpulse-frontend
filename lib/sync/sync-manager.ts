@@ -10,7 +10,8 @@
  */
 'use server'
 
-import { createSyncClient } from '@/lib/supabase/sync-client'
+import { createClient } from '@/lib/supabase/server'
+import type { Json } from '@/lib/supabase/database.types'
 import type { ActionResult } from '@/lib/types'
 import type {
   CloudProvider,
@@ -38,7 +39,7 @@ export async function processWebhook(
   provider: CloudProvider,
   payload: Record<string, unknown>
 ): Promise<void> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   // Extract cloud file ID from provider-specific payload
   const cloudFileId = extractCloudFileId(provider, payload)
@@ -116,7 +117,7 @@ export async function fetchCloudContent(
   documentId: string,
   provider: CloudProvider
 ): Promise<{ content: string; lastModified: string } | null> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   const { data: syncState } = await supabase
     .from('document_sync_state')
@@ -176,7 +177,7 @@ export async function syncToCloud(
   content: string,
   provider: CloudProvider
 ): Promise<ActionResult> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   const { data: syncState } = await supabase
     .from('document_sync_state')
@@ -232,12 +233,23 @@ export async function syncToCloud(
     const now = new Date().toISOString()
 
     // Record version in document_versions
+    const { data: maxVer } = await supabase
+      .from('document_versions')
+      .select('version_number')
+      .eq('document_id', documentId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .single()
+    const nextVer = ((maxVer?.version_number as number) ?? 0) + 1
+
     await supabase.from('document_versions').insert({
       document_id: documentId,
+      document_type: 'synced',
       company_id: syncState.company_id,
+      version_number: nextVer,
       source: 'missionpulse',
-      snapshot: { content },
-      diff_summary: summary,
+      snapshot: { content } as unknown as Json,
+      diff_summary: summary as unknown as Json,
     })
 
     // Update sync state
@@ -269,7 +281,7 @@ export async function syncToCloud(
 export async function getSyncStatus(
   documentId: string
 ): Promise<DocumentSyncState | null> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   const { data } = await supabase
     .from('document_sync_state')
@@ -292,7 +304,7 @@ export async function initializeSync(
   cloudFileId: string,
   companyId: string
 ): Promise<ActionResult> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   // Check if sync state already exists
   const { data: existing } = await supabase
@@ -350,7 +362,7 @@ async function updateSyncStatus(
   documentId: string,
   status: SyncStatus
 ): Promise<void> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   await supabase
     .from('document_sync_state')
@@ -424,7 +436,7 @@ function buildUploadUrl(
 async function getProviderToken(
   provider: CloudProvider
 ): Promise<string | null> {
-  const supabase = await createSyncClient()
+  const supabase = await createClient()
 
   const {
     data: { user },

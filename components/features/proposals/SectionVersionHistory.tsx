@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { History, RotateCcw, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 
 import { addToast } from '@/components/ui/Toast'
@@ -34,7 +34,13 @@ export function SectionVersionHistory({
   const [expanded, setExpanded] = useState(false)
   const [previewId, setPreviewId] = useState<string | null>(null)
 
-  const loadVersions = useCallback(async () => {
+  useEffect(() => {
+    if (!expanded) return
+    loadVersions()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, sectionId])
+
+  async function loadVersions() {
     setLoading(true)
     try {
       const res = await fetch(
@@ -48,12 +54,7 @@ export function SectionVersionHistory({
       // silently fail — versions are optional
     }
     setLoading(false)
-  }, [sectionId])
-
-  useEffect(() => {
-    if (!expanded) return
-    loadVersions()
-  }, [expanded, loadVersions])
+  }
 
   function handleRestore(version: VersionEntry) {
     if (!version.details.content_snapshot) {
@@ -84,37 +85,37 @@ export function SectionVersionHistory({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card/50">
+    <div className="rounded-xl border border-gray-800 bg-gray-900/50">
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-4 py-3"
       >
         <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <History className="h-4 w-4 text-gray-400" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
             Version History
           </span>
           {versions.length > 0 && (
-            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-400">
               {versions.length}
             </span>
           )}
         </div>
         {expanded ? (
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+          <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
         )}
       </button>
 
       {expanded && (
-        <div className="border-t border-border px-4 py-3">
+        <div className="border-t border-gray-800 px-4 py-3">
           {loading ? (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
             </div>
           ) : versions.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-3">
+            <p className="text-xs text-gray-500 text-center py-3">
               No version history yet. Versions are created when you save changes.
             </p>
           ) : (
@@ -122,11 +123,11 @@ export function SectionVersionHistory({
               {versions.map((version) => (
                 <div
                   key={version.id}
-                  className="rounded-lg border border-border bg-card/30 p-2.5"
+                  className="rounded-lg border border-gray-800 bg-gray-900/30 p-2.5"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-foreground">
+                      <span className="text-xs text-gray-300">
                         {formatDate(version.created_at)}
                       </span>
                       {version.details.status_change && (
@@ -138,14 +139,14 @@ export function SectionVersionHistory({
                     </div>
                     <div className="flex items-center gap-1">
                       {version.details.content_length != null && (
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-[10px] text-gray-600">
                           {version.details.content_length.toLocaleString()} chars
                         </span>
                       )}
                       {version.details.content_snapshot && (
                         <button
                           onClick={() => handleRestore(version)}
-                          className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                          className="p-1 text-gray-500 hover:text-[#00E5FA] transition-colors"
                           title="Restore this version"
                         >
                           <RotateCcw className="h-3 w-3" />
@@ -153,14 +154,14 @@ export function SectionVersionHistory({
                       )}
                     </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="text-[10px] text-gray-500 mt-0.5">
                     by {version.user_name}
                   </p>
 
                   {/* Preview */}
                   {previewId === version.id ? (
                     <div className="mt-2">
-                      <pre className="max-h-[150px] overflow-y-auto rounded border border-border bg-background p-2 text-[10px] text-muted-foreground whitespace-pre-wrap">
+                      <pre className="max-h-[150px] overflow-y-auto rounded border border-gray-800 bg-gray-950 p-2 text-[10px] text-gray-400 whitespace-pre-wrap">
                         {version.details.content_snapshot ?? 'No content captured'}
                       </pre>
                       <button

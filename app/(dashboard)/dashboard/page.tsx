@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: 'Dashboard — MissionPulse',
 }
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole } from '@/lib/rbac/config'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { formatCurrencyCompact, formatPwin, phaseColor } from '@/lib/utils/formatters'
 import type { Opportunity } from '@/lib/types'
 import Link from 'next/link'
@@ -15,6 +15,8 @@ import { getRecentActivity } from '@/lib/actions/audit'
 import { ActivityFeed } from '@/components/modules/ActivityFeed'
 import { TeamWorkloadHeatmap } from '@/components/features/dashboard/TeamWorkloadHeatmap'
 import { DashboardCustomizer } from '@/components/features/dashboard/DashboardCustomizer'
+import { getPilotStatus } from '@/lib/billing/pilot-conversion'
+import { PilotConversionBanner } from '@/components/features/billing/PilotConversionBanner'
 
 const WIDGET_DEFS = [
   { widget_type: 'kpi_cards', title: 'KPI Cards' },
@@ -125,21 +127,26 @@ function DeadlineRow({ opp }: { opp: Opportunity }) {
 
 // ─── Dashboard Page ─────────────────────────────────────────────
 export default async function DashboardPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
-  // Author role redirect — authors land on their workflow page
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    const role = resolveRole(profile?.role)
-    if (role === 'author') {
-      redirect('/proposals')
-    }
-  }
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, preferences, company_id')
+    .eq('id', user.id)
+    .single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'dashboard', 'shouldRender')) redirect('/proposals')
+
+  // Redirect first-time users to onboarding
+  const prefs = (profile?.preferences as Record<string, unknown>) ?? {}
+  if (!prefs.onboarding_complete) redirect('/onboarding')
+
+  // Fetch pilot status for conversion banner
+  const companyId = profile?.company_id as string | null
+  const pilotStatus = companyId ? await getPilotStatus(companyId) : null
 
   // Parallel fetch: widgets, opportunities, activity, counts, assignments, sections
   // All are independent after RBAC gate — run them all at once
@@ -266,6 +273,11 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Pilot Conversion Banner */}
+      {pilotStatus && (pilotStatus.isPilot || pilotStatus.showExpiredMessage) && (
+        <PilotConversionBanner status={pilotStatus} />
+      )}
+
       {/* Page Title */}
       <div className="flex items-center justify-between">
         <div>

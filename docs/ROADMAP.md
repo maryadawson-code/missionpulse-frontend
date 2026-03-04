@@ -19,7 +19,7 @@ Sprints 1-2 are COMPLETE. The foundation is solid:
 	•	Database: 200 tables, RLS on all, 37 with data, all RBAC functions deployed, pgvector active, audit triggers live
 Gap: No UI exists yet. No login screen. No dashboard. No modules. The security layer is rock-solid. Now we build everything the user actually sees.
 1.2 Where We're Going
-Production-ready MissionPulse v1.0 with all 16 modules, 8 AI agents, multi-model gateway, and track-changes UX. Deployed to missionpulse.io with staging on v2-development branch.
+Production-ready MissionPulse v1.0 with all 16 modules, 8 AI agents, multi-model gateway, and track-changes UX. Deployed to missionpulse.ai with staging on v2-development branch.
 1.3 Guiding Principles
 	•	Vertical slices, not horizontal layers. Every sprint ships a working feature end-to-end (UI + data + RBAC). You can demo every sprint.
 	•	Database is done. Don't touch it unless forced. 200 tables exist. We build against them, not rebuild them. Schema migrations only for missing columns.
@@ -862,7 +862,7 @@ Acceptance Criteria:
 	•	✓ Sample compliance requirements per opportunity
 	•	✓ Sample contract clauses
 	•	✓ Sample team assignments
-	•	✓ Demo user credentials: demo@missionpulse.io / [configured password]
+	•	✓ Demo user credentials: demo@missionpulse.ai / [configured password]
 	•	✓ npm run build passes
 Depends on: T-5.1
 Files: scripts/seed-demo.ts, supabase/seed.sql
@@ -941,12 +941,12 @@ SPRINT 18  —  Docs, DNS, Deploy, Go-Live
 Week 16
 Documentation, custom domain, production deployment, smoke tests, launch.
 T-18.1  Custom Domain + DNS    [2hr]
-Configure missionpulse.io DNS. Point to Netlify. SSL certificate. Verify staging + production URLs work.
+Configure missionpulse.ai DNS. Point to Netlify. SSL certificate. Verify staging + production URLs work.
 Acceptance Criteria:
-	•	✓ DNS A/CNAME records configured for missionpulse.io
+	•	✓ DNS A/CNAME records configured for missionpulse.ai
 	•	✓ SSL certificate provisioned (Netlify auto-manages)
-	•	✓ missionpulse.io resolves to production
-	•	✓ staging.missionpulse.io resolves to v2-development
+	•	✓ missionpulse.ai resolves to production
+	•	✓ staging.missionpulse.ai resolves to v2-development
 	•	✓ Redirect www → non-www
 	•	✓ Verify all auth callbacks use correct domain
 Depends on: None
@@ -965,7 +965,7 @@ Acceptance Criteria:
 Depends on: All prior sprints
 Files: Terminal (git merge), Netlify dashboard
 T-18.3  User Documentation    [6hr]
-Help docs covering: Getting Started, Modules Overview, AI Features, RBAC Explanation, Keyboard Shortcuts, FAQ. Hosted at docs.missionpulse.io or in-app.
+Help docs covering: Getting Started, Modules Overview, AI Features, RBAC Explanation, Keyboard Shortcuts, FAQ. Hosted at docs.missionpulse.ai or in-app.
 Acceptance Criteria:
 	•	✓ Getting Started guide (matches onboarding flow)
 	•	✓ Per-module help page

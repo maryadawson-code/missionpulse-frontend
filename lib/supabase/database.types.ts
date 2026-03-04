@@ -1587,6 +1587,8 @@ export type Database = {
           created_by: string | null
           domain: string | null
           features: Json | null
+          footer_text: string | null
+          header_text: string | null
           id: string
           is_active: boolean | null
           logo_url: string | null
@@ -1605,6 +1607,8 @@ export type Database = {
           created_by?: string | null
           domain?: string | null
           features?: Json | null
+          footer_text?: string | null
+          header_text?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -1623,6 +1627,8 @@ export type Database = {
           created_by?: string | null
           domain?: string | null
           features?: Json | null
+          footer_text?: string | null
+          header_text?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -1683,81 +1689,6 @@ export type Database = {
         }
         Relationships: []
       }
-      company_subscriptions: {
-        Row: {
-          id: string
-          company_id: string
-          plan_id: string
-          status: string
-          billing_interval: string
-          current_period_start: string
-          current_period_end: string
-          stripe_subscription_id: string | null
-          stripe_customer_id: string | null
-          auto_overage_enabled: boolean
-          pilot_start_date: string | null
-          pilot_end_date: string | null
-          pilot_amount_cents: number | null
-          pilot_converted: boolean | null
-          metadata: Json | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          company_id: string
-          plan_id: string
-          status?: string
-          billing_interval?: string
-          current_period_start?: string
-          current_period_end?: string
-          stripe_subscription_id?: string | null
-          stripe_customer_id?: string | null
-          auto_overage_enabled?: boolean
-          pilot_start_date?: string | null
-          pilot_end_date?: string | null
-          pilot_amount_cents?: number | null
-          pilot_converted?: boolean | null
-          metadata?: Json | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          company_id?: string
-          plan_id?: string
-          status?: string
-          billing_interval?: string
-          current_period_start?: string
-          current_period_end?: string
-          stripe_subscription_id?: string | null
-          stripe_customer_id?: string | null
-          auto_overage_enabled?: boolean
-          pilot_start_date?: string | null
-          pilot_end_date?: string | null
-          pilot_amount_cents?: number | null
-          pilot_converted?: boolean | null
-          metadata?: Json | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "company_subscriptions_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: true
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "company_subscriptions_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
-            referencedRelation: "subscription_plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       company_onboarding: {
         Row: {
           company_id: string | null
@@ -1796,6 +1727,87 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      company_subscriptions: {
+        Row: {
+          auto_overage_enabled: boolean
+          billing_interval: string
+          company_id: string
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          id: string
+          metadata: Json | null
+          pilot_amount_cents: number | null
+          pilot_converted: boolean | null
+          pilot_credit_applied: boolean | null
+          pilot_end_date: string | null
+          pilot_kpi: Json | null
+          pilot_start_date: string | null
+          plan_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          auto_overage_enabled?: boolean
+          billing_interval?: string
+          company_id: string
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          metadata?: Json | null
+          pilot_amount_cents?: number | null
+          pilot_converted?: boolean | null
+          pilot_credit_applied?: boolean | null
+          pilot_end_date?: string | null
+          pilot_kpi?: Json | null
+          pilot_start_date?: string | null
+          plan_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auto_overage_enabled?: boolean
+          billing_interval?: string
+          company_id?: string
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          metadata?: Json | null
+          pilot_amount_cents?: number | null
+          pilot_converted?: boolean | null
+          pilot_credit_applied?: boolean | null
+          pilot_end_date?: string | null
+          pilot_kpi?: Json | null
+          pilot_start_date?: string | null
+          plan_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       competitive_matrix: {
         Row: {
@@ -2450,6 +2462,39 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_intel: {
+        Row: {
+          black_hat: Json
+          contract_name: string
+          created_at: string | null
+          id: string
+          intel: Json
+          last_updated: string | null
+          model_used: string | null
+          sources: string[] | null
+        }
+        Insert: {
+          black_hat?: Json
+          contract_name: string
+          created_at?: string | null
+          id?: string
+          intel?: Json
+          last_updated?: string | null
+          model_used?: string | null
+          sources?: string[] | null
+        }
+        Update: {
+          black_hat?: Json
+          contract_name?: string
+          created_at?: string | null
+          id?: string
+          intel?: Json
+          last_updated?: string | null
+          model_used?: string | null
+          sources?: string[] | null
+        }
+        Relationships: []
+      }
       contracts: {
         Row: {
           clause_count: number | null
@@ -2482,6 +2527,107 @@ export type Database = {
           vehicle_name?: string
         }
         Relationships: []
+      }
+      coordination_log: {
+        Row: {
+          affected_documents: Json
+          changes_applied: Json
+          company_id: string
+          error_message: string | null
+          executed_at: string
+          id: string
+          rule_id: string
+          status: string
+          trigger_document_id: string
+        }
+        Insert: {
+          affected_documents?: Json
+          changes_applied?: Json
+          company_id: string
+          error_message?: string | null
+          executed_at?: string
+          id?: string
+          rule_id: string
+          status?: string
+          trigger_document_id: string
+        }
+        Update: {
+          affected_documents?: Json
+          changes_applied?: Json
+          company_id?: string
+          error_message?: string | null
+          executed_at?: string
+          id?: string
+          rule_id?: string
+          status?: string
+          trigger_document_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coordination_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coordination_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "coordination_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coordination_rules: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          source_doc_type: string
+          source_field_path: string
+          target_doc_type: string
+          target_field_path: string
+          transform_type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          source_doc_type: string
+          source_field_path: string
+          target_doc_type: string
+          target_field_path: string
+          transform_type?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          source_doc_type?: string
+          source_field_path?: string
+          target_doc_type?: string
+          target_field_path?: string
+          transform_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coordination_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cost_labor_categories: {
         Row: {
@@ -3343,6 +3489,62 @@ export type Database = {
           },
         ]
       }
+      document_sync_state: {
+        Row: {
+          cloud_file_id: string
+          cloud_provider: string
+          cloud_web_url: string | null
+          company_id: string
+          created_at: string
+          document_id: string
+          id: string
+          last_cloud_edit_at: string | null
+          last_mp_edit_at: string | null
+          last_sync_at: string | null
+          metadata: Json | null
+          sync_status: string
+          updated_at: string
+        }
+        Insert: {
+          cloud_file_id: string
+          cloud_provider: string
+          cloud_web_url?: string | null
+          company_id: string
+          created_at?: string
+          document_id: string
+          id?: string
+          last_cloud_edit_at?: string | null
+          last_mp_edit_at?: string | null
+          last_sync_at?: string | null
+          metadata?: Json | null
+          sync_status?: string
+          updated_at?: string
+        }
+        Update: {
+          cloud_file_id?: string
+          cloud_provider?: string
+          cloud_web_url?: string | null
+          company_id?: string
+          created_at?: string
+          document_id?: string
+          id?: string
+          last_cloud_edit_at?: string | null
+          last_mp_edit_at?: string | null
+          last_sync_at?: string | null
+          metadata?: Json | null
+          sync_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_sync_state_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_templates: {
         Row: {
           category: string | null
@@ -3405,6 +3607,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           diff_from_previous: Json | null
+          diff_summary: Json | null
           document_id: string | null
           document_type: string
           file_size: number | null
@@ -3412,6 +3615,8 @@ export type Database = {
           id: string
           is_milestone: boolean | null
           opportunity_id: string | null
+          snapshot: Json | null
+          source: string | null
           version_label: string | null
           version_number: number
         }
@@ -3422,6 +3627,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           diff_from_previous?: Json | null
+          diff_summary?: Json | null
           document_id?: string | null
           document_type: string
           file_size?: number | null
@@ -3429,6 +3635,8 @@ export type Database = {
           id?: string
           is_milestone?: boolean | null
           opportunity_id?: string | null
+          snapshot?: Json | null
+          source?: string | null
           version_label?: string | null
           version_number: number
         }
@@ -3439,6 +3647,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           diff_from_previous?: Json | null
+          diff_summary?: Json | null
           document_id?: string | null
           document_type?: string
           file_size?: number | null
@@ -3446,6 +3655,8 @@ export type Database = {
           id?: string
           is_milestone?: boolean | null
           opportunity_id?: string | null
+          snapshot?: Json | null
+          source?: string | null
           version_label?: string | null
           version_number?: number
         }
@@ -5683,6 +5894,195 @@ export type Database = {
         }
         Relationships: []
       }
+      mp_feature_usage: {
+        Row: {
+          feature: string
+          id: string
+          last_used_at: string | null
+          user_id: string
+          uses_remaining: number
+          uses_total: number
+        }
+        Insert: {
+          feature: string
+          id?: string
+          last_used_at?: string | null
+          user_id: string
+          uses_remaining?: number
+          uses_total?: number
+        }
+        Update: {
+          feature?: string
+          id?: string
+          last_used_at?: string | null
+          user_id?: string
+          uses_remaining?: number
+          uses_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_feature_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "mp_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_scoring_history: {
+        Row: {
+          avg_score: number | null
+          created_at: string | null
+          document_type: string | null
+          feature: string
+          file_name: string | null
+          file_type: string | null
+          id: string
+          model_used: string | null
+          overall_grade: string | null
+          red_flags: Json | null
+          scores: Json | null
+          tokens_input: number | null
+          tokens_output: number | null
+          top_fix: string | null
+          user_id: string
+          verdict: string | null
+        }
+        Insert: {
+          avg_score?: number | null
+          created_at?: string | null
+          document_type?: string | null
+          feature?: string
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          model_used?: string | null
+          overall_grade?: string | null
+          red_flags?: Json | null
+          scores?: Json | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          top_fix?: string | null
+          user_id: string
+          verdict?: string | null
+        }
+        Update: {
+          avg_score?: number | null
+          created_at?: string | null
+          document_type?: string | null
+          feature?: string
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          model_used?: string | null
+          overall_grade?: string | null
+          red_flags?: Json | null
+          scores?: Json | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          top_fix?: string | null
+          user_id?: string
+          verdict?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_scoring_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "mp_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_users: {
+        Row: {
+          company: string | null
+          converted_at: string | null
+          converted_profile_id: string | null
+          created_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          last_active_at: string | null
+          marketing_consent: boolean | null
+          role: string | null
+          source: string
+          stripe_customer_id: string | null
+          tier: string
+          updated_at: string | null
+        }
+        Insert: {
+          company?: string | null
+          converted_at?: string | null
+          converted_profile_id?: string | null
+          created_at?: string | null
+          email: string
+          full_name?: string | null
+          id?: string
+          last_active_at?: string | null
+          marketing_consent?: boolean | null
+          role?: string | null
+          source?: string
+          stripe_customer_id?: string | null
+          tier?: string
+          updated_at?: string | null
+        }
+        Update: {
+          company?: string | null
+          converted_at?: string | null
+          converted_profile_id?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          last_active_at?: string | null
+          marketing_consent?: boolean | null
+          role?: string | null
+          source?: string
+          stripe_customer_id?: string | null
+          tier?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_users_converted_profile_id_fkey"
+            columns: ["converted_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      newsletter_subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          ip_address: string | null
+          source: string
+          subscribed_at: string
+          unsubscribed_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          ip_address?: string | null
+          source?: string
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          ip_address?: string | null
+          source?: string
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string | null
@@ -6094,6 +6494,69 @@ export type Database = {
           requirement_id?: string | null
           status?: string | null
           target_date?: string | null
+        }
+        Relationships: []
+      }
+      opportunity_radar: {
+        Row: {
+          agency: string
+          ai_summary: string | null
+          contract_vehicle: string | null
+          created_at: string | null
+          description: string | null
+          id: number
+          model_used: string | null
+          naics_codes: Json | null
+          opportunity_type: string | null
+          relevance_score: number | null
+          response_deadline: string | null
+          scan_date: string
+          set_aside_type: string | null
+          small_business_eligible: boolean | null
+          solicitation_number: string | null
+          source_url: string | null
+          title: string
+          value_estimate: string | null
+        }
+        Insert: {
+          agency?: string
+          ai_summary?: string | null
+          contract_vehicle?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: never
+          model_used?: string | null
+          naics_codes?: Json | null
+          opportunity_type?: string | null
+          relevance_score?: number | null
+          response_deadline?: string | null
+          scan_date?: string
+          set_aside_type?: string | null
+          small_business_eligible?: boolean | null
+          solicitation_number?: string | null
+          source_url?: string | null
+          title: string
+          value_estimate?: string | null
+        }
+        Update: {
+          agency?: string
+          ai_summary?: string | null
+          contract_vehicle?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: never
+          model_used?: string | null
+          naics_codes?: Json | null
+          opportunity_type?: string | null
+          relevance_score?: number | null
+          response_deadline?: string | null
+          scan_date?: string
+          set_aside_type?: string | null
+          small_business_eligible?: boolean | null
+          solicitation_number?: string | null
+          source_url?: string | null
+          title?: string
+          value_estimate?: string | null
         }
         Relationships: []
       }
@@ -6826,6 +7289,57 @@ export type Database = {
           past_performance_id?: string | null
           phone?: string | null
           title?: string | null
+        }
+        Relationships: []
+      }
+      performance_metrics: {
+        Row: {
+          avg_ms: number
+          created_at: string
+          health_status: string
+          id: string
+          max_ms: number
+          measured_at: string
+          metadata: Json | null
+          metric_type: string
+          min_ms: number
+          name: string
+          p50_ms: number
+          p95_ms: number
+          p99_ms: number
+          sample_count: number
+        }
+        Insert: {
+          avg_ms: number
+          created_at?: string
+          health_status: string
+          id?: string
+          max_ms: number
+          measured_at: string
+          metadata?: Json | null
+          metric_type: string
+          min_ms?: number
+          name: string
+          p50_ms: number
+          p95_ms: number
+          p99_ms: number
+          sample_count: number
+        }
+        Update: {
+          avg_ms?: number
+          created_at?: string
+          health_status?: string
+          id?: string
+          max_ms?: number
+          measured_at?: string
+          metadata?: Json | null
+          metric_type?: string
+          min_ms?: number
+          name?: string
+          p50_ms?: number
+          p95_ms?: number
+          p99_ms?: number
+          sample_count?: number
         }
         Relationships: []
       }
@@ -7918,52 +8432,73 @@ export type Database = {
       }
       proposal_milestones: {
         Row: {
+          actual_date: string | null
           calendar_id: string | null
           color: string | null
+          company_id: string | null
           completed_at: string | null
           created_at: string | null
+          created_by: string | null
           due_date: string | null
           due_time: string | null
           id: string
           milestone_name: string
           milestone_type: string | null
           notes: string | null
+          opportunity_id: string | null
           owner: string | null
           reminder_days: number | null
+          scheduled_date: string | null
           sort_order: number | null
           status: string | null
+          title: string | null
+          updated_at: string | null
         }
         Insert: {
+          actual_date?: string | null
           calendar_id?: string | null
           color?: string | null
+          company_id?: string | null
           completed_at?: string | null
           created_at?: string | null
+          created_by?: string | null
           due_date?: string | null
           due_time?: string | null
           id?: string
           milestone_name: string
           milestone_type?: string | null
           notes?: string | null
+          opportunity_id?: string | null
           owner?: string | null
           reminder_days?: number | null
+          scheduled_date?: string | null
           sort_order?: number | null
           status?: string | null
+          title?: string | null
+          updated_at?: string | null
         }
         Update: {
+          actual_date?: string | null
           calendar_id?: string | null
           color?: string | null
+          company_id?: string | null
           completed_at?: string | null
           created_at?: string | null
+          created_by?: string | null
           due_date?: string | null
           due_time?: string | null
           id?: string
           milestone_name?: string
           milestone_type?: string | null
           notes?: string | null
+          opportunity_id?: string | null
           owner?: string | null
           reminder_days?: number | null
+          scheduled_date?: string | null
           sort_order?: number | null
           status?: string | null
+          title?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -7971,6 +8506,27 @@ export type Database = {
             columns: ["calendar_id"]
             isOneToOne: false
             referencedRelation: "proposal_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_milestones_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_milestones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_milestones_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
             referencedColumns: ["id"]
           },
         ]
@@ -9509,6 +10065,70 @@ export type Database = {
           },
         ]
       }
+      section_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          assignee_id: string
+          company_id: string
+          deadline: string | null
+          id: string
+          section_id: string
+          status: string
+          updated_at: string
+          volume: string | null
+          word_count: number | null
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          assignee_id: string
+          company_id: string
+          deadline?: string | null
+          id?: string
+          section_id: string
+          status?: string
+          updated_at?: string
+          volume?: string | null
+          word_count?: number | null
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          assignee_id?: string
+          company_id?: string
+          deadline?: string | null
+          id?: string
+          section_id?: string
+          status?: string
+          updated_at?: string
+          volume?: string | null
+          word_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "section_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "section_assignments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "section_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       section_versions: {
         Row: {
           author_id: string | null
@@ -9845,6 +10465,57 @@ export type Database = {
           },
         ]
       }
+      sso_configurations: {
+        Row: {
+          certificate: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          entity_id: string
+          id: string
+          is_active: boolean
+          sso_url: string
+          updated_at: string
+        }
+        Insert: {
+          certificate?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          entity_id: string
+          id?: string
+          is_active?: boolean
+          sso_url: string
+          updated_at?: string
+        }
+        Update: {
+          certificate?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string
+          id?: string
+          is_active?: boolean
+          sso_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sso_configurations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sso_configurations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stage_mappings: {
         Row: {
           created_at: string | null
@@ -10098,60 +10769,114 @@ export type Database = {
       }
       subscription_plans: {
         Row: {
-          id: string
-          name: string
-          slug: string
-          monthly_price: number
           annual_price: number
-          monthly_token_limit: number
-          overage_rate_per_mtok: number
-          max_users: number
-          max_opportunities: number
-          features: Json
-          stripe_monthly_price_id: string | null
-          stripe_annual_price_id: string | null
-          display_order: number
-          is_active: boolean
           created_at: string
+          display_order: number
+          features: Json
+          id: string
+          is_active: boolean
+          max_opportunities: number
+          max_users: number
+          monthly_price: number
+          monthly_token_limit: number
+          name: string
+          overage_rate_per_mtok: number
+          slug: string
+          stripe_annual_price_id: string | null
+          stripe_monthly_price_id: string | null
           updated_at: string
         }
         Insert: {
-          id?: string
-          name: string
-          slug: string
-          monthly_price?: number
           annual_price?: number
-          monthly_token_limit?: number
-          overage_rate_per_mtok?: number
-          max_users?: number
-          max_opportunities?: number
-          features?: Json
-          stripe_monthly_price_id?: string | null
-          stripe_annual_price_id?: string | null
-          display_order?: number
-          is_active?: boolean
           created_at?: string
+          display_order?: number
+          features?: Json
+          id?: string
+          is_active?: boolean
+          max_opportunities?: number
+          max_users?: number
+          monthly_price?: number
+          monthly_token_limit?: number
+          name: string
+          overage_rate_per_mtok?: number
+          slug: string
+          stripe_annual_price_id?: string | null
+          stripe_monthly_price_id?: string | null
           updated_at?: string
         }
         Update: {
-          id?: string
-          name?: string
-          slug?: string
-          monthly_price?: number
           annual_price?: number
-          monthly_token_limit?: number
-          overage_rate_per_mtok?: number
-          max_users?: number
-          max_opportunities?: number
-          features?: Json
-          stripe_monthly_price_id?: string | null
-          stripe_annual_price_id?: string | null
-          display_order?: number
-          is_active?: boolean
           created_at?: string
+          display_order?: number
+          features?: Json
+          id?: string
+          is_active?: boolean
+          max_opportunities?: number
+          max_users?: number
+          monthly_price?: number
+          monthly_token_limit?: number
+          name?: string
+          overage_rate_per_mtok?: number
+          slug?: string
+          stripe_annual_price_id?: string | null
+          stripe_monthly_price_id?: string | null
           updated_at?: string
         }
         Relationships: []
+      }
+      sync_conflicts: {
+        Row: {
+          cloud_version: Json
+          company_id: string
+          created_at: string
+          document_id: string
+          id: string
+          mp_version: Json
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          section_id: string | null
+        }
+        Insert: {
+          cloud_version?: Json
+          company_id: string
+          created_at?: string
+          document_id: string
+          id?: string
+          mp_version?: Json
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          section_id?: string | null
+        }
+        Update: {
+          cloud_version?: Json
+          company_id?: string
+          created_at?: string
+          document_id?: string
+          id?: string
+          mp_version?: Json
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          section_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_conflicts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_conflicts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_comments: {
         Row: {
@@ -10761,71 +11486,41 @@ export type Database = {
           },
         ]
       }
-      newsletter_subscribers: {
-        Row: {
-          id: string
-          email: string
-          source: string
-          subscribed_at: string
-          unsubscribed_at: string | null
-          ip_address: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          email: string
-          source?: string
-          subscribed_at?: string
-          unsubscribed_at?: string | null
-          ip_address?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          email?: string
-          source?: string
-          subscribed_at?: string
-          unsubscribed_at?: string | null
-          ip_address?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
       token_ledger: {
         Row: {
-          id: string
           company_id: string
-          period_start: string
+          created_at: string
+          id: string
+          overage_tokens_used: number
           period_end: string
+          period_start: string
           tokens_allocated: number
           tokens_consumed: number
           tokens_purchased: number
-          overage_tokens_used: number
-          created_at: string
           updated_at: string
         }
         Insert: {
-          id?: string
           company_id: string
-          period_start: string
+          created_at?: string
+          id?: string
+          overage_tokens_used?: number
           period_end: string
+          period_start: string
           tokens_allocated?: number
           tokens_consumed?: number
           tokens_purchased?: number
-          overage_tokens_used?: number
-          created_at?: string
           updated_at?: string
         }
         Update: {
-          id?: string
           company_id?: string
-          period_start?: string
+          created_at?: string
+          id?: string
+          overage_tokens_used?: number
           period_end?: string
+          period_start?: string
           tokens_allocated?: number
           tokens_consumed?: number
           tokens_purchased?: number
-          overage_tokens_used?: number
-          created_at?: string
           updated_at?: string
         }
         Relationships: [
@@ -10848,6 +11543,7 @@ export type Database = {
           metadata: Json | null
           opportunity_id: string | null
           output_tokens: number
+          provider: string | null
           user_id: string
         }
         Insert: {
@@ -10859,6 +11555,7 @@ export type Database = {
           metadata?: Json | null
           opportunity_id?: string | null
           output_tokens?: number
+          provider?: string | null
           user_id: string
         }
         Update: {
@@ -10870,6 +11567,7 @@ export type Database = {
           metadata?: Json | null
           opportunity_id?: string | null
           output_tokens?: number
+          provider?: string | null
           user_id?: string
         }
         Relationships: []
@@ -11343,6 +12041,57 @@ export type Database = {
           weekly_hours_available?: number | null
         }
         Relationships: []
+      }
+      workspaces: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          domain: string | null
+          id: string
+          is_active: boolean
+          name: string
+          parent_company_id: string
+          subscription_tier: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          domain?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          parent_company_id: string
+          subscription_tier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          domain?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          parent_company_id?: string
+          subscription_tier?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspaces_parent_company_id_fkey"
+            columns: ["parent_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -9,24 +9,12 @@
  * v1.3 Sprint 31 T-31.2 — Work Breakdown Structure & Section Assignments
  */
 import { redirect, notFound } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
-import { createSyncClient } from '@/lib/supabase/sync-client'
+
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
+import { WorkBreakdownMatrix } from '@/components/features/proposals/WorkBreakdownMatrix'
 import { TeamRollup } from '@/components/features/proposals/TeamRollup'
-import { Skeleton } from '@/components/ui/skeleton'
-const WorkBreakdownMatrix = dynamic(
-  () => import('@/components/features/proposals/WorkBreakdownMatrix').then((m) => m.WorkBreakdownMatrix),
-  {
-    loading: () => (
-      <div className="space-y-3">
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    ),
-  }
-)
 
 // ─── Summary Card ────────────────────────────────────────────────
 
@@ -44,7 +32,7 @@ function SummaryCard({ label, value, accent, subtext }: SummaryCardProps) {
       <p
         className={
           accent
-            ? 'mt-1 text-2xl font-bold text-primary'
+            ? 'mt-1 text-2xl font-bold text-[#00E5FA]'
             : 'mt-1 text-2xl font-bold text-foreground'
         }
       >
@@ -129,7 +117,7 @@ export default async function BreakdownPage({
   }))
 
   // Fetch section assignments (Phase J table)
-  const syncClient = await createSyncClient()
+  const syncClient = await createClient()
   const { data: assignmentRows } = await syncClient
     .from('section_assignments')
     .select('id, section_id, assignee_id, status, word_count, deadline')
@@ -187,7 +175,7 @@ export default async function BreakdownPage({
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h1 className="text-2xl font-bold text-white">
           Work Breakdown &mdash; {opportunity.title}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -220,7 +208,7 @@ export default async function BreakdownPage({
       <section>
         <div className="mb-3 flex items-center gap-2">
           <svg
-            className="h-4 w-4 text-primary"
+            className="h-4 w-4 text-[#00E5FA]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -249,7 +237,7 @@ export default async function BreakdownPage({
       <section>
         <div className="mb-3 flex items-center gap-2">
           <svg
-            className="h-4 w-4 text-primary"
+            className="h-4 w-4 text-[#00E5FA]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRole, hasPermission } from '@/lib/rbac/config'
 import Link from 'next/link'
 import { CreateDebriefForm } from './CreateDebriefForm'
 
@@ -41,6 +42,10 @@ export default async function DebriefsPage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const role = resolveRole(profile?.role)
+  if (!hasPermission(role, 'pipeline', 'shouldRender')) redirect('/dashboard')
 
   const { data: debriefs } = await supabase
     .from('debriefs')

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyWebhookEvent } from '@/lib/billing/stripe'
-import { createLogger } from '@/lib/logging/logger'
+import { handleConversionSuccess } from '@/lib/billing/pilot-conversion'
 
 // Use admin client for webhook processing (no user session)
 function getAdminClient() {
@@ -87,6 +87,14 @@ export async function POST(request: NextRequest) {
               new_values: { token_amount: tokenAmount, customer: session.customer },
             })
           }
+        } else if (type === 'pilot_conversion') {
+          // Pilot-to-annual conversion
+          await handleConversionSuccess({
+            companyId,
+            stripeSubscriptionId: session.subscription ?? '',
+            stripeCustomerId: session.customer,
+            pilotCreditCents: Number(session.metadata?.pilot_credit_cents ?? 0),
+          })
         } else if (type === 'subscription') {
           // Update company subscription
           await supabase
@@ -158,8 +166,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Processing error'
-    const log = createLogger('stripe-webhook')
-    log.error(message, { error: err instanceof Error ? err.message : String(err) })
+    console.error('[stripe-webhook] Error:', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
