@@ -18,7 +18,7 @@ Deno.serve(async (_req: Request) => {
   const { data: companies } = await supabase
     .from('opportunities')
     .select('company_id')
-    .not('deadline', 'is', null)
+    .not('due_date', 'is', null)
     .in('phase', ['Capture Planning', 'Proposal Development'])
 
   if (!companies || companies.length === 0) {
@@ -36,16 +36,16 @@ Deno.serve(async (_req: Request) => {
     // Get opportunities for this company
     const { data: opportunities } = await supabase
       .from('opportunities')
-      .select('id, title, deadline, phase, metadata')
+      .select('id, title, due_date, phase, metadata')
       .eq('company_id', companyId)
-      .not('deadline', 'is', null)
+      .not('due_date', 'is', null)
       .in('phase', ['Capture Planning', 'Proposal Development'])
 
     if (!opportunities) continue
 
     for (const opp of opportunities) {
       const now = new Date()
-      const due = new Date(opp.deadline)
+      const due = new Date(opp.due_date)
       const daysRemaining = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
       // Simple risk assessment for Edge Function

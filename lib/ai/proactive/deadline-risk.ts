@@ -60,7 +60,7 @@ export async function assessDeadlineRisks(
     .eq('company_id', companyId)
     .not('due_date', 'is', null)
     .in('phase', ['Capture Planning', 'Proposal Development'])
-    .order('deadline', { ascending: true })
+    .order('due_date', { ascending: true })
 
   if (!opportunities || opportunities.length === 0) {
     return {

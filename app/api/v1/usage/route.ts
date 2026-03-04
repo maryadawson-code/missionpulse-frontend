@@ -37,20 +37,20 @@ export async function GET(req: NextRequest) {
   // Get token ledger for the company
   const { data: ledger } = await supabase
     .from('token_ledger')
-    .select('tokens_allocated, tokens_consumed, tokens_purchased, overage_tokens')
+    .select('tokens_allocated, tokens_consumed, tokens_purchased, overage_tokens_used')
     .eq('company_id', validated.companyId)
     .single()
 
-  // Get recent usage
+  // Get recent usage from ai_interactions (has company_id, agent_type, tokens)
   const { data: recentUsage } = await supabase
-    .from('token_usage')
-    .select('tokens_used, task_type, created_at')
+    .from('ai_interactions')
+    .select('agent_type, tokens_input, tokens_output, created_at')
     .eq('company_id', validated.companyId)
     .order('created_at', { ascending: false })
     .limit(50)
 
   return NextResponse.json({
-    ledger: ledger ?? { tokens_allocated: 0, tokens_consumed: 0, tokens_purchased: 0, overage_tokens: 0 },
+    ledger: ledger ?? { tokens_allocated: 0, tokens_consumed: 0, tokens_purchased: 0, overage_tokens_used: 0 },
     recent_usage: recentUsage ?? [],
   }, { headers })
 }
