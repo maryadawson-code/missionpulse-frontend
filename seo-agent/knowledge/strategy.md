@@ -1,9 +1,9 @@
 # MissionPulse SEO Agent Strategy
 **Version:** 1.0.0
 **Last updated by agent:** 2026-03-04
-**Run count:** 0
+**Run count:** 1
 **Total fixes applied:** 0
-**Pages tracked:** [auto-populated on first run]
+**Pages tracked:** /, /plans, /8a-toolkit, /login, /signup
 
 ---
 
@@ -45,12 +45,12 @@ Agent updates this table after each run. Grades and rankings from observed data.
 
 | Page | Primary Keyword | Secondary Keywords | CTA Goal | Current Grade | Last Updated |
 |------|-----------------|--------------------|----------|---------------|-------------|
-| / | federal proposal management software | GovCon proposal AI, government contractor BD platform | Demo request | [AUDIT] | [DATE] |
-| /features | AI capture management | Shipley proposal automation, pWin analysis tool, proposal pipeline software | Feature exploration → Demo | [AUDIT] | [DATE] |
-| /pricing | proposal management software pricing | GovCon SaaS pricing, BD software cost, federal contractor tools | Plan selection | [AUDIT] | [DATE] |
-| /about | MissionPulse AI proposal platform | Mission Meets Tech, federal health IT contractor tools | Trust / Newsletter signup | [AUDIT] | [DATE] |
-| /demo | federal proposal software demo | MissionPulse demo, GovCon AI demo | Demo booking | [AUDIT] | [DATE] |
-| /blog | [auto-populated from discovered posts] | | Thought leadership → Demo | [AUDIT] | [DATE] |
+| / | federal proposal management software | GovCon proposal AI, government contractor BD platform | Demo request | A | 2026-03-04 |
+| /plans | proposal management software pricing | GovCon SaaS pricing, BD software cost, federal contractor tools | Plan selection | B | 2026-03-04 |
+| /8a-toolkit | 8(a) proposal management software | 8a small business proposal tools, set-aside contract software, SBA 8a compliance | Signup | B | 2026-03-04 |
+| /features | AI capture management | Shipley proposal automation, pWin analysis tool | Feature exploration → Demo | N/A (behind auth) | 2026-03-04 |
+| /about | MissionPulse AI proposal platform | Mission Meets Tech, federal health IT contractor tools | Trust / Newsletter signup | N/A (behind auth) | 2026-03-04 |
+| /demo | federal proposal software demo | MissionPulse demo, GovCon AI demo | Demo booking | N/A (behind auth) | 2026-03-04 |
 
 ---
 
