@@ -10,6 +10,14 @@ export const metadata: Metadata = {
     description:
       'Three tiers for every GovCon firm. Starter, Professional, and Enterprise. 17% annual discount. Below federal micro-purchase threshold.',
     url: 'https://missionpulse.ai/plans',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'MissionPulse pricing — Starter $149, Professional $499, Enterprise $2,500 per month',
+      },
+    ],
   },
   alternates: {
     canonical: 'https://missionpulse.ai/plans',

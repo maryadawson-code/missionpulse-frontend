@@ -22,6 +22,14 @@ export const metadata: Metadata = {
     description:
       'Built for 8(a) firms: AI-powered compliance, proposal generation, and pipeline management. Starter plan under $1,500/year.',
     url: 'https://missionpulse.ai/8a-toolkit',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'MissionPulse 8(a) Toolkit — AI-powered proposal management for small businesses',
+      },
+    ],
   },
   alternates: {
     canonical: 'https://missionpulse.ai/8a-toolkit',
