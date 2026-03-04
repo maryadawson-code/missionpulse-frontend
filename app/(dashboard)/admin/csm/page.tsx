@@ -22,6 +22,29 @@ export default async function CSMDashboardPage() {
 
   const companyId = profile?.company_id ?? ''
 
+  // Enterprise tier gate
+  const { data: subscription } = await supabase
+    .from('company_subscriptions')
+    .select('plan_id')
+    .eq('company_id', companyId)
+    .single()
+
+  const { data: planData } = subscription?.plan_id
+    ? await supabase.from('subscription_plans').select('slug').eq('id', subscription.plan_id).single()
+    : { data: null }
+
+  if (planData?.slug !== 'enterprise') {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Customer Success Dashboard</h1>
+        <div className="rounded-lg border bg-card p-8 text-center">
+          <p className="text-muted-foreground mb-4">Customer Success Management is available on the Enterprise plan.</p>
+          <a href="/plans" className="text-[#00E5FA] hover:underline">Upgrade to Enterprise →</a>
+        </div>
+      </div>
+    )
+  }
+
   // Get key metrics for CSM overview
   const [
     { count: totalUsers },
@@ -43,8 +66,9 @@ export default async function CSMDashboardPage() {
       .select('id', { count: 'exact', head: true })
       .eq('company_id', companyId),
     supabase
-      .from('token_usage')
-      .select('id', { count: 'exact', head: true }),
+      .from('ai_interactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId),
   ])
 
   // Get recent activity
