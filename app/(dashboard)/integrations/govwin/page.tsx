@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { GovWinConfig } from '@/components/features/integrations/GovWinConfig'
 
 export default async function GovWinPage() {
@@ -30,6 +31,7 @@ export default async function GovWinPage() {
     .single()
 
   const config = integration?.config as Record<string, unknown> | null
+  const available = await isProviderAvailable('govwin')
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -42,6 +44,7 @@ export default async function GovWinPage() {
 
       <GovWinConfig
         isConnected={integration?.status === 'active'}
+        isAvailable={available}
         lastSync={integration?.last_sync ?? null}
         errorMessage={integration?.error_message ?? null}
         alertCount={(config?.alert_count as number) ?? 0}

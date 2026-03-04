@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import {
   Link2,
   Link2Off,
@@ -15,6 +15,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getAuthUrl, disconnectIntegration } from '@/app/(dashboard)/integrations/actions'
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ interface PendingAlert {
 
 interface GovWinConfigProps {
   isConnected: boolean
+  isAvailable: boolean
   lastSync: string | null
   errorMessage: string | null
   alertCount: number
@@ -46,13 +48,31 @@ interface GovWinConfigProps {
 
 export function GovWinConfig({
   isConnected,
+  isAvailable,
   lastSync,
   errorMessage,
   alertCount,
   alertFilters,
   pendingAlerts,
 }: GovWinConfigProps) {
+  const [isPending, startTransition] = useTransition()
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle')
+
+  function handleConnect() {
+    startTransition(async () => {
+      const { url } = await getAuthUrl('govwin')
+      if (!url) return
+      const popup = window.open(url, 'govwin-oauth', 'width=600,height=700')
+      if (!popup) window.location.href = url
+    })
+  }
+
+  function handleDisconnect() {
+    startTransition(async () => {
+      await disconnectIntegration('govwin')
+      window.location.reload()
+    })
+  }
   const [naicsInput, setNaicsInput] = useState(alertFilters?.naicsCodes?.join(', ') ?? '')
   const [agencyInput, setAgencyInput] = useState(alertFilters?.agencies?.join(', ') ?? '')
   const [minValueInput, setMinValueInput] = useState(
@@ -121,19 +141,32 @@ export function GovWinConfig({
                 Sync Now
               </Button>
             )}
-            <Button variant={isConnected ? 'outline' : 'default'}>
-              {isConnected ? (
-                <>
-                  <Link2Off className="h-4 w-4" />
-                  Disconnect
-                </>
-              ) : (
-                <>
-                  <Link2 className="h-4 w-4" />
-                  Connect GovWin
-                </>
-              )}
-            </Button>
+            {isAvailable && (
+              <Button
+                variant={isConnected ? 'outline' : 'default'}
+                onClick={isConnected ? handleDisconnect : handleConnect}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isConnected ? (
+                  <>
+                    <Link2Off className="h-4 w-4" />
+                    Disconnect
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4" />
+                    Connect GovWin
+                  </>
+                )}
+              </Button>
+            )}
+            {!isAvailable && !isConnected && (
+              <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs text-amber-600 dark:text-amber-400">
+                Not Configured
+              </span>
+            )}
           </div>
         </div>
 
@@ -153,13 +186,18 @@ export function GovWinConfig({
           <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
         )}
 
-        {!isConnected && (
+        {!isConnected && isAvailable && (
           <div className="mt-4 rounded-lg border border-border bg-card/80 p-4">
             <p className="text-xs text-muted-foreground">
               Connect your GovWin IQ account to receive opportunity alerts, track competitors,
-              and access agency intelligence data. Configure{' '}
-              <code className="text-primary">GOVWIN_CLIENT_ID</code> and{' '}
-              <code className="text-primary">GOVWIN_CLIENT_SECRET</code> in your environment.
+              and access agency intelligence data. Click <strong>Connect GovWin</strong> above to sign in with your GovWin IQ credentials.
+            </p>
+          </div>
+        )}
+        {!isAvailable && !isConnected && (
+          <div className="mt-4 rounded-lg border border-border bg-card/80 p-4">
+            <p className="text-xs text-muted-foreground">
+              Ask your workspace administrator to configure GovWin IQ credentials in Settings.
             </p>
           </div>
         )}

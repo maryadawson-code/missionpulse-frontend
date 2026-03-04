@@ -108,22 +108,51 @@ export async function uploadRfpFile(
     const buffer = Buffer.from(await file.arrayBuffer())
     const { text: extractedText, status: uploadStatus } = await extractText(buffer, file.type)
 
-    const { data: doc, error: insertError } = await supabase
+    // Dedup: if this file was already uploaded for this opportunity, update instead of insert
+    const { data: existing } = await supabase
       .from('rfp_documents')
-      .insert({
-        opportunity_id: opportunityId,
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        storage_path: null,
-        extracted_text: extractedText,
-        upload_status: uploadStatus,
-      })
       .select('id')
-      .single()
+      .eq('opportunity_id', opportunityId)
+      .eq('file_name', file.name)
+      .maybeSingle()
 
-    if (insertError) {
-      return { success: false, error: `Failed to save document: ${insertError.message}` }
+    let doc: { id: string } | null = null
+    let insertError: { message: string } | null = null
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('rfp_documents')
+        .update({
+          file_type: file.type,
+          file_size: file.size,
+          extracted_text: extractedText,
+          upload_status: uploadStatus,
+        })
+        .eq('id', existing.id)
+        .select('id')
+        .single()
+      doc = data
+      insertError = error
+    } else {
+      const { data, error } = await supabase
+        .from('rfp_documents')
+        .insert({
+          opportunity_id: opportunityId,
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          storage_path: null,
+          extracted_text: extractedText,
+          upload_status: uploadStatus,
+        })
+        .select('id')
+        .single()
+      doc = data
+      insertError = error
+    }
+
+    if (insertError || !doc) {
+      return { success: false, error: `Failed to save document: ${insertError?.message ?? 'Unknown error'}` }
     }
 
     await supabase.from('activity_log').insert({
@@ -206,19 +235,45 @@ export async function uploadRfpZip(
 
       const { text: extractedText, status: uploadStatus } = await extractText(entryBuffer, mimeType)
 
-      const { data: doc } = await supabase
+      // Dedup: update existing row if same file was previously uploaded
+      const { data: existingDoc } = await supabase
         .from('rfp_documents')
-        .insert({
-          opportunity_id: opportunityId,
-          file_name: fileName,
-          file_type: mimeType,
-          file_size: entryBuffer.length,
-          storage_path: null,
-          extracted_text: extractedText,
-          upload_status: uploadStatus,
-        })
         .select('id')
-        .single()
+        .eq('opportunity_id', opportunityId)
+        .eq('file_name', fileName)
+        .maybeSingle()
+
+      let doc: { id: string } | null = null
+
+      if (existingDoc) {
+        const { data } = await supabase
+          .from('rfp_documents')
+          .update({
+            file_type: mimeType,
+            file_size: entryBuffer.length,
+            extracted_text: extractedText,
+            upload_status: uploadStatus,
+          })
+          .eq('id', existingDoc.id)
+          .select('id')
+          .single()
+        doc = data
+      } else {
+        const { data } = await supabase
+          .from('rfp_documents')
+          .insert({
+            opportunity_id: opportunityId,
+            file_name: fileName,
+            file_type: mimeType,
+            file_size: entryBuffer.length,
+            storage_path: null,
+            extracted_text: extractedText,
+            upload_status: uploadStatus,
+          })
+          .select('id')
+          .single()
+        doc = data
+      }
 
       if (doc) {
         processedFiles.push(fileName)
