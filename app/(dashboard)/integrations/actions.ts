@@ -14,6 +14,7 @@ import { getSalesforceAuthUrl, disconnectSalesforce } from '@/lib/integrations/s
 import { getSlackAuthUrl, disconnectSlack } from '@/lib/integrations/slack/auth'
 import { getGoogleAuthUrl, disconnectGoogle } from '@/lib/integrations/google/auth'
 import { getDocuSignAuthUrl, disconnectDocuSign } from '@/lib/integrations/docusign/auth'
+import { getGovWinAuthUrl, disconnectGovWin } from '@/lib/integrations/govwin/client'
 
 /**
  * Get the OAuth authorization URL for a given provider.
@@ -35,6 +36,8 @@ export async function getAuthUrl(
         return { url: await getGoogleAuthUrl() }
       case 'docusign':
         return { url: await getDocuSignAuthUrl() }
+      case 'govwin':
+        return { url: await getGovWinAuthUrl() }
       default:
         return { url: null, error: 'Unknown provider' }
     }
@@ -80,6 +83,9 @@ export async function disconnectIntegration(
         result = await disconnectDocuSign(ctx.companyId, ctx.userId)
         break
       }
+      case 'govwin':
+        result = await disconnectGovWin()
+        break
       default:
         return { success: false, error: 'Unknown provider' }
     }
