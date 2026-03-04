@@ -24,7 +24,7 @@ for arg in "$@"; do
 done
 
 log() {
-  if ! $QUIET_MODE; then echo "$@"; fi
+  if ! $QUIET_MODE; then echo "$@" >&2; fi
 }
 
 # ─── Checks ─────────────────────────────────────────────────
@@ -95,19 +95,20 @@ fi
 
 # 4. SSL certificate check
 log "Checking SSL certificate..."
-SSL_DOMAIN=$(echo "$SITE_URL" | sed 's|https\?://||' | sed 's|/.*||')
+SSL_DOMAIN=$(echo "$SITE_URL" | sed 's|https://||;s|http://||' | sed 's|/.*||')
 SSL_EXPIRY=$(echo | openssl s_client -servername "$SSL_DOMAIN" -connect "$SSL_DOMAIN:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | sed 's/notAfter=//')
 SSL_STATUS="valid"
 SSL_DAYS=0
 
 if [ -n "$SSL_EXPIRY" ]; then
-  if date -j -f "%b %d %T %Y %Z" "$SSL_EXPIRY" +%s >/dev/null 2>&1; then
-    # macOS date
-    SSL_EPOCH=$(date -j -f "%b %d %T %Y %Z" "$SSL_EXPIRY" +%s 2>/dev/null)
-  else
-    # Linux date
-    SSL_EPOCH=$(date -d "$SSL_EXPIRY" +%s 2>/dev/null || echo "0")
-  fi
+  SSL_EPOCH=$(python3 -c "
+from datetime import datetime
+try:
+    dt = datetime.strptime('$SSL_EXPIRY'.strip(), '%b %d %H:%M:%S %Y %Z')
+    print(int(dt.timestamp()))
+except:
+    print(0)
+" 2>/dev/null || echo "0")
   NOW_EPOCH=$(date +%s)
   SSL_DAYS=$(( (SSL_EPOCH - NOW_EPOCH) / 86400 ))
 
