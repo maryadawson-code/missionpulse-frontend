@@ -22,31 +22,31 @@ const thresholdConfig = {
   normal: { icon: null, bgClass: '', textClass: '', show: false },
   info: {
     icon: Info,
-    bgClass: 'bg-cyan-900/30 border-cyan-700/50',
-    textClass: 'text-cyan-300',
+    bgClass: 'bg-primary/10 border-primary/30',
+    textClass: 'text-primary',
     show: true,
   },
   warning: {
     icon: AlertTriangle,
     bgClass: 'bg-yellow-900/30 border-yellow-700/50',
-    textClass: 'text-yellow-300',
+    textClass: 'text-yellow-700 dark:text-yellow-300',
     show: true,
   },
   urgent: {
     icon: AlertTriangle,
     bgClass: 'bg-orange-900/30 border-orange-700/50',
-    textClass: 'text-orange-300',
+    textClass: 'text-orange-700 dark:text-orange-300',
     show: true,
   },
   soft_block: {
     icon: XCircle,
     bgClass: 'bg-red-900/30 border-red-700/50',
-    textClass: 'text-red-300',
+    textClass: 'text-red-700 dark:text-red-300',
     show: true,
   },
   hard_block: {
     icon: XCircle,
-    bgClass: 'bg-red-900/50 border-red-500/50',
+    bgClass: 'bg-red-50 dark:bg-red-900/50 border-red-500/50',
     textClass: 'text-red-200',
     show: true,
   },
@@ -98,12 +98,12 @@ export function TokenBudgetBanner({
                   ? 'bg-orange-500'
                   : usagePercent >= 50
                     ? 'bg-yellow-500'
-                    : 'bg-cyan-500'
+                    : 'bg-primary'
             }`}
             style={{ width: `${Math.min(usagePercent, 100)}%` }}
           />
         </div>
-        <p className="mt-0.5 text-xs text-gray-500">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {usagePercent}% of monthly allocation used
         </p>
       </div>
@@ -112,7 +112,7 @@ export function TokenBudgetBanner({
         {upgradeCta && (
           <Link
             href="/settings/billing"
-            className="inline-flex items-center gap-1 rounded-md bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 transition-colors"
+            className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Zap className="h-3 w-3" />
             Upgrade
@@ -123,7 +123,7 @@ export function TokenBudgetBanner({
         {(threshold === 'info' || threshold === 'warning') && (
           <button
             onClick={() => setDismissed(true)}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Dismiss"
           >
             <XCircle className="h-4 w-4" />

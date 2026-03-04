@@ -6,6 +6,9 @@
  *
  * Server-only utility.
  */
+import { createLogger } from '@/lib/logging/logger'
+
+const log = createLogger('query')
 
 // ─── Config ──────────────────────────────────────────────────
 
@@ -60,9 +63,13 @@ export async function timedQuery<T>(
       slowQueryBuffer.push(metrics)
     }
 
-    console.warn(
-      `[slow-query] ${table}.${operation} took ${duration_ms}ms (threshold: ${SLOW_QUERY_THRESHOLD_MS}ms, rows: ${metrics.row_count})`
-    )
+    log.warn('Slow query detected', {
+      table,
+      operation,
+      duration_ms,
+      threshold_ms: SLOW_QUERY_THRESHOLD_MS,
+      row_count: metrics.row_count,
+    })
   }
 
   return { ...result, duration_ms }

@@ -118,7 +118,7 @@ export function AutoExtract({
             onReject={handleReject}
           />
           {acceptedCount > 0 && (
-            <p className="text-xs text-emerald-400">
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
               {acceptedCount} requirement{acceptedCount !== 1 ? 's' : ''}{' '}
               added to the compliance matrix.
             </p>

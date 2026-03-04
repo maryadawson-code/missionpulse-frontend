@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { M365Config } from '@/components/features/integrations/M365Config'
 
 export default async function M365Page() {
@@ -29,12 +30,13 @@ export default async function M365Page() {
     .single()
 
   const config = integration?.config as Record<string, unknown> | null
+  const available = await isProviderAvailable('m365')
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Microsoft 365 Integration</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Microsoft 365 Integration</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Connect Microsoft 365 for OneDrive document storage, Word Online editing,
           and Outlook calendar sync.
         </p>
@@ -42,6 +44,7 @@ export default async function M365Page() {
 
       <M365Config
         isConnected={integration?.status === 'active'}
+        isAvailable={available}
         userName={(config?.user_name as string) ?? null}
         lastSync={integration?.last_sync ?? null}
         errorMessage={integration?.error_message ?? null}

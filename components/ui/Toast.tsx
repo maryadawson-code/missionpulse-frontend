@@ -21,9 +21,9 @@ function Toast({ toast, onDismiss }: ToastProps) {
   }, [toast.id, onDismiss])
 
   const colors = {
-    success: 'border-emerald-500/40 bg-emerald-950/60 text-emerald-300',
-    error: 'border-red-500/40 bg-red-950/60 text-red-300',
-    info: 'border-cyan/40 bg-cyan-950/60 text-cyan-300',
+    success: 'border-emerald-500/40 bg-emerald-950/60 text-emerald-700 dark:text-emerald-300',
+    error: 'border-red-500/40 bg-red-950/60 text-red-700 dark:text-red-300',
+    info: 'border-cyan/40 bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300',
   }
 
   return (

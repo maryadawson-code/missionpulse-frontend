@@ -103,9 +103,9 @@ export function PricingAI({
   return (
     <div className="space-y-4">
       {!suggestions && (
-        <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 p-6">
+        <div className="rounded-lg border border-amber-500/20 bg-amber-50 dark:bg-amber-950/10 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <DollarSign className="h-6 w-6 text-amber-400" />
+            <DollarSign className="h-6 w-6 text-amber-600 dark:text-amber-400" />
             <div>
               <h3 className="text-sm font-semibold text-foreground">
                 AI Pricing Advisor
@@ -129,7 +129,7 @@ export function PricingAI({
 
       {isPending && !suggestions && (
         <div className="flex items-center gap-3 rounded-lg border border-border p-6">
-          <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
+          <Loader2 className="h-5 w-5 animate-spin text-amber-600 dark:text-amber-400" />
           <span className="text-sm text-muted-foreground">
             Generating pricing analysis via AskSage (CUI-protected)...
           </span>

@@ -1,92 +1,34 @@
 // filepath: tests/collaboration/artifact-status.test.ts
 /**
  * Tests for ArtifactStatus type and SyncStatus validation
- * v1.3 Sprint 31
- *
- * Verifies that the ArtifactStatus interface has all expected fields
- * and that SyncStatus values conform to the known set.
- *
- * Types from: lib/types/sync.ts
+ * v1.3 Sprint 31 → Migrated to Vitest (v1.6 T-42.1)
  */
 
 import type {
   ArtifactStatus,
   SyncStatus,
   CloudProvider,
-  DocumentSource,
 } from '@/lib/types/sync'
 
-interface TestResult {
-  name: string
-  passed: boolean
-  error?: string
-}
-
-// ─── Test 1: All sync status values are valid ────────────────
-
-function testSyncStatusTypes(): TestResult {
-  try {
-    // The SyncStatus union: 'idle' | 'syncing' | 'synced' | 'conflict' | 'error'
+describe('artifact-status', () => {
+  it('validates all sync status values', () => {
     const validStatuses: SyncStatus[] = ['idle', 'syncing', 'synced', 'conflict', 'error']
 
-    // Verify each status can be assigned to the type
+    expect(validStatuses).toHaveLength(5)
+    expect(new Set(validStatuses).size).toBe(5)
+
     for (const status of validStatuses) {
-      const test: SyncStatus = status
-      if (typeof test !== 'string') {
-        return {
-          name: 'testSyncStatusTypes',
-          passed: false,
-          error: `Status '${status}' should be a string`,
-        }
-      }
+      expect(typeof status).toBe('string')
     }
 
-    // Verify we have exactly 5 known statuses
-    if (validStatuses.length !== 5) {
-      return {
-        name: 'testSyncStatusTypes',
-        passed: false,
-        error: `Expected 5 sync status values, got ${validStatuses.length}`,
-      }
-    }
+    expect(validStatuses).toContain('idle')
+    expect(validStatuses).toContain('syncing')
+    expect(validStatuses).toContain('synced')
+    expect(validStatuses).toContain('conflict')
+    expect(validStatuses).toContain('error')
+  })
 
-    // Verify no duplicates
-    const unique = new Set(validStatuses)
-    if (unique.size !== validStatuses.length) {
-      return {
-        name: 'testSyncStatusTypes',
-        passed: false,
-        error: 'Duplicate sync status values detected',
-      }
-    }
-
-    // Verify specific statuses are present
-    const requiredStatuses = ['idle', 'syncing', 'synced', 'conflict', 'error'] as const
-    for (const required of requiredStatuses) {
-      if (!validStatuses.includes(required)) {
-        return {
-          name: 'testSyncStatusTypes',
-          passed: false,
-          error: `Required status '${required}' missing from valid statuses`,
-        }
-      }
-    }
-
-    return { name: 'testSyncStatusTypes', passed: true }
-  } catch (err) {
-    return {
-      name: 'testSyncStatusTypes',
-      passed: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
-// ─── Test 2: ArtifactStatus has expected fields ──────────────
-
-function testArtifactStatusStructure(): TestResult {
-  try {
-    // Create a valid ArtifactStatus object with all required fields
+  it('ArtifactStatus has all expected fields', () => {
     const artifact: ArtifactStatus = {
       volumeName: 'Technical Volume',
       documentId: 'doc-tv-001',
@@ -98,54 +40,21 @@ function testArtifactStatusStructure(): TestResult {
       wordCount: 12500,
     }
 
-    // Verify volumeName
-    if (typeof artifact.volumeName !== 'string' || artifact.volumeName === '') {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: 'volumeName should be a non-empty string',
-      }
-    }
+    expect(typeof artifact.volumeName).toBe('string')
+    expect(artifact.volumeName).not.toBe('')
+    expect(typeof artifact.documentId).toBe('string')
+    expect(artifact.documentId).not.toBe('')
 
-    // Verify documentId
-    if (typeof artifact.documentId !== 'string' || artifact.documentId === '') {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: 'documentId should be a non-empty string',
-      }
-    }
-
-    // Verify syncStatus is a valid SyncStatus
     const validStatuses: SyncStatus[] = ['idle', 'syncing', 'synced', 'conflict', 'error']
-    if (!validStatuses.includes(artifact.syncStatus)) {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: `syncStatus '${artifact.syncStatus}' is not a valid SyncStatus`,
-      }
-    }
+    expect(validStatuses).toContain(artifact.syncStatus)
 
-    // Verify cloudProvider (nullable)
     const validProviders: (CloudProvider | null)[] = ['onedrive', 'google_drive', 'sharepoint', null]
-    if (!validProviders.includes(artifact.cloudProvider)) {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: `cloudProvider '${artifact.cloudProvider}' is not valid`,
-      }
-    }
+    expect(validProviders).toContain(artifact.cloudProvider)
 
-    // Verify wordCount is a non-negative number
-    if (typeof artifact.wordCount !== 'number' || artifact.wordCount < 0) {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: `wordCount should be a non-negative number, got ${artifact.wordCount}`,
-      }
-    }
+    expect(typeof artifact.wordCount).toBe('number')
+    expect(artifact.wordCount).toBeGreaterThanOrEqual(0)
 
-    // Verify nullable fields can be null
+    // Verify nullable fields accept null
     const nullableArtifact: ArtifactStatus = {
       volumeName: 'Management Volume',
       documentId: 'doc-mv-001',
@@ -157,70 +66,18 @@ function testArtifactStatusStructure(): TestResult {
       wordCount: 0,
     }
 
-    if (nullableArtifact.cloudProvider !== null) {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: 'cloudProvider should accept null',
-      }
-    }
-    if (nullableArtifact.lastEditedBy !== null) {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: 'lastEditedBy should accept null',
-      }
-    }
-    if (nullableArtifact.lastEditedAt !== null) {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: 'lastEditedAt should accept null',
-      }
-    }
-    if (nullableArtifact.editSource !== null) {
-      return {
-        name: 'testArtifactStatusStructure',
-        passed: false,
-        error: 'editSource should accept null',
-      }
-    }
+    expect(nullableArtifact.cloudProvider).toBeNull()
+    expect(nullableArtifact.lastEditedBy).toBeNull()
+    expect(nullableArtifact.lastEditedAt).toBeNull()
+    expect(nullableArtifact.editSource).toBeNull()
 
-    // Verify all ArtifactStatus keys are present
+    // Verify all expected keys are present
     const expectedKeys = [
-      'volumeName',
-      'documentId',
-      'syncStatus',
-      'cloudProvider',
-      'lastEditedBy',
-      'lastEditedAt',
-      'editSource',
-      'wordCount',
+      'volumeName', 'documentId', 'syncStatus', 'cloudProvider',
+      'lastEditedBy', 'lastEditedAt', 'editSource', 'wordCount',
     ]
-    const artifactKeys = Object.keys(artifact)
     for (const key of expectedKeys) {
-      if (!artifactKeys.includes(key)) {
-        return {
-          name: 'testArtifactStatusStructure',
-          passed: false,
-          error: `Missing expected key '${key}' in ArtifactStatus`,
-        }
-      }
+      expect(Object.keys(artifact)).toContain(key)
     }
-
-    return { name: 'testArtifactStatusStructure', passed: true }
-  } catch (err) {
-    return {
-      name: 'testArtifactStatusStructure',
-      passed: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
-// ─── Export all tests ────────────────────────────────────────
-
-export const tests = [
-  testSyncStatusTypes,
-  testArtifactStatusStructure,
-]
+  })
+})

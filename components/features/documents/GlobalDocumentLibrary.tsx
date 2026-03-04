@@ -88,12 +88,12 @@ function statusStyle(status: string | null): string {
   switch (status) {
     case 'final':
     case 'approved':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'in_review':
     case 'review':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'draft':
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
     default:
       return 'bg-muted text-muted-foreground'
   }
@@ -281,7 +281,7 @@ export function GlobalDocumentLibrary({
                               {doc.document_name}
                             </span>
                             {doc.is_locked && (
-                              <Lock className="h-3 w-3 text-amber-400" />
+                              <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                             )}
                             {versions.length > 1 && (
                               <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">

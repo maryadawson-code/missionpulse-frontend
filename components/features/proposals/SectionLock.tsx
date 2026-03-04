@@ -109,7 +109,7 @@ export function SectionLockControl({
     return (
       <button
         onClick={handleRelease}
-        className="flex items-center gap-1.5 rounded-lg bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+        className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
         title="Release section lock"
       >
         <Edit3 className="h-3.5 w-3.5" />
@@ -120,7 +120,7 @@ export function SectionLockControl({
 
   if (lockStatus.locked) {
     return (
-      <div className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
+      <div className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
         <Lock className="h-3.5 w-3.5" />
         Locked by {lockStatus.lockedBy}
       </div>
@@ -130,7 +130,7 @@ export function SectionLockControl({
   return (
     <button
       onClick={handleClaim}
-      className="flex items-center gap-1.5 rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-400 hover:border-gray-600 hover:text-white transition-colors"
+      className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
       title="Claim section for editing"
     >
       <Unlock className="h-3.5 w-3.5" />

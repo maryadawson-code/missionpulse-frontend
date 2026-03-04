@@ -44,12 +44,16 @@ export default async function IronDomePage() {
   const reqs = allReqs ?? []
   const opps = opportunities ?? []
 
+  // Helper: normalize status for comparison (handles both lowercase DB and legacy title-case)
+  const normalizeStatus = (s: string | null) => s?.toLowerCase().replace(/ /g, '_') ?? ''
+
   // Aggregate per opportunity
   const oppStats = opps.map((opp) => {
     const oppReqs = reqs.filter((r) => r.opportunity_id === opp.id)
-    const addressed = oppReqs.filter(
-      (r) => r.status === 'Addressed' || r.status === 'Verified'
-    ).length
+    const addressed = oppReqs.filter((r) => {
+      const s = normalizeStatus(r.status)
+      return s === 'addressed' || s === 'verified'
+    }).length
     const pct = oppReqs.length > 0 ? Math.round((addressed / oppReqs.length) * 100) : 0
 
     return {
@@ -60,30 +64,31 @@ export default async function IronDomePage() {
       due_date: opp.due_date,
       total: oppReqs.length,
       addressed,
-      notStarted: oppReqs.filter((r) => r.status === 'Not Started' || !r.status).length,
-      inProgress: oppReqs.filter((r) => r.status === 'In Progress').length,
-      verified: oppReqs.filter((r) => r.status === 'Verified').length,
+      notStarted: oppReqs.filter((r) => !r.status || normalizeStatus(r.status) === 'not_started').length,
+      inProgress: oppReqs.filter((r) => normalizeStatus(r.status) === 'in_progress').length,
+      verified: oppReqs.filter((r) => normalizeStatus(r.status) === 'verified').length,
       pct,
     }
   })
 
   // Global stats
   const totalReqs = reqs.length
-  const totalAddressed = reqs.filter(
-    (r) => r.status === 'Addressed' || r.status === 'Verified'
-  ).length
-  const totalVerified = reqs.filter((r) => r.status === 'Verified').length
+  const totalAddressed = reqs.filter((r) => {
+    const s = normalizeStatus(r.status)
+    return s === 'addressed' || s === 'verified'
+  }).length
+  const totalVerified = reqs.filter((r) => normalizeStatus(r.status) === 'verified').length
   const overallPct = totalReqs > 0 ? Math.round((totalAddressed / totalReqs) * 100) : 0
 
-  // Gaps: requirements with status 'Not Started' that have been pending for a while
+  // Gaps: requirements with status 'not_started' that have been pending for a while
   const gaps = reqs.filter(
-    (r) => !r.status || r.status === 'Not Started'
+    (r) => !r.status || normalizeStatus(r.status) === 'not_started'
   )
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Iron Dome</h1>
+        <h1 className="text-2xl font-bold text-foreground">Iron Dome</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Compliance command center — track requirements across all active opportunities.
           NIST SP 800-171 / CMMC Level 2.

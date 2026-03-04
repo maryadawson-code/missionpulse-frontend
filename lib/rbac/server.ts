@@ -141,10 +141,40 @@ export async function requireAdmin(): Promise<ServerRoleInfo> {
 
 /**
  * Asserts the current user can access CUI-protected content.
- * Checks security.canViewAllClassifications or module-specific shouldRender.
+ * Checks module permissions AND enforces MFA (AAL2) for CUI modules.
+ * Redirects to /mfa if user has only single-factor auth.
  */
 export async function requireSensitiveAccess(
-  moduleId: 'pricing' | 'blackhat'
+  moduleId: 'pricing' | 'blackhat' | 'strategy'
 ): Promise<ServerRoleInfo> {
-  return requireModuleAccess(moduleId, 'view')
+  const roleInfo = await requireModuleAccess(moduleId, 'view')
+
+  // Enforce MFA for CUI-protected modules
+  await requireMFA()
+
+  return roleInfo
+}
+
+// ---------------------------------------------------------------------------
+// requireMFA — enforces multi-factor authentication (AAL2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Checks the user's Authenticator Assurance Level (AAL).
+ * Redirects to /mfa if the user is only at AAL1 (single-factor).
+ * Use for CUI-protected modules that require MFA per CMMC/NIST.
+ */
+export async function requireMFA(): Promise<void> {
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+
+  if (error) {
+    // If MFA check fails, redirect to MFA page as a safety measure
+    redirect('/mfa')
+  }
+
+  // If user has MFA factors enrolled but hasn't completed the challenge
+  if (data.currentLevel === 'aal1' && data.nextLevel === 'aal2') {
+    redirect('/mfa')
+  }
 }

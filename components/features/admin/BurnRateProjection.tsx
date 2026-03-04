@@ -41,32 +41,32 @@ export function BurnRateProjection({
           <p className="text-xs font-medium uppercase text-muted-foreground">
             Burn Rate Projection
           </p>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             Based on {formatTokens(avgDailyTokens)} tokens/day average
           </p>
         </div>
         {willExhaust ? (
           isAtRisk ? (
-            <TrendingDown className="h-5 w-5 text-red-400" />
+            <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
           ) : (
-            <TrendingUp className="h-5 w-5 text-yellow-400" />
+            <TrendingUp className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
           )
         ) : (
-          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
         )}
       </div>
 
       <div className="mt-4">
         {willExhaust ? (
           <div>
-            <p className={`text-lg font-semibold ${isAtRisk ? 'text-red-400' : 'text-yellow-400'}`}>
+            <p className={`text-lg font-semibold ${isAtRisk ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
               {daysRemaining === 0
                 ? 'Limit reached'
                 : `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining`}
             </p>
-            <p className="mt-1 text-sm text-gray-400">
+            <p className="mt-1 text-sm text-muted-foreground">
               At current pace, you&apos;ll hit your limit on{' '}
-              <span className="font-medium text-white">
+              <span className="font-medium text-foreground">
                 {new Date(projectedExhaustionDate).toLocaleDateString('en-US', {
                   month: 'long',
                   day: 'numeric',
@@ -76,12 +76,12 @@ export function BurnRateProjection({
           </div>
         ) : (
           <div>
-            <p className="text-lg font-semibold text-emerald-400">
+            <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
               On track
             </p>
-            <p className="mt-1 text-sm text-gray-400">
+            <p className="mt-1 text-sm text-muted-foreground">
               At current pace, usage won&apos;t exceed allocation before{' '}
-              <span className="font-medium text-white">{periodEndDate}</span>
+              <span className="font-medium text-foreground">{periodEndDate}</span>
             </p>
           </div>
         )}
@@ -90,14 +90,14 @@ export function BurnRateProjection({
       {/* Daily average indicator */}
       <div className="mt-4 flex items-center gap-4 border-t border-border pt-4">
         <div>
-          <p className="text-xs text-gray-500">Daily Avg</p>
-          <p className="text-sm font-semibold text-white">
+          <p className="text-xs text-muted-foreground">Daily Avg</p>
+          <p className="text-sm font-semibold text-foreground">
             {formatTokens(avgDailyTokens)}
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">Period Ends</p>
-          <p className="text-sm font-semibold text-white">{periodEndDate}</p>
+          <p className="text-xs text-muted-foreground">Period Ends</p>
+          <p className="text-sm font-semibold text-foreground">{periodEndDate}</p>
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 
 export async function updateComplianceStatus(
   requirementId: string,
@@ -22,7 +23,7 @@ export async function updateComplianceStatus(
   }
 
   // Track verification
-  if (status === 'Verified') {
+  if (status.toLowerCase() === 'verified') {
     updates.verified_at = new Date().toISOString()
     updates.verified_by = user.id
   }
@@ -44,6 +45,17 @@ export async function updateComplianceStatus(
       new_status: status,
     },
   })
+
+  await supabase.from('audit_logs').insert({
+    action: 'update_compliance_status',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: requirementId,
+    details: { opportunity_id: opportunityId, new_status: status },
+  })
+
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('review_compliance')
 
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }
@@ -71,6 +83,25 @@ export async function assignComplianceReviewer(
 
   if (error) return { success: false, error: error.message }
 
+  await supabase.from('activity_log').insert({
+    action: 'assign_compliance_reviewer',
+    user_name: user.email ?? 'Unknown',
+    details: {
+      entity_type: 'compliance_requirement',
+      entity_id: requirementId,
+      opportunity_id: opportunityId,
+      assigned_to: assignedTo,
+    },
+  })
+
+  await supabase.from('audit_logs').insert({
+    action: 'assign_compliance_reviewer',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: requirementId,
+    details: { opportunity_id: opportunityId, assigned_to: assignedTo },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }
 }
@@ -96,6 +127,24 @@ export async function updateComplianceEvidence(
     .eq('id', requirementId)
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'update_compliance_evidence',
+    user_name: user.email ?? 'Unknown',
+    details: {
+      entity_type: 'compliance_requirement',
+      entity_id: requirementId,
+      opportunity_id: opportunityId,
+    },
+  })
+
+  await supabase.from('audit_logs').insert({
+    action: 'update_compliance_evidence',
+    user_id: user.id,
+    entity_type: 'compliance_requirement',
+    entity_id: requirementId,
+    details: { opportunity_id: opportunityId },
+  })
 
   revalidatePath(`/pipeline/${opportunityId}/compliance`)
   return { success: true }

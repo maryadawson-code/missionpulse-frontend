@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { addToast } from '@/components/ui/Toast'
 import {
   recordGateDecision,
@@ -65,11 +66,11 @@ interface LaunchControlProps {
 function decisionIcon(decision: string) {
   switch (decision) {
     case 'go':
-      return <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+      return <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
     case 'no_go':
-      return <XCircle className="h-4 w-4 text-red-400" />
+      return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
     case 'conditional':
-      return <AlertTriangle className="h-4 w-4 text-amber-400" />
+      return <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
     default:
       return <Clock className="h-4 w-4 text-muted-foreground" />
   }
@@ -78,11 +79,11 @@ function decisionIcon(decision: string) {
 function decisionColor(decision: string) {
   switch (decision) {
     case 'go':
-      return 'bg-emerald-500/20 text-emerald-300'
+      return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
     case 'no_go':
-      return 'bg-red-500/20 text-red-300'
+      return 'bg-red-500/20 text-red-700 dark:text-red-300'
     case 'conditional':
-      return 'bg-amber-500/20 text-amber-300'
+      return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
     default:
       return 'bg-gray-500/20 text-gray-300'
   }
@@ -116,11 +117,6 @@ export function LaunchControl({
   docCount,
   gateAuthority,
 }: LaunchControlProps) {
-  const [isPending, startTransition] = useTransition()
-  const [showGateForm, setShowGateForm] = useState(false)
-  const [confirmSubmit, setConfirmSubmit] = useState(false)
-  const [binderResult, setBinderResult] = useState<{ volume: string; title: string; wordCount: number }[] | null>(null)
-
   // Filter gates by user's gate authority
   const approvedGates = gateAuthority
     ? SHIPLEY_GATES.filter((g) => {
@@ -129,6 +125,16 @@ export function LaunchControl({
       })
     : SHIPLEY_GATES
   const canApproveAny = approvedGates.length > 0
+
+  const [isPending, startTransition] = useTransition()
+  const [showGateForm, setShowGateForm] = useState(false)
+  const [confirmSubmit, setConfirmSubmit] = useState(false)
+  const [binderResult, setBinderResult] = useState<{ volume: string; title: string; wordCount: number }[] | null>(null)
+  const [selectedGateNumber, setSelectedGateNumber] = useState(approvedGates[0]?.number ?? 1)
+  const [pendingDecision, setPendingDecision] = useState<string | null>(null)
+  const [pendingConditions, setPendingConditions] = useState('')
+  const [showConfirmGate, setShowConfirmGate] = useState(false)
+  const [expandedGate, setExpandedGate] = useState<number | null>(null)
 
   const daysUntilDue = opportunity.dueDate
     ? Math.ceil(
@@ -144,17 +150,32 @@ export function LaunchControl({
     complianceStats.percentage < 100 ||
     (daysUntilDue !== null && daysUntilDue <= 2)
 
-  function handleGateDecision(formData: FormData) {
+  const selectedGate = SHIPLEY_GATES.find((g) => g.number === selectedGateNumber)
+
+  function handleGateFormSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    setPendingDecision(formData.get('decision') as string)
+    setPendingConditions(formData.get('conditions') as string ?? '')
+    setShowConfirmGate(true)
+  }
+
+  async function confirmGateDecision(): Promise<{ success: boolean; error?: string }> {
+    const formData = new FormData()
     formData.set('opportunityId', opportunity.id)
-    startTransition(async () => {
-      const result = await recordGateDecision(formData)
-      if (result.success) {
-        addToast('success', 'Gate decision recorded')
-        setShowGateForm(false)
-      } else {
-        addToast('error', result.error ?? 'Failed to record decision')
-      }
-    })
+    formData.set('gateNumber', String(selectedGateNumber))
+    formData.set('gateName', selectedGate?.name ?? '')
+    formData.set('decision', pendingDecision ?? 'go')
+    formData.set('conditions', pendingConditions)
+
+    const result = await recordGateDecision(formData)
+    if (result.success) {
+      setShowGateForm(false)
+      setShowConfirmGate(false)
+      setPendingDecision(null)
+      setPendingConditions('')
+    }
+    return result
   }
 
   function handleMarkSubmitted() {
@@ -175,13 +196,13 @@ export function LaunchControl({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-[#00E5FA]" />
+            <Shield className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Compliance
             </p>
           </div>
           <p
-            className={`mt-2 text-2xl font-bold ${complianceStats.percentage >= 100 ? 'text-emerald-400' : complianceStats.percentage >= 80 ? 'text-amber-400' : 'text-red-400'}`}
+            className={`mt-2 text-2xl font-bold ${complianceStats.percentage >= 100 ? 'text-emerald-600 dark:text-emerald-400' : complianceStats.percentage >= 80 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}
           >
             {complianceStats.percentage}%
           </p>
@@ -192,13 +213,13 @@ export function LaunchControl({
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Rocket className="h-4 w-4 text-[#00E5FA]" />
+            <Rocket className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               pWin
             </p>
           </div>
           <p
-            className={`mt-2 text-2xl font-bold ${opportunity.pwin >= 70 ? 'text-emerald-400' : opportunity.pwin >= 40 ? 'text-amber-400' : 'text-red-400'}`}
+            className={`mt-2 text-2xl font-bold ${opportunity.pwin >= 70 ? 'text-emerald-600 dark:text-emerald-400' : opportunity.pwin >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}
           >
             {opportunity.pwin}%
           </p>
@@ -209,13 +230,13 @@ export function LaunchControl({
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-[#00E5FA]" />
+            <Clock className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Deadline
             </p>
           </div>
           <p
-            className={`mt-2 text-2xl font-bold ${daysUntilDue === null ? 'text-muted-foreground' : daysUntilDue <= 2 ? 'text-red-400' : daysUntilDue <= 7 ? 'text-amber-400' : 'text-foreground'}`}
+            className={`mt-2 text-2xl font-bold ${daysUntilDue === null ? 'text-muted-foreground' : daysUntilDue <= 2 ? 'text-red-600 dark:text-red-400' : daysUntilDue <= 7 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}
           >
             {daysUntilDue !== null ? `${daysUntilDue}d` : '—'}
           </p>
@@ -224,7 +245,7 @@ export function LaunchControl({
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-[#00E5FA]" />
+            <Users className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Team
             </p>
@@ -237,7 +258,7 @@ export function LaunchControl({
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-[#00E5FA]" />
+            <FileText className="h-4 w-4 text-primary" />
             <p className="text-xs font-medium uppercase text-muted-foreground">
               Documents
             </p>
@@ -251,16 +272,16 @@ export function LaunchControl({
 
       {/* Warnings */}
       {hasWarnings && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-4 space-y-2">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2">
           {complianceStats.percentage < 100 && (
-            <div className="flex items-center gap-2 text-sm text-amber-300">
+            <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
               <AlertTriangle className="h-4 w-4" />
               {complianceStats.total - complianceStats.verified} compliance
               requirements not yet verified
             </div>
           )}
           {daysUntilDue !== null && daysUntilDue <= 2 && (
-            <div className="flex items-center gap-2 text-sm text-red-300">
+            <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
               <AlertTriangle className="h-4 w-4" />
               Deadline in {daysUntilDue} day{daysUntilDue !== 1 ? 's' : ''}!
             </div>
@@ -287,7 +308,7 @@ export function LaunchControl({
 
         {showGateForm && canApproveAny && (
           <form
-            action={handleGateDecision}
+            onSubmit={handleGateFormSubmit}
             className="border-b border-border px-5 py-4 space-y-3"
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -297,6 +318,8 @@ export function LaunchControl({
                 </label>
                 <select
                   name="gateNumber"
+                  value={selectedGateNumber}
+                  onChange={(e) => setSelectedGateNumber(Number(e.target.value))}
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
                 >
                   {approvedGates.map((g) => (
@@ -318,11 +341,6 @@ export function LaunchControl({
                   <option value="conditional">Conditional Go</option>
                   <option value="no_go">No Go</option>
                 </select>
-                <input
-                  type="hidden"
-                  name="gateName"
-                  value=""
-                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
@@ -343,49 +361,104 @@ export function LaunchControl({
           </form>
         )}
 
+        <ConfirmModal
+          open={showConfirmGate}
+          onOpenChange={setShowConfirmGate}
+          title={`Confirm Gate ${selectedGateNumber} Decision`}
+          description={`You are recording a "${(pendingDecision ?? 'go').replace(/_/g, ' ').toUpperCase()}" decision for Gate ${selectedGateNumber}: ${selectedGate?.name ?? ''}. This action will be logged to the audit trail.`}
+          confirmLabel={`Record ${(pendingDecision ?? 'go').replace(/_/g, ' ')}`}
+          destructive={pendingDecision === 'no_go'}
+          onConfirm={confirmGateDecision}
+          successMessage="Gate decision recorded"
+        />
+
         <div className="px-5 py-4 space-y-3">
           {SHIPLEY_GATES.map((gate) => {
-            const decision = gateDecisions.find(
+            const gateHistory = gateDecisions.filter(
               (d) => d.gateNumber === gate.number
             )
+            const latestDecision = gateHistory[gateHistory.length - 1]
+            const isExpanded = expandedGate === gate.number
             return (
-              <div
-                key={gate.number}
-                className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  {decision ? (
-                    decisionIcon(decision.decision)
-                  ) : (
-                    <div className="h-4 w-4 rounded-full border border-border" />
-                  )}
-                  <div>
-                    <p className="text-sm text-foreground">
-                      Gate {gate.number}: {gate.name}
-                    </p>
-                    {decision?.conditions && decision.conditions.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Conditions: {decision.conditions.join('; ')}
+              <div key={gate.number} className="rounded-lg border border-border">
+                <button
+                  type="button"
+                  onClick={() => setExpandedGate(isExpanded ? null : gate.number)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    {latestDecision ? (
+                      decisionIcon(latestDecision.decision)
+                    ) : (
+                      <div className="h-4 w-4 rounded-full border border-border" />
+                    )}
+                    <div>
+                      <p className="text-sm text-foreground">
+                        Gate {gate.number}: {gate.name}
                       </p>
+                      {latestDecision?.conditions && latestDecision.conditions.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Conditions: {latestDecision.conditions.join('; ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {latestDecision && (
+                      <>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${decisionColor(latestDecision.decision)}`}
+                        >
+                          {latestDecision.decision.replace(/_/g, ' ').toUpperCase()}
+                        </span>
+                        {latestDecision.pwinAtGate != null && (
+                          <span className="text-xs font-mono text-muted-foreground">
+                            pWin: {latestDecision.pwinAtGate}%
+                          </span>
+                        )}
+                      </>
+                    )}
+                    {gateHistory.length > 1 && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {gateHistory.length} decisions
+                      </span>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {decision && (
-                    <>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${decisionColor(decision.decision)}`}
+                </button>
+
+                {/* Expandable decision history */}
+                {isExpanded && gateHistory.length > 0 && (
+                  <div className="border-t border-border px-4 py-2 space-y-2">
+                    {gateHistory.map((d) => (
+                      <div
+                        key={d.id}
+                        className="flex items-center justify-between text-xs"
                       >
-                        {decision.decision.replace(/_/g, ' ').toUpperCase()}
-                      </span>
-                      {decision.pwinAtGate != null && (
-                        <span className="text-xs font-mono text-muted-foreground">
-                          pWin: {decision.pwinAtGate}%
+                        <div className="flex items-center gap-2">
+                          {decisionIcon(d.decision)}
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${decisionColor(d.decision)}`}
+                          >
+                            {d.decision.replace(/_/g, ' ').toUpperCase()}
+                          </span>
+                          {d.conditions.length > 0 && (
+                            <span className="text-muted-foreground">
+                              {d.conditions.join('; ')}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-muted-foreground">
+                          {new Date(d.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
                         </span>
-                      )}
-                    </>
-                  )}
-                </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -425,9 +498,9 @@ export function LaunchControl({
         <div className="px-5 py-4 space-y-2">
           <div className="flex items-center gap-2">
             {complianceStats.percentage >= 100 ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <XCircle className="h-4 w-4 text-red-400" />
+              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             )}
             <span className="text-sm text-foreground">
               All SHALLs mapped to sections
@@ -438,9 +511,9 @@ export function LaunchControl({
           </div>
           <div className="flex items-center gap-2">
             {sectionStats && sectionStats.total > 0 && sectionStats.final === sectionStats.total ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <XCircle className="h-4 w-4 text-red-400" />
+              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             )}
             <span className="text-sm text-foreground">
               All sections in &quot;final&quot; status
@@ -451,9 +524,9 @@ export function LaunchControl({
           </div>
           <div className="flex items-center gap-2">
             {gateDecisions.some((g) => g.gateNumber === 6 && g.decision === 'go') ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <XCircle className="h-4 w-4 text-red-400" />
+              <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             )}
             <span className="text-sm text-foreground">
               Gate 6 (Submit/No-Submit) approved
@@ -465,8 +538,8 @@ export function LaunchControl({
         {binderResult && (
           <div className="border-t border-border px-5 py-4">
             <div className="flex items-center gap-2 mb-3">
-              <Download className="h-4 w-4 text-emerald-400" />
-              <span className="text-sm font-medium text-emerald-300">
+              <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                 Binder Assembled Successfully
               </span>
             </div>

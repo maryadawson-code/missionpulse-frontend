@@ -1,12 +1,28 @@
 import { redirect } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
-import { TokenUsageCharts } from '@/components/features/admin/TokenUsageCharts'
 import { TokenGauge } from '@/components/features/admin/TokenGauge'
 import { BurnRateProjection } from '@/components/features/admin/BurnRateProjection'
+import { AgentSatisfactionGrid } from '@/components/features/admin/AgentSatisfactionGrid'
 import { getCompanySubscription } from '@/lib/billing/plans'
 import { getTokenBalance } from '@/lib/billing/ledger'
 import { getBurnRateProjection } from '@/lib/billing/burn-rate'
+import { getAgentSatisfactionScores } from '@/lib/ai/feedback-context'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const TokenUsageCharts = dynamic(
+  () => import('@/components/features/admin/TokenUsageCharts').then((m) => m.TokenUsageCharts),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-4">
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    ),
+  }
+)
 
 const MONTHLY_BUDGET = Number(process.env.AI_MONTHLY_BUDGET_USD ?? '500')
 
@@ -44,14 +60,13 @@ export default async function AIUsagePage() {
     .order('created_at', { ascending: false })
     .limit(500)
 
-  // Plan-aware data (if company has a subscription)
-  const subscription = companyId
-    ? await getCompanySubscription(companyId)
-    : null
-  const balance = companyId ? await getTokenBalance(companyId) : null
-  const burnRate = companyId
-    ? await getBurnRateProjection(companyId)
-    : null
+  // Plan-aware data + satisfaction scores (parallelized)
+  const [subscription, balance, burnRate, satisfactionScores] = await Promise.all([
+    companyId ? getCompanySubscription(companyId) : null,
+    companyId ? getTokenBalance(companyId) : null,
+    companyId ? getBurnRateProjection(companyId) : null,
+    companyId ? getAgentSatisfactionScores(companyId) : [],
+  ])
 
   const planName = subscription?.plan?.name ?? 'No Plan'
   const usagePercent = balance?.usage_percent ?? 0
@@ -59,8 +74,8 @@ export default async function AIUsagePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">AI Usage Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">AI Usage Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Token consumption, budget monitoring, and burn rate projection.
         </p>
       </div>
@@ -86,6 +101,8 @@ export default async function AIUsagePage() {
           )}
         </div>
       )}
+
+      <AgentSatisfactionGrid scores={satisfactionScores ?? []} />
 
       <TokenUsageCharts
         entries={entries ?? []}

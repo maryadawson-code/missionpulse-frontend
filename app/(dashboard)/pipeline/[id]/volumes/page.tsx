@@ -7,13 +7,13 @@ function statusStyle(status: string | null): string {
   switch (status?.toLowerCase()) {
     case 'final':
     case 'submitted':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'review':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'draft':
-      return 'bg-blue-500/15 text-blue-300'
+      return 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -86,37 +86,37 @@ export default async function VolumesPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">Proposal Volumes</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Proposal Volumes</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Track page counts, compliance, and status for each volume of {opp.title}.
         </p>
       </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Volumes</p>
-          <p className="mt-1 text-lg font-bold text-white">{items.length}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Volumes</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{items.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Pages</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Pages</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {totalPages}
             {totalLimit > 0 && (
-              <span className="text-sm font-normal text-gray-500">
+              <span className="text-sm font-normal text-muted-foreground">
                 {' '}
                 / {totalLimit}
               </span>
             )}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Avg Compliance</p>
-          <p className="mt-1 text-lg font-bold text-white">{avgCompliance}%</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Avg Compliance</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{avgCompliance}%</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Page Usage</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Page Usage</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {totalLimit > 0
               ? `${Math.round((totalPages / totalLimit) * 100)}%`
               : '—'}
@@ -152,12 +152,12 @@ export default async function VolumesPage({
             return (
               <div
                 key={vol.id}
-                className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-3"
+                className="rounded-xl border border-border bg-card/50 p-5 space-y-3"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-white">
+                      <h3 className="text-sm font-semibold text-foreground">
                         Volume {vol.volume_number}: {vol.volume_name}
                       </h3>
                       {vol.status && (
@@ -168,7 +168,7 @@ export default async function VolumesPage({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 mt-1 text-[10px] text-gray-500">
+                    <div className="flex items-center gap-4 mt-1 text-[10px] text-muted-foreground">
                       {vol.owner_id && ownerMap[vol.owner_id] && (
                         <span>Owner: {ownerMap[vol.owner_id]}</span>
                       )}
@@ -187,10 +187,10 @@ export default async function VolumesPage({
                     <div
                       className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${
                         vol.compliance_score >= 80
-                          ? 'bg-emerald-500/15 text-emerald-300'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                           : vol.compliance_score >= 50
-                            ? 'bg-amber-500/15 text-amber-300'
-                            : 'bg-red-500/15 text-red-300'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                            : 'bg-red-500/15 text-red-700 dark:text-red-300'
                       }`}
                     >
                       {Math.round(vol.compliance_score)}%
@@ -200,17 +200,17 @@ export default async function VolumesPage({
 
                 {/* Page Progress Bar */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-gray-400">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>Page Usage</span>
                     <span>
                       {vol.current_pages ?? 0} / {vol.page_limit ?? '—'} pages
                       {vol.page_limit && vol.page_limit > 0 && (
-                        <span className="ml-1 text-gray-500">({pct}%)</span>
+                        <span className="ml-1 text-muted-foreground">({pct}%)</span>
                       )}
                     </span>
                   </div>
                   {vol.page_limit && vol.page_limit > 0 && (
-                    <div className="h-2 w-full rounded-full bg-gray-800">
+                    <div className="h-2 w-full rounded-full bg-muted">
                       <div
                         className={`h-2 rounded-full ${barColor} transition-all`}
                         style={{ width: `${pct}%` }}

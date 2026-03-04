@@ -3,6 +3,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createLogger } from '@/lib/logging/logger'
+import { sanitizePlainText } from '@/lib/security/sanitize'
+import { updateNotificationPreferencesSchema } from '@/lib/api/schemas'
+
+const log = createLogger('settings')
 
 interface ActionResult {
   success: boolean
@@ -29,8 +34,8 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const { error } = await supabase
     .from('profiles')
     .update({
-      full_name: fullName?.trim() || null,
-      company: company?.trim() || null,
+      full_name: fullName ? sanitizePlainText(fullName.trim()) : null,
+      company: company ? sanitizePlainText(company.trim()) : null,
       phone: phone?.trim() || null,
       avatar_url: avatarUrl?.trim() || null,
       updated_at: new Date().toISOString(),
@@ -38,7 +43,7 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     .eq('id', user.id)
 
   if (error) {
-    console.error('[settings:profile]', error.message)
+    log.error('Profile update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -51,7 +56,7 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
   })
 
   revalidatePath('/settings')
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -71,7 +76,7 @@ export async function updatePassword(
   const { error } = await supabase.auth.updateUser({ password })
 
   if (error) {
-    console.error('[settings:password]', error.message)
+    log.error('Password update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -89,6 +94,12 @@ export async function updateNotificationPreferences(
     push_enabled: boolean
   }[]
 ): Promise<ActionResult> {
+  // Validate inputs
+  const parsed = updateNotificationPreferencesSchema.safeParse(preferences)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
 
   const {
@@ -111,7 +122,7 @@ export async function updateNotificationPreferences(
       )
 
     if (error) {
-      console.error('[settings:notif-prefs]', error.message)
+      log.error('Notification prefs update failed', { error: error.message })
       return { success: false, error: error.message }
     }
   }

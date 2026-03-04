@@ -202,8 +202,15 @@ export function DataTable<TData, TValue>({
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                {headerGroup.headers.map((header) => {
+                  const sorted = header.column.getIsSorted()
+                  const ariaSort = sorted === 'asc'
+                    ? 'ascending' as const
+                    : sorted === 'desc'
+                      ? 'descending' as const
+                      : undefined
+                  return (
+                  <TableHead key={header.id} aria-sort={ariaSort} scope="col">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -211,7 +218,8 @@ export function DataTable<TData, TValue>({
                           header.getContext()
                         )}
                   </TableHead>
-                ))}
+                  )
+                })}
               </TableRow>
             ))}
           </TableHeader>

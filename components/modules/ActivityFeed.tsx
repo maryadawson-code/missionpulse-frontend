@@ -48,7 +48,7 @@ interface ActivityFeedProps {
 export function ActivityFeed({ items }: ActivityFeedProps) {
   if (items.length === 0) {
     return (
-      <p className="py-4 text-center text-sm text-gray-500">
+      <p className="py-4 text-center text-sm text-muted-foreground">
         No recent activity
       </p>
     )
@@ -59,17 +59,17 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
       {items.map((item) => (
         <div
           key={item.id}
-          className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-800/50"
+          className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50"
         >
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#00E5FA]/10 text-xs font-semibold text-[#00E5FA]">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
             {getInitials(item.user_name)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-gray-200">
+            <p className="text-sm text-foreground">
               <span className="font-medium">{item.user_name ?? 'Unknown'}</span>{' '}
-              <span className="text-gray-400">{formatAction(item.action)}</span>
+              <span className="text-muted-foreground">{formatAction(item.action)}</span>
             </p>
-            <p className="text-xs text-gray-500">{timeAgo(item.timestamp)}</p>
+            <p className="text-xs text-muted-foreground">{timeAgo(item.timestamp)}</p>
           </div>
         </div>
       ))}

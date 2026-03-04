@@ -105,7 +105,7 @@ export default async function DocumentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Documents</h1>
+        <h1 className="text-2xl font-bold text-foreground">Documents</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Company-wide document library. Templates, past performance, capabilities, and certifications.
         </p>

@@ -125,6 +125,17 @@ export async function updateTeamMemberRole(
 
   if (error) return { success: false, error: error.message }
 
+  await supabase.from('activity_log').insert({
+    action: 'update_team_member_role',
+    user_name: user.email ?? 'Unknown',
+    details: {
+      entity_type: 'opportunity_assignment',
+      entity_id: assignmentId,
+      opportunity_id: opportunityId,
+      new_role: role,
+    },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/team`)
   revalidatePath(`/war-room/${opportunityId}`)
   return { success: true }

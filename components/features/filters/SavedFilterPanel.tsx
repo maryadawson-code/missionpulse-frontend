@@ -83,7 +83,7 @@ export function SavedFilterPanel({
               </button>
               <button
                 onClick={() => handleDelete(f.id)}
-                className="hidden rounded p-0.5 text-muted-foreground hover:text-red-400 group-hover:inline-flex"
+                className="hidden rounded p-0.5 text-muted-foreground hover:text-red-600 dark:text-red-400 group-hover:inline-flex"
               >
                 <Trash2 className="h-2.5 w-2.5" />
               </button>

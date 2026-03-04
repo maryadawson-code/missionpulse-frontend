@@ -44,8 +44,8 @@ export function WordOnlineButton({
       <button
         disabled
         className={cn(
-          'inline-flex items-center gap-2 rounded-md bg-gray-700 px-3 py-1.5 text-sm',
-          'text-gray-400 cursor-not-allowed opacity-60',
+          'inline-flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-sm',
+          'text-muted-foreground cursor-not-allowed opacity-60',
           className,
         )}
       >

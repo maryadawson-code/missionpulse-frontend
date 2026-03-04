@@ -8,16 +8,16 @@ function statusStyle(status: string | null): string {
   switch (status?.toLowerCase()) {
     case 'final':
     case 'approved':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'review':
     case 'in_review':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'draft':
-      return 'bg-blue-500/15 text-blue-300'
+      return 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
     case 'revision':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -93,30 +93,30 @@ export default async function SectionsHubPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">Proposal Sections</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Proposal Sections</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           All proposal sections for {opp.title}. Click to edit.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Sections</p>
-          <p className="mt-1 text-lg font-bold text-white">{items.length}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Sections</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{items.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Completed</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Completed</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">
             {completed}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Current Pages</p>
-          <p className="mt-1 text-lg font-bold text-white">{totalPages}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Current Pages</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{totalPages}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Page Limit</p>
-          <p className="mt-1 text-lg font-bold text-white">{totalPageLimit}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Page Limit</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{totalPageLimit}</p>
         </div>
       </div>
 
@@ -134,21 +134,21 @@ export default async function SectionsHubPage({
             )
             return (
               <div key={vol} className="space-y-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {vol} ({volSections.length})
                 </h2>
-                <div className="divide-y divide-gray-800 rounded-xl border border-gray-800 bg-gray-900/50">
+                <div className="divide-y divide-border rounded-xl border border-border bg-card/50">
                   {volSections.map((sec) => (
                     <Link
                       key={sec.id}
                       href={`/pipeline/${id}/sections/${sec.id}`}
-                      className="flex items-center justify-between px-4 py-3 hover:bg-gray-800/30 transition-colors group"
+                      className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors group"
                     >
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+                        <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
                           {sec.section_title}
                         </p>
-                        <div className="flex items-center gap-3 mt-0.5 text-[10px] text-gray-500">
+                        <div className="flex items-center gap-3 mt-0.5 text-[10px] text-muted-foreground">
                           {sec.writer_id && writerMap[sec.writer_id] && (
                             <span>{writerMap[sec.writer_id]}</span>
                           )}

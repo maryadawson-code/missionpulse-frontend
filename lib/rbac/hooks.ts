@@ -13,6 +13,7 @@ import {
   getVisibleNav,
   getRoleConfig,
   isInternalRole,
+  getTierVisibleModules,
 } from './config'
 
 // ---------------------------------------------------------------------------
@@ -150,4 +151,11 @@ export function useVisibleNav(): UseVisibleNavReturn {
     ...getVisibleNav(dbRole ?? "partner"),
     loading: false,
   }
+}
+
+// ---------------------------------------------------------------------------
+// useTierModules — returns visible modules for the current subscription tier
+// ---------------------------------------------------------------------------
+export function useTierModules(tier: string = 'starter'): ModuleId[] {
+  return getTierVisibleModules(tier)
 }

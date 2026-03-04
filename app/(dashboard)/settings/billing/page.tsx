@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { resolveRole } from '@/lib/rbac/config'
 import { getPlans, getCompanySubscription } from '@/lib/billing/plans'
 import { getTokenBalance } from '@/lib/billing/ledger'
 import { BillingDashboard } from './BillingDashboard'
@@ -19,12 +19,11 @@ export default async function BillingPage() {
     .single()
 
   const role = resolveRole(profile?.role)
-  if (!hasPermission(role, 'admin', 'canView')) {
-    redirect('/dashboard')
-  }
+
+  // All authenticated users can VIEW billing — executives/admins can CHANGE plan
+  const isExecutive = ['executive', 'operations', 'admin', 'CEO', 'COO'].includes(role)
 
   const companyId = profile?.company_id
-  const isExecutive = ['executive', 'admin', 'CEO', 'COO'].includes(role)
 
   const plans = await getPlans()
   const subscription = companyId
@@ -35,9 +34,11 @@ export default async function BillingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Billing & Subscription</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Manage your plan, purchase tokens, and view billing history.
+        <h1 className="text-2xl font-bold text-foreground">Billing & Subscription</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isExecutive
+            ? 'Manage your plan, purchase tokens, and view billing history.'
+            : 'View your plan and token usage.'}
         </p>
       </div>
 

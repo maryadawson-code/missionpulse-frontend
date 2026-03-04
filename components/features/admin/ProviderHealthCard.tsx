@@ -47,15 +47,15 @@ export function ProviderHealthCard() {
   }, [refresh])
 
   return (
-    <div className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-200">
+        <h3 className="text-sm font-semibold text-foreground">
           AI Provider Health
         </h3>
         <button
           onClick={refresh}
           disabled={loading}
-          className="text-xs text-[#00E5FA] hover:text-[#00E5FA]/80 disabled:opacity-50"
+          className="text-xs text-primary hover:text-primary/80 disabled:opacity-50"
         >
           {loading ? 'Checking...' : 'Refresh'}
         </button>
@@ -65,15 +65,15 @@ export function ProviderHealthCard() {
         {providers.map((p) => (
           <div
             key={p.id}
-            className="flex items-center justify-between rounded-md bg-[#00050F]/50 px-3 py-2"
+            className="flex items-center justify-between rounded-md bg-background/50 px-3 py-2"
           >
             <div className="flex items-center gap-2">
               <span
                 className={`h-2 w-2 rounded-full ${statusColor(p.status)}`}
               />
-              <span className="text-sm text-gray-300">{p.name}</span>
+              <span className="text-sm text-muted-foreground">{p.name}</span>
               {p.fedRamp && (
-                <span className="rounded bg-green-900/30 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
+                <span className="rounded bg-green-900/30 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
                   FedRAMP
                 </span>
               )}
@@ -82,30 +82,30 @@ export function ProviderHealthCard() {
             <div className="flex items-center gap-3">
               {p.configured ? (
                 <>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     {p.latencyMs > 0 ? `${p.latencyMs}ms` : '—'}
                   </span>
                   <span
                     className={`text-xs font-medium ${
                       p.status === 'healthy'
-                        ? 'text-green-400'
+                        ? 'text-green-600 dark:text-green-400'
                         : p.status === 'degraded'
-                          ? 'text-yellow-400'
-                          : 'text-red-400'
+                          ? 'text-yellow-600 dark:text-yellow-400'
+                          : 'text-red-600 dark:text-red-400'
                     }`}
                   >
                     {statusLabel(p.status)}
                   </span>
                 </>
               ) : (
-                <span className="text-xs text-gray-600">Not configured</span>
+                <span className="text-xs text-muted-foreground">Not configured</span>
               )}
             </div>
           </div>
         ))}
 
         {providers.length === 0 && !loading && (
-          <p className="text-center text-xs text-gray-500">
+          <p className="text-center text-xs text-muted-foreground">
             No providers registered
           </p>
         )}

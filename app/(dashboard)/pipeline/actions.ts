@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/types'
 import type { Database } from '@/lib/supabase/database.types'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
 
 type OpportunityInsert = Database['public']['Tables']['opportunities']['Insert']
 type OpportunityUpdate = Database['public']['Tables']['opportunities']['Update']
@@ -65,7 +66,16 @@ export async function actionCreateOpportunity(
     return { success: false, error: error.message }
   }
 
-  // Log activity (activity_log table — schema: action, user_name, user_role, details, ip_address)
+  // Immutable audit log (AU-9)
+  await supabase.from('audit_logs').insert({
+    action: 'CREATE',
+    entity_type: 'opportunity',
+    entity_id: data.id,
+    user_id: user.id,
+    details: { title: insertData.title },
+  })
+
+  // Activity log (user-visible)
   const { data: actorProfile } = await supabase
     .from('profiles')
     .select('full_name, role')
@@ -79,7 +89,10 @@ export async function actionCreateOpportunity(
     details: { entity_type: 'opportunity', entity_id: data.id, title: insertData.title },
   })
 
-  revalidatePath('/')
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('create_opportunity')
+
+  revalidatePath('/dashboard')
   revalidatePath('/pipeline')
   redirect(`/pipeline/${data.id}`)
 }
@@ -130,7 +143,16 @@ export async function actionUpdateOpportunity(
     return { success: false, error: error.message }
   }
 
-  // Log activity
+  // Immutable audit log (AU-9)
+  await supabase.from('audit_logs').insert({
+    action: 'UPDATE',
+    entity_type: 'opportunity',
+    entity_id: opportunityId,
+    user_id: user.id,
+    details: { title: updateData.title },
+  })
+
+  // Activity log (user-visible)
   const { data: actorProfile } = await supabase
     .from('profiles')
     .select('full_name, role')
@@ -144,7 +166,7 @@ export async function actionUpdateOpportunity(
     details: { entity_type: 'opportunity', entity_id: opportunityId, title: updateData.title },
   })
 
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   revalidatePath('/pipeline')
   revalidatePath(`/pipeline/${opportunityId}`)
 
@@ -181,7 +203,16 @@ export async function actionDeleteOpportunity(
     return { success: false, error: error.message }
   }
 
-  // Log activity
+  // Immutable audit log (AU-9)
+  await supabase.from('audit_logs').insert({
+    action: 'DELETE',
+    entity_type: 'opportunity',
+    entity_id: opportunityId,
+    user_id: user.id,
+    details: { title: existing?.title ?? 'Unknown' },
+  })
+
+  // Activity log (user-visible)
   const { data: actorProfile } = await supabase
     .from('profiles')
     .select('full_name, role')
@@ -195,7 +226,7 @@ export async function actionDeleteOpportunity(
     details: { entity_type: 'opportunity', entity_id: opportunityId, title: existing?.title ?? 'Unknown' },
   })
 
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   revalidatePath('/pipeline')
   redirect('/pipeline')
 }
@@ -256,7 +287,16 @@ export async function actionCreateOpportunityTyped(
     return { success: false, error: error.message }
   }
 
-  // Log activity
+  // Immutable audit log (AU-9)
+  await supabase.from('audit_logs').insert({
+    action: 'CREATE',
+    entity_type: 'opportunity',
+    entity_id: inserted.id,
+    user_id: user.id,
+    details: { title: data.title },
+  })
+
+  // Activity log (user-visible)
   const { data: actorProfile } = await supabase
     .from('profiles')
     .select('full_name, role')
@@ -270,7 +310,10 @@ export async function actionCreateOpportunityTyped(
     details: { entity_type: 'opportunity', entity_id: inserted.id, title: data.title },
   })
 
-  revalidatePath('/')
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('create_opportunity')
+
+  revalidatePath('/dashboard')
   revalidatePath('/pipeline')
 
   return { success: true, data: { id: inserted.id } }

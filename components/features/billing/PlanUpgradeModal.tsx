@@ -59,13 +59,13 @@ export function PlanUpgradeModal({
       <div className="relative w-full max-w-4xl rounded-2xl border border-border bg-[#0A0F1C] p-6 shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 text-gray-500 hover:text-gray-300 transition-colors"
+          className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <h2 className="text-xl font-bold text-white">Upgrade Your Plan</h2>
-        <p className="mt-1 text-sm text-gray-400">
+        <h2 className="text-xl font-bold text-foreground">Upgrade Your Plan</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           Choose a plan that fits your team&apos;s needs.
         </p>
 
@@ -75,8 +75,8 @@ export function PlanUpgradeModal({
             onClick={() => setBillingInterval('monthly')}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               billingInterval === 'monthly'
-                ? 'bg-cyan-600 text-white'
-                : 'bg-white/5 text-gray-400 hover:text-white'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-white/5 text-muted-foreground hover:text-foreground'
             }`}
           >
             Monthly
@@ -85,12 +85,12 @@ export function PlanUpgradeModal({
             onClick={() => setBillingInterval('annual')}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               billingInterval === 'annual'
-                ? 'bg-cyan-600 text-white'
-                : 'bg-white/5 text-gray-400 hover:text-white'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-white/5 text-muted-foreground hover:text-foreground'
             }`}
           >
             Annual
-            <span className="ml-1 text-[10px] text-cyan-300">Save 17%</span>
+            <span className="ml-1 text-[10px] text-primary">Save 17%</span>
           </button>
         </div>
 
@@ -107,45 +107,45 @@ export function PlanUpgradeModal({
                 key={plan.slug}
                 className={`rounded-xl border p-5 transition-colors ${
                   isCurrent
-                    ? 'border-cyan-500/50 bg-cyan-900/10'
-                    : 'border-border bg-card hover:border-cyan-700/30'
+                    ? 'border-primary/50 bg-primary/10'
+                    : 'border-border bg-card hover:border-primary/30'
                 }`}
               >
-                <h3 className="text-lg font-bold text-white">{plan.name}</h3>
+                <h3 className="text-lg font-bold text-foreground">{plan.name}</h3>
                 <div className="mt-2">
-                  <span className="text-3xl font-bold text-white">
+                  <span className="text-3xl font-bold text-foreground">
                     ${price.toFixed(0)}
                   </span>
-                  <span className="text-sm text-gray-500">/mo</span>
+                  <span className="text-sm text-muted-foreground">/mo</span>
                   {billingInterval === 'annual' && (
-                    <p className="text-xs text-cyan-400">
+                    <p className="text-xs text-primary">
                       ${plan.annual_price.toFixed(0)}/year
                     </p>
                   )}
                 </div>
 
                 <ul className="mt-4 space-y-2">
-                  <li className="flex items-center gap-2 text-sm text-gray-300">
-                    <Check className="h-4 w-4 text-cyan-400" />
+                  <li className="flex items-center gap-2 text-sm text-foreground">
+                    <Check className="h-4 w-4 text-primary" />
                     {formatTokens(plan.monthly_token_limit)} tokens/mo
                   </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-300">
-                    <Check className="h-4 w-4 text-cyan-400" />
+                  <li className="flex items-center gap-2 text-sm text-foreground">
+                    <Check className="h-4 w-4 text-primary" />
                     {plan.max_users === -1 ? 'Unlimited' : plan.max_users} users
                   </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-300">
-                    <Check className="h-4 w-4 text-cyan-400" />
+                  <li className="flex items-center gap-2 text-sm text-foreground">
+                    <Check className="h-4 w-4 text-primary" />
                     {plan.max_opportunities === -1 ? 'Unlimited' : plan.max_opportunities} opportunities
                   </li>
                   {plan.features.integrations && (
-                    <li className="flex items-center gap-2 text-sm text-gray-300">
-                      <Check className="h-4 w-4 text-cyan-400" />
+                    <li className="flex items-center gap-2 text-sm text-foreground">
+                      <Check className="h-4 w-4 text-primary" />
                       Integrations
                     </li>
                   )}
                   {plan.features.fine_tuning && (
-                    <li className="flex items-center gap-2 text-sm text-gray-300">
-                      <Check className="h-4 w-4 text-cyan-400" />
+                    <li className="flex items-center gap-2 text-sm text-foreground">
+                      <Check className="h-4 w-4 text-primary" />
                       Fine-tuning
                     </li>
                   )}
@@ -156,8 +156,8 @@ export function PlanUpgradeModal({
                   disabled={isCurrent || loading !== null}
                   className={`mt-4 w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                     isCurrent
-                      ? 'bg-white/5 text-gray-500 cursor-not-allowed'
-                      : 'bg-cyan-600 text-white hover:bg-cyan-500 disabled:opacity-50'
+                      ? 'bg-white/5 text-muted-foreground cursor-not-allowed'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
                   }`}
                 >
                   {loading === plan.slug ? (

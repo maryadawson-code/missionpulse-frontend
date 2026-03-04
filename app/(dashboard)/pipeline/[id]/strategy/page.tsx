@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { requireMFA } from '@/lib/rbac/server'
 import { CUIBanner } from '@/components/rbac/CUIBanner'
 import { CompetitorManager } from '@/components/features/blackhat/CompetitorManager'
 import { BlackHatAI } from '@/components/features/blackhat/BlackHatAI'
@@ -33,6 +34,9 @@ export default async function OpportunityStrategyPage({ params }: Props) {
   ) {
     return null
   }
+
+  // CUI module — enforce MFA (AAL2) per NIST AC-3 / CMMC
+  await requireMFA()
 
   const { data: opportunity } = await supabase
     .from('opportunities')
@@ -87,10 +91,10 @@ export default async function OpportunityStrategyPage({ params }: Props) {
         ]}
       />
       <div>
-        <h1 className="text-2xl font-bold text-white">
+        <h1 className="text-2xl font-bold text-foreground">
           Black Hat Review — {opportunity.title}
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           Competitive analysis, ghost strategies, and counter-tactics for{' '}
           {opportunity.agency ?? 'this opportunity'}.
         </p>

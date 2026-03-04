@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import {
   Link2,
   Link2Off,
@@ -12,11 +12,13 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getAuthUrl, disconnectIntegration } from '@/app/(dashboard)/integrations/actions'
 
 // ─── Types ───────────────────────────────────────────────────
 
 interface M365ConfigProps {
   isConnected: boolean
+  isAvailable: boolean
   userName: string | null
   lastSync: string | null
   errorMessage: string | null
@@ -27,12 +29,14 @@ interface M365ConfigProps {
 
 export function M365Config({
   isConnected,
+  isAvailable,
   userName,
   lastSync,
   errorMessage,
   onedriveRoot,
 }: M365ConfigProps) {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
+  const [isPending, startTransition] = useTransition()
 
   function handleTestConnection() {
     setTestStatus('testing')
@@ -41,24 +45,40 @@ export function M365Config({
     }, 1500)
   }
 
+  function handleConnect() {
+    startTransition(async () => {
+      const { url } = await getAuthUrl('m365')
+      if (!url) return
+      const popup = window.open(url, 'm365-oauth', 'width=600,height=700')
+      if (!popup) window.location.href = url
+    })
+  }
+
+  function handleDisconnect() {
+    startTransition(async () => {
+      await disconnectIntegration('m365')
+      window.location.reload()
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Connection Status */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+      <div className="rounded-xl border border-border bg-card/50 p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700">
-              <Cloud className="h-5 w-5 text-white" />
+              <Cloud className="h-5 w-5 text-foreground" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">Microsoft 365</h3>
+              <h3 className="text-sm font-semibold text-foreground">Microsoft 365</h3>
               <div className="flex items-center gap-2 mt-0.5">
                 <div
                   className={`h-2 w-2 rounded-full ${
-                    isConnected ? 'bg-emerald-400' : 'bg-gray-500'
+                    isConnected ? 'bg-emerald-400' : 'bg-muted-foreground'
                   }`}
                 />
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-muted-foreground">
                   {isConnected ? `Connected${userName ? ` as ${userName}` : ''}` : 'Not Connected'}
                 </span>
               </div>
@@ -76,29 +96,42 @@ export function M365Config({
                 {testStatus === 'testing' ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : testStatus === 'success' ? (
-                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                 ) : null}
                 Test
               </Button>
             )}
-            <Button variant={isConnected ? 'outline' : 'default'}>
-              {isConnected ? (
-                <>
-                  <Link2Off className="h-4 w-4" />
-                  Disconnect
-                </>
-              ) : (
-                <>
-                  <Link2 className="h-4 w-4" />
-                  Connect M365
-                </>
-              )}
-            </Button>
+            {isAvailable && (
+              <Button
+                variant={isConnected ? 'outline' : 'default'}
+                onClick={isConnected ? handleDisconnect : handleConnect}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isConnected ? (
+                  <>
+                    <Link2Off className="h-4 w-4" />
+                    Disconnect
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4" />
+                    Connect M365
+                  </>
+                )}
+              </Button>
+            )}
+            {!isAvailable && !isConnected && (
+              <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs text-amber-600 dark:text-amber-400">
+                Not Configured
+              </span>
+            )}
           </div>
         </div>
 
         {lastSync && (
-          <p className="text-xs text-gray-500 mt-3">
+          <p className="text-xs text-muted-foreground mt-3">
             Last synced:{' '}
             {new Date(lastSync).toLocaleString('en-US', {
               month: 'short',
@@ -110,49 +143,45 @@ export function M365Config({
         )}
 
         {errorMessage && (
-          <p className="text-xs text-red-400 mt-2">Error: {errorMessage}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
         )}
 
-        {!isConnected && (
-          <div className="mt-4 rounded-lg border border-gray-800 bg-gray-900/80 p-4">
-            <p className="text-xs text-gray-400">
-              Configure <code className="text-[#00E5FA]">M365_CLIENT_ID</code>,{' '}
-              <code className="text-[#00E5FA]">M365_CLIENT_SECRET</code>, and{' '}
-              <code className="text-[#00E5FA]">M365_TENANT_ID</code> in your
-              environment to enable Microsoft 365 integration.
-            </p>
-          </div>
+        {!isAvailable && !isConnected && (
+          <p className="text-xs text-muted-foreground mt-3">
+            Ask your workspace administrator to configure Microsoft 365 credentials in Settings.
+          </p>
         )}
+
       </div>
 
       {/* Capabilities */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="rounded-xl border border-border bg-card/50 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <FolderOpen className="h-4 w-4 text-[#00E5FA]" />
-            <h4 className="text-xs font-semibold text-white">OneDrive Storage</h4>
+            <FolderOpen className="h-4 w-4 text-primary" />
+            <h4 className="text-xs font-semibold text-foreground">OneDrive Storage</h4>
           </div>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
             Save generated documents directly to OneDrive. Auto-organized into{' '}
-            <code className="text-[#00E5FA]">{onedriveRoot}/[Opportunity]/[Volume]/</code>
+            <code className="text-primary">{onedriveRoot}/[Opportunity]/[Volume]/</code>
           </p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="rounded-xl border border-border bg-card/50 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <FileText className="h-4 w-4 text-[#00E5FA]" />
-            <h4 className="text-xs font-semibold text-white">Word Online Editing</h4>
+            <FileText className="h-4 w-4 text-primary" />
+            <h4 className="text-xs font-semibold text-foreground">Word Online Editing</h4>
           </div>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
             Open proposal volumes in Word Online for real-time collaborative editing.
             Changes sync back to MissionPulse.
           </p>
         </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+        <div className="rounded-xl border border-border bg-card/50 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Calendar className="h-4 w-4 text-[#00E5FA]" />
-            <h4 className="text-xs font-semibold text-white">Calendar Sync</h4>
+            <Calendar className="h-4 w-4 text-primary" />
+            <h4 className="text-xs font-semibold text-foreground">Calendar Sync</h4>
           </div>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
             Push gate reviews, color team sessions, and submission deadlines
             to Outlook calendar.
           </p>
@@ -161,9 +190,9 @@ export function M365Config({
 
       {/* OneDrive Folder Structure */}
       {isConnected && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h3 className="text-sm font-semibold text-white mb-3">Folder Structure</h3>
-          <div className="rounded-lg border border-gray-800 bg-gray-900/80 p-4 font-mono text-xs text-gray-400">
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Folder Structure</h3>
+          <div className="rounded-lg border border-border bg-card/80 p-4 font-mono text-xs text-muted-foreground">
             <p>{onedriveRoot}/</p>
             <p className="pl-4">├── [Opportunity Title]/</p>
             <p className="pl-8">├── Technical Volume/</p>

@@ -74,7 +74,7 @@ export default async function RequirementsPage({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-white">Extract Requirements</h1>
+        <h1 className="text-2xl font-bold text-foreground">Extract Requirements</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {opportunity.title} — {document.file_name}
         </p>

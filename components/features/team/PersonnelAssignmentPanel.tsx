@@ -24,13 +24,13 @@ interface PersonnelAssignmentPanelProps {
 function clearanceColor(status: string | null): string {
   switch (status) {
     case 'active':
-      return 'text-emerald-400'
+      return 'text-emerald-600 dark:text-emerald-400'
     case 'pending':
     case 'interim':
-      return 'text-amber-400'
+      return 'text-amber-600 dark:text-amber-400'
     case 'expired':
     case 'inactive':
-      return 'text-red-400'
+      return 'text-red-600 dark:text-red-400'
     default:
       return 'text-gray-400'
   }
@@ -39,12 +39,12 @@ function clearanceColor(status: string | null): string {
 function availabilityBadge(status: string | null): { bg: string; text: string; label: string } {
   switch (status) {
     case 'available':
-      return { bg: 'bg-emerald-500/15', text: 'text-emerald-300', label: 'Available' }
+      return { bg: 'bg-emerald-500/15', text: 'text-emerald-700 dark:text-emerald-300', label: 'Available' }
     case 'partially_available':
-      return { bg: 'bg-amber-500/15', text: 'text-amber-300', label: 'Partial' }
+      return { bg: 'bg-amber-500/15', text: 'text-amber-700 dark:text-amber-300', label: 'Partial' }
     case 'unavailable':
     case 'assigned':
-      return { bg: 'bg-red-500/15', text: 'text-red-300', label: 'Unavailable' }
+      return { bg: 'bg-red-500/15', text: 'text-red-700 dark:text-red-300', label: 'Unavailable' }
     default:
       return { bg: 'bg-gray-500/15', text: 'text-gray-300', label: status ?? 'Unknown' }
   }

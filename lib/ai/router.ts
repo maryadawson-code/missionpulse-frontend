@@ -7,6 +7,7 @@
  */
 'use server'
 
+import { createLogger } from '@/lib/logging/logger'
 import type { ClassificationLevel } from './types'
 import { AIError } from './types'
 import type {
@@ -19,6 +20,10 @@ import { getAllowedProviders } from './providers/interface'
 import { createAskSageProvider } from './providers/asksage'
 import { createAnthropicProvider } from './providers/anthropic'
 import { createOpenAIProvider } from './providers/openai'
+import {
+  getPrimaryProviderId as getConfiguredPrimary,
+  getFallbackProviderId as getConfiguredFallback,
+} from './providers/routing-config'
 
 // ─── Provider Registry ──────────────────────────────────────
 
@@ -41,23 +46,9 @@ async function getProviderById(id: ProviderId): Promise<AIProvider | null> {
   return providers.find((p) => p.id === id) ?? null
 }
 
-// ─── Environment Config ─────────────────────────────────────
-
-function getPrimaryProviderId(): ProviderId {
-  const envVal = process.env.AI_PRIMARY_PROVIDER ?? 'asksage'
-  if (['asksage', 'anthropic', 'openai'].includes(envVal)) {
-    return envVal as ProviderId
-  }
-  return 'asksage'
-}
-
-function getFallbackProviderId(): ProviderId {
-  const envVal = process.env.AI_FALLBACK_PROVIDER ?? 'anthropic'
-  if (['asksage', 'anthropic', 'openai'].includes(envVal)) {
-    return envVal as ProviderId
-  }
-  return 'anthropic'
-}
+// ─── Routing Config ─────────────────────────────────────────
+// Primary/fallback provider resolved from Redis (admin-configurable)
+// with fallback to AI_PRIMARY_PROVIDER / AI_FALLBACK_PROVIDER env vars.
 
 // ─── Routing ────────────────────────────────────────────────
 
@@ -105,20 +96,42 @@ export async function routeRequest(
     }
   }
 
-  // UNCLASSIFIED → respect env priority
-  const primaryId = getPrimaryProviderId()
-  const fallbackId = getFallbackProviderId()
+  // UNCLASSIFIED → respect configured priority
+  const primaryId = await getConfiguredPrimary()
+  const fallbackId = await getConfiguredFallback()
 
   const primary = await getProviderById(primaryId)
   const fallback = await getProviderById(fallbackId)
 
+  const log = createLogger('ai-router')
+  log.info('Route selection', {
+    primaryId,
+    fallbackId,
+    primaryConfigured: primary?.isConfigured() ?? false,
+    fallbackConfigured: fallback?.isConfigured() ?? false,
+    allowedProviders: allowed.map((p) => `${p.id}(${p.isConfigured() ? 'yes' : 'no'})`),
+  })
+
   // Use configured primary, or first available
   const selectedPrimary =
     primary?.isConfigured() ? primary : allowed[0]
-  const selectedFallback =
-    fallback?.isConfigured() && fallback.id !== selectedPrimary.id
-      ? fallback
-      : allowed.find((p) => p.id !== selectedPrimary.id) ?? null
+
+  // Only use a fallback if it's a DIFFERENT configured provider.
+  // When primary === fallback (admin config) OR when the configured fallback
+  // was promoted to primary (because original primary wasn't configured),
+  // do NOT auto-discover other providers as fallback.
+  let selectedFallback: AIProvider | null = null
+  if (primaryId !== fallbackId && selectedPrimary.id !== fallback?.id) {
+    selectedFallback =
+      fallback?.isConfigured() && fallback.id !== selectedPrimary.id
+        ? fallback
+        : null  // No auto-discovery — only use explicitly configured fallback
+  }
+
+  log.info('Route result', {
+    primary: selectedPrimary.id,
+    fallback: selectedFallback?.id ?? 'none',
+  })
 
   return {
     provider: selectedPrimary,
@@ -144,10 +157,11 @@ export async function routedQuery(
     // If no fallback or CUI (can't fall back to non-FedRAMP), re-throw
     if (!route.fallback) throw primaryErr
 
-    console.warn(
-      `[ai-router] Primary provider ${route.provider.name} failed, falling back to ${route.fallback.name}:`,
-      primaryErr instanceof Error ? primaryErr.message : primaryErr
-    )
+    createLogger('ai-router').warn('Primary provider failed, falling back', {
+      primary: route.provider.name,
+      fallback: route.fallback.name,
+      error: primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
+    })
 
     return await route.fallback.query(request)
   }
@@ -167,8 +181,8 @@ export async function getProviderStatus(): Promise<
   }>
 > {
   const providers = await getProviders()
-  const primaryId = getPrimaryProviderId()
-  const fallbackId = getFallbackProviderId()
+  const primaryId = await getConfiguredPrimary()
+  const fallbackId = await getConfiguredFallback()
 
   return providers.map((p) => ({
     id: p.id,

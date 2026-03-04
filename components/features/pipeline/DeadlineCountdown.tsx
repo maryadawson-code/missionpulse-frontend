@@ -30,21 +30,21 @@ export function DeadlineCountdown({ targetDate }: DeadlineCountdownProps) {
 
   // Color: green >7d, amber 2-7d, red <2d, pulsing red overdue
   const colorClass = overdue
-    ? 'text-red-400 animate-pulse'
+    ? 'text-red-600 dark:text-red-400 animate-pulse'
     : days >= 7
-      ? 'text-emerald-400'
+      ? 'text-emerald-600 dark:text-emerald-400'
       : days >= 2
-        ? 'text-amber-400'
-        : 'text-red-400'
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-red-600 dark:text-red-400'
 
   return (
     <div className="flex items-center gap-2">
       <div className={`flex items-baseline gap-1 font-mono text-sm font-bold ${colorClass}`}>
         {overdue && <span className="text-xs font-medium">OVERDUE</span>}
-        <span>{days}<span className="text-xs font-normal text-gray-500">d</span></span>
-        <span>{padTwo(hours)}<span className="text-xs font-normal text-gray-500">h</span></span>
-        <span>{padTwo(minutes)}<span className="text-xs font-normal text-gray-500">m</span></span>
-        <span>{padTwo(seconds)}<span className="text-xs font-normal text-gray-500">s</span></span>
+        <span>{days}<span className="text-xs font-normal text-muted-foreground">d</span></span>
+        <span>{padTwo(hours)}<span className="text-xs font-normal text-muted-foreground">h</span></span>
+        <span>{padTwo(minutes)}<span className="text-xs font-normal text-muted-foreground">m</span></span>
+        <span>{padTwo(seconds)}<span className="text-xs font-normal text-muted-foreground">s</span></span>
       </div>
     </div>
   )

@@ -13,7 +13,7 @@ const MARKING_LABELS: Record<CUIBannerProps['marking'], string> = {
 export function CUIBanner({ marking, className = '' }: CUIBannerProps) {
   return (
     <div
-      className={`rounded-md border border-amber-500/40 bg-amber-950/30 px-4 py-2 text-xs font-mono text-amber-300 ${className}`}
+      className={`rounded-md border border-amber-500/40 bg-amber-950/30 px-4 py-2 text-xs font-mono text-amber-700 dark:text-amber-300 ${className}`}
       role="alert"
       aria-label="CUI marking"
     >

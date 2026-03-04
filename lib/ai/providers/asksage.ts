@@ -7,10 +7,13 @@
 
 import { AIError } from '../types'
 import type { AIErrorCode } from '../types'
+import { classifyContent } from './classify-shared'
 import type {
   AIProvider,
   ProviderQueryRequest,
   ProviderQueryResponse,
+  ProviderClassifyRequest,
+  ProviderClassifyResponse,
 } from './interface'
 
 // ─── Config ──────────────────────────────────────────────────
@@ -143,6 +146,10 @@ export async function createAskSageProvider(): Promise<AIProvider> {
       }
 
       throw lastError ?? new AIError('UNKNOWN', 'All retries exhausted', false)
+    },
+
+    async classify(request: ProviderClassifyRequest): Promise<ProviderClassifyResponse> {
+      return classifyContent(request, 'asksage')
     },
 
     async ping() {

@@ -1,7 +1,3 @@
-'use server'
-
-import { PDFParse } from 'pdf-parse'
-
 export interface ParsedPDF {
   text: string
   pageCount: number
@@ -18,20 +14,34 @@ export async function extractPdfText(buffer: Buffer): Promise<ParsedPDF> {
     throw new Error('File exceeds maximum size of 50MB')
   }
 
-  let parser: PDFParse | null = null
+  // pdfjs-dist is externalized via serverComponentsExternalPackages in
+  // next.config.mjs so webpack keeps it as a native require() instead of
+  // bundling the browser build (which needs DOMMatrix, a browser-only API).
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise
 
   try {
-    parser = new PDFParse({ data: new Uint8Array(buffer) })
+    const pages: string[] = []
 
-    const textResult = await parser.getText()
-    const infoResult = await parser.getInfo()
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i)
+      const content = await page.getTextContent()
+      const pageText = content.items
+        .filter((item: Record<string, unknown>) => 'str' in item)
+        .map((item: Record<string, unknown>) => item.str as string)
+        .join(' ')
+      pages.push(pageText)
+    }
+
+    const meta = await doc.getMetadata().catch(() => null)
 
     return {
-      text: textResult.text,
-      pageCount: textResult.pages?.length ?? 0,
+      text: pages.join('\n'),
+      pageCount: doc.numPages,
       info: {
-        title: infoResult.info?.Title ?? undefined,
-        author: infoResult.info?.Author ?? undefined,
+        title: (meta?.info as Record<string, string>)?.Title ?? undefined,
+        author: (meta?.info as Record<string, string>)?.Author ?? undefined,
       },
     }
   } catch (err) {
@@ -41,8 +51,6 @@ export async function extractPdfText(buffer: Buffer): Promise<ParsedPDF> {
     }
     throw new Error(`Failed to parse PDF: ${message}`)
   } finally {
-    if (parser) {
-      await parser.destroy().catch(() => {})
-    }
+    await doc.destroy()
   }
 }

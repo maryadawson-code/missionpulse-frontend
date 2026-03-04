@@ -5,16 +5,23 @@
 'use server'
 
 import { AIError } from '../types'
+import { classifyContent } from './classify-shared'
 import type {
   AIProvider,
   ProviderQueryRequest,
   ProviderQueryResponse,
+  ProviderClassifyRequest,
+  ProviderClassifyResponse,
 } from './interface'
 
 // ─── Config ──────────────────────────────────────────────────
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? ''
 const OPENAI_API_URL = 'https://api.openai.com/v1'
+
+// Read the API key at call time — NOT at module load time.
+function getOpenAIKey(): string {
+  return process.env.OPENAI_API_KEY ?? ''
+}
 
 const MAX_RETRIES = 2
 const BASE_DELAY_MS = 1000
@@ -38,11 +45,11 @@ export async function createOpenAIProvider(): Promise<AIProvider> {
     isFedRAMPAuthorized: false,
 
     isConfigured() {
-      return Boolean(OPENAI_API_KEY)
+      return Boolean(getOpenAIKey())
     },
 
     async query(request: ProviderQueryRequest): Promise<ProviderQueryResponse> {
-      if (!OPENAI_API_KEY) {
+      if (!getOpenAIKey()) {
         throw new AIError(
           'AUTH_ERROR',
           'OpenAI API key not configured',
@@ -70,7 +77,7 @@ export async function createOpenAIProvider(): Promise<AIProvider> {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${OPENAI_API_KEY}`,
+              Authorization: `Bearer ${getOpenAIKey()}`,
             },
             body: JSON.stringify({
               model: request.model,
@@ -127,15 +134,19 @@ export async function createOpenAIProvider(): Promise<AIProvider> {
       throw lastError ?? new AIError('UNKNOWN', 'All retries exhausted', false)
     },
 
+    async classify(request: ProviderClassifyRequest): Promise<ProviderClassifyResponse> {
+      return classifyContent(request, 'openai')
+    },
+
     async ping() {
       const start = Date.now()
       try {
-        if (!OPENAI_API_KEY) {
+        if (!getOpenAIKey()) {
           return { ok: false, latencyMs: 0 }
         }
         const response = await fetch(`${OPENAI_API_URL}/models`, {
           method: 'GET',
-          headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+          headers: { Authorization: `Bearer ${getOpenAIKey()}` },
           signal: AbortSignal.timeout(5000),
         })
         return { ok: response.ok, latencyMs: Date.now() - start }

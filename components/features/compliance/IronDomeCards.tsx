@@ -24,10 +24,10 @@ export function IronDomeCards({
       icon: Shield,
       color:
         overallPct >= 80
-          ? 'text-emerald-400'
+          ? 'text-emerald-600 dark:text-emerald-400'
           : overallPct >= 50
-            ? 'text-amber-400'
-            : 'text-red-400',
+            ? 'text-amber-600 dark:text-amber-400'
+            : 'text-red-600 dark:text-red-400',
     },
     {
       label: 'Total Requirements',
@@ -39,19 +39,19 @@ export function IronDomeCards({
       label: 'Addressed',
       value: totalAddressed.toLocaleString(),
       icon: CheckCircle2,
-      color: 'text-emerald-400',
+      color: 'text-emerald-600 dark:text-emerald-400',
     },
     {
       label: 'Verified',
       value: totalVerified.toLocaleString(),
       icon: Activity,
-      color: 'text-blue-400',
+      color: 'text-blue-600 dark:text-blue-400',
     },
     {
       label: 'Gaps',
       value: gapCount.toLocaleString(),
       icon: AlertTriangle,
-      color: gapCount > 0 ? 'text-amber-400' : 'text-muted-foreground',
+      color: gapCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
     },
     {
       label: 'Active Pursuits',

@@ -4,7 +4,13 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { logNotification } from '@/lib/utils/notifications'
+import { tryCompleteOnboardingStep } from '@/lib/billing/onboarding-hooks'
+import { createLogger } from '@/lib/logging/logger'
+import { sanitizePlainText } from '@/lib/security/sanitize'
+import { updatePhaseSchema } from '@/lib/api/schemas'
 import type { OpportunityInsert, OpportunityUpdate } from '@/lib/types/opportunities'
+
+const log = createLogger('opportunities')
 
 interface ActionResult {
   success: boolean
@@ -27,7 +33,7 @@ export async function getOpportunities() {
     .order('updated_at', { ascending: false })
 
   if (error) {
-    console.error('[opportunities:list]', error.message)
+    log.error('List failed', { error: error.message })
     return { data: null, error: error.message }
   }
 
@@ -47,7 +53,7 @@ export async function getOpportunity(id: string) {
     .single()
 
   if (error) {
-    console.error('[opportunities:get]', error.message)
+    log.error('Get failed', { error: error.message })
     return { data: null, error: error.message }
   }
 
@@ -93,7 +99,7 @@ export async function createOpportunity(
   }
 
   const insert: OpportunityInsert = {
-    title: title.trim(),
+    title: sanitizePlainText(title.trim()),
     agency: formData.get('agency') as string | null,
     sub_agency: formData.get('sub_agency') as string | null,
     ceiling,
@@ -124,7 +130,7 @@ export async function createOpportunity(
     .single()
 
   if (error) {
-    console.error('[opportunities:create]', error.message)
+    log.error('Create failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -145,8 +151,11 @@ export async function createOpportunity(
     user_id: user.id,
   })
 
+  // Pilot onboarding hook
+  tryCompleteOnboardingStep('create_opportunity')
+
   revalidatePath('/pipeline')
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true, id: data.id }
 }
 
@@ -183,7 +192,7 @@ export async function updateOpportunity(
   const pwin = pwinRaw ? Number(pwinRaw) : 50
 
   const update: OpportunityUpdate = {
-    title: String(title).trim(),
+    title: sanitizePlainText(String(title).trim()),
     agency: formData.get('agency') as string | null,
     sub_agency: formData.get('sub_agency') as string | null,
     ceiling,
@@ -213,7 +222,7 @@ export async function updateOpportunity(
     .eq('id', id)
 
   if (error) {
-    console.error('[opportunities:update]', error.message)
+    log.error('Update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -234,7 +243,7 @@ export async function updateOpportunity(
 
   revalidatePath('/pipeline')
   revalidatePath(`/war-room/${id}`)
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true, id }
 }
 
@@ -246,6 +255,12 @@ export async function updateOpportunityPhase(
   id: string,
   phase: string
 ): Promise<ActionResult> {
+  // Validate inputs
+  const parsed = updatePhaseSchema.safeParse({ id, phase })
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
 
   const {
@@ -259,7 +274,7 @@ export async function updateOpportunityPhase(
     .eq('id', id)
 
   if (error) {
-    console.error('[opportunities:updatePhase]', error.message)
+    log.error('Phase update failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -300,7 +315,7 @@ export async function updateOpportunityPhase(
 
   revalidatePath('/pipeline')
   revalidatePath(`/war-room/${id}`)
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true, id }
 }
 
@@ -325,7 +340,7 @@ export async function deleteOpportunity(id: string): Promise<ActionResult> {
   const { error } = await supabase.from('opportunities').delete().eq('id', id)
 
   if (error) {
-    console.error('[opportunities:delete]', error.message)
+    log.error('Delete failed', { error: error.message })
     return { success: false, error: error.message }
   }
 
@@ -345,7 +360,7 @@ export async function deleteOpportunity(id: string): Promise<ActionResult> {
   })
 
   revalidatePath('/pipeline')
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -375,8 +390,8 @@ export async function updateOpportunityField(
     return { success: false, error: `Field "${field}" is not editable` }
   }
 
-  // Coerce value types
-  let dbValue: string | number | null = value.trim() || null
+  // Sanitize and coerce value types
+  let dbValue: string | number | null = sanitizePlainText(value.trim()) || null
   if ((field === 'ceiling' || field === 'pwin') && dbValue !== null) {
     const num = Number(String(dbValue).replace(/[,$]/g, ''))
     if (isNaN(num)) return { success: false, error: `${field} must be a number` }
@@ -396,6 +411,13 @@ export async function updateOpportunityField(
     entity_id: id,
     user_id: user.id,
     details: { field, new_value: dbValue },
+  })
+
+  await supabase.from('activity_log').insert({
+    action: 'updated_opportunity_field',
+    entity_type: 'opportunity',
+    entity_id: id,
+    user_id: user.id,
   })
 
   revalidatePath(`/pipeline/${id}`)

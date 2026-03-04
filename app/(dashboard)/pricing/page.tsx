@@ -77,14 +77,14 @@ export default async function PricingPage() {
     <div className="space-y-6">
       <CUIBanner marking="SP-PROPIN" />
       <div>
-        <h1 className="text-2xl font-bold text-white">Pricing</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Pricing</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Build and manage government contract pricing models, rate tables, and cost estimates.
         </p>
       </div>
 
       {(modelsError || itemsError) && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
           Failed to load pricing data: {modelsError?.message ?? itemsError?.message}
         </div>
       )}

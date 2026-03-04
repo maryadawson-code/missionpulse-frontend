@@ -162,10 +162,10 @@ export function GanttTimeline({ milestones }: GanttTimelineProps) {
           {/* Today marker */}
           {showTodayMarker && (
             <div
-              className="absolute top-0 bottom-0 w-px border-l border-dashed border-[#00E5FA]/50"
+              className="absolute top-0 bottom-0 w-px border-l border-dashed border-primary/50"
               style={{ left: `${todayPos}%` }}
             >
-              <span className="absolute -top-5 -translate-x-1/2 whitespace-nowrap rounded bg-[#00E5FA]/20 px-1.5 py-0.5 text-[9px] font-medium text-[#00E5FA]">
+              <span className="absolute -top-5 -translate-x-1/2 whitespace-nowrap rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-medium text-primary">
                 Today
               </span>
             </div>
@@ -187,7 +187,7 @@ export function GanttTimeline({ milestones }: GanttTimelineProps) {
               >
                 {/* Dot */}
                 <div
-                  className={`h-4 w-4 rounded-full border-2 border-[#00050F] transition-transform ${getMilestoneBgColor(ms.milestone_type)} ${statusOpacity(ms.status)} ${isHovered ? 'scale-150' : ''}`}
+                  className={`h-4 w-4 rounded-full border-2 border-background transition-transform ${getMilestoneBgColor(ms.milestone_type)} ${statusOpacity(ms.status)} ${isHovered ? 'scale-150' : ''}`}
                 />
 
                 {/* Label below dot */}
@@ -199,8 +199,8 @@ export function GanttTimeline({ milestones }: GanttTimelineProps) {
 
                 {/* Hover tooltip */}
                 {isHovered && original && (
-                  <div className="absolute bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-border bg-[#0A0F1A] px-4 py-3 shadow-xl">
-                    <p className="whitespace-nowrap text-sm font-medium text-white">
+                  <div className="absolute bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-border bg-card px-4 py-3 shadow-xl">
+                    <p className="whitespace-nowrap text-sm font-medium text-foreground">
                       {original.title}
                     </p>
                     <div className="mt-1.5 flex items-center gap-2">

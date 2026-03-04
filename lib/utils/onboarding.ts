@@ -51,7 +51,7 @@ export async function completeOnboarding() {
 
   if (error) return { success: false, error: error.message }
 
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -83,6 +83,6 @@ export async function resetOnboarding() {
 
   if (error) return { success: false, error: error.message }
 
-  revalidatePath('/')
+  revalidatePath('/dashboard')
   return { success: true }
 }

@@ -102,7 +102,7 @@ function statusIndicator(status: string | null) {
     case 'error':
       return 'bg-red-400'
     default:
-      return 'bg-gray-600'
+      return 'bg-muted-foreground'
   }
 }
 
@@ -137,7 +137,7 @@ export function IntegrationCards({ integrations }: IntegrationCardsProps) {
               </div>
               <div className="flex items-center gap-1.5">
                 <div
-                  className={`h-2 w-2 rounded-full ${connected ? statusIndicator(connected.status) : 'bg-gray-600'}`}
+                  className={`h-2 w-2 rounded-full ${connected ? statusIndicator(connected.status) : 'bg-gray-200 dark:bg-gray-600'}`}
                 />
                 <span className="text-[10px] text-muted-foreground">
                   {isConnected
@@ -166,14 +166,14 @@ export function IntegrationCards({ integrations }: IntegrationCardsProps) {
             )}
 
             {connected?.error_message && (
-              <p className="text-[10px] text-red-400 truncate" title={connected.error_message}>
+              <p className="text-[10px] text-red-600 dark:text-red-400 truncate" title={connected.error_message}>
                 {connected.error_message}
               </p>
             )}
 
             <div className="flex gap-2">
-              <Link href={avail.href}>
-                <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={avail.href}>
                   {isConnected ? (
                     <>
                       <RefreshCw className="h-3 w-3" />
@@ -185,8 +185,8 @@ export function IntegrationCards({ integrations }: IntegrationCardsProps) {
                       Connect
                     </>
                   )}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </div>
         )

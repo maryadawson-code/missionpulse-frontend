@@ -1,10 +1,17 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { saveWidgetVisibilitySchema } from '@/lib/api/schemas'
 
 export async function saveWidgetVisibility(
   widgets: { widget_type: string; is_visible: boolean }[]
 ): Promise<{ success: boolean; error?: string }> {
+  // Validate inputs
+  const parsed = saveWidgetVisibilitySchema.safeParse(widgets)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

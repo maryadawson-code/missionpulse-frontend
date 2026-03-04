@@ -118,7 +118,7 @@ export function TrackChangesBlock({
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs text-emerald-400"
+            className="h-7 text-xs text-emerald-600 dark:text-emerald-400"
             onClick={handleAcceptAllItems}
           >
             <CheckCheck className="h-3 w-3" />
@@ -127,7 +127,7 @@ export function TrackChangesBlock({
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs text-red-400"
+            className="h-7 text-xs text-red-600 dark:text-red-400"
             onClick={handleRejectAllItems}
           >
             <XCircle className="h-3 w-3" />
@@ -159,12 +159,12 @@ export function TrackChangesBlock({
                   <div className="flex items-center gap-2">
                     <ConfidenceBadge level={suggestion.confidence} />
                     {status === 'accepted' && (
-                      <span className="text-[10px] font-medium text-emerald-400">
+                      <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
                         Accepted
                       </span>
                     )}
                     {status === 'rejected' && (
-                      <span className="text-[10px] font-medium text-red-400">
+                      <span className="text-[10px] font-medium text-red-600 dark:text-red-400">
                         Rejected
                       </span>
                     )}
@@ -216,7 +216,7 @@ export function TrackChangesBlock({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-xs text-emerald-400 hover:text-emerald-300"
+                        className="h-7 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:text-emerald-300"
                         onClick={() => handleAccept(suggestion)}
                       >
                         <Check className="h-3 w-3" />
@@ -225,7 +225,7 @@ export function TrackChangesBlock({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-xs text-red-400 hover:text-red-300"
+                        className="h-7 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:text-red-300"
                         onClick={() => handleReject(suggestion.id)}
                       >
                         <X className="h-3 w-3" />
@@ -262,7 +262,7 @@ export function TrackChangesBlock({
 
       {/* Model attribution + AI disclaimer */}
       <div className="border-t border-border px-4 py-2 space-y-1">
-        <p className="text-[10px] font-medium text-amber-400/80">
+        <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400/80">
           AI GENERATED — REQUIRES HUMAN REVIEW
         </p>
         <p className="text-[10px] text-muted-foreground">

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolveRole, getModulePermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { DocuSignConfig } from '@/components/features/integrations/DocuSignConfig'
 
 export default async function DocuSignIntegrationPage() {
@@ -33,18 +34,20 @@ export default async function DocuSignIntegrationPage() {
     .single()
 
   const config = integration?.config as Record<string, unknown> | null
+  const available = await isProviderAvailable('docusign')
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">DocuSign</h1>
-        <p className="text-sm text-gray-400 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">DocuSign</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           E-signature routing for gate approvals, NDAs, and teaming agreements.
         </p>
       </div>
 
       <DocuSignConfig
         isConnected={integration?.status === 'active'}
+        isAvailable={available}
         userName={(config?.user_name as string) ?? null}
         environment={(config?.environment as string) ?? 'demo'}
         lastSync={integration?.last_sync ?? null}

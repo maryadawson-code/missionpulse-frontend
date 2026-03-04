@@ -33,8 +33,8 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage your profile and account preferences
         </p>
       </div>
@@ -47,7 +47,7 @@ export default async function SettingsPage() {
         >
           <span className="text-lg mt-0.5">💳</span>
           <div>
-            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+            <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
               Billing &amp; Subscription
             </p>
             <p className="text-xs text-slate mt-0.5">Manage your plan, tokens, and payment</p>
@@ -59,7 +59,7 @@ export default async function SettingsPage() {
         >
           <span className="text-lg mt-0.5">🔔</span>
           <div>
-            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+            <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
               Notifications
             </p>
             <p className="text-xs text-slate mt-0.5">Control email, in-app, and push alerts</p>
@@ -71,7 +71,7 @@ export default async function SettingsPage() {
         >
           <span className="text-lg mt-0.5">📥</span>
           <div>
-            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+            <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
               Data Import
             </p>
             <p className="text-xs text-slate mt-0.5">Import opportunities from CSV or Excel</p>

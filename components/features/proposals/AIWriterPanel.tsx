@@ -11,6 +11,7 @@ import {
 } from '@/components/features/ai/TrackChangesBlock'
 import { runWriterAgent } from '@/lib/ai/agents/writer'
 import { parseWriterOutput } from '@/lib/ai/agents/parsers'
+import { persistSuggestionDecision } from '@/lib/actions/track-changes'
 
 interface AIWriterPanelProps {
   sectionTitle: string
@@ -18,6 +19,7 @@ interface AIWriterPanelProps {
   rfpContext: string
   playbookContent: string[]
   opportunityId: string
+  sectionId?: string
   onAcceptContent?: (_content: string) => void
 }
 
@@ -27,6 +29,7 @@ export function AIWriterPanel({
   rfpContext,
   playbookContent,
   opportunityId,
+  sectionId,
   onAcceptContent,
 }: AIWriterPanelProps) {
   const [isPending, startTransition] = useTransition()
@@ -71,16 +74,45 @@ export function AIWriterPanel({
   ])
 
   const handleAccept = useCallback(
-    (_id: string, content: string) => {
+    (id: string, content: string) => {
       setAcceptedParagraphs((prev) => [...prev, content])
       onAcceptContent?.(content)
+
+      // Fire-and-forget persistence to activity_feed + audit_logs
+      if (sectionId) {
+        const suggestion = suggestions?.find((s) => s.id === id)
+        persistSuggestionDecision({
+          suggestionId: id,
+          decision: 'accepted',
+          sectionId,
+          opportunityId,
+          content,
+          confidence: suggestion?.confidence ?? 'medium',
+          modelAttribution: modelName,
+        })
+      }
     },
-    [onAcceptContent]
+    [onAcceptContent, sectionId, opportunityId, suggestions, modelName]
   )
 
-  const handleReject = useCallback((_id: string) => {
-    // Rejected paragraphs are simply skipped
-  }, [])
+  const handleReject = useCallback(
+    (id: string) => {
+      // Fire-and-forget persistence to activity_feed + audit_logs
+      if (sectionId) {
+        const suggestion = suggestions?.find((s) => s.id === id)
+        persistSuggestionDecision({
+          suggestionId: id,
+          decision: 'rejected',
+          sectionId,
+          opportunityId,
+          content: suggestion?.content ?? '',
+          confidence: suggestion?.confidence ?? 'medium',
+          modelAttribution: modelName,
+        })
+      }
+    },
+    [sectionId, opportunityId, suggestions, modelName]
+  )
 
   const handleAcceptAll = useCallback(() => {
     if (!suggestions) return
@@ -138,7 +170,7 @@ export function AIWriterPanel({
 
       {acceptedParagraphs.length > 0 && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-          <h4 className="mb-2 text-xs font-semibold text-emerald-400">
+          <h4 className="mb-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
             Accepted Content ({acceptedParagraphs.length} paragraph
             {acceptedParagraphs.length !== 1 ? 's' : ''})
           </h4>

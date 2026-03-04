@@ -5,9 +5,9 @@ interface ConfidenceBadgeProps {
 }
 
 const BADGE_STYLES = {
-  high: 'bg-emerald-500/20 text-emerald-400',
-  medium: 'bg-amber-500/20 text-amber-400',
-  low: 'bg-red-500/20 text-red-400',
+  high: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+  medium: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
+  low: 'bg-red-500/20 text-red-600 dark:text-red-400',
 }
 
 const BADGE_LABELS = {

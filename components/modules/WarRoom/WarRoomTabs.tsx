@@ -67,14 +67,14 @@ function OverviewTab({ opp }: { opp: Opportunity }) {
       {opp.description && (
         <div>
           <h3 className="text-sm font-medium text-slate mb-2">Description</h3>
-          <p className="text-sm text-white leading-relaxed">{opp.description}</p>
+          <p className="text-sm text-foreground leading-relaxed">{opp.description}</p>
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {fields.map(({ label, value }) => (
           <div key={label}>
             <dt className="text-xs font-medium text-slate">{label}</dt>
-            <dd className="text-sm text-white mt-0.5">{value ?? '—'}</dd>
+            <dd className="text-sm text-foreground mt-0.5">{value ?? '—'}</dd>
           </div>
         ))}
       </div>
@@ -83,7 +83,7 @@ function OverviewTab({ opp }: { opp: Opportunity }) {
           <h3 className="text-sm font-medium text-slate mb-2">
             Primary Contact
           </h3>
-          <p className="text-sm text-white">
+          <p className="text-sm text-foreground">
             {opp.contact_name ?? '—'}
             {opp.contact_email && (
               <span className="text-slate ml-2">({opp.contact_email})</span>
@@ -111,20 +111,20 @@ function StrategyTab({
     <div className="space-y-4">
       <CUIBanner marking="OPSEC" />
       <div className="rounded-lg border border-border bg-navy p-6">
-        <h3 className="text-sm font-medium text-white mb-3">
+        <h3 className="text-sm font-medium text-foreground mb-3">
           Capture Strategy
         </h3>
         <p className="text-sm text-slate">
           Strategy details will be populated from the AI Strategy Agent and
           manual capture inputs. Go/No-Go decision:{' '}
-          <span className="font-medium text-white">
+          <span className="font-medium text-foreground">
             {opp.go_no_go ?? 'Pending'}
           </span>
         </p>
         {opp.notes && (
           <div className="mt-4 border-t border-border pt-4">
             <h4 className="text-xs font-medium text-slate mb-1">Notes</h4>
-            <p className="text-sm text-white whitespace-pre-wrap">{opp.notes}</p>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{opp.notes}</p>
           </div>
         )}
       </div>
@@ -156,7 +156,7 @@ function TeamTab({
           className="flex items-center justify-between rounded-md border border-border bg-navy px-4 py-3"
         >
           <div>
-            <p className="text-sm font-medium text-white">
+            <p className="text-sm font-medium text-foreground">
               {a.profile?.full_name ?? a.profile?.email ?? 'Unknown'}
             </p>
             <p className="text-xs text-slate">{a.profile?.role ?? '—'}</p>
@@ -203,7 +203,7 @@ function TimelineTab({ opp }: { opp: Opportunity }) {
             )}
           </div>
           <div className="pb-2">
-            <p className="text-sm font-medium text-white">{event.label}</p>
+            <p className="text-sm font-medium text-foreground">{event.label}</p>
             <p className="text-xs text-slate">{formatDate(event.date)}</p>
           </div>
         </div>
@@ -234,8 +234,8 @@ export function WarRoomTabs({
             onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === tab.key
-                ? 'border-cyan text-white'
-                : 'border-transparent text-slate hover:text-white'
+                ? 'border-cyan text-foreground'
+                : 'border-transparent text-slate hover:text-foreground'
             }`}
           >
             {tab.label}

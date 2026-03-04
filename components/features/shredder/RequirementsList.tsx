@@ -15,7 +15,14 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { addToast } from '@/components/ui/Toast'
 import { updateRequirement } from '@/app/(dashboard)/pipeline/[id]/shredder/requirements/actions'
 
-const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'] as const
+// DB stores lowercase priorities; UI displays title-case
+const PRIORITIES = ['critical', 'high', 'medium', 'low'] as const
+const PRIORITY_LABELS: Record<string, string> = {
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+}
 const SECTIONS = ['Technical', 'Management', 'Past Performance', 'Cost', 'Other'] as const
 
 interface Requirement {
@@ -98,7 +105,7 @@ export function RequirementsList({
             <SelectContent>
               {PRIORITIES.map((p) => (
                 <SelectItem key={p} value={p}>
-                  {p}
+                  {PRIORITY_LABELS[p]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -202,14 +209,14 @@ function RequirementRow({
   }
 
   const priorityColor = (p: string | null) => {
-    switch (p) {
-      case 'Critical':
-        return 'text-red-400'
-      case 'High':
-        return 'text-amber-400'
-      case 'Medium':
-        return 'text-blue-400'
-      case 'Low':
+    switch (p?.toLowerCase()) {
+      case 'critical':
+        return 'text-red-600 dark:text-red-400'
+      case 'high':
+        return 'text-amber-600 dark:text-amber-400'
+      case 'medium':
+        return 'text-blue-600 dark:text-blue-400'
+      case 'low':
         return 'text-muted-foreground'
       default:
         return 'text-muted-foreground'
@@ -233,7 +240,7 @@ function RequirementRow({
             </span>
             <StatusBadge status={req.status} />
             <span className={`text-[10px] font-medium ${priorityColor(req.priority)}`}>
-              {req.priority ?? 'Medium'}
+              {PRIORITY_LABELS[req.priority ?? 'medium'] ?? req.priority ?? 'Medium'}
             </span>
           </div>
 
@@ -243,7 +250,7 @@ function RequirementRow({
 
           <div className="flex flex-wrap items-center gap-2">
             <Select
-              value={req.priority ?? 'Medium'}
+              value={req.priority?.toLowerCase() ?? 'medium'}
               onValueChange={(v) => handleUpdate('priority', v)}
               disabled={isPending}
             >
@@ -253,7 +260,7 @@ function RequirementRow({
               <SelectContent>
                 {PRIORITIES.map((p) => (
                   <SelectItem key={p} value={p}>
-                    {p}
+                    {PRIORITY_LABELS[p]}
                   </SelectItem>
                 ))}
               </SelectContent>

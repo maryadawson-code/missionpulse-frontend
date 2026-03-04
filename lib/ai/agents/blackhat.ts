@@ -2,6 +2,7 @@
 
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
+import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 
 export async function runBlackHatAgent(context: {
   opportunityTitle: string
@@ -43,12 +44,19 @@ For each item, include a "Because" explanation.
 
 IMPORTANT: This analysis contains CUI//OPSEC data. All competitive intelligence is operations security.`
 
+  const baseSystemPrompt =
+    'You are a senior GovCon capture strategist conducting a Black Hat review. Think like the competitor — what would their proposal look like? Provide specific, actionable intelligence, not generic observations. All output is CUI//OPSEC.'
+
+  const feedbackCtx = await buildFeedbackContext('blackhat')
+  const systemPrompt = feedbackCtx
+    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
+    : baseSystemPrompt
+
   return aiRequest({
     taskType: 'strategy',
     prompt,
     opportunityId: context.opportunityId,
-    systemPrompt:
-      'You are a senior GovCon capture strategist conducting a Black Hat review. Think like the competitor — what would their proposal look like? Provide specific, actionable intelligence, not generic observations. All output is CUI//OPSEC.',
+    systemPrompt,
   })
 }
 
@@ -86,11 +94,18 @@ For each major recommendation, include a "Because" explanation.
 
 IMPORTANT: CUI//OPSEC data.`
 
+  const multiBasePrompt =
+    'You are a senior GovCon capture strategist conducting a multi-competitor Black Hat review. Analyze the competitive field holistically. Focus on exploitable gaps and realistic counter-strategies. All output is CUI//OPSEC.'
+
+  const multiFeedbackCtx = await buildFeedbackContext('blackhat')
+  const multiSystemPrompt = multiFeedbackCtx
+    ? `${multiBasePrompt}\n\n${multiFeedbackCtx.instructions}`
+    : multiBasePrompt
+
   return aiRequest({
     taskType: 'strategy',
     prompt,
     opportunityId: context.opportunityId,
-    systemPrompt:
-      'You are a senior GovCon capture strategist conducting a multi-competitor Black Hat review. Analyze the competitive field holistically. Focus on exploitable gaps and realistic counter-strategies. All output is CUI//OPSEC.',
+    systemPrompt: multiSystemPrompt,
   })
 }

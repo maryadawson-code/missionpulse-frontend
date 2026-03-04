@@ -23,11 +23,16 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { addToast } from '@/components/ui/Toast'
 import { SyncStatusBadge } from '@/components/features/sync/SyncStatusBadge'
+import { ConflictResolutionModal } from '@/components/features/sync/ConflictResolutionModal'
 import {
   assembleCloudBinder,
   getArtifactStatuses,
 } from '@/lib/utils/cloud-binder-assembly'
-import type { ArtifactStatus, SyncStatus } from '@/lib/types/sync'
+import {
+  getConflictForDocument,
+  resolveDocumentConflict,
+} from '@/app/(dashboard)/pipeline/[id]/launch/actions'
+import type { ArtifactStatus, SyncStatus, SyncConflict, ConflictResolution } from '@/lib/types/sync'
 
 // -- Props ------------------------------------------------------------------
 
@@ -83,6 +88,8 @@ export function CloudBinderPanel({
   const [loading, setLoading] = useState(true)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [activeConflict, setActiveConflict] = useState<SyncConflict | null>(null)
+  const [resolvingDocId, setResolvingDocId] = useState<string | null>(null)
 
   // Fetch artifact statuses on mount
   useEffect(() => {
@@ -122,6 +129,31 @@ export function CloudBinderPanel({
 
   const hasIssues = conflictCount > 0 || errorCount > 0
 
+  async function handleOpenConflict(documentId: string) {
+    setResolvingDocId(documentId)
+    const result = await getConflictForDocument(documentId)
+    if (result.conflict) {
+      setActiveConflict(result.conflict as SyncConflict)
+    } else {
+      addToast('error', result.error ?? 'No conflict found for this document')
+      setResolvingDocId(null)
+    }
+  }
+
+  async function handleResolveConflict(resolution: ConflictResolution) {
+    if (!activeConflict) return
+    const result = await resolveDocumentConflict(activeConflict.id, resolution as 'keep_mp' | 'keep_cloud' | 'merge')
+    if (result.success) {
+      addToast('success', 'Conflict resolved')
+      const statuses = await getArtifactStatuses(opportunityId)
+      setArtifacts(statuses)
+    } else {
+      addToast('error', result.error ?? 'Failed to resolve conflict')
+    }
+    setActiveConflict(null)
+    setResolvingDocId(null)
+  }
+
   function handleBuild() {
     startTransition(async () => {
       const result = await assembleCloudBinder(opportunityId)
@@ -142,7 +174,7 @@ export function CloudBinderPanel({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div className="flex items-center gap-3">
-          <FileArchive className="h-5 w-5 text-[#00E5FA]" />
+          <FileArchive className="h-5 w-5 text-primary" />
           <div>
             <h3 className="text-sm font-semibold text-foreground">
               Cloud Binder Assembly
@@ -159,7 +191,7 @@ export function CloudBinderPanel({
               download
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30',
-                'bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300',
+                'bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300',
                 'transition-colors hover:bg-emerald-500/20'
               )}
             >
@@ -193,10 +225,10 @@ export function CloudBinderPanel({
             className={cn(
               'mt-1 text-xl font-bold',
               syncHealth >= 80
-                ? 'text-emerald-400'
+                ? 'text-emerald-600 dark:text-emerald-400'
                 : syncHealth >= 50
-                  ? 'text-amber-400'
-                  : 'text-red-400'
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400'
             )}
           >
             {loading ? '--' : `${syncHealth}%`}
@@ -225,7 +257,7 @@ export function CloudBinderPanel({
           <p
             className={cn(
               'mt-1 text-xl font-bold',
-              hasIssues ? 'text-amber-400' : 'text-emerald-400'
+              hasIssues ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
             )}
           >
             {loading ? '--' : conflictCount + errorCount}
@@ -236,16 +268,16 @@ export function CloudBinderPanel({
       {/* Warnings */}
       {!loading && hasIssues && (
         <div className="border-b border-border px-5 py-3">
-          <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 space-y-1.5">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-1.5">
             {conflictCount > 0 && (
-              <div className="flex items-center gap-2 text-xs text-amber-300">
+              <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 {conflictCount} artifact{conflictCount !== 1 ? 's' : ''} with
                 sync conflicts -- resolve before building binder
               </div>
             )}
             {errorCount > 0 && (
-              <div className="flex items-center gap-2 text-xs text-red-300">
+              <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-300">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 {errorCount} artifact{errorCount !== 1 ? 's' : ''} with sync
                 errors
@@ -279,11 +311,11 @@ export function CloudBinderPanel({
                 className={cn(
                   'rounded-lg border p-3 transition-colors',
                   artifact.syncStatus === 'error'
-                    ? 'border-red-500/30 bg-red-950/10'
+                    ? 'border-red-500/30 bg-red-50 dark:bg-red-950/10'
                     : artifact.syncStatus === 'conflict'
-                      ? 'border-amber-500/30 bg-amber-950/10'
+                      ? 'border-amber-500/30 bg-amber-50 dark:bg-amber-950/10'
                       : artifact.syncStatus === 'syncing'
-                        ? 'border-blue-500/30 bg-blue-950/10'
+                        ? 'border-blue-500/30 bg-blue-50 dark:bg-blue-950/10'
                         : 'border-border bg-background'
                 )}
               >
@@ -323,16 +355,39 @@ export function CloudBinderPanel({
                 </div>
 
                 {artifact.syncStatus === 'synced' && (
-                  <div className="mt-2 flex items-center gap-1 text-[10px] text-emerald-400">
+                  <div className="mt-2 flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="h-3 w-3" />
                     Cloud synced
                   </div>
+                )}
+
+                {artifact.syncStatus === 'conflict' && (
+                  <button
+                    onClick={() => handleOpenConflict(artifact.documentId)}
+                    disabled={resolvingDocId === artifact.documentId}
+                    className="mt-2 flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    Resolve Conflict
+                  </button>
                 )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Conflict Resolution Modal */}
+      {activeConflict && (
+        <ConflictResolutionModal
+          conflict={activeConflict}
+          onResolve={handleResolveConflict}
+          onClose={() => {
+            setActiveConflict(null)
+            setResolvingDocId(null)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, Trash2, Eye, ChevronDown, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { FileText, Trash2, Eye, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, Loader2, RotateCw } from 'lucide-react'
 import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { deleteRfpDocument } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
+import { deleteRfpDocument, shredDocument } from '@/app/(dashboard)/pipeline/[id]/shredder/actions'
+import { addToast } from '@/components/ui/Toast'
 
 interface RfpDocument {
   id: string
@@ -16,6 +17,7 @@ interface RfpDocument {
   upload_status: string | null
   created_at: string | null
   extracted_text: string | null
+  text_length: number
 }
 
 interface RfpDocumentListProps {
@@ -44,6 +46,18 @@ function formatDate(dateStr: string | null): string {
 export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<RfpDocument | null>(null)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+
+  const handleRetryShred = async (docId: string) => {
+    setRetryingId(docId)
+    const result = await shredDocument(docId, opportunityId)
+    setRetryingId(null)
+    if (result.success) {
+      addToast('success', `Extracted ${result.data?.requirementCount ?? 0} requirements`)
+    } else {
+      addToast('error', result.error ?? 'Shredding failed')
+    }
+  }
 
   if (documents.length === 0) {
     return (
@@ -66,7 +80,7 @@ export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListPro
         {documents.map((doc) => {
           const isExpanded = expandedId === doc.id
           const isProcessed = doc.upload_status === 'processed'
-          const textLength = doc.extracted_text?.length ?? 0
+          const textLength = doc.text_length
 
           return (
             <div
@@ -94,26 +108,53 @@ export function RfpDocumentList({ documents, opportunityId }: RfpDocumentListPro
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {formatFileSize(doc.file_size)} · {formatDate(doc.created_at)}
-                    {isProcessed && textLength > 0 && (
+                    {textLength > 0 && (
                       <> · {textLength.toLocaleString()} chars extracted</>
                     )}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {isProcessed ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">
+                  {doc.upload_status === 'shredded' ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Shredded
+                    </span>
+                  ) : doc.upload_status === 'shredding' || retryingId === doc.id ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Shredding
+                    </span>
+                  ) : doc.upload_status === 'shred_failed' ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+                      <AlertCircle className="h-3 w-3" />
+                      Shred Failed
+                    </span>
+                  ) : isProcessed ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                       <CheckCircle2 className="h-3 w-3" />
                       Parsed
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
                       <AlertCircle className="h-3 w-3" />
                       {doc.upload_status ?? 'Unknown'}
                     </span>
                   )}
 
-                  {isProcessed && (
+                  {doc.upload_status === 'shred_failed' && retryingId !== doc.id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={() => handleRetryShred(doc.id)}
+                      aria-label="Retry shredding"
+                    >
+                      <RotateCw className="h-4 w-4" />
+                    </Button>
+                  )}
+
+                  {(isProcessed || doc.upload_status === 'shredded') && (
                     <Link href={`/pipeline/${opportunityId}/shredder/requirements?doc=${doc.id}`}>
                       <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="View requirements">
                         <Eye className="h-4 w-4" />

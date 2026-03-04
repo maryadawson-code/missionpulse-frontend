@@ -1,5 +1,37 @@
+import { withSentryConfig } from '@sentry/nextjs'
+import withBundleAnalyzer from '@next/bundle-analyzer'
+
+const analyzeBundles = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+})
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
+  poweredByHeader: false,
+  experimental: {
+    instrumentationHook: true,
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
+    serverComponentsExternalPackages: ['pdfjs-dist'],
+    outputFileTracingIncludes: {
+      '/pipeline/\\[id\\]/shredder': ['./node_modules/pdfjs-dist/**/*'],
+    },
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.gravatar.com',
+      },
+    ],
+  },
   async headers() {
     return [
       {
@@ -29,24 +61,15 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
           },
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https:",
-              "font-src 'self' https://fonts.gstatic.com",
-              `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://*.supabase.co'} https://api.asksage.ai https://api.sam.gov`,
-              "frame-ancestors 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-            ].join('; '),
-          },
+          // CSP is set dynamically in middleware (per-request nonce)
         ],
       },
     ]
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(analyzeBundles(nextConfig), {
+  silent: !process.env.CI,
+  hideSourceMaps: true,
+  tunnelRoute: '/monitoring',
+});

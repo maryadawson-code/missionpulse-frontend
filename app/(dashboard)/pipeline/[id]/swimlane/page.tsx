@@ -1,10 +1,28 @@
 // filepath: app/(dashboard)/pipeline/[id]/swimlane/page.tsx
 
 import { notFound } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
-import { SwimlaneBoard } from '@/components/features/swimlane/SwimlaneBoard'
 import { Breadcrumb } from '@/components/layout/Breadcrumb'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const SwimlaneBoard = dynamic(
+  () => import('@/components/features/swimlane/SwimlaneBoard').then((m) => m.SwimlaneBoard),
+  {
+    loading: () => (
+      <div className="grid grid-cols-6 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ))}
+      </div>
+    ),
+  }
+)
 
 interface SwimlanePageProps {
   params: Promise<{ id: string }>
@@ -59,7 +77,7 @@ export default async function SwimlanePage({ params }: SwimlanePageProps) {
         { label: 'Swimlane' },
       ]} />
       <div>
-        <h1 className="text-2xl font-bold text-white">Swimlane</h1>
+        <h1 className="text-2xl font-bold text-foreground">Swimlane</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {opportunity.title} — {(sections ?? []).length} section{(sections ?? []).length === 1 ? '' : 's'}
         </p>

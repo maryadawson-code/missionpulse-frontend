@@ -1,7 +1,8 @@
 // filepath: components/modules/PipelineTable.tsx
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useCallback } from 'react'
+import { X } from 'lucide-react'
 import { deleteOpportunity } from '@/lib/actions/opportunities'
 import { addToast } from '@/components/ui/Toast'
 import { exportToCSV } from '@/lib/utils/export'
@@ -57,20 +58,20 @@ function formatDate(dateStr: string | null): string {
 
 function pwinColor(pwin: number | null): string {
   const v = pwin ?? 50
-  if (v >= 70) return 'text-emerald-400'
-  if (v >= 40) return 'text-amber-400'
-  return 'text-red-400'
+  if (v >= 70) return 'text-emerald-600 dark:text-emerald-400'
+  if (v >= 40) return 'text-amber-600 dark:text-amber-400'
+  return 'text-red-600 dark:text-red-400'
 }
 
 function phaseColor(phase: string | null): string {
   const p = phase ?? 'Gate 1'
-  if (p.includes('5') || p.includes('6')) return 'bg-emerald-500/20 text-emerald-300'
-  if (p.includes('3') || p.includes('4')) return 'bg-amber-500/20 text-amber-300'
-  return 'bg-slate-500/20 text-slate-300'
+  if (p.includes('5') || p.includes('6')) return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+  if (p.includes('3') || p.includes('4')) return 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+  return 'bg-muted/20 text-muted-foreground'
 }
 
 const SortIcon = ({ active, direction }: { active: boolean; direction: SortDirection }) => (
-  <span className={`ml-1 text-xs ${active ? 'text-cyan' : 'text-slate-600'}`}>
+  <span className={`ml-1 text-xs ${active ? 'text-cyan' : 'text-muted-foreground'}`}>
     {active ? (direction === 'asc' ? '▲' : '▼') : '⇅'}
   </span>
 )
@@ -92,6 +93,36 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
   })
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const hasActiveFilters = useMemo(() => {
+    return !!(
+      filters.phase ||
+      filters.status ||
+      filters.setAside ||
+      filters.search ||
+      filters.ceilingMin ||
+      filters.ceilingMax ||
+      filters.pwinMin ||
+      filters.pwinMax ||
+      filters.dueDateStart ||
+      filters.dueDateEnd
+    )
+  }, [filters])
+
+  const clearFilters = useCallback(() => {
+    setFilters({
+      phase: null,
+      status: null,
+      setAside: null,
+      search: '',
+      ceilingMin: '',
+      ceilingMax: '',
+      pwinMin: '',
+      pwinMax: '',
+      dueDateStart: '',
+      dueDateEnd: '',
+    })
+  }, [])
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -185,7 +216,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
   }
 
   const thClass =
-    'px-4 py-3 text-left text-xs font-medium text-slate uppercase tracking-wider cursor-pointer hover:text-white transition-colors select-none'
+    'px-4 py-3 text-left text-xs font-medium text-slate uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors select-none'
   const tdClass = 'px-4 py-3 text-sm whitespace-nowrap'
 
   return (
@@ -195,16 +226,18 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
         <input
           type="text"
           placeholder="Search pipeline..."
+          aria-label="Search pipeline by title, agency, or solicitation number"
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-          className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan w-64"
+          className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan w-64"
         />
         <select
           value={filters.phase ?? ''}
+          aria-label="Filter by Shipley phase"
           onChange={(e) =>
             setFilters((f) => ({ ...f, phase: e.target.value || null }))
           }
-          className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-white focus:border-cyan focus:outline-none"
+          className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-foreground focus:border-cyan focus:outline-none"
         >
           <option value="">All Phases</option>
           {SHIPLEY_PHASES.map((p) => (
@@ -215,10 +248,11 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
         </select>
         <select
           value={filters.status ?? ''}
+          aria-label="Filter by status"
           onChange={(e) =>
             setFilters((f) => ({ ...f, status: e.target.value || null }))
           }
-          className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-white focus:border-cyan focus:outline-none"
+          className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-foreground focus:border-cyan focus:outline-none"
         >
           <option value="">All Statuses</option>
           {OPPORTUNITY_STATUSES.map((s) => (
@@ -229,10 +263,11 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
         </select>
         <select
           value={filters.setAside ?? ''}
+          aria-label="Filter by set-aside type"
           onChange={(e) =>
             setFilters((f) => ({ ...f, setAside: e.target.value || null }))
           }
-          className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-white focus:border-cyan focus:outline-none"
+          className="rounded-md border border-border bg-navy px-3 py-2 text-sm text-foreground focus:border-cyan focus:outline-none"
         >
           <option value="">All Set-Asides</option>
           {SET_ASIDES.map((s) => (
@@ -259,10 +294,20 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
               `pipeline-export-${new Date().toISOString().slice(0, 10)}.csv`
             )
           }
-          className="rounded-md border border-border px-3 py-2 text-sm text-slate hover:text-white hover:border-cyan transition-colors"
+          className="rounded-md border border-border px-3 py-2 text-sm text-slate hover:text-foreground hover:border-cyan transition-colors"
         >
           Export CSV
         </button>
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm text-slate hover:text-foreground hover:border-red-400 transition-colors"
+            aria-label="Clear all filters"
+          >
+            <X className="h-3.5 w-3.5" />
+            Clear Filters
+          </button>
+        )}
         {canEdit && (
           <a
             href="/pipeline/new"
@@ -276,64 +321,70 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
       {/* Range Filters Row */}
       <div className="flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-[10px] font-medium text-gray-500 mb-1">Ceiling ($)</label>
+          <label className="block text-[10px] font-medium text-muted-foreground mb-1">Ceiling ($)</label>
           <div className="flex items-center gap-1">
             <input
               type="number"
               placeholder="Min"
+              aria-label="Minimum ceiling value"
               value={filters.ceilingMin}
               onChange={(e) => setFilters((f) => ({ ...f, ceilingMin: e.target.value }))}
-              className="w-24 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none"
+              className="w-24 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none"
             />
-            <span className="text-gray-600 text-xs">–</span>
+            <span className="text-muted-foreground text-xs">–</span>
             <input
               type="number"
               placeholder="Max"
+              aria-label="Maximum ceiling value"
               value={filters.ceilingMax}
               onChange={(e) => setFilters((f) => ({ ...f, ceilingMax: e.target.value }))}
-              className="w-24 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none"
+              className="w-24 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none"
             />
           </div>
         </div>
         <div>
-          <label className="block text-[10px] font-medium text-gray-500 mb-1">pWin (%)</label>
+          <label className="block text-[10px] font-medium text-muted-foreground mb-1">pWin (%)</label>
           <div className="flex items-center gap-1">
             <input
               type="number"
               placeholder="Min"
+              aria-label="Minimum pWin percentage"
               min={0}
               max={100}
               value={filters.pwinMin}
               onChange={(e) => setFilters((f) => ({ ...f, pwinMin: e.target.value }))}
-              className="w-16 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none"
+              className="w-16 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none"
             />
-            <span className="text-gray-600 text-xs">–</span>
+            <span className="text-muted-foreground text-xs">–</span>
             <input
               type="number"
               placeholder="Max"
+              aria-label="Maximum pWin percentage"
               min={0}
               max={100}
               value={filters.pwinMax}
               onChange={(e) => setFilters((f) => ({ ...f, pwinMax: e.target.value }))}
-              className="w-16 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-cyan focus:outline-none"
+              className="w-16 rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-cyan focus:outline-none"
             />
           </div>
         </div>
         <div>
-          <label className="block text-[10px] font-medium text-gray-500 mb-1">Due Date</label>
+          <label className="block text-[10px] font-medium text-muted-foreground mb-1">Due Date</label>
           <div className="flex items-center gap-1">
             <input
               type="date"
+              aria-label="Due date start"
               value={filters.dueDateStart}
               onChange={(e) => setFilters((f) => ({ ...f, dueDateStart: e.target.value }))}
-              className="rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white focus:border-cyan focus:outline-none"
+              className="rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground focus:border-cyan focus:outline-none"
             />
-            <span className="text-gray-600 text-xs">–</span>
+            <span className="text-muted-foreground text-xs">–</span>
             <input
               type="date"
+              aria-label="Due date end"
               value={filters.dueDateEnd}
               onChange={(e) => setFilters((f) => ({ ...f, dueDateEnd: e.target.value }))}
-              className="rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-white focus:border-cyan focus:outline-none"
+              className="rounded-md border border-border bg-navy px-2 py-1.5 text-xs text-foreground focus:border-cyan focus:outline-none"
             />
           </div>
         </div>
@@ -386,7 +437,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
                   <td className={tdClass}>
                     <a
                       href={`/war-room/${opp.id}`}
-                      className="font-medium text-white hover:text-cyan transition-colors"
+                      className="font-medium text-foreground hover:text-cyan transition-colors"
                     >
                       {opp.title}
                     </a>
@@ -419,7 +470,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
                         </a>
                         <button
                           onClick={() => setDeleteTarget(opp.id)}
-                          className="text-xs text-slate hover:text-red-400 transition-colors"
+                          className="text-xs text-slate hover:text-red-600 dark:text-red-400 transition-colors"
                         >
                           Delete
                         </button>
@@ -442,7 +493,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="rounded-lg border border-border bg-surface p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="text-lg font-semibold text-white mb-2">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               Delete Opportunity
             </h3>
             <p className="text-sm text-slate mb-6">
@@ -453,7 +504,7 @@ export function PipelineTable({ opportunities, initialSearch = '', canEdit = tru
               <button
                 onClick={() => setDeleteTarget(null)}
                 disabled={isPending}
-                className="rounded-md border border-border px-4 py-2 text-sm text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+                className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-white/5 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>

@@ -1,7 +1,8 @@
 /**
  * Semantic Cache — content-addressable caching for AI responses.
  *
- * Hashes prompt + model + classification into a cache key.
+ * Hashes companyId + prompt + model + classification into a cache key.
+ * Company isolation ensures no cross-tenant cache hits (CMMC SC-4).
  * TTL varies by agent type (Black Hat = 1hr, default = 24hr).
  * Tracks hit/miss metrics in Redis.
  *
@@ -49,7 +50,8 @@ export interface CacheMetrics {
   hit_rate: number
 }
 
-interface CacheKeyInput {
+export interface CacheKeyInput {
+  companyId: string
   prompt: string
   model: string
   classification: ClassificationLevel
@@ -60,11 +62,13 @@ interface CacheKeyInput {
 // ─── Hash Function ───────────────────────────────────────────
 
 /**
- * Generate a deterministic cache key from prompt + model + classification.
+ * Generate a deterministic cache key from companyId + prompt + model + classification.
  * Uses SHA-256 for collision resistance.
+ * Company isolation: companyId is the first segment, preventing cross-tenant cache hits (CMMC SC-4).
  */
 function generateCacheKey(input: CacheKeyInput): string {
   const normalized = [
+    input.companyId,
     input.prompt.trim().toLowerCase(),
     input.model,
     input.classification,
@@ -73,7 +77,7 @@ function generateCacheKey(input: CacheKeyInput): string {
   ].join('|')
 
   const hash = createHash('sha256').update(normalized).digest('hex')
-  return `${CACHE_PREFIX}${input.taskType}:${hash}`
+  return `${CACHE_PREFIX}${input.companyId}:${input.taskType}:${hash}`
 }
 
 /**
@@ -147,16 +151,19 @@ export async function setCachedResponse(
 
 /**
  * Invalidate all cached responses for a specific agent type.
+ * Optionally scoped to a single company (CMMC SC-4).
  * Used when Playbook content changes or context shifts.
  */
 export async function invalidateAgentCache(
-  taskType: TaskType
+  taskType: TaskType,
+  companyId?: string
 ): Promise<number> {
   const redis = getRedis()
   if (!redis) return 0
 
   try {
-    const pattern = `${CACHE_PREFIX}${taskType}:*`
+    const scope = companyId ? `${companyId}:` : '*:'
+    const pattern = `${CACHE_PREFIX}${scope}${taskType}:*`
     let deleted = 0
     let scanCursor = '0'
 

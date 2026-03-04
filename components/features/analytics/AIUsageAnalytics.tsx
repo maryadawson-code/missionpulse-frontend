@@ -207,8 +207,8 @@ export function AIUsageAnalytics({
               onClick={() => setRangeDays(range.days)}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 rangeDays === range.days
-                  ? 'bg-[#00E5FA]/20 text-[#00E5FA]'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                  ? 'bg-primary/20 text-primary'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
               }`}
             >
               {range.label}
@@ -217,7 +217,7 @@ export function AIUsageAnalytics({
         </div>
         <button
           onClick={exportCSV}
-          className="rounded-lg bg-gray-800 px-4 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
+          className="rounded-lg bg-muted px-4 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
         >
           Export CSV
         </button>
@@ -245,8 +245,8 @@ export function AIUsageAnalytics({
       {/* Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Daily cost trend */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h3 className="mb-4 text-sm font-semibold text-white">
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h3 className="mb-4 text-sm font-semibold text-foreground">
             Daily Cost Trend
           </h3>
           {dailyCostTrend.length > 0 ? (
@@ -287,8 +287,8 @@ export function AIUsageAnalytics({
         </div>
 
         {/* Cost by agent pie */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h3 className="mb-4 text-sm font-semibold text-white">
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h3 className="mb-4 text-sm font-semibold text-foreground">
             Cost by Agent
           </h3>
           {costByAgent.length > 0 ? (
@@ -335,7 +335,7 @@ export function AIUsageAnalytics({
                           AGENT_COLORS[item.name] ?? '#64748b',
                       }}
                     />
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       {item.name}: {formatCost(item.cost)}
                     </span>
                   </div>
@@ -348,8 +348,8 @@ export function AIUsageAnalytics({
         </div>
 
         {/* Cost by model */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h3 className="mb-4 text-sm font-semibold text-white">
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h3 className="mb-4 text-sm font-semibold text-foreground">
             Cost by Model
           </h3>
           {costByModel.length > 0 ? (
@@ -385,8 +385,8 @@ export function AIUsageAnalytics({
         </div>
 
         {/* Cost per proposal */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-          <h3 className="mb-4 text-sm font-semibold text-white">
+        <div className="rounded-xl border border-border bg-card/50 p-5">
+          <h3 className="mb-4 text-sm font-semibold text-foreground">
             Cost per Proposal (Top 10)
           </h3>
           {costPerProposal.length > 0 ? (
@@ -437,11 +437,11 @@ function KPICard({
   subtitle?: string
 }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-      <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-white">{value}</p>
+    <div className="rounded-xl border border-border bg-card/50 p-5">
+      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
       {subtitle && (
-        <p className="mt-1 text-xs text-gray-500">{subtitle}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
       )}
     </div>
   )
@@ -449,7 +449,7 @@ function KPICard({
 
 function EmptyState() {
   return (
-    <div className="flex h-[250px] items-center justify-center text-sm text-gray-500">
+    <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
       No usage data for this period
     </div>
   )

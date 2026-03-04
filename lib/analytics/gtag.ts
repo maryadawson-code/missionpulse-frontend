@@ -10,7 +10,7 @@ export const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? ''
 // Type-safe event names for marketing conversion tracking
 export type MarketingEvent =
   | 'pricing_page_view'
-  | 'pilot_signup_click'
+  | 'signup_click'
   | 'newsletter_subscribe'
   | 'eight_a_toolkit_view'
   | 'plan_selected'

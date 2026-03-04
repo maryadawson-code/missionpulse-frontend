@@ -3,6 +3,7 @@
  */
 'use server'
 
+import { createLogger } from '@/lib/logging/logger'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import type { TokenUsageEntry } from './types'
@@ -26,6 +27,8 @@ export async function logTokenUsage(
     })
   } catch (err) {
     // Non-blocking: log failure but don't break the AI operation
-    console.error('[ai-logger] Failed to log token usage:', err)
+    createLogger('ai-logger').error('Failed to log token usage', {
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }

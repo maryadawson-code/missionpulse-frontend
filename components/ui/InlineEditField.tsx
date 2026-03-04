@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useTransition } from 'react'
-import { Pencil, Check, X } from 'lucide-react'
+import { Pencil, Check, X, Loader2 } from 'lucide-react'
+import { addToast } from '@/components/ui/Toast'
 
 interface InlineEditFieldProps {
   label: string
@@ -54,6 +55,8 @@ export function InlineEditField({
       const result = await onSave(fieldName, draft)
       if (result.success) {
         setEditing(false)
+      } else {
+        addToast('error', result.error ?? `Failed to save ${label}`)
       }
     })
   }
@@ -71,12 +74,12 @@ export function InlineEditField({
   const displayValue = format ? format(value) : (value ?? '—')
 
   const inputClass =
-    'w-full rounded border border-[#00E5FA]/50 bg-gray-900 px-2 py-1 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-[#00E5FA]/25'
+    'w-full rounded border border-primary/50 bg-card px-2 py-1 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary/25'
 
   if (editing) {
     return (
       <div>
-        <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</dt>
+        <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</dt>
         <dd className="mt-1 flex items-center gap-1">
           {type === 'textarea' ? (
             <textarea
@@ -99,10 +102,10 @@ export function InlineEditField({
               disabled={isPending}
             />
           )}
-          <button onClick={save} disabled={isPending} className="p-1 text-emerald-400 hover:text-emerald-300">
-            <Check className="h-3.5 w-3.5" />
+          <button onClick={save} disabled={isPending} className="p-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:text-emerald-300" aria-label={`Save ${label}`}>
+            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
           </button>
-          <button onClick={cancel} disabled={isPending} className="p-1 text-gray-500 hover:text-gray-300">
+          <button onClick={cancel} disabled={isPending} className="p-1 text-muted-foreground hover:text-foreground" aria-label={`Cancel editing ${label}`}>
             <X className="h-3.5 w-3.5" />
           </button>
         </dd>
@@ -112,14 +115,14 @@ export function InlineEditField({
 
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</dt>
+      <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="mt-1 flex items-center gap-1.5 group">
-        <span className="text-sm text-gray-200">{displayValue}</span>
+        <span className="text-sm text-foreground">{displayValue}</span>
         {canEdit && (
           <button
             onClick={startEdit}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-gray-500 hover:text-[#00E5FA]"
-            title={`Edit ${label}`}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-muted-foreground hover:text-primary"
+            aria-label={`Edit ${label}`}
           >
             <Pencil className="h-3 w-3" />
           </button>

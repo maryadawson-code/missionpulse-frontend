@@ -34,9 +34,9 @@ interface ProposalOutlineListProps {
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-500/20 text-gray-300',
-  in_progress: 'bg-blue-500/20 text-blue-300',
-  submitted: 'bg-emerald-500/20 text-emerald-300',
-  archived: 'bg-amber-500/20 text-amber-300',
+  in_progress: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
+  submitted: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+  archived: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
 }
 
 export function ProposalOutlineList({
@@ -213,7 +213,7 @@ export function ProposalOutlineList({
                 {canEdit && (
                   <button
                     onClick={() => handleDelete(outline.id)}
-                    className="p-1 text-muted-foreground hover:text-red-400 transition-colors"
+                    className="p-1 text-muted-foreground hover:text-red-600 dark:text-red-400 transition-colors"
                     title="Delete outline"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

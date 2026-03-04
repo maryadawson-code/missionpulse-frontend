@@ -6,15 +6,15 @@ function statusStyle(status: string | null): string {
   switch (status?.toLowerCase()) {
     case 'executed':
     case 'active':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'pending':
     case 'draft':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'expired':
     case 'terminated':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -62,33 +62,33 @@ export default async function PartnersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Teaming Partners</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Teaming Partners</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage partner relationships, teaming agreements, and capability
           alignment.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Partners</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Partners</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {partnerItems.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Agreements</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Agreements</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {agreementItems.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Executed</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">{executed}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Executed</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{executed}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Pending</p>
-          <p className="mt-1 text-lg font-bold text-amber-400">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Pending</p>
+          <p className="mt-1 text-lg font-bold text-amber-600 dark:text-amber-400">
             {agreementItems.filter(
               (a) => a.status === 'pending' || a.status === 'draft'
             ).length}
@@ -107,19 +107,19 @@ export default async function PartnersPage() {
         <>
           {partnerItems.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Partners ({partnerItems.length})
               </h2>
               <div className="space-y-3">
                 {partnerItems.map((partner) => (
                   <div
                     key={partner.id}
-                    className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-2"
+                    className="rounded-xl border border-border bg-card/50 p-5 space-y-2"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-semibold text-white">
+                          <h3 className="text-sm font-semibold text-foreground">
                             {partner.company_name}
                           </h3>
                           {partner.status && (
@@ -130,12 +130,12 @@ export default async function PartnersPage() {
                             </span>
                           )}
                           {partner.role && (
-                            <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                               {partner.role}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 mt-1 text-[10px] text-gray-500">
+                        <div className="flex items-center gap-4 mt-1 text-[10px] text-muted-foreground">
                           {partner.contact_name && (
                             <span>Contact: {partner.contact_name}</span>
                           )}
@@ -160,7 +160,7 @@ export default async function PartnersPage() {
                           </span>
                         )}
                         {partner.workshare_percentage != null && (
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-muted-foreground">
                             {partner.workshare_percentage}%
                           </span>
                         )}
@@ -175,24 +175,24 @@ export default async function PartnersPage() {
           {/* Agreements */}
           {agreementItems.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Teaming Agreements ({agreementItems.length})
               </h2>
-              <div className="divide-y divide-gray-800 rounded-xl border border-gray-800 bg-gray-900/50">
+              <div className="divide-y divide-border rounded-xl border border-border bg-card/50">
                 {agreementItems.map((a) => (
                   <div
                     key={a.id}
                     className="flex items-center justify-between px-4 py-3"
                   >
                     <div>
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-sm font-medium text-foreground">
                         {a.partner_name}
                       </p>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-[10px] text-muted-foreground">
                         {a.agreement_type ?? 'Teaming Agreement'}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                       {a.executed_date && (
                         <span>
                           {new Date(a.executed_date).toLocaleDateString(
@@ -202,7 +202,7 @@ export default async function PartnersPage() {
                         </span>
                       )}
                       {a.expiration_date && (
-                        <span className="text-gray-600">
+                        <span className="text-muted-foreground">
                           exp{' '}
                           {new Date(a.expiration_date).toLocaleDateString(
                             'en-US',

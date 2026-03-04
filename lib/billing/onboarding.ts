@@ -42,33 +42,33 @@ const STEP_DEFINITIONS: Array<{
 }> = [
   {
     id: 'create_opportunity',
-    title: 'Create an Opportunity',
-    description: 'Add your first pursuit to the pipeline',
-    href: '/pipeline/new',
+    title: 'Explore the Sample Opportunity',
+    description: 'See how pipeline tracking works — or create your own',
+    href: '/pipeline',
   },
   {
     id: 'run_ai_agent',
-    title: 'Run an AI Agent',
-    description: 'Use capture analysis or AI chat on an opportunity',
+    title: 'Ask the AI a Question',
+    description: 'Get instant proposal guidance and strategy recommendations',
     href: '/ai-chat',
   },
   {
     id: 'invite_team',
-    title: 'Invite a Team Member',
+    title: 'Invite a Teammate',
     description: 'Add a colleague to collaborate on proposals',
-    href: '/admin/users',
+    href: '/settings',
   },
   {
     id: 'generate_document',
-    title: 'Generate a Document',
-    description: 'Create a proposal section or export a binder',
-    href: '/documents',
+    title: 'Upload an RFP Document',
+    description: 'Let the AI extract requirements automatically',
+    href: '/shredder',
   },
   {
     id: 'review_compliance',
     title: 'Review Compliance Matrix',
-    description: 'Check requirements against an RFP',
-    href: '/pipeline',
+    description: 'Track requirements coverage for your opportunities',
+    href: '/compliance',
   },
 ]
 

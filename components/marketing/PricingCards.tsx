@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics/gtag'
 
 // Amendment A-1 pricing
 const PLANS = [
@@ -24,7 +25,7 @@ const PLANS = [
       '500K tokens/month',
     ],
     highlighted: false,
-    cta: 'Start Free Pilot',
+    cta: 'Get Started',
   },
   {
     name: 'Professional',
@@ -45,7 +46,7 @@ const PLANS = [
       '2M tokens/month',
     ],
     highlighted: true,
-    cta: 'Start Free Pilot',
+    cta: 'Get Started',
   },
   {
     name: 'Enterprise',
@@ -98,21 +99,29 @@ function formatMonthly(price: number): string {
 export function PricingCards() {
   const [isAnnual, setIsAnnual] = useState(true)
 
+  useEffect(() => {
+    trackEvent('pricing_page_view')
+  }, [])
+
   return (
     <div>
       {/* Billing toggle */}
       <div className="mb-12 flex items-center justify-center gap-4">
         <span
           className={`text-sm font-medium ${
-            !isAnnual ? 'text-white' : 'text-gray-500'
+            !isAnnual ? 'text-foreground' : 'text-muted-foreground'
           }`}
         >
           Monthly
         </span>
         <button
-          onClick={() => setIsAnnual(!isAnnual)}
+          onClick={() => {
+            const next = !isAnnual
+            setIsAnnual(next)
+            trackEvent('plan_selected', { billing_interval: next ? 'annual' : 'monthly' })
+          }}
           className={`relative h-7 w-12 rounded-full transition-colors ${
-            isAnnual ? 'bg-[#00E5FA]' : 'bg-gray-700'
+            isAnnual ? 'bg-primary' : 'bg-muted'
           }`}
           aria-label="Toggle annual billing"
         >
@@ -124,13 +133,13 @@ export function PricingCards() {
         </button>
         <span
           className={`text-sm font-medium ${
-            isAnnual ? 'text-white' : 'text-gray-500'
+            isAnnual ? 'text-foreground' : 'text-muted-foreground'
           }`}
         >
           Annual
         </span>
         {isAnnual && (
-          <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+          <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-600 dark:text-green-400">
             Save 17%
           </span>
         )}
@@ -143,12 +152,12 @@ export function PricingCards() {
             key={plan.name}
             className={`relative rounded-xl border p-8 ${
               plan.highlighted
-                ? 'border-[#00E5FA]/50 bg-[#00E5FA]/5'
-                : 'border-gray-800 bg-gray-900/30'
+                ? 'border-primary/50 bg-primary/5'
+                : 'border-border bg-card/30'
             }`}
           >
             {plan.highlighted && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#00E5FA] px-4 py-1 text-xs font-semibold text-[#00050F]">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-[#00050F]">
                 Most Popular
               </div>
             )}
@@ -161,39 +170,39 @@ export function PricingCards() {
                   <span className="text-4xl font-bold">
                     ${formatMonthly(plan.annualMonthly)}
                   </span>
-                  <span className="text-gray-500">/mo</span>
+                  <span className="text-muted-foreground">/mo</span>
                 </>
               ) : (
                 <>
                   <span className="text-4xl font-bold">
                     ${formatPrice(plan.monthlyPrice)}
                   </span>
-                  <span className="text-gray-500">/mo</span>
+                  <span className="text-muted-foreground">/mo</span>
                 </>
               )}
             </div>
 
             {isAnnual && (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 ${formatPrice(plan.annualPrice)}/year — billed annually
               </p>
             )}
 
             {isAnnual && plan.annualPrice < 15000 && (
-              <p className="mt-1 text-xs text-green-400">
+              <p className="mt-1 text-xs text-green-600 dark:text-green-400">
                 Below $15K micro-purchase threshold (FAR 13.2)
               </p>
             )}
 
-            <p className="mt-3 text-sm text-gray-400">{plan.description}</p>
+            <p className="mt-3 text-sm text-muted-foreground">{plan.description}</p>
 
             <ul className="mt-6 space-y-3">
               {plan.features.map((f) => (
                 <li
                   key={f}
-                  className="flex items-center gap-2 text-sm text-gray-300"
+                  className="flex items-center gap-2 text-sm text-muted-foreground"
                 >
-                  <Check className="h-4 w-4 flex-shrink-0 text-[#00E5FA]" />
+                  <Check className="h-4 w-4 flex-shrink-0 text-primary" />
                   {f}
                 </li>
               ))}
@@ -201,10 +210,17 @@ export function PricingCards() {
 
             <Link
               href={plan.slug === 'enterprise' ? '/signup?plan=enterprise' : `/signup?plan=${plan.slug}`}
+              onClick={() =>
+                trackEvent('signup_click', {
+                  plan_tier: plan.slug,
+                  billing_interval: isAnnual ? 'annual' : 'monthly',
+                  source: 'pricing_page',
+                })
+              }
               className={`mt-8 block rounded-lg px-6 py-3 text-center text-sm font-medium transition-colors ${
                 plan.highlighted
-                  ? 'bg-[#00E5FA] text-[#00050F] hover:bg-[#00E5FA]/90'
-                  : 'border border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'
+                  ? 'bg-primary text-[#00050F] hover:bg-primary/90'
+                  : 'border border-border text-muted-foreground hover:border-border hover:text-foreground'
               }`}
             >
               {plan.cta}
@@ -221,25 +237,25 @@ export function PricingCards() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-800">
-                <th className="pb-4 pr-8 text-left font-medium text-gray-400">
+              <tr className="border-b border-border">
+                <th className="pb-4 pr-8 text-left font-medium text-muted-foreground">
                   Feature
                 </th>
-                <th className="pb-4 px-4 text-center font-medium text-gray-400">
+                <th className="pb-4 px-4 text-center font-medium text-muted-foreground">
                   Starter
                 </th>
-                <th className="pb-4 px-4 text-center font-medium text-[#00E5FA]">
+                <th className="pb-4 px-4 text-center font-medium text-primary">
                   Professional
                 </th>
-                <th className="pb-4 pl-4 text-center font-medium text-gray-400">
+                <th className="pb-4 pl-4 text-center font-medium text-muted-foreground">
                   Enterprise
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-border/50">
               {FEATURE_COMPARISON.map((row) => (
                 <tr key={row.feature}>
-                  <td className="py-3 pr-8 text-gray-300">{row.feature}</td>
+                  <td className="py-3 pr-8 text-muted-foreground">{row.feature}</td>
                   <td className="py-3 px-4 text-center">
                     <FeatureCell value={row.starter} />
                   </td>
@@ -261,10 +277,10 @@ export function PricingCards() {
 
 function FeatureCell({ value }: { value: boolean | string }) {
   if (value === true) {
-    return <Check className="mx-auto h-4 w-4 text-[#00E5FA]" />
+    return <Check className="mx-auto h-4 w-4 text-primary" />
   }
   if (value === false) {
-    return <span className="text-gray-600">—</span>
+    return <span className="text-muted-foreground">—</span>
   }
-  return <span className="text-gray-300">{value}</span>
+  return <span className="text-muted-foreground">{value}</span>
 }

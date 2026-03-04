@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { HubSpotConfig } from '@/components/features/integrations/HubSpotConfig'
 
 export default async function HubSpotPage() {
@@ -28,11 +29,13 @@ export default async function HubSpotPage() {
     .eq('provider', 'hubspot')
     .single()
 
+  const available = await isProviderAvailable('hubspot')
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">HubSpot Integration</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">HubSpot Integration</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Connect HubSpot CRM for bi-directional sync of opportunities, deals,
           and contacts.
         </p>
@@ -43,6 +46,7 @@ export default async function HubSpotPage() {
           integration?.status === 'active' ||
           integration?.status === 'connected'
         }
+        isAvailable={available}
         lastSync={integration?.last_sync ?? null}
         errorMessage={integration?.error_message ?? null}
       />

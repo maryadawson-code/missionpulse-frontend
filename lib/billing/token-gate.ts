@@ -45,13 +45,15 @@ export async function checkTokenGate(
 ): Promise<TokenGateResult> {
   const balance = await getTokenBalance(companyId)
 
-  // No balance → no subscription → block
+  // No balance → subscription provisioning gap. Allow with warning rather
+  // than hard-blocking: workspace provisioning creates companies but may
+  // not create company_subscriptions/token_ledger rows immediately.
   if (!balance) {
     return {
-      allowed: false,
-      threshold: 'hard_block',
+      allowed: true,
+      threshold: 'warning',
       balance: null,
-      message: 'No active subscription. Subscribe to enable AI features.',
+      message: 'Subscription not fully provisioned — running in trial mode.',
       upgrade_cta: true,
       grace_period: false,
     }
@@ -118,9 +120,9 @@ export async function checkTokenGate(
   // Thresholds below 100% — allowed with appropriate message
   const messages: Record<string, string | null> = {
     normal: null,
-    info: '50% of monthly AI credits used.',
-    warning: '75% of monthly AI credits used. Consider upgrading your plan.',
-    urgent: '90% of monthly AI credits used. Limit approaching.',
+    info: null,
+    warning: "You're running low on tokens. Consider upgrading your plan or purchasing more.",
+    urgent: "You're almost out of tokens this month. Purchase more or upgrade your plan to keep using AI features.",
   }
 
   return {

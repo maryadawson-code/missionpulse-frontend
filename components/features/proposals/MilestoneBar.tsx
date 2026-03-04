@@ -84,7 +84,7 @@ export function MilestoneBar({ milestone }: MilestoneBarProps) {
       <div className="min-w-0 flex-1">
         {/* Title row */}
         <div className="flex items-center gap-2">
-          <h3 className="truncate text-sm font-medium text-white">
+          <h3 className="truncate text-sm font-medium text-foreground">
             {milestone.title}
           </h3>
           <span className={`shrink-0 text-[10px] font-medium ${getMilestoneColor(type)}`}>
@@ -103,7 +103,7 @@ export function MilestoneBar({ milestone }: MilestoneBarProps) {
             </span>
           )}
           {isOverdue && (
-            <span className="font-medium text-red-400">
+            <span className="font-medium text-red-600 dark:text-red-400">
               Overdue
             </span>
           )}

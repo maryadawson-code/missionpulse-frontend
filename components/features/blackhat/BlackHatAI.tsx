@@ -119,9 +119,9 @@ export function BlackHatAI({ opportunity, competitors }: BlackHatAIProps) {
   return (
     <div className="space-y-4">
       {!suggestions && (
-        <div className="rounded-lg border border-red-500/20 bg-red-950/10 p-6">
+        <div className="rounded-lg border border-red-500/20 bg-red-50 dark:bg-red-950/10 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <Shield className="h-6 w-6 text-red-400" />
+            <Shield className="h-6 w-6 text-red-600 dark:text-red-400" />
             <div>
               <h3 className="text-sm font-semibold text-foreground">
                 AI Black Hat Analyst
@@ -163,7 +163,7 @@ export function BlackHatAI({ opportunity, competitors }: BlackHatAIProps) {
 
       {isPending && !suggestions && (
         <div className="flex items-center gap-3 rounded-lg border border-border p-6">
-          <Loader2 className="h-5 w-5 animate-spin text-red-400" />
+          <Loader2 className="h-5 w-5 animate-spin text-red-600 dark:text-red-400" />
           <span className="text-sm text-muted-foreground">
             Generating Black Hat analysis via AskSage (OPSEC-protected)...
           </span>

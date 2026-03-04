@@ -4,6 +4,7 @@
  */
 'use server'
 
+import { createLogger } from '@/lib/logging/logger'
 import { createClient } from '@/lib/supabase/server'
 import type { AIRequestOptions, AIResponse } from './types'
 import { AIError } from './types'
@@ -78,11 +79,10 @@ export async function aiRequest(
   }
 
   try {
-    // Step 1: Classify the request
-    const classification = await classifyRequest(
-      options.prompt,
-      options.context
-    )
+    // Step 1: Classify the request (skip scanner if caller provides override)
+    const classification = options.classificationOverride
+      ? { level: options.classificationOverride, reasons: ['caller-override'], patterns_matched: [] }
+      : await classifyRequest(options.prompt, options.context)
 
     // Step 2: Select model
     const modelSelection = await selectModel(
@@ -90,8 +90,9 @@ export async function aiRequest(
       classification.level
     )
 
-    // Step 3: Check cache
+    // Step 3: Check cache (companyId scoped — CMMC SC-4 isolation)
     const cacheInput = {
+      companyId: companyId ?? 'unknown',
       prompt: options.prompt,
       model: modelSelection.primary.model,
       classification: classification.level,
@@ -183,15 +184,19 @@ export async function aiRequest(
     const latencyMs = Date.now() - startTime
 
     // Graceful fallback — feature works without AI
+    const log = createLogger('ai-pipeline')
     if (err instanceof AIError) {
-      console.error(`[ai-pipeline] ${err.code}: ${err.message}`)
+      log.error(`${err.code}: ${err.message}`, { code: err.code })
     } else {
-      console.error('[ai-pipeline] Unexpected error:', err)
+      log.error('Unexpected error', { error: err instanceof Error ? err.message : String(err) })
     }
 
+    const errorDetail = err instanceof AIError
+      ? `${err.code}: ${err.message}`
+      : err instanceof Error ? err.message : 'Unknown error'
+
     return {
-      content:
-        'AI processing is currently unavailable. Please try again later or complete this task manually.',
+      content: `AI processing failed: ${errorDetail}`,
       model_used: 'none',
       engine: 'asksage',
       confidence: 'low',

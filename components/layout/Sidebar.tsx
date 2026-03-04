@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { RBACModule, ModulePermission } from '@/lib/types'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 // ─── Nav Item Config ────────────────────────────────────────────
 // Maps RBAC module keys to display labels, routes, and icons (SVG paths).
@@ -30,6 +31,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Pipeline',
     href: '/pipeline',
     iconPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+  },
+  {
+    module: 'pipeline',
+    label: 'RFP Shredder',
+    href: '/shredder',
+    iconPath: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
   },
   {
     module: 'pipeline',
@@ -131,8 +138,8 @@ const ADMIN_MODULES = ['admin', 'integrations', 'audit_log']
 
 // ─── CUI / Sensitivity Badges ───────────────────────────────────
 const CUI_BADGES: Record<string, { label: string; color: string }> = {
-  pricing: { label: 'CUI', color: 'bg-amber-500/20 text-amber-400' },
-  blackhat: { label: 'Private', color: 'bg-red-500/20 text-red-400' },
+  pricing: { label: 'CUI', color: 'bg-amber-500/20 text-amber-600 dark:text-amber-400' },
+  blackhat: { label: 'Private', color: 'bg-red-500/20 text-red-600 dark:text-red-400' },
 }
 
 // ─── Props ──────────────────────────────────────────────────────
@@ -141,9 +148,10 @@ interface SidebarProps {
   userDisplayName: string | null
   userRole: string | null
   unreadNotifications?: number
+  subscriptionTier?: string
 }
 
-export default function Sidebar({ permissions, userDisplayName, userRole, unreadNotifications = 0 }: SidebarProps) {
+export default function Sidebar({ permissions, userDisplayName, userRole, unreadNotifications = 0, subscriptionTier: _subscriptionTier }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -171,10 +179,10 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
       {/* Mobile hamburger button */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-700 bg-[#00050F] lg:hidden"
+        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background lg:hidden"
         aria-label="Open menu"
       >
-        <svg className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
@@ -187,19 +195,20 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
         />
       )}
 
-    <aside className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-gray-800 bg-[#00050F] transition-transform lg:static lg:translate-x-0 ${
+    <aside className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-border bg-background transition-transform lg:static lg:translate-x-0 ${
       mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
     }`}>
       {/* Logo / Brand */}
-      <div className="flex h-16 items-center justify-between border-b border-gray-800 px-5">
+      <div className="flex h-16 items-center justify-between border-b border-border px-5">
         <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00E5FA]/10">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
           <svg
-            className="h-5 w-5 text-[#00E5FA]"
+            className="h-5 w-5 text-primary"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={2}
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -208,23 +217,23 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
             />
           </svg>
         </div>
-        <span className="text-sm font-semibold text-white tracking-wide">
+        <span className="text-sm font-semibold text-foreground tracking-wide">
           MissionPulse
         </span>
         </div>
         <button
           onClick={() => setMobileOpen(false)}
-          className="rounded p-1 text-gray-500 hover:text-gray-200 lg:hidden"
+          className="rounded p-1 text-muted-foreground hover:text-foreground lg:hidden"
           aria-label="Close menu"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Main navigation">
         <ul className="space-y-1">
           {/* Primary section */}
           {primary.map((item) => {
@@ -237,23 +246,25 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
                   <svg
                     className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={1.5}
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
@@ -271,7 +282,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
           {/* Secondary (Analysis) section */}
           {secondary.length > 0 && (
             <li className="px-3 py-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Analysis</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Analysis</span>
             </li>
           )}
           {secondary.map((item) => {
@@ -284,23 +295,25 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
                   <svg
                     className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={1.5}
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
@@ -318,7 +331,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
           {/* Resources section — visible if pipeline is visible */}
           {permissions['pipeline']?.shouldRender && (
             <li className="px-3 py-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Resources</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Resources</span>
             </li>
           )}
           {permissions['pipeline']?.shouldRender && [
@@ -336,23 +349,25 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
                   <svg
                     className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={1.5}
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
@@ -365,7 +380,7 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
           {/* Admin section */}
           {admin.length > 0 && (
             <li className="px-3 py-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Admin</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Admin</span>
             </li>
           )}
           {admin.map((item) => {
@@ -378,23 +393,25 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`
                     group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
                   <svg
                     className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+                      isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={1.5}
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.iconPath} />
                   </svg>
@@ -412,26 +429,28 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
       </nav>
 
       {/* Bottom links — Notifications + Settings */}
-      <div className="border-t border-gray-800 px-3 py-2 space-y-1">
+      <div className="border-t border-border px-3 py-2 space-y-1">
         <Link
           href="/notifications"
+          aria-current={pathname === '/notifications' ? 'page' : undefined}
           className={`
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
               pathname === '/notifications'
-                ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             }
           `}
         >
           <svg
             className={`h-5 w-5 flex-shrink-0 ${
-              pathname === '/notifications' ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+              pathname === '/notifications' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
             }`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={1.5}
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
           </svg>
@@ -444,23 +463,25 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
         </Link>
         <Link
           href="/settings"
+          aria-current={pathname === '/settings' ? 'page' : undefined}
           className={`
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
               pathname === '/settings'
-                ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             }
           `}
         >
           <svg
             className={`h-5 w-5 flex-shrink-0 ${
-              pathname === '/settings' ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+              pathname === '/settings' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
             }`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={1.5}
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           </svg>
@@ -468,23 +489,25 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
         </Link>
         <Link
           href="/help"
+          aria-current={pathname === '/help' ? 'page' : undefined}
           className={`
             group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
             ${
               pathname === '/help'
-                ? 'bg-[#00E5FA]/10 text-[#00E5FA]'
-                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             }
           `}
         >
           <svg
             className={`h-5 w-5 flex-shrink-0 ${
-              pathname === '/help' ? 'text-[#00E5FA]' : 'text-gray-500 group-hover:text-gray-400'
+              pathname === '/help' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
             }`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={1.5}
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
           </svg>
@@ -493,9 +516,9 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
       </div>
 
       {/* User Footer */}
-      <div className="border-t border-gray-800 px-4 py-3">
+      <div className="border-t border-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-700 text-xs font-medium text-gray-300">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-medium text-muted-foreground">
             {userDisplayName
               ? userDisplayName
                   .split(' ')
@@ -506,13 +529,14 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               : '??'}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-gray-200">
+            <p className="truncate text-sm font-medium text-foreground">
               {userDisplayName ?? 'Unknown User'}
             </p>
-            <p className="truncate text-xs text-gray-500">
+            <p className="truncate text-xs text-muted-foreground">
               {userRole?.replace(/_/g, ' ') ?? 'No role'}
             </p>
           </div>
+          <ThemeToggle />
           <button
             onClick={async () => {
               const supabase = createBrowserClient(
@@ -523,10 +547,10 @@ export default function Sidebar({ permissions, userDisplayName, userRole, unread
               router.push('/login')
               router.refresh()
             }}
-            className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-red-400"
+            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600 dark:text-red-400"
             title="Sign out"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
             </svg>
           </button>

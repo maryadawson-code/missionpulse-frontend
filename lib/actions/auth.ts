@@ -21,6 +21,12 @@ export async function signIn(formData: FormData) {
     return { error: error.message }
   }
 
+  // Check if the user has MFA enrolled and needs to complete a challenge
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2') {
+    redirect('/mfa')
+  }
+
   revalidatePath('/', 'layout')
   redirect('/dashboard')
 }
@@ -32,7 +38,7 @@ export async function signUp(formData: FormData) {
   const password = formData.get('password') as string
   const fullName = formData.get('full_name') as string
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -42,6 +48,12 @@ export async function signUp(formData: FormData) {
 
   if (error) {
     return { error: error.message }
+  }
+
+  // If email confirmation is enabled, session will be null.
+  // Show a confirmation message instead of redirecting.
+  if (!data.session) {
+    return { confirmEmail: true }
   }
 
   revalidatePath('/', 'layout')

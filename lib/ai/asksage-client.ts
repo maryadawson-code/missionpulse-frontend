@@ -7,6 +7,7 @@
  */
 'use server'
 
+import { createLogger } from '@/lib/logging/logger'
 import { AIError } from './types'
 import type { AIErrorCode } from './types'
 
@@ -47,7 +48,7 @@ export async function queryAskSage(
 ): Promise<AskSageResponse> {
   if (!ASKSAGE_API_KEY) {
     // Graceful degradation when API key not configured
-    console.warn('[asksage] No API key configured — returning mock response')
+    createLogger('asksage').warn('No API key configured — returning mock response')
     return mockResponse(request)
   }
 

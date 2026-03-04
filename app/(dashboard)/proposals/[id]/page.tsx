@@ -105,8 +105,8 @@ export default async function ProposalDetailPage({ params }: Props) {
 
   const STATUS_COLORS: Record<string, string> = {
     draft: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-    in_progress: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    submitted: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    in_progress: 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
+    submitted: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
   }
 
   return (
@@ -121,7 +121,7 @@ export default async function ProposalDetailPage({ params }: Props) {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-foreground">
             {outline.outline_name}
           </h1>
           <span
@@ -130,10 +130,10 @@ export default async function ProposalDetailPage({ params }: Props) {
             {(outline.status ?? 'draft').replace(/_/g, ' ')}
           </span>
         </div>
-        <div className="mt-1 flex items-center gap-3 text-sm text-gray-500">
+        <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
           {opportunityTitle && <span>{opportunityTitle}</span>}
           {outline.volume_type && (
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-muted-foreground">
               {outline.volume_type}
             </span>
           )}

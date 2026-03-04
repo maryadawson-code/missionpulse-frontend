@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolveRole, getModulePermission } from '@/lib/rbac/config'
+import { isProviderAvailable } from '@/lib/integrations/availability'
 import { GoogleConfig } from '@/components/features/integrations/GoogleConfig'
 
 export default async function GoogleIntegrationPage() {
@@ -33,18 +34,20 @@ export default async function GoogleIntegrationPage() {
     .single()
 
   const config = integration?.config as Record<string, unknown> | null
+  const available = await isProviderAvailable('google')
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Google Workspace</h1>
-        <p className="text-sm text-gray-400 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">Google Workspace</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Google Drive, Calendar, and Gmail integration for document collaboration and scheduling.
         </p>
       </div>
 
       <GoogleConfig
         isConnected={integration?.status === 'active'}
+        isAvailable={available}
         userName={(config?.user_name as string) ?? null}
         userEmail={(config?.user_email as string) ?? null}
         lastSync={integration?.last_sync ?? null}

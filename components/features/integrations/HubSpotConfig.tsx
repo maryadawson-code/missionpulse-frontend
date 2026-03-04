@@ -1,11 +1,14 @@
 'use client'
 
-import { Link2, Link2Off, RefreshCw, ArrowLeftRight } from 'lucide-react'
+import { useTransition } from 'react'
+import { Link2, Link2Off, RefreshCw, ArrowLeftRight, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { getAuthUrl, disconnectIntegration } from '@/app/(dashboard)/integrations/actions'
 
 interface HubSpotConfigProps {
   isConnected: boolean
+  isAvailable: boolean
   lastSync: string | null
   errorMessage: string | null
 }
@@ -24,9 +27,28 @@ const FIELD_MAPPINGS = [
 
 export function HubSpotConfig({
   isConnected,
+  isAvailable,
   lastSync,
   errorMessage,
 }: HubSpotConfigProps) {
+  const [isPending, startTransition] = useTransition()
+
+  function handleConnect() {
+    startTransition(async () => {
+      const { url } = await getAuthUrl('hubspot')
+      if (!url) return
+      const popup = window.open(url, 'hubspot-oauth', 'width=600,height=700')
+      if (!popup) window.location.href = url
+    })
+  }
+
+  function handleDisconnect() {
+    startTransition(async () => {
+      await disconnectIntegration('hubspot')
+      window.location.reload()
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Connection Status */}
@@ -51,19 +73,32 @@ export function HubSpotConfig({
             </div>
           </div>
 
-          <Button variant={isConnected ? 'outline' : 'default'}>
-            {isConnected ? (
-              <>
-                <Link2Off className="h-4 w-4" />
-                Disconnect
-              </>
-            ) : (
-              <>
-                <Link2 className="h-4 w-4" />
-                Connect HubSpot
-              </>
-            )}
-          </Button>
+          {isAvailable && (
+            <Button
+              variant={isConnected ? 'outline' : 'default'}
+              onClick={isConnected ? handleDisconnect : handleConnect}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isConnected ? (
+                <>
+                  <Link2Off className="h-4 w-4" />
+                  Disconnect
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-4 w-4" />
+                  Connect HubSpot
+                </>
+              )}
+            </Button>
+          )}
+          {!isAvailable && !isConnected && (
+            <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs text-amber-600 dark:text-amber-400">
+              Not Configured
+            </span>
+          )}
         </div>
 
         {lastSync && (
@@ -79,18 +114,15 @@ export function HubSpotConfig({
         )}
 
         {errorMessage && (
-          <p className="text-xs text-red-400 mt-2">Error: {errorMessage}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error: {errorMessage}</p>
         )}
 
-        {!isConnected && (
-          <div className="mt-4 rounded-lg border border-border bg-muted/10 p-4">
-            <p className="text-xs text-muted-foreground">
-              To connect HubSpot, you need a HubSpot API key or OAuth
-              credentials. Configure <code>HUBSPOT_API_KEY</code> in your
-              environment variables, or click Connect to start the OAuth flow.
-            </p>
-          </div>
+        {!isAvailable && !isConnected && (
+          <p className="text-xs text-muted-foreground mt-3">
+            Ask your workspace administrator to configure HubSpot credentials in Settings.
+          </p>
         )}
+
       </div>
 
       {/* Sync Settings */}
@@ -119,7 +151,7 @@ export function HubSpotConfig({
                   name="syncDirection"
                   value={dir}
                   defaultChecked={dir === 'Bidirectional'}
-                  className="rounded-full border-border text-[#00E5FA]"
+                  className="rounded-full border-border text-primary"
                   disabled={!isConnected}
                 />
                 <span className="text-xs text-foreground">{dir}</span>

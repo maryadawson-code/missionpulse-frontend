@@ -25,8 +25,9 @@ export async function addCompetitor(formData: FormData) {
     ? weaknessesRaw.split('\n').map((w) => w.trim()).filter(Boolean)
     : []
 
+  const competitorId = crypto.randomUUID()
   const { error } = await supabase.from('competitors').insert({
-    id: crypto.randomUUID(),
+    id: competitorId,
     opportunity_id: opportunityId,
     name,
     threat_level: threatLevel || 'medium',
@@ -37,6 +38,12 @@ export async function addCompetitor(formData: FormData) {
   })
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'add_competitor',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'competitor', entity_id: competitorId, opportunity_id: opportunityId, name },
+  })
 
   revalidatePath(`/pipeline/${opportunityId}/strategy`)
   return { success: true }
@@ -73,6 +80,12 @@ export async function updateCompetitor(formData: FormData) {
 
   if (error) return { success: false, error: error.message }
 
+  await supabase.from('activity_log').insert({
+    action: 'update_competitor',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'competitor', entity_id: competitorId, opportunity_id: opportunityId },
+  })
+
   revalidatePath(`/pipeline/${opportunityId}/strategy`)
   return { success: true }
 }
@@ -90,6 +103,12 @@ export async function deleteCompetitor(competitorId: string, opportunityId: stri
     .eq('id', competitorId)
 
   if (error) return { success: false, error: error.message }
+
+  await supabase.from('activity_log').insert({
+    action: 'delete_competitor',
+    user_name: user.email ?? 'Unknown',
+    details: { entity_type: 'competitor', entity_id: competitorId, opportunity_id: opportunityId },
+  })
 
   revalidatePath(`/pipeline/${opportunityId}/strategy`)
   return { success: true }

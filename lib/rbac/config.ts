@@ -226,6 +226,51 @@ export function getGateAuthority(role: string): GateAuthority {
   }
 }
 
+// ─── Tier-Aware Module Visibility ────────────────────────────
+
+type SubscriptionTier = 'starter' | 'professional' | 'enterprise' | string
+
+const TIER_MODULES: Record<string, ModuleId[]> = {
+  starter: [
+    'dashboard', 'pipeline', 'proposals', 'compliance',
+    'ai_chat', 'documents', 'workflow_board', 'personnel',
+  ],
+  professional: [
+    'dashboard', 'pipeline', 'proposals', 'compliance',
+    'ai_chat', 'documents', 'workflow_board', 'personnel',
+    'strategy', 'analytics', 'integrations', 'pricing',
+  ],
+  enterprise: ALL_MODULES,
+}
+
+/**
+ * Get the set of modules visible for a subscription tier.
+ * Starter: 8 core modules. Professional: 12. Enterprise: all 15.
+ */
+export function getTierVisibleModules(tier: SubscriptionTier): ModuleId[] {
+  return TIER_MODULES[tier] ?? TIER_MODULES.starter
+}
+
+/**
+ * Filter a permissions map to only include modules visible for the given tier.
+ * Modules not in the tier list will have shouldRender set to false.
+ */
+export function filterPermissionsByTier(
+  permissions: Record<string, ModulePermission>,
+  tier: SubscriptionTier
+): Record<string, ModulePermission> {
+  const tierModules = getTierVisibleModules(tier)
+  const filtered: Record<string, ModulePermission> = {}
+  for (const [module, perm] of Object.entries(permissions)) {
+    if (tierModules.includes(module as ModuleId)) {
+      filtered[module] = perm
+    } else {
+      filtered[module] = { ...perm, shouldRender: false }
+    }
+  }
+  return filtered
+}
+
 /** Get session timeout in seconds for a role. */
 export function getSessionTimeout(role: string): number {
   const roleConfig = getRoleConfig(role)

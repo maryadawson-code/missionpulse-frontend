@@ -117,12 +117,12 @@ export function SamGovSearch() {
                       </span>
                     )}
                     {opp.setAside && (
-                      <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300">
+                      <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300">
                         {opp.setAside}
                       </span>
                     )}
                     {opp.responseDeadLine && (
-                      <span className="text-xs text-amber-400">
+                      <span className="text-xs text-amber-600 dark:text-amber-400">
                         Due: {new Date(opp.responseDeadLine).toLocaleDateString()}
                       </span>
                     )}
@@ -139,7 +139,7 @@ export function SamGovSearch() {
                       href={`https://sam.gov/opp/${opp.noticeId}/view`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-[#00E5FA]"
+                      className="text-muted-foreground hover:text-primary"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </a>

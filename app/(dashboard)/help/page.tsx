@@ -81,8 +81,8 @@ export default async function HelpPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Help & Documentation</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Help & Documentation</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Learn how to use MissionPulse to win more federal contracts.
         </p>
       </div>
@@ -90,23 +90,23 @@ export default async function HelpPage() {
       {HELP_SECTIONS.map((section) => (
         <div
           key={section.title}
-          className="rounded-xl border border-gray-800 bg-gray-900/50"
+          className="rounded-xl border border-border bg-card/50"
         >
-          <div className="border-b border-gray-800 px-5 py-4">
-            <h2 className="text-base font-semibold text-white">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="text-base font-semibold text-foreground">
               {section.title}
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {section.description}
             </p>
           </div>
-          <div className="divide-y divide-gray-800/50">
+          <div className="divide-y divide-border/50">
             {section.items.map((item) => (
               <div key={item.title} className="px-5 py-3">
-                <h3 className="text-sm font-medium text-gray-200">
+                <h3 className="text-sm font-medium text-foreground">
                   {item.title}
                 </h3>
-                <p className="mt-0.5 text-xs text-gray-400 leading-relaxed">
+                <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
                   {item.description}
                 </p>
               </div>
@@ -115,13 +115,13 @@ export default async function HelpPage() {
         </div>
       ))}
 
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-        <h2 className="text-sm font-semibold text-white">Need more help?</h2>
-        <p className="mt-1 text-xs text-gray-400">
+      <div className="rounded-xl border border-border bg-card/50 p-5">
+        <h2 className="text-sm font-semibold text-foreground">Need more help?</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
           Contact support at{' '}
-          <span className="text-[#00E5FA]">support@missionpulse.ai</span> or
+          <span className="text-primary">support@missionpulse.ai</span> or
           visit our{' '}
-          <Link href="/settings" className="text-[#00E5FA] hover:underline">
+          <Link href="/settings" className="text-primary hover:underline">
             Settings
           </Link>{' '}
           page to manage your account.

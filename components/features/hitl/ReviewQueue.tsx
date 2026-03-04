@@ -49,9 +49,9 @@ const TYPE_ICONS = {
 }
 
 const TYPE_COLORS = {
-  compliance: 'text-blue-400',
-  contract: 'text-amber-400',
-  document: 'text-emerald-400',
+  compliance: 'text-blue-600 dark:text-blue-400',
+  contract: 'text-amber-600 dark:text-amber-400',
+  document: 'text-emerald-600 dark:text-emerald-400',
 }
 
 const TYPE_LABELS = {
@@ -102,7 +102,7 @@ export function ReviewQueue({ items, canEdit = true }: ReviewQueueProps) {
       {/* Items */}
       {filtered.length === 0 ? (
         <div className="rounded-lg border border-border p-12 text-center">
-          <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" />
+          <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600 dark:text-emerald-400" />
           <p className="mt-3 text-sm text-muted-foreground">
             No items pending review. All caught up!
           </p>
@@ -210,7 +210,7 @@ function ReviewItemRow({ item, canEdit = true }: { item: ReviewItem; canEdit?: b
                 variant="outline"
                 onClick={handleApprove}
                 disabled={isPending}
-                className="h-7 text-xs text-emerald-400 hover:text-emerald-300"
+                className="h-7 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:text-emerald-300"
               >
                 {isPending ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -227,7 +227,7 @@ function ReviewItemRow({ item, canEdit = true }: { item: ReviewItem; canEdit?: b
                   setShowChangesForm(false)
                 }}
                 disabled={isPending}
-                className="h-7 text-xs text-red-400 hover:text-red-300"
+                className="h-7 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:text-red-300"
               >
                 <XCircle className="h-3 w-3" />
                 Reject
@@ -240,7 +240,7 @@ function ReviewItemRow({ item, canEdit = true }: { item: ReviewItem; canEdit?: b
                   setShowRejectForm(false)
                 }}
                 disabled={isPending}
-                className="h-7 text-xs text-amber-400 hover:text-amber-300"
+                className="h-7 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:text-amber-300"
               >
                 <MessageSquare className="h-3 w-3" />
                 Request Changes
@@ -253,7 +253,7 @@ function ReviewItemRow({ item, canEdit = true }: { item: ReviewItem; canEdit?: b
       {/* Reject form */}
       {showRejectForm && (
         <div className="border-t border-border px-4 py-3 space-y-2">
-          <p className="text-xs font-medium text-red-400">Rejection Reason</p>
+          <p className="text-xs font-medium text-red-600 dark:text-red-400">Rejection Reason</p>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -289,7 +289,7 @@ function ReviewItemRow({ item, canEdit = true }: { item: ReviewItem; canEdit?: b
       {/* Request changes form */}
       {showChangesForm && (
         <div className="border-t border-border px-4 py-3 space-y-2">
-          <p className="text-xs font-medium text-amber-400">Feedback</p>
+          <p className="text-xs font-medium text-amber-600 dark:text-amber-400">Feedback</p>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}

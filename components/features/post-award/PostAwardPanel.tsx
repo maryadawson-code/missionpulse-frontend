@@ -45,10 +45,10 @@ interface PostAwardPanelProps {
 }
 
 const OUTCOMES = [
-  { value: 'won', label: 'Won', icon: Trophy, color: 'text-emerald-400' },
-  { value: 'lost', label: 'Lost', icon: XCircle, color: 'text-red-400' },
+  { value: 'won', label: 'Won', icon: Trophy, color: 'text-emerald-600 dark:text-emerald-400' },
+  { value: 'lost', label: 'Lost', icon: XCircle, color: 'text-red-600 dark:text-red-400' },
   { value: 'no_bid', label: 'No Bid', icon: Ban, color: 'text-gray-400' },
-  { value: 'protest', label: 'Protest', icon: AlertTriangle, color: 'text-amber-400' },
+  { value: 'protest', label: 'Protest', icon: AlertTriangle, color: 'text-amber-600 dark:text-amber-400' },
 ]
 
 export function PostAwardPanel({
@@ -252,7 +252,7 @@ export function PostAwardPanel({
       <div className="rounded-xl border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-[#00E5FA]" />
+            <BookOpen className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold text-foreground">
               Lessons Learned ({lessons.length})
             </h3>
@@ -355,7 +355,7 @@ export function PostAwardPanel({
                   </p>
                 )}
                 {lesson.recommendation && (
-                  <p className="text-xs text-[#00E5FA] mt-1">
+                  <p className="text-xs text-primary mt-1">
                     Rec: {lesson.recommendation}
                   </p>
                 )}

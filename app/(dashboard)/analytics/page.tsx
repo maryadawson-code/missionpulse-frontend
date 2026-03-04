@@ -1,9 +1,29 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { resolveRole, hasPermission } from '@/lib/rbac/config'
-import { AnalyticsDashboard } from '@/components/features/analytics/AnalyticsDashboard'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const AnalyticsDashboard = dynamic(
+  () => import('@/components/features/analytics/AnalyticsDashboard').then((m) => m.AnalyticsDashboard),
+  {
+    loading: () => (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    ),
+  }
+)
 
 export const metadata: Metadata = {
   title: 'Analytics — MissionPulse',
@@ -191,8 +211,8 @@ export default async function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Analytics</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Pipeline metrics, win rate trends, and performance dashboards across
             your portfolio.
           </p>
@@ -203,7 +223,7 @@ export default async function AnalyticsPage() {
         >
           <span className="text-base">🤖</span>
           <div>
-            <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+            <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
               AI Usage Analytics
             </p>
             <p className="text-[11px] text-slate">Token consumption &amp; cost breakdown</p>

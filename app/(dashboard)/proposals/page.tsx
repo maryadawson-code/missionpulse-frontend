@@ -176,7 +176,7 @@ export default async function ProposalsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Proposals</h1>
+        <h1 className="text-2xl font-bold text-foreground">Proposals</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Manage proposal outlines and review pending items.
         </p>
@@ -206,7 +206,7 @@ export default async function ProposalsPage() {
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             Compliance
           </p>
-          <p className="mt-1 text-2xl font-bold text-blue-400">
+          <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
             {items.filter((i) => i.type === 'compliance').length}
           </p>
         </div>
@@ -214,7 +214,7 @@ export default async function ProposalsPage() {
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             Contracts
           </p>
-          <p className="mt-1 text-2xl font-bold text-amber-400">
+          <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">
             {items.filter((i) => i.type === 'contract').length}
           </p>
         </div>
@@ -222,7 +222,7 @@ export default async function ProposalsPage() {
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             Documents
           </p>
-          <p className="mt-1 text-2xl font-bold text-emerald-400">
+          <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
             {items.filter((i) => i.type === 'document').length}
           </p>
         </div>

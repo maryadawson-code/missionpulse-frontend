@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
+
 export default function GlobalError({
   error,
   reset,
@@ -7,15 +10,19 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    Sentry.captureException(error)
+  }, [error])
+
   return (
-    <html lang="en" className="dark">
-      <body className="bg-[#00050F] text-white antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-background text-foreground antialiased">
         <div className="flex min-h-screen items-center justify-center p-8">
           <div className="text-center space-y-4">
-            <h1 className="text-4xl font-bold text-red-400">
+            <h1 className="text-4xl font-bold text-red-600 dark:text-red-400">
               Something Went Wrong
             </h1>
-            <p className="text-slate-400 max-w-md mx-auto">
+            <p className="text-muted-foreground max-w-md mx-auto">
               {error.digest
                 ? `Error ID: ${error.digest}`
                 : 'An unexpected error occurred. Our team has been notified.'}
@@ -23,13 +30,13 @@ export default function GlobalError({
             <div className="flex items-center justify-center gap-4 pt-2">
               <button
                 onClick={reset}
-                className="rounded-lg bg-[#00E5FA] px-6 py-2.5 font-semibold text-[#00050F] transition hover:bg-[#00E5FA]/90"
+                className="rounded-lg bg-primary px-6 py-2.5 font-semibold text-primary-foreground transition hover:bg-primary/90"
               >
                 Try Again
               </button>
               <a
                 href="/dashboard"
-                className="rounded-lg border border-gray-700 px-6 py-2.5 font-semibold text-gray-300 transition hover:border-gray-500"
+                className="rounded-lg border border-border px-6 py-2.5 font-semibold text-muted-foreground transition hover:border-input"
               >
                 Go Home
               </a>

@@ -2,6 +2,7 @@
 
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
+import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 
 export async function runComplianceExtraction(context: {
   sourceText: string
@@ -29,11 +30,22 @@ ${context.sourceText.slice(0, 8000)}
 
 Format as a numbered list with clear delimiters for each field.`
 
+  const baseSystemPrompt =
+    'You are an expert GovCon compliance analyst. Extract every compliance requirement from RFP text. Be thorough — missing a requirement can be grounds for elimination. Err on the side of including marginal requirements with lower confidence.'
+
+  const feedbackCtx = await buildFeedbackContext('compliance')
+  const systemPrompt = feedbackCtx
+    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
+    : baseSystemPrompt
+
   return aiRequest({
     taskType: 'compliance',
     prompt,
     opportunityId: context.opportunityId,
-    systemPrompt:
-      'You are an expert GovCon compliance analyst. Extract every compliance requirement from RFP text. Be thorough — missing a requirement can be grounds for elimination. Err on the side of including marginal requirements with lower confidence.',
+    systemPrompt,
+    // RFP/solicitation text is from published government sources — not CUI.
+    // Skip content scanner to avoid false OPSEC classification from terms
+    // like "TS/SCI", "FOUO", etc. that appear in public solicitations.
+    classificationOverride: 'UNCLASSIFIED',
   })
 }

@@ -22,8 +22,8 @@ export function VolumeProgress({ sections }: VolumeProgressProps) {
   const sorted = Object.entries(volumes).sort(([a], [b]) => a.localeCompare(b))
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+    <div className="rounded-xl border border-border bg-card/50 p-6">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
         Volume Progress
       </h2>
       <div className="space-y-3">
@@ -34,16 +34,16 @@ export function VolumeProgress({ sections }: VolumeProgressProps) {
               ? 'bg-emerald-500'
               : pct >= 50
                 ? 'bg-amber-500'
-                : 'bg-[#00E5FA]'
+                : 'bg-primary'
           return (
             <div key={volume}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-300">{volume}</span>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs font-medium text-muted-foreground">{volume}</span>
+                <span className="text-xs text-muted-foreground">
                   {final}/{total} sections final
                 </span>
               </div>
-              <div className="h-2 w-full rounded-full bg-gray-800">
+              <div className="h-2 w-full rounded-full bg-muted">
                 <div
                   className={`h-2 rounded-full transition-all duration-300 ${barColor}`}
                   style={{ width: `${pct}%` }}

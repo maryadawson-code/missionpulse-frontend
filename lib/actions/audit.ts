@@ -6,7 +6,10 @@
 'use server'
 
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createLogger } from '@/lib/logging/logger'
 import type { Database } from '@/lib/supabase/database.types'
+
+const log = createLogger('audit')
 
 // ── Supabase Json type alias ──
 type Json = Database['public']['Tables']['activity_log']['Row']['details']
@@ -77,13 +80,13 @@ export async function logActivity(entry: ActivityLogEntry): Promise<AuditResult>
 
     if (error) {
       // Non-blocking: log failure but don't break the parent operation
-      console.error('[audit] activity_log insert failed:', error.message)
+      log.error('activity_log insert failed', { error: error.message })
       return { success: false, error: error.message }
     }
 
     return { success: true }
   } catch (err) {
-    console.error('[audit] unexpected error:', err)
+    log.error('Unexpected error', { error: err instanceof Error ? err.message : String(err) })
     return { success: false, error: 'Unexpected audit error' }
   }
 }
@@ -141,13 +144,13 @@ export async function logAudit(entry: {
       })
 
     if (error) {
-      console.error('[audit] audit_logs insert failed:', error.message)
+      log.error('audit_logs insert failed', { error: error.message })
       return { success: false, error: error.message }
     }
 
     return { success: true }
   } catch (err) {
-    console.error('[audit] unexpected error:', err)
+    log.error('Unexpected error', { error: err instanceof Error ? err.message : String(err) })
     return { success: false, error: 'Unexpected audit error' }
   }
 }
@@ -185,7 +188,7 @@ export async function getRecentActivity(limit = 10): Promise<{
       .limit(limit)
 
     if (error) {
-      console.error('[audit] getRecentActivity failed:', error.message)
+      log.error('getRecentActivity failed', { error: error.message })
       return { data: [], error: error.message }
     }
 
@@ -200,7 +203,7 @@ export async function getRecentActivity(limit = 10): Promise<{
 
     return { data: items }
   } catch (err) {
-    console.error('[audit] unexpected error:', err)
+    log.error('Unexpected error', { error: err instanceof Error ? err.message : String(err) })
     return { data: [], error: 'Failed to load activity' }
   }
 }

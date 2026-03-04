@@ -62,12 +62,12 @@ export function VoiceProfileManager({
     return (
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-gray-400">{label}</span>
-          <span className="text-[10px] font-medium text-white">{value}/100</span>
+          <span className="text-[10px] text-muted-foreground">{label}</span>
+          <span className="text-[10px] font-medium text-foreground">{value}/100</span>
         </div>
-        <div className="h-1.5 rounded-full bg-gray-800">
+        <div className="h-1.5 rounded-full bg-muted">
           <div
-            className="h-1.5 rounded-full bg-[#00E5FA]"
+            className="h-1.5 rounded-full bg-primary"
             style={{ width: `${value}%` }}
           />
         </div>
@@ -79,12 +79,12 @@ export function VoiceProfileManager({
     <div className="space-y-6">
       {/* Upload Section */}
       {!existingProfile && (
-        <div className="rounded-xl border border-dashed border-gray-700 bg-gray-900/50 p-8 text-center">
-          <Upload className="h-10 w-10 mx-auto text-gray-600 mb-3" />
-          <h3 className="text-sm font-semibold text-white mb-1">
+        <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
+          <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          <h3 className="text-sm font-semibold text-foreground mb-1">
             Generate Voice Profile
           </h3>
-          <p className="text-xs text-gray-500 mb-4 max-w-md mx-auto">
+          <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
             Upload at least 3 past proposals (PDF or DOCX) to analyze your company&apos;s
             writing style. The AI will extract vocabulary, tone, and structural patterns.
           </p>
@@ -100,7 +100,7 @@ export function VoiceProfileManager({
             {generating ? 'Analyzing...' : 'Upload & Analyze'}
           </Button>
           {!canEdit && (
-            <p className="text-[10px] text-gray-600 mt-2">
+            <p className="text-[10px] text-muted-foreground mt-2">
               Executive or Operations role required to create voice profiles.
             </p>
           )}
@@ -111,15 +111,15 @@ export function VoiceProfileManager({
       {existingProfile && (
         <>
           {/* Status Bar */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+          <div className="rounded-xl border border-border bg-card/50 p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-[#00E5FA]/10">
-                  <Fingerprint className="h-5 w-5 text-[#00E5FA]" />
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-primary/10">
+                  <Fingerprint className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Voice Profile Active</h3>
-                  <p className="text-xs text-gray-500">
+                  <h3 className="text-sm font-semibold text-foreground">Voice Profile Active</h3>
+                  <p className="text-xs text-muted-foreground">
                     Based on {existingProfile.sourceDocCount} documents — Last updated{' '}
                     {new Date(existingProfile.updatedAt).toLocaleDateString('en-US', {
                       month: 'short',
@@ -144,11 +144,11 @@ export function VoiceProfileManager({
 
           {/* Tone Metrics */}
           {existingProfile.tone && (
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-4">
+            <div className="rounded-xl border border-border bg-card/50 p-5 space-y-4">
               <div className="flex items-center gap-2">
-                <Sliders className="h-4 w-4 text-[#00E5FA]" />
-                <h3 className="text-sm font-semibold text-white">Tone Profile</h3>
-                <span className="ml-auto text-[10px] text-gray-500 rounded bg-gray-800 px-2 py-0.5">
+                <Sliders className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Tone Profile</h3>
+                <span className="ml-auto text-[10px] text-muted-foreground rounded bg-muted px-2 py-0.5">
                   {existingProfile.tone.persuasionStyle}
                 </span>
               </div>
@@ -164,24 +164,24 @@ export function VoiceProfileManager({
 
           {/* Structure */}
           {existingProfile.structure && (
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">Writing Structure</h3>
+            <div className="rounded-xl border border-border bg-card/50 p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Writing Structure</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <p className="text-[10px] text-gray-500">Avg Sentence Length</p>
-                  <p className="text-lg font-bold text-white">
+                  <p className="text-[10px] text-muted-foreground">Avg Sentence Length</p>
+                  <p className="text-lg font-bold text-foreground">
                     {Math.round(existingProfile.structure.avgSentenceLength)} words
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500">Active Voice Ratio</p>
-                  <p className="text-lg font-bold text-white">
+                  <p className="text-[10px] text-muted-foreground">Active Voice Ratio</p>
+                  <p className="text-lg font-bold text-foreground">
                     {Math.round(existingProfile.structure.activeVoiceRatio * 100)}%
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500">Heading Style</p>
-                  <p className="text-lg font-bold text-white capitalize">
+                  <p className="text-[10px] text-muted-foreground">Heading Style</p>
+                  <p className="text-lg font-bold text-foreground capitalize">
                     {existingProfile.structure.headingStyle}
                   </p>
                 </div>
@@ -192,16 +192,16 @@ export function VoiceProfileManager({
           {/* Terminology & Phrases */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {existingProfile.terminology.length > 0 && (
-              <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+              <div className="rounded-xl border border-border bg-card/50 p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <BookOpen className="h-4 w-4 text-[#00E5FA]" />
-                  <h3 className="text-xs font-semibold text-white">Domain Terminology</h3>
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  <h3 className="text-xs font-semibold text-foreground">Domain Terminology</h3>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {existingProfile.terminology.slice(0, 15).map((term, i) => (
                     <span
                       key={i}
-                      className="rounded bg-gray-800 px-2 py-0.5 text-[10px] text-gray-300"
+                      className="rounded bg-muted px-2 py-0.5 text-[10px] text-foreground"
                     >
                       {term}
                     </span>
@@ -211,15 +211,15 @@ export function VoiceProfileManager({
             )}
 
             {existingProfile.samplePhrases.length > 0 && (
-              <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-                <h3 className="text-xs font-semibold text-white mb-3">
+              <div className="rounded-xl border border-border bg-card/50 p-5">
+                <h3 className="text-xs font-semibold text-foreground mb-3">
                   Characteristic Phrases
                 </h3>
                 <div className="space-y-2">
                   {existingProfile.samplePhrases.slice(0, 5).map((phrase, i) => (
                     <p
                       key={i}
-                      className="text-[10px] text-gray-400 italic border-l-2 border-[#00E5FA]/30 pl-2"
+                      className="text-[10px] text-muted-foreground italic border-l-2 border-primary/30 pl-2"
                     >
                       &ldquo;{phrase}&rdquo;
                     </p>
@@ -231,9 +231,9 @@ export function VoiceProfileManager({
 
           {/* Custom Prompt Modifier */}
           {canEdit && (
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-white">Custom Voice Instructions</h3>
-              <p className="text-xs text-gray-500">
+            <div className="rounded-xl border border-border bg-card/50 p-5 space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Custom Voice Instructions</h3>
+              <p className="text-xs text-muted-foreground">
                 Add custom instructions for the AI writer. These override the auto-detected voice profile.
               </p>
               <textarea
@@ -241,7 +241,7 @@ export function VoiceProfileManager({
                 onChange={(e) => setModifier(e.target.value)}
                 rows={3}
                 placeholder="e.g., Always use 'we' instead of 'the team'. Reference past performance within first 2 sentences..."
-                className="w-full rounded-lg border border-gray-800 bg-gray-900/80 px-3 py-2 text-xs text-white placeholder:text-gray-600 focus:border-[#00E5FA] focus:outline-none"
+                className="w-full rounded-lg border border-border bg-card/80 px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
               />
               <Button variant="outline" size="sm">
                 Save Instructions

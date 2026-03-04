@@ -2,6 +2,7 @@
 
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
+import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 
 export async function runContractsAgent(context: {
   clauses: { id: string; clause_number: string; clause_title: string; full_text: string }[]
@@ -26,11 +27,18 @@ For each clause, provide:
 
 Format each clause analysis clearly.`
 
+  const baseSystemPrompt =
+    'You are a government contracts attorney with deep FAR/DFARS expertise. Provide practical, actionable risk assessments. Focus on business impact rather than legal theory.'
+
+  const feedbackCtx = await buildFeedbackContext('contracts')
+  const systemPrompt = feedbackCtx
+    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
+    : baseSystemPrompt
+
   return aiRequest({
     taskType: 'contracts',
     prompt,
     opportunityId: context.opportunityId,
-    systemPrompt:
-      'You are a government contracts attorney with deep FAR/DFARS expertise. Provide practical, actionable risk assessments. Focus on business impact rather than legal theory.',
+    systemPrompt,
   })
 }

@@ -3,7 +3,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const PRODUCTION_URL =
-  process.env.PRODUCTION_URL ?? 'https://missionpulse.netlify.app'
+  process.env.PRODUCTION_URL ?? 'https://missionpulse.ai'
 
 export default defineConfig({
   testDir: './tests/e2e',

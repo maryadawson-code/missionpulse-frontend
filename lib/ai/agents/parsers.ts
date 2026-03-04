@@ -101,13 +101,13 @@ export function parseExtractedRequirements(
       reqMatch?.[1]?.trim() ?? block.replace(/^[\d.\s]+/, '').trim().slice(0, 300)
     if (requirementText.length < 10) continue
 
-    const priorityRaw = priorityMatch?.[1]?.trim() ?? 'Medium'
-    const confRaw = confMatch?.[1]?.trim().toLowerCase() ?? 'medium'
+    const priorityRaw = priorityMatch?.[1]?.trim().split(/[\s\n,;]/)[0] ?? 'Medium'
+    const confRaw = confMatch?.[1]?.trim().split(/[\s\n,;]/)[0].toLowerCase() ?? 'medium'
 
     requirements.push({
       reference,
       requirement: requirementText,
-      section: sectionMatch?.[1]?.trim() ?? 'Other',
+      section: sectionMatch?.[1]?.trim().split('\n')[0].trim() ?? 'Other',
       priority: ['Critical', 'High', 'Medium', 'Low'].includes(priorityRaw)
         ? priorityRaw
         : 'Medium',

@@ -17,14 +17,14 @@ function confidenceStyle(level: string | null): string {
   switch (level?.toLowerCase()) {
     case 'high':
     case 'confirmed':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'medium':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'low':
     case 'rumor':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -84,10 +84,10 @@ export default async function IntelPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">
+        <h1 className="text-2xl font-bold text-foreground">
           Intelligence Collection
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           Competitive intelligence and market data for {opp.title}.
         </p>
       </div>
@@ -95,24 +95,24 @@ export default async function IntelPage({
       {/* Competitive Matrices */}
       {matrixList.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Competitive Matrices
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {matrixList.map((m) => (
               <div
                 key={m.id}
-                className="rounded-lg border border-gray-800 bg-gray-900/50 p-4"
+                className="rounded-lg border border-border bg-card/50 p-4"
               >
-                <h3 className="text-sm font-medium text-white">
+                <h3 className="text-sm font-medium text-foreground">
                   {m.matrix_name}
                 </h3>
                 {m.description && (
-                  <p className="mt-1 text-xs text-gray-400">{m.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{m.description}</p>
                 )}
-                <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-500">
+                <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
                   {m.status && (
-                    <span className="rounded-full bg-slate-500/15 px-2 py-0.5 text-slate-300">
+                    <span className="rounded-full bg-slate-500/15 px-2 py-0.5 text-slate-700 dark:text-slate-300">
                       {m.status}
                     </span>
                   )}
@@ -126,7 +126,7 @@ export default async function IntelPage({
 
       {/* Intel Collection */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Collected Intelligence
         </h2>
 
@@ -159,19 +159,19 @@ export default async function IntelPage({
                         </span>
                       )}
                       {item.classification && (
-                        <span className="text-[10px] text-gray-600">
+                        <span className="text-[10px] text-muted-foreground">
                           {item.classification}
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[10px] text-muted-foreground">
                       {formatDate(item.created_at)}
                     </span>
                   </div>
 
-                  <p className="text-sm text-gray-300">{item.content}</p>
+                  <p className="text-sm text-muted-foreground">{item.content}</p>
 
-                  <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                     {item.source_name && (
                       <span>
                         Source: {item.source_name}
@@ -188,7 +188,7 @@ export default async function IntelPage({
                       {tags.map((tag, i) => (
                         <span
                           key={i}
-                          className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-400"
+                          className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
                         >
                           {tag}
                         </span>

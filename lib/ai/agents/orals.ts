@@ -2,6 +2,7 @@
 
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
+import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 
 export async function runOralsAgent(context: {
   title: string
@@ -31,11 +32,18 @@ Please generate:
 
 For each Q&A pair, include a "Because" explaining why an evaluator would ask this question.`
 
+  const baseSystemPrompt =
+    'You are an experienced government source evaluation board member and orals coach. Generate realistic, challenging questions that evaluators actually ask. Provide practical coaching tips, not generic presentation advice.'
+
+  const feedbackCtx = await buildFeedbackContext('orals')
+  const systemPrompt = feedbackCtx
+    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
+    : baseSystemPrompt
+
   return aiRequest({
     taskType: 'orals',
     prompt,
     opportunityId: context.opportunityId,
-    systemPrompt:
-      'You are an experienced government source evaluation board member and orals coach. Generate realistic, challenging questions that evaluators actually ask. Provide practical coaching tips, not generic presentation advice.',
+    systemPrompt,
   })
 }

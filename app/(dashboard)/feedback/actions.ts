@@ -54,17 +54,8 @@ export async function voteForSuggestion(
 
   if (voteError) return { success: false, error: voteError.message }
 
-  // Increment vote count
-  const { data: suggestion } = await supabase
-    .from('feature_suggestions')
-    .select('votes')
-    .eq('id', suggestionId)
-    .single()
-
-  await supabase
-    .from('feature_suggestions')
-    .update({ votes: (suggestion?.votes ?? 0) + 1 })
-    .eq('id', suggestionId)
+  // Atomic increment via database RPC
+  await supabase.rpc('increment_votes', { suggestion_id: suggestionId })
 
   return { success: true }
 }

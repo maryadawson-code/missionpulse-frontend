@@ -59,8 +59,8 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
 
 
   const inputClass =
-    'w-full rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 text-sm text-gray-200 placeholder-gray-500 outline-none transition-colors focus:border-[#00E5FA]/50 focus:ring-1 focus:ring-[#00E5FA]/25 disabled:opacity-50'
-  const labelClass = 'block text-sm font-medium text-gray-300 mb-1.5'
+    'w-full rounded-lg border border-border bg-card/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/25 disabled:opacity-50'
+  const labelClass = 'block text-sm font-medium text-muted-foreground mb-1.5'
 
   function handleProfileSubmit(formData: FormData) {
     startTransition(async () => {
@@ -100,8 +100,8 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
     <div className="space-y-8 max-w-2xl">
       {/* Profile Section */}
       <form action={handleProfileSubmit}>
-        <fieldset className="space-y-4 rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-          <legend className="text-sm font-semibold text-white px-2">
+        <fieldset className="space-y-4 rounded-xl border border-border bg-card/50 p-6">
+          <legend className="text-sm font-semibold text-foreground px-2">
             Profile Information
           </legend>
 
@@ -133,7 +133,7 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
                 className={inputClass}
                 disabled
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Contact admin to change email
               </p>
             </div>
@@ -201,7 +201,7 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
             <button
               type="submit"
               disabled={isPending}
-              className="rounded-lg bg-[#00E5FA] px-6 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90 disabled:opacity-50"
+              className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {isPending ? 'Saving...' : 'Save Changes'}
             </button>
@@ -211,8 +211,8 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
 
       {/* Password Section */}
       <form action={handlePasswordSubmit}>
-        <fieldset className="space-y-4 rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-          <legend className="text-sm font-semibold text-white px-2">
+        <fieldset className="space-y-4 rounded-xl border border-border bg-card/50 p-6">
+          <legend className="text-sm font-semibold text-foreground px-2">
             Change Password
           </legend>
 
@@ -250,7 +250,7 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
             <button
               type="submit"
               disabled={passwordPending}
-              className="rounded-lg bg-[#00E5FA] px-6 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90 disabled:opacity-50"
+              className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-[#00050F] transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {passwordPending ? 'Updating...' : 'Update Password'}
             </button>
@@ -259,13 +259,13 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
       </form>
 
       {/* Notification Preferences */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
+      <div className="rounded-xl border border-border bg-card/50 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-white">
+            <h3 className="text-sm font-semibold text-foreground">
               Notification Preferences
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               Choose how you want to be notified
             </p>
           </div>
@@ -282,7 +282,7 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
                 }
               })
             }}
-            className="rounded-lg bg-[#00E5FA] px-4 py-1.5 text-xs font-medium text-[#00050F] transition-colors hover:bg-[#00E5FA]/90 disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-[#00050F] transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {notifPending ? 'Saving...' : 'Save'}
           </button>
@@ -291,25 +291,25 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-800">
-                <th className="py-2 text-xs font-semibold text-gray-500 pr-4">
+              <tr className="border-b border-border">
+                <th className="py-2 text-xs font-semibold text-muted-foreground pr-4">
                   Type
                 </th>
-                <th className="py-2 text-xs font-semibold text-gray-500 text-center px-4">
+                <th className="py-2 text-xs font-semibold text-muted-foreground text-center px-4">
                   In-App
                 </th>
-                <th className="py-2 text-xs font-semibold text-gray-500 text-center px-4">
+                <th className="py-2 text-xs font-semibold text-muted-foreground text-center px-4">
                   Email
                 </th>
-                <th className="py-2 text-xs font-semibold text-gray-500 text-center px-4">
+                <th className="py-2 text-xs font-semibold text-muted-foreground text-center px-4">
                   Push
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-border/50">
               {NOTIFICATION_TYPES.map((nt, idx) => (
                 <tr key={nt.type}>
-                  <td className="py-2.5 text-xs text-gray-300 pr-4">
+                  <td className="py-2.5 text-xs text-muted-foreground pr-4">
                     {nt.label}
                   </td>
                   <td className="py-2.5 text-center px-4">
@@ -321,7 +321,7 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
                         next[idx] = { ...next[idx], in_app_enabled: e.target.checked }
                         setPrefs(next)
                       }}
-                      className="rounded border-gray-700 text-[#00E5FA]"
+                      className="rounded border-border text-primary"
                     />
                   </td>
                   <td className="py-2.5 text-center px-4">
@@ -333,7 +333,7 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
                         next[idx] = { ...next[idx], email_enabled: e.target.checked }
                         setPrefs(next)
                       }}
-                      className="rounded border-gray-700 text-[#00E5FA]"
+                      className="rounded border-border text-primary"
                     />
                   </td>
                   <td className="py-2.5 text-center px-4">
@@ -345,7 +345,7 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
                         next[idx] = { ...next[idx], push_enabled: e.target.checked }
                         setPrefs(next)
                       }}
-                      className="rounded border-gray-700 text-[#00E5FA]"
+                      className="rounded border-border text-primary"
                     />
                   </td>
                 </tr>
@@ -356,13 +356,13 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
       </div>
 
       {/* Appearance */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-        <h3 className="text-sm font-semibold text-white">Appearance</h3>
-        <p className="mt-1 text-xs text-gray-500">Choose your preferred theme.</p>
+      <div className="rounded-xl border border-border bg-card/50 p-6">
+        <h3 className="text-sm font-semibold text-foreground">Appearance</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Choose your preferred theme.</p>
         <div className="mt-4 flex items-center gap-3">
           <button
             type="button"
-            className="flex items-center gap-2 rounded-lg border border-[#00E5FA]/50 bg-[#00E5FA]/10 px-4 py-2.5 text-sm font-medium text-[#00E5FA]"
+            className="flex items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary"
             disabled
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -372,7 +372,7 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
           </button>
           <button
             type="button"
-            className="flex items-center gap-2 rounded-lg border border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-400 transition-colors hover:border-gray-600 hover:text-gray-300"
+            className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-border hover:text-muted-foreground"
             onClick={() => addToast('info', 'Light theme coming soon')}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -384,16 +384,16 @@ export function SettingsForm({ profile, notificationPrefs = [] }: SettingsFormPr
       </div>
 
       {/* Account Info */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-        <h3 className="text-sm font-semibold text-white">Account</h3>
+      <div className="rounded-xl border border-border bg-card/50 p-6">
+        <h3 className="text-sm font-semibold text-foreground">Account</h3>
         <dl className="mt-4 space-y-3">
           <div className="flex items-center justify-between">
-            <dt className="text-xs text-gray-500">User ID</dt>
-            <dd className="text-xs font-mono text-gray-400">{profile.id}</dd>
+            <dt className="text-xs text-muted-foreground">User ID</dt>
+            <dd className="text-xs font-mono text-muted-foreground">{profile.id}</dd>
           </div>
           <div className="flex items-center justify-between">
-            <dt className="text-xs text-gray-500">Role</dt>
-            <dd className="text-xs text-gray-400">
+            <dt className="text-xs text-muted-foreground">Role</dt>
+            <dd className="text-xs text-muted-foreground">
               {profile.role.replace(/_/g, ' ')}
             </dd>
           </div>

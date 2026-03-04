@@ -56,8 +56,8 @@ export default async function AdminPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Admin Console</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Admin Console</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage users and system settings
         </p>
       </div>
@@ -72,7 +72,7 @@ export default async function AdminPage() {
           >
             <span className="text-lg mt-0.5">{link.icon}</span>
             <div>
-              <p className="text-sm font-medium text-white group-hover:text-cyan transition-colors">
+              <p className="text-sm font-medium text-foreground group-hover:text-cyan transition-colors">
                 {link.label}
               </p>
               <p className="text-xs text-slate mt-0.5">{link.desc}</p>
@@ -82,7 +82,7 @@ export default async function AdminPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-600 dark:text-red-400">
           Failed to load users: {error.message}
         </div>
       )}

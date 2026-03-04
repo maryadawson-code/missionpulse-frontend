@@ -102,8 +102,8 @@ export default async function AIChatPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-white">AI Assistant</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">AI Assistant</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Just type naturally — your message is automatically routed to the right agent.
         </p>
       </div>

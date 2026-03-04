@@ -16,15 +16,15 @@ function impactStyle(impact: string | null): string {
   switch (impact?.toLowerCase()) {
     case 'critical':
     case 'very high':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     case 'high':
-      return 'bg-orange-500/15 text-orange-300'
+      return 'bg-orange-500/15 text-orange-700 dark:text-orange-300'
     case 'medium':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'low':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -33,14 +33,14 @@ function statusStyle(status: string | null): string {
     case 'mitigated':
     case 'resolved':
     case 'closed':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'active':
     case 'open':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     case 'monitoring':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -127,35 +127,35 @@ export default async function RisksPage({
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-white">Risk Register</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Risk Register</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Track and mitigate risks for {opp.title}.
         </p>
       </div>
 
       {/* Risk Summary Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Risks</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Risks</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {riskItems.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Active</p>
-          <p className="mt-1 text-lg font-bold text-red-400">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Active</p>
+          <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">
             {activeRisks.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">High/Critical</p>
-          <p className="mt-1 text-lg font-bold text-amber-400">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">High/Critical</p>
+          <p className="mt-1 text-lg font-bold text-amber-600 dark:text-amber-400">
             {highRisks.length}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Avg Score</p>
-          <p className="mt-1 text-lg font-bold text-white">{avgScore}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Avg Score</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{avgScore}</p>
         </div>
       </div>
 
@@ -174,12 +174,12 @@ export default async function RisksPage({
             return (
               <div
                 key={risk.id}
-                className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-3"
+                className="rounded-xl border border-border bg-card/50 p-5 space-y-3"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-white">
+                      <h3 className="text-sm font-semibold text-foreground">
                         {risk.risk_title}
                       </h3>
                       {risk.impact && (
@@ -202,7 +202,7 @@ export default async function RisksPage({
                       )}
                     </div>
                     {risk.description && (
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {risk.description}
                       </p>
                     )}
@@ -211,10 +211,10 @@ export default async function RisksPage({
                     <div
                       className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${
                         risk.risk_score >= 15
-                          ? 'bg-red-500/15 text-red-300'
+                          ? 'bg-red-500/15 text-red-700 dark:text-red-300'
                           : risk.risk_score >= 8
-                            ? 'bg-amber-500/15 text-amber-300'
-                            : 'bg-emerald-500/15 text-emerald-300'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                            : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                       }`}
                     >
                       {risk.risk_score}
@@ -222,7 +222,7 @@ export default async function RisksPage({
                   )}
                 </div>
 
-                <div className="flex items-center gap-4 text-[10px] text-gray-500">
+                <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
                   {risk.category && <span>Category: {risk.category}</span>}
                   {risk.probability && (
                     <span>Probability: {risk.probability}</span>
@@ -235,18 +235,18 @@ export default async function RisksPage({
 
                 {/* Mitigations */}
                 {mitigations.length > 0 && (
-                  <div className="border-t border-gray-800 pt-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  <div className="border-t border-border pt-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                       Mitigations
                     </p>
                     <div className="space-y-1">
                       {mitigations.map((m) => (
                         <div
                           key={m.id}
-                          className="flex items-center justify-between rounded px-2 py-1 text-xs bg-gray-800/30"
+                          className="flex items-center justify-between rounded px-2 py-1 text-xs bg-muted/30"
                         >
-                          <span className="text-gray-300">{m.action}</span>
-                          <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                          <span className="text-muted-foreground">{m.action}</span>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                             {m.assigned_to && <span>{m.assigned_to}</span>}
                             {m.status && (
                               <span

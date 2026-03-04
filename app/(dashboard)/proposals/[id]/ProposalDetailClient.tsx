@@ -52,9 +52,9 @@ interface ProposalDetailClientProps {
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-gray-500/20 text-gray-300',
-  in_progress: 'bg-blue-500/20 text-blue-300',
-  review: 'bg-amber-500/20 text-amber-300',
-  final: 'bg-emerald-500/20 text-emerald-300',
+  in_progress: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
+  review: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+  final: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
 }
 
 const VOLUME_COLORS: Record<string, string> = {
@@ -187,7 +187,7 @@ export function ProposalDetailClient({
                 </div>
               </div>
               {volume.pageLimit && totalPages > volume.pageLimit && (
-                <span className="text-xs text-red-400 font-medium">
+                <span className="text-xs text-red-600 dark:text-red-400 font-medium">
                   Over limit
                 </span>
               )}

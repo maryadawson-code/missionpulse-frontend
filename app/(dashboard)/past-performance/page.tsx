@@ -6,16 +6,16 @@ function ratingStyle(rating: string | null): string {
   switch (rating?.toLowerCase()) {
     case 'exceptional':
     case 'outstanding':
-      return 'bg-emerald-500/15 text-emerald-300'
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     case 'very good':
     case 'satisfactory':
-      return 'bg-blue-500/15 text-blue-300'
+      return 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
     case 'marginal':
-      return 'bg-amber-500/15 text-amber-300'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     case 'unsatisfactory':
-      return 'bg-red-500/15 text-red-300'
+      return 'bg-red-500/15 text-red-700 dark:text-red-300'
     default:
-      return 'bg-slate-500/15 text-slate-300'
+      return 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
   }
 }
 
@@ -59,20 +59,20 @@ export default async function PastPerformancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Past Performance Library</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Past Performance Library</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Track contract history, CPARS ratings, and relevance for future proposals.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Records</p>
-          <p className="mt-1 text-lg font-bold text-white">{items.length}</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Records</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{items.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Total Value</p>
-          <p className="mt-1 text-lg font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Total Value</p>
+          <p className="mt-1 text-lg font-bold text-foreground">
             {totalValue > 0
               ? new Intl.NumberFormat('en-US', {
                   style: 'currency',
@@ -82,13 +82,13 @@ export default async function PastPerformancePage() {
               : '—'}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Avg Relevance</p>
-          <p className="mt-1 text-lg font-bold text-white">{avgRelevance}%</p>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Avg Relevance</p>
+          <p className="mt-1 text-lg font-bold text-foreground">{avgRelevance}%</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">Exceptional</p>
-          <p className="mt-1 text-lg font-bold text-emerald-400">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <p className="text-xs text-muted-foreground">Exceptional</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">
             {items.filter(
               (r) =>
                 r.cpars_rating === 'exceptional' ||
@@ -110,12 +110,12 @@ export default async function PastPerformancePage() {
           {items.map((rec) => (
             <div
               key={rec.id}
-              className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-2"
+              className="rounded-xl border border-border bg-card/50 p-5 space-y-2"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3 className="text-sm font-semibold text-foreground">
                       {rec.contract_title}
                     </h3>
                     {rec.cpars_rating && (
@@ -127,7 +127,7 @@ export default async function PastPerformancePage() {
                     )}
                   </div>
                   {rec.client_agency && (
-                    <p className="mt-0.5 text-xs text-gray-400">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {rec.client_agency}
                       {rec.contract_number && ` · ${rec.contract_number}`}
                     </p>
@@ -137,10 +137,10 @@ export default async function PastPerformancePage() {
                   <div
                     className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${
                       rec.relevance_score >= 80
-                        ? 'bg-emerald-500/15 text-emerald-300'
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                         : rec.relevance_score >= 50
-                          ? 'bg-amber-500/15 text-amber-300'
-                          : 'bg-slate-500/15 text-slate-300'
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                          : 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
                     }`}
                   >
                     {rec.relevance_score}%
@@ -149,12 +149,12 @@ export default async function PastPerformancePage() {
               </div>
 
               {rec.description && (
-                <p className="text-xs text-gray-400 line-clamp-2">
+                <p className="text-xs text-muted-foreground line-clamp-2">
                   {rec.description}
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-4 text-[10px] text-gray-500">
+              <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground">
                 {rec.contract_value && (
                   <span>
                     Value:{' '}

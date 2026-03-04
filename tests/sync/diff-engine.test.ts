@@ -1,214 +1,64 @@
 // filepath: tests/sync/diff-engine.test.ts
 /**
  * Tests for diff-engine.ts — Section-level Diff Engine
- * v1.3 Sprint 31
- *
- * Tests the LCS-based diff engine that computes line-level and section-level
- * diffs between document versions. All functions under test are async.
- *
- * Import: computeDiff, summarizeDiff from '@/lib/sync/diff-engine'
+ * v1.3 Sprint 31 → Migrated to Vitest (v1.6 T-42.1)
  */
 
 import { computeDiff, summarizeDiff } from '@/lib/sync/diff-engine'
 import type { DiffResult } from '@/lib/types/sync'
 
-interface TestResult {
-  name: string
-  passed: boolean
-  error?: string
-}
+describe('diff-engine', () => {
+  it('returns 0 changes for two empty strings', async () => {
+    const result = await computeDiff('', '')
 
-// ─── Test 1: Both strings empty → 0 changes ──────────────────
+    expect(result.additions).toHaveLength(0)
+    expect(result.deletions).toHaveLength(0)
+    expect(result.modifications).toHaveLength(0)
+  })
 
-async function testEmptyDiff(): Promise<TestResult> {
-  try {
-    const result: DiffResult = await computeDiff('', '')
+  it('detects pure addition when old is empty', async () => {
+    const result = await computeDiff('', 'Line one\nLine two\nLine three')
 
-    if (result.additions.length !== 0) {
-      return {
-        name: 'testEmptyDiff',
-        passed: false,
-        error: `Expected 0 additions, got ${result.additions.length}`,
-      }
-    }
-    if (result.deletions.length !== 0) {
-      return {
-        name: 'testEmptyDiff',
-        passed: false,
-        error: `Expected 0 deletions, got ${result.deletions.length}`,
-      }
-    }
-    if (result.modifications.length !== 0) {
-      return {
-        name: 'testEmptyDiff',
-        passed: false,
-        error: `Expected 0 modifications, got ${result.modifications.length}`,
-      }
-    }
-    return { name: 'testEmptyDiff', passed: true }
-  } catch (err) {
-    return {
-      name: 'testEmptyDiff',
-      passed: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
-// ─── Test 2: Pure addition — old empty, new has 3 lines ──────
-
-async function testPureAddition(): Promise<TestResult> {
-  try {
-    const oldContent = ''
-    const newContent = 'Line one\nLine two\nLine three'
-    const result: DiffResult = await computeDiff(oldContent, newContent)
-
-    // The diff engine splits on '\n'. Empty string → [''], 3 lines → ['Line one','Line two','Line three'].
-    // LCS between [''] and ['Line one','Line two','Line three'] should yield 3 added lines.
     const totalAdded = result.additions.reduce(
       (sum, block) => sum + block.content.split('\n').length,
       0
     )
+    expect(totalAdded).toBeGreaterThanOrEqual(3)
+  })
 
-    if (totalAdded < 3) {
-      return {
-        name: 'testPureAddition',
-        passed: false,
-        error: `Expected at least 3 added lines, got ${totalAdded} (additions: ${result.additions.length} blocks)`,
-      }
-    }
-
-    return { name: 'testPureAddition', passed: true }
-  } catch (err) {
-    return {
-      name: 'testPureAddition',
-      passed: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
-// ─── Test 3: Pure deletion — old has 3 lines, new empty ──────
-
-async function testPureDeletion(): Promise<TestResult> {
-  try {
-    const oldContent = 'Line one\nLine two\nLine three'
-    const newContent = ''
-    const result: DiffResult = await computeDiff(oldContent, newContent)
+  it('detects pure deletion when new is empty', async () => {
+    const result = await computeDiff('Line one\nLine two\nLine three', '')
 
     const totalDeleted = result.deletions.reduce(
       (sum, block) => sum + block.content.split('\n').length,
       0
     )
+    expect(totalDeleted).toBeGreaterThanOrEqual(3)
+  })
 
-    if (totalDeleted < 3) {
-      return {
-        name: 'testPureDeletion',
-        passed: false,
-        error: `Expected at least 3 deleted lines, got ${totalDeleted} (deletions: ${result.deletions.length} blocks)`,
-      }
-    }
+  it('detects modification when one line changes', async () => {
+    const result = await computeDiff(
+      'Header\nOriginal middle line\nFooter',
+      'Header\nModified middle line\nFooter'
+    )
 
-    return { name: 'testPureDeletion', passed: true }
-  } catch (err) {
-    return {
-      name: 'testPureDeletion',
-      passed: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
-// ─── Test 4: Modification — change one line in middle ────────
-
-async function testModification(): Promise<TestResult> {
-  try {
-    const oldContent = 'Header\nOriginal middle line\nFooter'
-    const newContent = 'Header\nModified middle line\nFooter'
-    const result: DiffResult = await computeDiff(oldContent, newContent)
-
-    // The engine should detect the change. It may classify it as a modification
-    // (if add/remove at same position are paired) or as 1 addition + 1 deletion.
     const totalChanges =
       result.modifications.length + result.additions.length + result.deletions.length
+    expect(totalChanges).toBeGreaterThanOrEqual(1)
+    expect(result.unchanged).toBeGreaterThanOrEqual(2)
+  })
 
-    if (totalChanges === 0) {
-      return {
-        name: 'testModification',
-        passed: false,
-        error: 'Expected at least 1 change (modification, addition, or deletion), got 0',
-      }
-    }
-
-    // Header and Footer should be unchanged
-    if (result.unchanged < 2) {
-      return {
-        name: 'testModification',
-        passed: false,
-        error: `Expected at least 2 unchanged lines, got ${result.unchanged}`,
-      }
-    }
-
-    return { name: 'testModification', passed: true }
-  } catch (err) {
-    return {
-      name: 'testModification',
-      passed: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
-// ─── Test 5: No change — identical strings ───────────────────
-
-async function testNoChange(): Promise<TestResult> {
-  try {
+  it('returns 0 changes for identical strings', async () => {
     const content = 'Section A\nSection B\nSection C'
-    const result: DiffResult = await computeDiff(content, content)
+    const result = await computeDiff(content, content)
 
-    if (result.additions.length !== 0) {
-      return {
-        name: 'testNoChange',
-        passed: false,
-        error: `Expected 0 additions, got ${result.additions.length}`,
-      }
-    }
-    if (result.deletions.length !== 0) {
-      return {
-        name: 'testNoChange',
-        passed: false,
-        error: `Expected 0 deletions, got ${result.deletions.length}`,
-      }
-    }
-    if (result.modifications.length !== 0) {
-      return {
-        name: 'testNoChange',
-        passed: false,
-        error: `Expected 0 modifications, got ${result.modifications.length}`,
-      }
-    }
-    if (result.unchanged <= 0) {
-      return {
-        name: 'testNoChange',
-        passed: false,
-        error: `Expected unchanged > 0, got ${result.unchanged}`,
-      }
-    }
+    expect(result.additions).toHaveLength(0)
+    expect(result.deletions).toHaveLength(0)
+    expect(result.modifications).toHaveLength(0)
+    expect(result.unchanged).toBeGreaterThan(0)
+  })
 
-    return { name: 'testNoChange', passed: true }
-  } catch (err) {
-    return {
-      name: 'testNoChange',
-      passed: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
-// ─── Test 6: summarizeDiff returns correct counts ────────────
-
-async function testSummarizeDiff(): Promise<TestResult> {
-  try {
+  it('summarizeDiff returns correct counts', async () => {
     const mockDiff: DiffResult = {
       additions: [
         { path: 'line', content: 'new line 1' },
@@ -225,45 +75,8 @@ async function testSummarizeDiff(): Promise<TestResult> {
 
     const summary = await summarizeDiff(mockDiff)
 
-    if (summary.additions !== 2) {
-      return {
-        name: 'testSummarizeDiff',
-        passed: false,
-        error: `Expected additions=2, got ${summary.additions}`,
-      }
-    }
-    if (summary.deletions !== 1) {
-      return {
-        name: 'testSummarizeDiff',
-        passed: false,
-        error: `Expected deletions=1, got ${summary.deletions}`,
-      }
-    }
-    if (summary.modifications !== 3) {
-      return {
-        name: 'testSummarizeDiff',
-        passed: false,
-        error: `Expected modifications=3, got ${summary.modifications}`,
-      }
-    }
-
-    return { name: 'testSummarizeDiff', passed: true }
-  } catch (err) {
-    return {
-      name: 'testSummarizeDiff',
-      passed: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
-// ─── Export all tests ────────────────────────────────────────
-
-export const tests = [
-  testEmptyDiff,
-  testPureAddition,
-  testPureDeletion,
-  testModification,
-  testNoChange,
-  testSummarizeDiff,
-]
+    expect(summary.additions).toBe(2)
+    expect(summary.deletions).toBe(1)
+    expect(summary.modifications).toBe(3)
+  })
+})

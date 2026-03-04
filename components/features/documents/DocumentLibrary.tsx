@@ -261,7 +261,7 @@ export function DocumentLibrary({
                         {doc.document_name}
                       </span>
                       {doc.is_locked && (
-                        <Lock className="h-3 w-3 text-amber-400" />
+                        <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                       )}
                     </div>
                   </td>
