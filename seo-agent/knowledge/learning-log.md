@@ -58,3 +58,42 @@ At the start of each run:
 **New standing rule:**
 - /plans is the public pricing page, not /pricing — always check /plans for pricing SEO
 - /8a-toolkit exists as a dedicated landing page for 8(a) small business audience — high GovCon SEO value
+
+---
+
+### 2026-03-04 Run #1 Follow-up (Pre-approved Fixes)
+
+**Pages audited:** /, /plans, /8a-toolkit (code review — not curl-based)
+**New pages discovered:** none
+**Fixes applied:** 3
+**Proposals created:** 2 (FAQ section for /plans, og-image.png asset)
+**Plausible data available:** no
+**Regressions detected:** no
+
+**What was found:**
+- Baseline audit over-reported OG gaps on /plans and /8a-toolkit. The curl-based audit missed og:description and og:url because Next.js renders them server-side during hydration. The actual source code already had og:title, og:description, and og:url in the metadata export. Only og:image was truly missing on all three public pages.
+- No og-image.png asset exists anywhere in the repo or on the live site. /logo.png referenced in Organization schema also returns 404.
+- /plans has no FAQ-style Q&A content — only trust badges and a sales contact link. Cannot construct FAQPage schema without fabricating questions.
+
+**What was fixed this run:**
+- og:image added to app/layout.tsx (root — inherits to all pages) — commit 5da462c
+- og:image added to app/(public)/plans/page.tsx — commit 5da462c
+- og:image added to app/(public)/8a-toolkit/page.tsx — commit 5da462c
+
+**Traffic correlation from prior run:** N/A (first fixes, no 30-day baseline)
+
+**Competitive signal:** none observed
+
+**Strategy updates made:**
+- /plans grade upgraded B → A (OG tags now complete)
+- /8a-toolkit grade upgraded B → A (OG tags now complete)
+
+**What to prioritize next run:**
+- Create og-image.png (1200x630) — og:image tags point to it but the file doesn't exist
+- Fix /logo.png 404 — referenced in Organization schema but returns 404
+- Add FAQ section + FAQPage schema to /plans (proposal created, awaiting approval)
+- Set up Plausible API key for traffic correlation
+
+**New standing rule:**
+- curl-based audits can miss Next.js metadata that's only rendered at SSR time. Always verify OG gaps by reading the source code metadata export, not just curling the HTML.
+- og:image is structurally the most impactful OG fix for LinkedIn/Slack shares — GovCon buyers share links frequently in these channels.
