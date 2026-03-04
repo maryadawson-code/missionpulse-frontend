@@ -90,6 +90,7 @@ export async function recordVersion(
     .from('document_versions')
     .insert({
       document_id: documentId,
+      document_type: 'synced',
       company_id: companyId,
       version_number: nextVersionNumber,
       source,

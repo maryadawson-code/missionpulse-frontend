@@ -233,9 +233,20 @@ export async function syncToCloud(
     const now = new Date().toISOString()
 
     // Record version in document_versions
+    const { data: maxVer } = await supabase
+      .from('document_versions')
+      .select('version_number')
+      .eq('document_id', documentId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .single()
+    const nextVer = ((maxVer?.version_number as number) ?? 0) + 1
+
     await supabase.from('document_versions').insert({
       document_id: documentId,
+      document_type: 'synced',
       company_id: syncState.company_id,
+      version_number: nextVer,
       source: 'missionpulse',
       snapshot: { content } as unknown as Json,
       diff_summary: summary as unknown as Json,

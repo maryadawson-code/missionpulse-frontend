@@ -275,6 +275,7 @@ export async function executeCoordination(
 
     await syncClient.from('document_versions').insert({
       document_id: docId,
+      document_type: 'proposal',
       company_id: companyId,
       version_number: nextVersion,
       source: 'missionpulse',

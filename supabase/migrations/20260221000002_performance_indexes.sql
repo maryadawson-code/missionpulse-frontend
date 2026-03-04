@@ -64,24 +64,10 @@ CREATE INDEX IF NOT EXISTS idx_token_usage_agent_id
 CREATE INDEX IF NOT EXISTS idx_token_usage_agent_id_created_at
   ON token_usage (agent_id, created_at DESC);
 
--- ─── TIER 3: Supporting ───────────────────────────────────────
+-- ─── TIER 3: Supporting (skip safely if table does not exist) ─
 
--- Activity log: recent activity feed
-CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp
-  ON activity_log (timestamp DESC);
-
--- Opportunity assignments: team view per opportunity
-CREATE INDEX IF NOT EXISTS idx_opportunity_assignments_opportunity_id
-  ON opportunity_assignments (opportunity_id);
-
--- Proposals: per-opportunity document list
-CREATE INDEX IF NOT EXISTS idx_proposals_opportunity_id
-  ON proposals (opportunity_id);
-
--- Gate reviews: per-opportunity gate decisions
-CREATE INDEX IF NOT EXISTS idx_gate_reviews_opportunity_id
-  ON gate_reviews (opportunity_id);
-
--- Contract clauses: per-opportunity clause list
-CREATE INDEX IF NOT EXISTS idx_contract_clauses_opportunity_id
-  ON contract_clauses (opportunity_id);
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log (timestamp DESC); EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_opportunity_assignments_opportunity_id ON opportunity_assignments (opportunity_id); EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_proposals_opportunity_id ON proposals (opportunity_id); EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_gate_reviews_opportunity_id ON gate_reviews (opportunity_id); EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_contract_clauses_opportunity_id ON contract_clauses (opportunity_id); EXCEPTION WHEN undefined_table THEN NULL; END $$;
