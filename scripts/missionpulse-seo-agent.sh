@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 # MissionPulse SEO Intelligence Agent — Audit Shell
 #
 # Usage:
@@ -72,8 +72,6 @@ done
 # STEP 3: Audit each live page
 # ─────────────────────────────────────────────
 
-declare -A PAGE_GRADES
-
 for PAGE in "${LIVE_PAGES[@]}"; do
   HTML=$(curl -s "$SITE$PAGE" --max-time 15 || echo "")
 
@@ -88,7 +86,8 @@ for PAGE in "${LIVE_PAGES[@]}"; do
   HAS_SW_SCHEMA=$(echo "$HTML" | grep -c 'SoftwareApplication' || echo "0")
   HAS_FAQ_SCHEMA=$(echo "$HTML" | grep -c 'FAQPage' || echo "0")
   IMG_TOTAL=$(echo "$HTML" | grep -c '<img' || echo "0")
-  IMG_MISSING_ALT=$(echo "$HTML" | grep '<img' | grep -vc 'alt=' || echo "0")
+  IMG_MISSING_ALT=$(echo "$HTML" | grep '<img' | grep -vc 'alt=' 2>/dev/null || echo "0")
+  IMG_MISSING_ALT=$(echo "$IMG_MISSING_ALT" | tail -1)
   ALT_COVERAGE=$([ "$IMG_TOTAL" -gt 0 ] && echo "$(( (IMG_TOTAL - IMG_MISSING_ALT) * 100 / IMG_TOTAL ))" || echo "100")
   IN_SITEMAP=$(echo "$SITEMAP" | grep -c "$SITE$PAGE" || echo "0")
 
@@ -116,7 +115,6 @@ for PAGE in "${LIVE_PAGES[@]}"; do
   elif [ "$SCORE" -ge 5 ]; then GRADE="C"
   else GRADE="F"; fi
 
-  PAGE_GRADES[$PAGE]="$GRADE"
   echo "  $PAGE → $GRADE (score: $SCORE/10, schema: $SCHEMA_COUNT, SWApp: $HAS_SW_SCHEMA, FAQ: $HAS_FAQ_SCHEMA)"
 done
 
