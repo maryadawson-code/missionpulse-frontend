@@ -134,7 +134,7 @@ export async function checkStripe(): Promise<CheckResult> {
     // Dynamic import to avoid loading Stripe unless needed
     const Stripe = (await import('stripe')).default
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2026-01-28.clover',
+      apiVersion: '2026-02-25.clover',
     })
     await stripe.balance.retrieve()
     return {
