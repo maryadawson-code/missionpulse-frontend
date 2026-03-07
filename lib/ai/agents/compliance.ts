@@ -4,11 +4,23 @@ import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 import { COMPLIANCE_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
+import { runResearch } from '@/lib/ai/research-router'
 
 export async function runComplianceExtraction(context: {
   sourceText: string
   opportunityId: string
 }): Promise<AIResponse> {
+  // Published solicitation text is not CUI — it's a publicly available government document.
+  const researchResult = await runResearch({
+    query: context.sourceText.slice(0, 500),
+    agentType: 'compliance',
+    isCUI: false,
+  })
+
+  const liveIntelSection = researchResult.content
+    ? `LIVE INTELLIGENCE (fetched ${new Date().toISOString()}):\n${researchResult.content}\n\nSources: ${researchResult.sources.join(', ')}`
+    : null
+
   const prompt = `Analyze the following RFP/solicitation text and extract all compliance requirements.
 
 For each requirement found, provide:
@@ -28,14 +40,14 @@ Focus on:
 
 Source text:
 ${context.sourceText.slice(0, 8000)}
-
+${liveIntelSection ? '\nCross-reference any vehicle or framework mentions against the live intelligence above.' : ''}
 Format as a numbered list with clear delimiters for each field.`
 
   const baseSystemPrompt =
     'You are an expert GovCon compliance analyst. Extract every compliance requirement from RFP text. Be thorough — missing a requirement can be grounds for elimination. Err on the side of including marginal requirements with lower confidence.'
 
   const feedbackCtx = await buildFeedbackContext('compliance')
-  const systemPrompt = [baseSystemPrompt, COMPLIANCE_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
+  const systemPrompt = [baseSystemPrompt, liveIntelSection, COMPLIANCE_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
     .filter(Boolean)
     .join('\n\n')
 
