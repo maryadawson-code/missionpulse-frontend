@@ -89,16 +89,19 @@ export default function PilotAdminClient({
       if (result.success) {
         // Find company name
         const comp = companies.find((c) => c.id === selectedCompany)
+        const now = new Date()
+        const end = new Date(now)
+        end.setDate(end.getDate() + 30)
         setPilots((prev) => [
           {
             companyId: selectedCompany,
             companyName: comp?.name ?? 'Unknown',
             planTier: selectedPlan,
-            pilotStartDate: result.pilotStartDate,
-            pilotEndDate: result.pilotEndDate,
+            pilotStartDate: now.toISOString(),
+            pilotEndDate: end.toISOString(),
             daysRemaining: 30,
             status: 'pilot',
-            pilotAmountCents: result.pilotAmountCents,
+            pilotAmountCents: 0,
             engagementScore: 0,
           },
           ...prev,

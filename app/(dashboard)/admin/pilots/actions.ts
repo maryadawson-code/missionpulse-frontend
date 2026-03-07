@@ -3,16 +3,20 @@
  */
 'use server'
 
-import { createPilot, convertPilot } from '@/lib/billing/pilots'
+import { createPilot, convertPilotToAnnual } from '@/lib/billing/pilots'
 
 export async function createPilotAction(
   companyId: string,
   planTier: string,
   kpis: Record<string, unknown>
 ) {
-  return createPilot(companyId, planTier, kpis)
+  return createPilot({
+    companyId,
+    planId: planTier,
+    pilotKpi: typeof kpis.target === 'string' ? kpis.target : JSON.stringify(kpis),
+  })
 }
 
 export async function convertPilotAction(companyId: string) {
-  return convertPilot(companyId)
+  return convertPilotToAnnual(companyId)
 }
