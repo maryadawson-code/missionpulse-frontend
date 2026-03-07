@@ -7,6 +7,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { validateAPIKey } from '@/lib/api/keys'
 import { checkRateLimit, getRateLimitHeaders } from '@/lib/api/rate-limiter'
+import { aiQuerySchema } from '@/lib/api/schemas'
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -31,19 +32,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'AI permission required' }, { status: 403, headers })
   }
 
-  const body = await req.json() as { query?: string; opportunityId?: string; agent?: string }
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400, headers })
+  }
 
-  if (!body.query) {
-    return NextResponse.json({ error: 'query field required' }, { status: 400, headers })
+  const parsed = aiQuerySchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+      { status: 400, headers }
+    )
   }
 
   // AI query is processed via the existing AI agent system
   // The API exposes the same capabilities as the web UI
   return NextResponse.json({
     message: 'AI query accepted',
-    query: body.query,
-    opportunityId: body.opportunityId ?? null,
-    agent: body.agent ?? 'chat',
+    query: parsed.data.query,
+    opportunityId: parsed.data.opportunityId ?? null,
+    agent: parsed.data.agent ?? 'chat',
     status: 'queued',
     footer: 'AI GENERATED — REQUIRES HUMAN REVIEW',
   }, { headers })

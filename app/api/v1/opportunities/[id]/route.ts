@@ -8,6 +8,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { validateAPIKey } from '@/lib/api/keys'
 import { checkRateLimit, getRateLimitHeaders } from '@/lib/api/rate-limiter'
+import { updateOpportunitySchema } from '@/lib/api/schemas'
 
 async function authenticate(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -71,12 +72,26 @@ export async function PATCH(
     return NextResponse.json({ error: 'Write permission required' }, { status: 403, headers: auth.headers })
   }
 
-  const body = await req.json()
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400, headers: auth.headers })
+  }
+
+  const parsed = updateOpportunitySchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+      { status: 400, headers: auth.headers }
+    )
+  }
+
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('opportunities')
-    .update(body)
+    .update(parsed.data)
     .eq('id', id)
     .eq('company_id', auth.validated.companyId)
     .select('id, title, status')

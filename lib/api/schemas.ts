@@ -65,6 +65,44 @@ export function validationErrorResponse(error: string, details: z.ZodError) {
   )
 }
 
+// ─── Public REST API v1 schemas ──────────────────────────────────
+
+export const createOpportunitySchema = z.object({
+  title: z.string().min(1, 'Title is required').max(500),
+  agency: z.string().max(255).optional(),
+  ceiling: z.number().nonnegative().optional(),
+  pwin: z.number().min(0).max(100).optional(),
+  phase: z.string().max(100).optional(),
+  status: z.string().max(100).optional(),
+  due_date: z.string().datetime().optional().nullable(),
+  solicitation_number: z.string().max(100).optional(),
+  set_aside: z.string().max(100).optional(),
+  naics_code: z.string().max(20).optional(),
+  description: z.string().max(10000).optional(),
+  source: z.string().max(255).optional(),
+})
+
+export const updateOpportunitySchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  agency: z.string().max(255).optional(),
+  ceiling: z.number().nonnegative().optional(),
+  pwin: z.number().min(0).max(100).optional(),
+  phase: z.string().max(100).optional(),
+  status: z.string().max(100).optional(),
+  due_date: z.string().datetime().optional().nullable(),
+  solicitation_number: z.string().max(100).optional(),
+  set_aside: z.string().max(100).optional(),
+  naics_code: z.string().max(20).optional(),
+  description: z.string().max(10000).optional(),
+  source: z.string().max(255).optional(),
+})
+
+export const aiQuerySchema = z.object({
+  query: z.string().min(1, 'Query is required').max(10000),
+  opportunityId: z.string().uuid().optional(),
+  agent: z.string().max(50).optional(),
+})
+
 // ─── Newsletter schemas ──────────────────────────────────────────
 
 export const newsletterSubscribeSchema = z.object({
