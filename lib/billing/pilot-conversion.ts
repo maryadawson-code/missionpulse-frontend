@@ -307,3 +307,49 @@ export async function handleConversionSuccess(params: {
     },
   })
 }
+
+// ─── Pilot Banner Data ─────────────────────────────────────
+
+export interface PilotBannerData {
+  show: boolean
+  daysRemaining: number
+  planName: string
+  creditAmount: number
+}
+
+/**
+ * Get banner data for pilot conversion CTA.
+ * Shows when pilot has <= 5 days remaining.
+ */
+export async function getPilotBannerData(): Promise<PilotBannerData> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { show: false, daysRemaining: 0, planName: '', creditAmount: 0 }
+
+  const { data: profile } = await supabase
+    .from('profiles').select('company_id').eq('id', user.id).single()
+  if (!profile?.company_id) return { show: false, daysRemaining: 0, planName: '', creditAmount: 0 }
+
+  const { data: sub } = await supabase
+    .from('company_subscriptions')
+    .select('status, pilot_end_date, pilot_amount_cents, plan_id')
+    .eq('company_id', profile.company_id)
+    .eq('status', 'pilot')
+    .single()
+  if (!sub) return { show: false, daysRemaining: 0, planName: '', creditAmount: 0 }
+
+  const { data: plan } = await supabase
+    .from('subscription_plans').select('name').eq('id', sub.plan_id).single()
+
+  const endDate = sub.pilot_end_date ? new Date(sub.pilot_end_date as string) : null
+  const daysRemaining = endDate
+    ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86400000))
+    : 0
+
+  return {
+    show: daysRemaining <= 5,
+    daysRemaining,
+    planName: plan?.name ?? 'Pilot',
+    creditAmount: (sub.pilot_amount_cents as number) ?? 0,
+  }
+}

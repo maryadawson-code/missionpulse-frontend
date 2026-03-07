@@ -1,269 +1,141 @@
 // filepath: app/(dashboard)/pilot-review/page.tsx
-
-import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { resolveRole, hasPermission } from '@/lib/rbac/config'
-import { generateROIReport } from '@/lib/billing/pilot-conversion'
+import { calculateEngagementScore } from '@/lib/billing/engagement'
 import Link from 'next/link'
-import { ConvertButton } from './ConvertButton'
-
-export const metadata: Metadata = {
-  title: 'Pilot ROI Review — MissionPulse',
-}
-
-function StatCard({
-  label,
-  value,
-  comparison,
-}: {
-  label: string
-  value: string
-  comparison?: string
-}) {
-  return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-      <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold text-white">{value}</p>
-      {comparison && (
-        <p className="mt-1 text-xs text-gray-400">{comparison}</p>
-      )}
-    </div>
-  )
-}
 
 export default async function PilotReviewPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, company_id')
+    .select('company_id, role')
     .eq('id', user.id)
     .single()
+  if (!profile?.company_id) redirect('/dashboard')
 
-  const role = resolveRole(profile?.role)
-  if (!hasPermission(role, 'admin', 'canView')) redirect('/dashboard')
-
-  const companyId = profile?.company_id
-  if (!companyId) redirect('/dashboard')
-
-  const report = await generateROIReport(companyId)
-
-  // Get pilot credit for display
   const { data: sub } = await supabase
     .from('company_subscriptions')
-    .select('pilot_amount_cents, status')
-    .eq('company_id', companyId)
+    .select('status, pilot_end_date, pilot_amount_cents, plan_id')
+    .eq('company_id', profile.company_id)
     .single()
 
-  const creditDollars = ((sub?.pilot_amount_cents as number) ?? 0) / 100
-  const isPilotOrExpired = ['pilot', 'expired'].includes(
-    (sub?.status as string) ?? ''
-  )
+  if (!sub || !['pilot', 'pilot_expired'].includes(sub.status ?? '')) {
+    redirect('/dashboard')
+  }
+
+  const { data: plan } = await supabase
+    .from('subscription_plans')
+    .select('name, annual_price')
+    .eq('id', sub.plan_id)
+    .single()
+
+  const engagement = await calculateEngagementScore(profile.company_id)
+
+  const endDate = sub.pilot_end_date ? new Date(sub.pilot_end_date) : null
+  const daysRemaining = endDate
+    ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86400000))
+    : 0
+  const isExpired = sub.status === 'pilot_expired'
+  const creditAmount = sub.pilot_amount_cents ?? 0
+  const annualPrice = plan?.annual_price ?? 0
+  const amountDue = Math.max(0, annualPrice - creditAmount)
+  const timeSaved = engagement.breakdown.ai_queries * 2 + engagement.breakdown.proposals_created * 4
+
+  const fmt = (cents: number) =>
+    (cents / 100).toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    })
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="p-6 max-w-3xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">
-          Your Pilot ROI Report
+        <h1 className="text-3xl font-bold text-white">
+          {isExpired ? 'Your Pilot Has Ended' : 'Your Pilot ROI Report'}
         </h1>
-        <p className="mt-1 text-sm text-gray-400">
-          Here&apos;s what you accomplished during your {report.daysActive}-day
-          pilot.
+        <p className="text-gray-400 mt-2">
+          {isExpired
+            ? 'Your data is preserved for 30 days. Convert now to keep full access.'
+            : `${daysRemaining} days remaining \u2014 here\u2019s what you\u2019ve accomplished.`}
         </p>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Proposals Drafted"
-          value={report.proposalsDrafted.toString()}
-          comparison={`vs ~${report.estimatedManualHours}hr manual effort`}
-        />
-        <StatCard
-          label="AI Queries"
-          value={report.aiQueriesCount.toLocaleString()}
-          comparison={`~${report.timeSavedHours}hr saved`}
-        />
-        <StatCard
-          label="Compliance Items"
-          value={report.complianceItemsTracked.toString()}
-          comparison="SHALL/MUST requirements tracked"
-        />
-        <StatCard
-          label="Documents Generated"
-          value={report.documentsGenerated.toString()}
-          comparison="Proposals, volumes, and exports"
-        />
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'AI Queries Run', value: engagement.breakdown.ai_queries },
+          { label: 'Proposals Created', value: engagement.breakdown.proposals_created },
+          { label: 'Compliance Items', value: engagement.breakdown.compliance_matrices },
+          { label: 'Est. Hours Saved', value: `~${timeSaved}hr` },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-[#00E5FA]">{stat.value}</div>
+            <div className="text-xs text-gray-400 mt-1">{stat.label}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Side-by-side Comparison */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">
-          Your Pilot vs. Without MissionPulse
-        </h2>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="rounded-lg border border-[#00E5FA]/20 bg-[#00E5FA]/5 p-5">
-            <h3 className="text-sm font-semibold text-[#00E5FA] mb-3">
-              With MissionPulse
-            </h3>
-            <ul className="space-y-2 text-sm text-gray-300">
-              <li className="flex justify-between">
-                <span>Time on proposals</span>
-                <span className="font-medium text-white">
-                  ~{Math.round(report.timeSavedHours * 0.6)}hr
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>Compliance coverage</span>
-                <span className="font-medium text-[#00E5FA]">100%</span>
-              </li>
-              <li className="flex justify-between">
-                <span>AI-assisted sections</span>
-                <span className="font-medium text-white">
-                  {report.aiQueriesCount}
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>Team members active</span>
-                <span className="font-medium text-white">
-                  {report.teamMembersActive}
-                </span>
-              </li>
-            </ul>
+      {/* Time Comparison */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+        <h2 className="text-lg font-semibold text-white">Pilot vs. Manual Process</h2>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-400">Compliance matrix (manual)</span>
+            <span className="text-red-400">~4 hours each</span>
           </div>
-
-          <div className="rounded-lg border border-gray-700 bg-gray-800/30 p-5">
-            <h3 className="text-sm font-semibold text-gray-400 mb-3">
-              Without MissionPulse
-            </h3>
-            <ul className="space-y-2 text-sm text-gray-500">
-              <li className="flex justify-between">
-                <span>Time on proposals</span>
-                <span className="font-medium text-gray-300">
-                  ~{report.estimatedManualHours}hr (industry avg)
-                </span>
-              </li>
-              <li className="flex justify-between">
-                <span>Compliance coverage</span>
-                <span className="font-medium text-gray-300">~85%</span>
-              </li>
-              <li className="flex justify-between">
-                <span>AI-assisted sections</span>
-                <span className="font-medium text-gray-300">0</span>
-              </li>
-              <li className="flex justify-between">
-                <span>Manual coordination</span>
-                <span className="font-medium text-gray-300">
-                  Email + spreadsheets
-                </span>
-              </li>
-            </ul>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Compliance matrix (MissionPulse)</span>
+            <span className="text-green-400">~15 minutes</span>
+          </div>
+          <div className="border-t border-gray-700 pt-2 flex justify-between font-semibold">
+            <span className="text-gray-300">Est. time saved this pilot</span>
+            <span className="text-[#00E5FA]">~{timeSaved} hours</span>
           </div>
         </div>
       </div>
 
-      {/* Engagement Score */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-        <h2 className="text-lg font-semibold text-white mb-2">
-          Engagement Score
+      {/* Conversion CTA */}
+      <div className="bg-gradient-to-r from-[#00E5FA]/10 to-transparent border border-[#00E5FA]/30 rounded-xl p-6 space-y-4">
+        <h2 className="text-xl font-bold text-white">
+          Convert to Annual \u2014 {plan?.name ?? 'Your Plan'}
         </h2>
-        <div className="flex items-center gap-4">
-          <div className="relative h-20 w-20">
-            <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-              <path
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none"
-                stroke="#1E293B"
-                strokeWidth="3"
-              />
-              <path
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none"
-                stroke={
-                  report.engagementScore > 70
-                    ? '#10B981'
-                    : report.engagementScore > 40
-                      ? '#F59E0B'
-                      : '#EF4444'
-                }
-                strokeWidth="3"
-                strokeDasharray={`${report.engagementScore}, 100`}
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-bold text-white">
-                {report.engagementScore}
-              </span>
-            </div>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between text-gray-300">
+            <span>Annual plan price</span>
+            <span>{fmt(annualPrice)}</span>
           </div>
-          <div>
-            <p className="text-sm text-gray-300">
-              {report.engagementScore > 70
-                ? 'Excellent engagement — you\'re getting strong value from MissionPulse.'
-                : report.engagementScore > 40
-                  ? 'Good start — there\'s more to explore.'
-                  : 'Getting started — try more features to maximize ROI.'}
-            </p>
+          <div className="flex justify-between text-green-400">
+            <span>Pilot credit applied</span>
+            <span>&minus; {fmt(creditAmount)}</span>
+          </div>
+          <div className="flex justify-between font-bold text-white border-t border-gray-700 pt-2">
+            <span>Due today</span>
+            <span>{fmt(amountDue)}</span>
           </div>
         </div>
+        <Link
+          href="/api/billing/checkout?interval=annual"
+          className="block w-full text-center px-6 py-3 bg-[#00E5FA] text-[#00050F] font-bold rounded-lg hover:bg-[#00E5FA]/90 transition-colors"
+        >
+          Convert Now \u2014 {fmt(amountDue)} Due Today
+        </Link>
+        <p className="text-xs text-gray-500 text-center">
+          Pilot credit automatically applied at checkout.
+        </p>
       </div>
 
-      {/* Token Usage */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6">
-        <h2 className="text-lg font-semibold text-white mb-2">
-          AI Token Usage
-        </h2>
-        <div className="flex items-center gap-4">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-800">
-            <div
-              className="h-full rounded-full bg-[#00E5FA]"
-              style={{
-                width: `${
-                  report.tokensAllocated > 0
-                    ? Math.min(
-                        100,
-                        Math.round(
-                          (report.tokensConsumed / report.tokensAllocated) * 100
-                        )
-                      )
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-          <span className="text-sm text-gray-400">
-            {(report.tokensConsumed / 1000).toFixed(0)}K /{' '}
-            {(report.tokensAllocated / 1000).toFixed(0)}K tokens
-          </span>
-        </div>
-      </div>
-
-      {/* CTA */}
-      {isPilotOrExpired && (
-        <div className="rounded-xl border border-[#00E5FA]/20 bg-gradient-to-r from-[#0F172A] to-[#00050F] p-6 text-center">
-          <h2 className="text-xl font-bold text-white">Ready to continue?</h2>
-          {creditDollars > 0 && (
-            <p className="mt-1 text-sm text-gray-400">
-              Your ${creditDollars.toFixed(0)} pilot payment will be credited
-              toward your annual subscription.
-            </p>
-          )}
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <ConvertButton />
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-6 py-2.5 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-800"
-            >
-              Back to Dashboard
-            </Link>
-          </div>
+      {/* Data preservation note for expired */}
+      {isExpired && (
+        <div className="border border-gray-700 rounded-xl p-5 text-center space-y-2">
+          <div className="text-gray-300 font-medium">Your data is safe</div>
+          <p className="text-gray-400 text-sm">
+            All proposals, compliance matrices, and team data preserved for 30 days.
+            Convert to restore full access immediately.
+          </p>
         </div>
       )}
     </div>
