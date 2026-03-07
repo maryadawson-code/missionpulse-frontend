@@ -12,7 +12,7 @@ MissionPulse is a federal proposal management SaaS for government contractors. B
 
 - **Runtime:** Node.js 20
 - **Framework:** Next.js 14 (App Router — Server Components by default)
-- **Database:** Supabase PostgreSQL with Row Level Security on all 200 tables
+- **Database:** Supabase PostgreSQL with Row Level Security on all 216 tables
 - **Auth:** Supabase Auth via `@supabase/ssr` (cookie-based sessions, email/password)
 - **RBAC:** 12 roles × 14 modules via `roles_permissions_config.json` v9.5
 - **Styling:** Tailwind CSS 3.x (dark mode, `class` strategy) + Shield & Pulse design tokens
@@ -74,7 +74,7 @@ middleware.ts          # Session refresh + auth redirect
 ## Architecture Docs (read when relevant)
 
 - `PHASE_2_RULES.md` → Framework decisions, data access rules, prohibited patterns
-- `GROUND_TRUTH_v2.md` → Live database audit (200 tables, 37 with data, all RLS functions)
+- `GROUND_TRUTH_v2.md` → Live database audit (216 tables, 37 with data, all RLS functions)
 - `roles_permissions_config.json` → Canonical RBAC matrix (12 roles × 14 modules)
 - `database.types.ts` → Generated DB types (sole schema authority)
 - `ROADMAP_GTM_EXTENSION.md` → GTM & Revenue Architecture (parallel track S-GTM-1 to S-GTM-3)

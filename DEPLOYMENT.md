@@ -127,7 +127,7 @@ All environment variables are managed via the Vercel dashboard (or `.env.local` 
 | Variable | Description | Required |
 |---|---|---|
 | `NEXT_PUBLIC_SITE_URL` | Public site URL (defaults to `https://missionpulse.ai`) | Optional |
-| `NEXT_PUBLIC_APP_URL` | Application URL used in billing redirects (defaults to `https://missionpulse.io`) | Optional |
+| `NEXT_PUBLIC_APP_URL` | Application URL used in billing redirects (defaults to `https://missionpulse.ai`) | Optional |
 | `NEXT_PUBLIC_SHOW_VITALS` | Set to `true` to show Web Vitals overlay in browser | Optional |
 | `CRON_SECRET` | Secret for authenticating cron job requests | Yes |
 

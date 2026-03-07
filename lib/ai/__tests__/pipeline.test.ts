@@ -272,8 +272,9 @@ describe('AI Pipeline', () => {
         prompt: 'Help me with compliance for Section L',
       })
 
-      // Should return the graceful fallback message
-      expect(result.content).toContain('AI processing is currently unavailable')
+      // Should return the graceful fallback message with error detail
+      expect(result.content).toContain('AI processing failed:')
+      expect(result.content).toContain('Provider timeout after 30s')
       expect(result.model_used).toBe('none')
       expect(result.engine).toBe('asksage')
       expect(result.confidence).toBe('low')

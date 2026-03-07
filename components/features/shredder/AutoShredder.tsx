@@ -11,7 +11,7 @@ interface AutoShredderProps {
   documentIds: string[]
   opportunityId: string
   onComplete: () => void
-  onRetryFailed?: (failedIds: string[]) => void
+  onRetryFailed?: (_failedIds: string[]) => void
 }
 
 type DocStatus = 'pending' | 'shredding' | 'done' | 'failed'

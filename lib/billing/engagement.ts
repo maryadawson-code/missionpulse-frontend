@@ -201,6 +201,63 @@ export async function updateAllPilotEngagement(): Promise<number> {
   return updated
 }
 
+// ─── Pilot Engagement Score (writes to pilot_engagement_scores) ──
+
+export interface PilotEngagementScore {
+  score: number
+  breakdown: {
+    daily_logins: number
+    ai_queries: number
+    proposals_created: number
+    compliance_matrices: number
+    team_invites: number
+  }
+  tier: 'healthy' | 'at_risk' | 'critical'
+  calculatedAt: string
+}
+
+/**
+ * Calculate engagement and persist to pilot_engagement_scores table.
+ * Used by admin dashboard and engagement-scorer edge function.
+ */
+export async function calculateEngagementScore(
+  companyId: string
+): Promise<PilotEngagementScore> {
+  const result = await calculateEngagement(companyId)
+
+  // Map existing factors into breakdown columns
+  const breakdown = {
+    daily_logins: Math.round((result.factors.loginFrequency / 100) * 30),
+    ai_queries: Math.round((result.factors.aiUsage / 100) * 300),
+    proposals_created: Math.round((result.factors.featureAdoption / 100) * 14),
+    compliance_matrices: Math.round((result.factors.docsGenerated / 100) * 10),
+    team_invites: Math.round((result.factors.teamInvites / 100) * 5),
+  }
+
+  const tier: PilotEngagementScore['tier'] =
+    result.score >= 70 ? 'healthy' : result.score >= 40 ? 'at_risk' : 'critical'
+
+  // Persist to dedicated table
+  const supabase = await createClient()
+  await supabase.from('pilot_engagement_scores').insert({
+    company_id: companyId,
+    score: result.score,
+    daily_logins: breakdown.daily_logins,
+    ai_queries: breakdown.ai_queries,
+    proposals_created: breakdown.proposals_created,
+    compliance_matrices: breakdown.compliance_matrices,
+    team_invites: breakdown.team_invites,
+    calculated_at: new Date().toISOString(),
+  })
+
+  return {
+    score: result.score,
+    breakdown,
+    tier,
+    calculatedAt: result.computedAt,
+  }
+}
+
 // ─── ROI Summary ─────────────────────────────────────────
 
 export interface ROISummary {

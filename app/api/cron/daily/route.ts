@@ -189,7 +189,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ─── 3. Audit log ─────────────────────────────────────────
+    // ─── 3. Data retention — clean up stale records ────────────
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { count: activityDeleted } = await supabase
+      .from('activity_log')
+      .delete({ count: 'exact' })
+      .lt('timestamp', ninetyDaysAgo)
+
+    const { count: chatDeleted } = await supabase
+      .from('chat_history')
+      .delete({ count: 'exact' })
+      .lt('created_at', ninetyDaysAgo)
+
+    const { count: monitoringDeleted } = await supabase
+      .from('monitoring_events')
+      .delete({ count: 'exact' })
+      .lt('created_at', ninetyDaysAgo)
+
+    const retentionCleaned = (activityDeleted ?? 0) + (chatDeleted ?? 0) + (monitoringDeleted ?? 0)
+
+    // ─── 4. Audit log ─────────────────────────────────────────
     await supabase.from('audit_logs').insert({
       action: 'daily_cron',
       user_id: '00000000-0000-0000-0000-000000000000',
@@ -198,6 +218,7 @@ export async function GET(request: NextRequest) {
       details: {
         expired_pilots: expiredCount,
         engagement_updated: engagementUpdated,
+        retention_cleaned: retentionCleaned,
         ran_at: now,
       },
     })
@@ -206,6 +227,7 @@ export async function GET(request: NextRequest) {
       success: true,
       expired_pilots: expiredCount,
       engagement_updated: engagementUpdated,
+      retention_cleaned: retentionCleaned,
       ran_at: now,
     })
   } catch (err) {

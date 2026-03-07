@@ -3,6 +3,8 @@
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
+import { BLACK_HAT_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
+import { runResearch } from '@/lib/ai/research-router'
 
 export async function runBlackHatAgent(context: {
   opportunityTitle: string
@@ -13,6 +15,22 @@ export async function runBlackHatAgent(context: {
   competitorWeaknesses: string[]
   opportunityId: string
 }): Promise<AIResponse> {
+  // Research query uses ONLY public data (competitor name + agency + opportunity title).
+  // NOT the CUI-marked competitive analysis output.
+  const researchResult = await runResearch({
+    query: `${context.competitorName} federal contracts ${context.agency ?? ''} past performance awards`,
+    agentType: 'blackhat',
+    opportunityContext: {
+      title: context.opportunityTitle,
+      agency: context.agency,
+    },
+    isCUI: false,
+  })
+
+  const liveIntelSection = researchResult.content
+    ? `LIVE INTELLIGENCE (fetched ${new Date().toISOString()}):\n${researchResult.content}\n\nSources: ${researchResult.sources.join(', ')}`
+    : null
+
   const strengths = context.competitorStrengths.length > 0
     ? context.competitorStrengths.map((s, i) => `${i + 1}. ${s}`).join('\n')
     : 'No known strengths'
@@ -48,9 +66,9 @@ IMPORTANT: This analysis contains CUI//OPSEC data. All competitive intelligence 
     'You are a senior GovCon capture strategist conducting a Black Hat review. Think like the competitor — what would their proposal look like? Provide specific, actionable intelligence, not generic observations. All output is CUI//OPSEC.'
 
   const feedbackCtx = await buildFeedbackContext('blackhat')
-  const systemPrompt = feedbackCtx
-    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
-    : baseSystemPrompt
+  const systemPrompt = [baseSystemPrompt, liveIntelSection, BLACK_HAT_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'strategy',
@@ -67,6 +85,22 @@ export async function runMultiCompetitorBlackHat(context: {
   competitors: { name: string; strengths: string[]; weaknesses: string[] }[]
   opportunityId: string
 }): Promise<AIResponse> {
+  // Research query: competitor names are public data
+  const competitorNames = context.competitors.map((c) => c.name).join(' OR ')
+  const multiResearchResult = await runResearch({
+    query: `${competitorNames} federal health IT contracts competition`,
+    agentType: 'blackhat',
+    opportunityContext: {
+      title: context.opportunityTitle,
+      agency: context.agency,
+    },
+    isCUI: false,
+  })
+
+  const multiLiveIntelSection = multiResearchResult.content
+    ? `LIVE INTELLIGENCE (fetched ${new Date().toISOString()}):\n${multiResearchResult.content}\n\nSources: ${multiResearchResult.sources.join(', ')}`
+    : null
+
   const competitorProfiles = context.competitors
     .map(
       (c) =>
@@ -98,9 +132,9 @@ IMPORTANT: CUI//OPSEC data.`
     'You are a senior GovCon capture strategist conducting a multi-competitor Black Hat review. Analyze the competitive field holistically. Focus on exploitable gaps and realistic counter-strategies. All output is CUI//OPSEC.'
 
   const multiFeedbackCtx = await buildFeedbackContext('blackhat')
-  const multiSystemPrompt = multiFeedbackCtx
-    ? `${multiBasePrompt}\n\n${multiFeedbackCtx.instructions}`
-    : multiBasePrompt
+  const multiSystemPrompt = [multiBasePrompt, multiLiveIntelSection, BLACK_HAT_AGENT_HEALTH_IT_INJECTION, multiFeedbackCtx?.instructions]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'strategy',

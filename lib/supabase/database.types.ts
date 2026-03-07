@@ -7525,6 +7525,53 @@ export type Database = {
           },
         ]
       }
+      pilot_engagement_scores: {
+        Row: {
+          ai_queries: number | null
+          calculated_at: string
+          company_id: string
+          compliance_matrices: number | null
+          created_at: string | null
+          daily_logins: number | null
+          id: string
+          proposals_created: number | null
+          score: number
+          team_invites: number | null
+        }
+        Insert: {
+          ai_queries?: number | null
+          calculated_at?: string
+          company_id: string
+          compliance_matrices?: number | null
+          created_at?: string | null
+          daily_logins?: number | null
+          id?: string
+          proposals_created?: number | null
+          score?: number
+          team_invites?: number | null
+        }
+        Update: {
+          ai_queries?: number | null
+          calculated_at?: string
+          company_id?: string
+          compliance_matrices?: number | null
+          created_at?: string | null
+          daily_logins?: number | null
+          id?: string
+          proposals_created?: number | null
+          score?: number
+          team_invites?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pilot_engagement_scores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_stages: {
         Row: {
           color: string | null

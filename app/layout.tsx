@@ -99,7 +99,7 @@ export default function RootLayout({
         '@type': 'Organization',
         name: 'Mission Meets Tech, LLC',
         url: 'https://missionpulse.ai',
-        logo: 'https://missionpulse.ai/logo.png',
+        logo: 'https://missionpulse.ai/icon',
         description:
           'Building AI-powered tools for government contractors to win more federal contracts.',
       },

@@ -67,9 +67,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Generate per-request CSP nonce
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+
+  // Set CSP header with nonce
+  const cspHeader = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `style-src 'self' 'nonce-${nonce}'`,
+    "img-src 'self' data: https://*.supabase.co https://*.gravatar.com",
+    "font-src 'self'",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.upstash.io",
+    "frame-src https://checkout.stripe.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ')
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
   let response = NextResponse.next({
-    request: { headers: request.headers },
+    request: { headers: requestHeaders },
   })
+
+  response.headers.set('Content-Security-Policy', cspHeader)
 
   const supabase = createServerClient(
     supabaseUrl,

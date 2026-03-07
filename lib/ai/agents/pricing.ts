@@ -4,6 +4,8 @@ import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildPricingContext } from '@/lib/integrations/fpds/client'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
+import { PRICING_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
+import { runResearch } from '@/lib/ai/research-router'
 
 export async function runPricingAgent(context: {
   title: string
@@ -15,6 +17,22 @@ export async function runPricingAgent(context: {
   existingLCATs: string[]
   opportunityId: string
 }): Promise<AIResponse> {
+  // Research query uses only public opportunity identifiers — not pricing data.
+  const researchResult = await runResearch({
+    query: `${context.title} ${context.agency ?? ''} ${context.naicsCode ?? ''} FPDS historical awards GSA rate card`,
+    agentType: 'pricing',
+    opportunityContext: {
+      title: context.title,
+      agency: context.agency,
+      ceiling: context.ceiling ?? undefined,
+    },
+    isCUI: false,
+  })
+
+  const liveIntelSection = researchResult.content
+    ? `LIVE INTELLIGENCE (fetched ${new Date().toISOString()}):\n${researchResult.content}\n\nSources: ${researchResult.sources.join(', ')}`
+    : null
+
   const reqList = context.requirements
     .map((r, i) => `${i + 1}. ${r}`)
     .join('\n')
@@ -62,9 +80,9 @@ IMPORTANT: This analysis contains CUI//SP-PROPIN data. All pricing information i
     'You are a GovCon pricing strategist with deep expertise in government cost proposals. Provide specific rate recommendations based on agency, NAICS, and market data. When FPDS market data is provided, use it to calibrate your pricing recommendations and validate your rate ranges against actual market transactions. Focus on realistic, competitive pricing that maximizes win probability while maintaining acceptable margins. All output is CUI//SP-PROPIN.'
 
   const feedbackCtx = await buildFeedbackContext('pricing')
-  const systemPrompt = feedbackCtx
-    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
-    : baseSystemPrompt
+  const systemPrompt = [baseSystemPrompt, liveIntelSection, PRICING_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'pricing',

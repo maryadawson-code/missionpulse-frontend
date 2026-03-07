@@ -62,14 +62,15 @@ describe('checkTokenGate()', () => {
     vi.clearAllMocks()
   })
 
-  it('blocks when no balance exists (no subscription)', async () => {
+  it('allows with warning when no balance exists (trial mode)', async () => {
     mockedGetTokenBalance.mockResolvedValue(null)
 
     const result = await checkTokenGate('company-1')
-    expect(result.allowed).toBe(false)
-    expect(result.threshold).toBe('hard_block')
+    expect(result.allowed).toBe(true)
+    expect(result.threshold).toBe('warning')
     expect(result.balance).toBeNull()
     expect(result.upgrade_cta).toBe(true)
+    expect(result.message).toContain('trial mode')
   })
 
   it('allows with normal threshold at 0% usage', async () => {

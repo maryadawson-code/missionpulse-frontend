@@ -3,6 +3,8 @@
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
+import { STRATEGY_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
+import { runResearch } from '@/lib/ai/research-router'
 
 export async function runStrategyAgent(context: {
   title: string
@@ -12,6 +14,21 @@ export async function runStrategyAgent(context: {
   naicsCode: string | null
   opportunityId: string
 }): Promise<AIResponse> {
+  // Pre-agent research: fetch competitive landscape intelligence
+  const researchResult = await runResearch({
+    query: `${context.title} ${context.agency ?? ''} competitor competition budget recompete`,
+    agentType: 'strategy',
+    opportunityContext: {
+      title: context.title,
+      agency: context.agency,
+    },
+    isCUI: false,
+  })
+
+  const liveIntelSection = researchResult.content
+    ? `LIVE INTELLIGENCE (fetched ${new Date().toISOString()}):\n${researchResult.content}\n\nSources: ${researchResult.sources.join(', ')}`
+    : null
+
   const prompt = `Generate a capture strategy for this government opportunity:
 
 Title: ${context.title}
@@ -32,9 +49,14 @@ For each item, include a brief "Because" explanation.`
     'You are a GovCon strategy consultant specializing in Shipley methodology. Generate specific, actionable strategy recommendations. Avoid generic advice — tie everything to the specific opportunity details provided.'
 
   const feedbackCtx = await buildFeedbackContext('strategy')
-  const systemPrompt = feedbackCtx
-    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
-    : baseSystemPrompt
+  const systemPrompt = [
+    baseSystemPrompt,
+    liveIntelSection,
+    STRATEGY_AGENT_HEALTH_IT_INJECTION,
+    feedbackCtx?.instructions,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'strategy',
