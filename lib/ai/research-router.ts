@@ -80,7 +80,7 @@ function hasDeepResearchSignals(query: string): boolean {
  * Pure function: select research engine based on CUI status, agent type,
  * query content, and API key availability.
  */
-export function selectEngine(query: ResearchQuery): ResearchEngine {
+function selectEngine(query: ResearchQuery): ResearchEngine {
   // Rule 1: CUI content → asksage (no-op; CUI handled by pipeline.ts)
   if (query.isCUI) {
     return 'asksage'

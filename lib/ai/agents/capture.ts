@@ -4,7 +4,7 @@ import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 import { CAPTURE_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
-import { runResearch, type ResearchQuery } from '@/lib/ai/research-router'
+import { runResearch } from '@/lib/ai/research-router'
 
 export async function runCaptureAnalysis(context: {
   title: string
