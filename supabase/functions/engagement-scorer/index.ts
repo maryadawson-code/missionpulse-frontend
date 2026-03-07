@@ -1,157 +1,85 @@
-/**
- * Engagement Scorer — Supabase Edge Function (Deno)
- *
- * Runs daily via cron. Calculates engagement scores for all active pilots
- * and stores them in company_subscriptions.metadata.
- *
- * If score < 40 and pilot is in week 2+, flags for notification.
- *
- * TODO: deploy via `supabase functions deploy engagement-scorer`
- * TODO: set up cron: `supabase functions schedule engagement-scorer --schedule "0 7 * * *"`
- */
-
+// filepath: supabase/functions/engagement-scorer/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-interface PilotRow {
-  company_id: string
-  pilot_start_date: string | null
-  metadata: Record<string, unknown> | null
-}
-
-// Scoring weights
-const WEIGHTS = {
-  loginFrequency: 0.20,
-  aiUsage: 0.25,
-  featureAdoption: 0.25,
-  teamInvites: 0.15,
-  docsGenerated: 0.15,
-}
-
-Deno.serve(async () => {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
+Deno.serve(async (req: Request) => {
+  const authHeader = req.headers.get('Authorization')
+  if (authHeader !== `Bearer ${Deno.env.get('CRON_SECRET')}`) {
+    return new Response('Unauthorized', { status: 401 })
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey)
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
 
-  // Get all active pilots
-  const { data: pilots, error: queryError } = await supabase
+  const { data: pilots } = await supabase
     .from('company_subscriptions')
-    .select('company_id, pilot_start_date, metadata')
+    .select('company_id, pilot_end_date')
     .eq('status', 'pilot')
+  if (!pilots?.length) return new Response(JSON.stringify({ scored: 0 }), { status: 200 })
 
-  if (queryError) {
-    console.error('[engagement-scorer] Query error:', queryError.message)
-    return new Response(
-      JSON.stringify({ error: queryError.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  let scored = 0
 
-  const pilotRows = (pilots ?? []) as PilotRow[]
-  const results: Array<{ companyId: string; score: number; flagged: boolean }> = []
-  const now = Date.now()
-
-  for (const pilot of pilotRows) {
-    const since = pilot.pilot_start_date ?? new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString()
-
-    // Login frequency
-    const { count: loginCount } = await supabase
+  for (const pilot of pilots) {
+    const { data: acts } = await supabase
       .from('activity_feed')
-      .select('id', { count: 'exact', head: true })
+      .select('action_type, created_at')
       .eq('company_id', pilot.company_id)
-      .eq('action_type', 'login')
-      .gte('created_at', since)
+      .gte('created_at', thirtyDaysAgo)
+    const a = acts ?? []
 
-    const loginScore = Math.min(100, Math.round(((loginCount ?? 0) / 30) * 100))
-
-    // AI usage
-    const { count: aiCount } = await supabase
-      .from('token_usage')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', since)
-
-    const aiPerDay = (aiCount ?? 0) / 30
-    const aiScore = Math.min(100, Math.round((aiPerDay / 10) * 100))
-
-    // Feature adoption
-    const { data: actions } = await supabase
-      .from('activity_feed')
-      .select('action_type')
-      .eq('company_id', pilot.company_id)
-      .gte('created_at', since)
-
-    const uniqueActions = new Set((actions ?? []).map((r: { action_type: string }) => r.action_type))
-    const featureScore = Math.min(100, Math.round((uniqueActions.size / 14) * 100))
-
-    // Team invites
-    const { count: memberCount } = await supabase
+    const loginDays = new Set(
+      a.filter((x) => x.action_type === 'login' || x.action_type === 'session_start')
+        .map((x) => (x.created_at ?? '').slice(0, 10))
+    ).size
+    const aiQ = a.filter((x) => (x.action_type ?? '').startsWith('ai_') || x.action_type === 'agent_run').length
+    const props = a.filter((x) => x.action_type === 'opportunity_created').length
+    const comp = a.filter((x) => x.action_type === 'compliance_run' || x.action_type === 'rfp_shredder_run').length
+    const { count: tc } = await supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
       .eq('company_id', pilot.company_id)
+      .neq('role', 'executive')
 
-    const teamScore = Math.min(100, Math.round((((memberCount ?? 1) - 1) / 5) * 100))
-
-    // Documents generated
-    const { count: docCount } = await supabase
-      .from('company_documents')
-      .select('id', { count: 'exact', head: true })
-      .eq('company_id', pilot.company_id)
-      .gte('uploaded_at', since)
-
-    const docScore = Math.min(100, Math.round(((docCount ?? 0) / 10) * 100))
-
-    // Composite score
     const score = Math.round(
-      loginScore * WEIGHTS.loginFrequency +
-      aiScore * WEIGHTS.aiUsage +
-      featureScore * WEIGHTS.featureAdoption +
-      teamScore * WEIGHTS.teamInvites +
-      docScore * WEIGHTS.docsGenerated
+      Math.min(loginDays / 15, 1) * 20 +
+      Math.min(aiQ / 20, 1) * 25 +
+      Math.min(props / 2, 1) * 25 +
+      Math.min(comp / 3, 1) * 15 +
+      Math.min((tc ?? 0) / 2, 1) * 15
     )
 
-    // Update metadata
-    const currentMeta = pilot.metadata ?? {}
-    await supabase
-      .from('company_subscriptions')
-      .update({
-        metadata: {
-          ...currentMeta,
-          engagement_score: score,
-          engagement_computed_at: new Date().toISOString(),
-        },
-      })
-      .eq('company_id', pilot.company_id)
+    await supabase.from('pilot_engagement_scores').insert({
+      company_id: pilot.company_id,
+      score,
+      daily_logins: loginDays,
+      ai_queries: aiQ,
+      proposals_created: props,
+      compliance_matrices: comp,
+      team_invites: tc ?? 0,
+      calculated_at: new Date().toISOString(),
+    })
 
-    // Flag if low engagement in week 2+
-    const daysSinceStart = pilot.pilot_start_date
-      ? Math.ceil((now - new Date(pilot.pilot_start_date).getTime()) / (24 * 60 * 60 * 1000))
-      : 0
-    const flagged = score < 40 && daysSinceStart >= 14
-
-    if (flagged) {
-      console.warn(
-        `[engagement-scorer] LOW ENGAGEMENT: ${pilot.company_id} score=${score} day=${daysSinceStart}`
-      )
+    // Week 2 alert for at-risk pilots
+    const pilotStart = pilot.pilot_end_date
+      ? new Date(new Date(pilot.pilot_end_date).getTime() - 30 * 24 * 60 * 60 * 1000)
+      : null
+    if (pilotStart) {
+      const daysIn = Math.floor((Date.now() - pilotStart.getTime()) / 86400000)
+      if (score < 40 && daysIn >= 13 && daysIn <= 15) {
+        await supabase.from('activity_feed').insert({
+          company_id: pilot.company_id,
+          user_id: null,
+          action_type: 'engagement_alert_week2',
+          entity_type: 'subscription',
+          entity_id: pilot.company_id,
+          description: `Week 2 alert: score ${score}/100 — at-risk pilot`,
+        })
+      }
     }
-
-    results.push({ companyId: pilot.company_id, score, flagged })
+    scored++
   }
 
-  console.log(`[engagement-scorer] Scored ${results.length} pilots`)
-
-  return new Response(
-    JSON.stringify({
-      scored: results.length,
-      flagged: results.filter((r) => r.flagged).length,
-      results,
-    }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
-  )
+  return new Response(JSON.stringify({ scored }), { status: 200 })
 })
