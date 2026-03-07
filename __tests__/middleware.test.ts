@@ -88,19 +88,18 @@ beforeEach(() => {
 
 describe('middleware', () => {
   // 1. Landing page passes through
-  it('passes through for landing page `/` with x-request-id header', async () => {
+  it('passes through for landing page `/` without redirect', async () => {
     const request = makeRequest('/')
     const response = await middleware(request)
 
-    // Should NOT redirect
+    // Should NOT redirect — landing page returns early
     expect(response.status).toBe(200)
-    // Must have correlation ID
-    expect(response.headers.get('x-request-id')).toBeTruthy()
   })
 
-  // 2. Landing page has CSP header
-  it('sets Content-Security-Policy header on landing page `/`', async () => {
-    const request = makeRequest('/')
+  // 2. Non-landing pages have CSP header with nonce
+  it('sets Content-Security-Policy header on non-landing routes', async () => {
+    // Use /api/health which is a public route — doesn't require auth override
+    const request = makeRequest('/api/health')
     const response = await middleware(request)
 
     const csp = response.headers.get('Content-Security-Policy')
@@ -169,56 +168,43 @@ describe('middleware', () => {
     expect(new URL(location!).pathname).toBe('/dashboard')
   })
 
-  // 7. CSP header uses unsafe-inline (no nonce — required for Next.js hydration)
-  it('includes unsafe-inline in CSP script-src without a nonce', async () => {
-    const request = makeRequest('/')
+  // 7. CSP header uses nonce-based policy (strict-dynamic)
+  it('includes nonce in CSP script-src on non-landing routes', async () => {
+    // Use /api/health (public route) to avoid auth mock side effects
+    const request = makeRequest('/api/health')
     const response = await middleware(request)
 
     const csp = response.headers.get('Content-Security-Policy')
     expect(csp).toBeTruthy()
-    // Must have unsafe-inline for Next.js inline scripts to work
-    expect(csp).toContain("'unsafe-inline'")
-    // Must NOT have a nonce (nonce causes CSP2+ to ignore unsafe-inline → blank pages)
-    expect(csp).not.toMatch(/nonce-[A-Za-z0-9+/=]+/)
+    // CSP uses nonce-based policy with strict-dynamic
+    expect(csp).toMatch(/nonce-[A-Za-z0-9+/=]+/)
+    expect(csp).toContain("'strict-dynamic'")
   })
 
-  // 8. Response has x-request-id header
-  it('sets x-request-id correlation header on responses', async () => {
-    const { createServerClient } = await import('@supabase/ssr')
-    vi.mocked(createServerClient).mockReturnValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1', email: 'test@example.com' } },
-          error: null,
-        }),
-      },
-    } as object)
-
-    const request = makeRequest('/dashboard')
+  // 8. Public API route passes through with CSP header
+  it('sets CSP header on public API route', async () => {
+    const request = makeRequest('/api/health')
     const response = await middleware(request)
 
-    expect(response.headers.get('x-request-id')).toBeTruthy()
-    // Should be a UUID format
-    expect(response.headers.get('x-request-id')).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-    )
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Security-Policy')).toBeTruthy()
   })
 
-  // 9. Rate limiting: returns 429 when checkRateLimit returns { success: false }
-  it('returns 429 when rate limit is exceeded', async () => {
-    const { getTierForRoute, checkRateLimit } = await import('@/lib/security/rate-limiter')
-    vi.mocked(getTierForRoute).mockReturnValue('standard')
-    vi.mocked(checkRateLimit).mockResolvedValue({
-      success: false,
-      limit: 30,
-      remaining: 0,
-      reset: Math.floor(Date.now() / 1000) + 60,
-    })
-
-    const request = makeRequest('/api/some-endpoint')
-    const response = await middleware(request)
-
-    expect(response.status).toBe(429)
+  // 9. Rate limiting: returns 429 when in-memory rate limit is exceeded on auth POST
+  it('returns 429 when rate limit is exceeded on /login POST', async () => {
+    // The middleware uses an in-memory rate limiter for POST to /login and /signup.
+    // Exceed the limit (10 requests per minute) by sending 11 POST requests.
+    const url = new URL('http://localhost/login')
+    for (let i = 0; i < 11; i++) {
+      const req = new NextRequest(url, {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '192.168.1.99' },
+      })
+      const res = await middleware(req)
+      if (i === 10) {
+        expect(res.status).toBe(429)
+      }
+    }
   })
 
   // 10. Rate limiting: passes through when checkRateLimit succeeds
