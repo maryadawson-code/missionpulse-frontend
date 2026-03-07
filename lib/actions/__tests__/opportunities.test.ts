@@ -214,7 +214,7 @@ describe('createOpportunity', () => {
       (call: [string]) => call[0]
     )
     expect(fromCalls).toContain('audit_logs')
-    expect(fromCalls).toContain('activity_log')
+    expect(fromCalls).toContain('activity_feed')
 
     // Verify tryCompleteOnboardingStep was called
     expect(tryCompleteOnboardingStep).toHaveBeenCalledWith('create_opportunity')
@@ -254,7 +254,7 @@ describe('updateOpportunity', () => {
       (call: [string]) => call[0]
     )
     expect(fromCalls).toContain('audit_logs')
-    expect(fromCalls).toContain('activity_log')
+    expect(fromCalls).toContain('activity_feed')
   })
 })
 
@@ -317,7 +317,7 @@ describe('deleteOpportunity', () => {
       (call: [string]) => call[0]
     )
     expect(fromCalls).toContain('audit_logs')
-    expect(fromCalls).toContain('activity_log')
+    expect(fromCalls).toContain('activity_feed')
   })
 })
 

@@ -162,7 +162,7 @@ describe('v1.3 Hash Utility', () => {
 describe('v1.3 Migration Tables', () => {
   it('Phase J migration file exists', async () => {
     const fs = await import('fs')
-    const path = 'supabase/migrations/20260222_v1_3_phase_j.sql'
+    const path = 'supabase/migrations/20260222000004_v1_3_phase_j.sql'
     expect(fs.existsSync(path)).toBe(true)
   })
 })
