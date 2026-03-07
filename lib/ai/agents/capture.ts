@@ -4,6 +4,7 @@ import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
 import { CAPTURE_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
+import { runResearch, type ResearchQuery } from '@/lib/ai/research-router'
 
 export async function runCaptureAnalysis(context: {
   title: string
@@ -14,6 +15,22 @@ export async function runCaptureAnalysis(context: {
   setAside: string | null
   opportunityId: string
 }): Promise<AIResponse> {
+  // Pre-agent research: fetch live intelligence
+  const researchResult = await runResearch({
+    query: `${context.title} ${context.agency ?? ''} incumbent contract vehicle recompete`,
+    agentType: 'capture',
+    opportunityContext: {
+      title: context.title,
+      agency: context.agency,
+      ceiling: context.ceiling ?? undefined,
+    },
+    isCUI: false,
+  })
+
+  const liveIntelSection = researchResult.content
+    ? `LIVE INTELLIGENCE (fetched ${new Date().toISOString()}):\n${researchResult.content}\n\nSources: ${researchResult.sources.join(', ')}`
+    : null
+
   const prompt = `Analyze this government contract opportunity and provide a capture analysis:
 
 Title: ${context.title}
@@ -36,7 +53,12 @@ Format each section clearly with headers.`
     'You are a senior GovCon capture manager with 20+ years of experience. Provide actionable, specific analysis based on the opportunity details. Be realistic about win probability.'
 
   const feedbackCtx = await buildFeedbackContext('capture')
-  const systemPrompt = [baseSystemPrompt, CAPTURE_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
+  const systemPrompt = [
+    baseSystemPrompt,
+    liveIntelSection,
+    CAPTURE_AGENT_HEALTH_IT_INJECTION,
+    feedbackCtx?.instructions,
+  ]
     .filter(Boolean)
     .join('\n\n')
 
