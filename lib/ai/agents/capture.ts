@@ -3,6 +3,7 @@
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
+import { CAPTURE_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
 
 export async function runCaptureAnalysis(context: {
   title: string
@@ -35,9 +36,9 @@ Format each section clearly with headers.`
     'You are a senior GovCon capture manager with 20+ years of experience. Provide actionable, specific analysis based on the opportunity details. Be realistic about win probability.'
 
   const feedbackCtx = await buildFeedbackContext('capture')
-  const systemPrompt = feedbackCtx
-    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
-    : baseSystemPrompt
+  const systemPrompt = [baseSystemPrompt, CAPTURE_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'capture',

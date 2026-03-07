@@ -4,6 +4,7 @@ import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { getVoiceProfile, type VoiceProfile } from '@/lib/ai/voice-fingerprint'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
+import { WRITER_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
 
 /**
  * Run the Writer Agent with optional company voice profile.
@@ -62,7 +63,7 @@ Format: Write each paragraph separately, with a "Because:" line after it.`
 
   // Build system prompt: base + voice profile + feedback context
   const feedbackCtx = await buildFeedbackContext('writer')
-  const promptParts = [baseSystemPrompt]
+  const promptParts = [baseSystemPrompt, WRITER_AGENT_HEALTH_IT_INJECTION]
   if (voiceInstructions) promptParts.push(voiceInstructions)
   if (feedbackCtx) promptParts.push(feedbackCtx.instructions)
 

@@ -4,6 +4,7 @@ import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildPricingContext } from '@/lib/integrations/fpds/client'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
+import { PRICING_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
 
 export async function runPricingAgent(context: {
   title: string
@@ -62,9 +63,9 @@ IMPORTANT: This analysis contains CUI//SP-PROPIN data. All pricing information i
     'You are a GovCon pricing strategist with deep expertise in government cost proposals. Provide specific rate recommendations based on agency, NAICS, and market data. When FPDS market data is provided, use it to calibrate your pricing recommendations and validate your rate ranges against actual market transactions. Focus on realistic, competitive pricing that maximizes win probability while maintaining acceptable margins. All output is CUI//SP-PROPIN.'
 
   const feedbackCtx = await buildFeedbackContext('pricing')
-  const systemPrompt = feedbackCtx
-    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
-    : baseSystemPrompt
+  const systemPrompt = [baseSystemPrompt, PRICING_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'pricing',

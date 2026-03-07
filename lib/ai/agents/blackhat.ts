@@ -3,6 +3,7 @@
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
+import { BLACK_HAT_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
 
 export async function runBlackHatAgent(context: {
   opportunityTitle: string
@@ -48,9 +49,9 @@ IMPORTANT: This analysis contains CUI//OPSEC data. All competitive intelligence 
     'You are a senior GovCon capture strategist conducting a Black Hat review. Think like the competitor — what would their proposal look like? Provide specific, actionable intelligence, not generic observations. All output is CUI//OPSEC.'
 
   const feedbackCtx = await buildFeedbackContext('blackhat')
-  const systemPrompt = feedbackCtx
-    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
-    : baseSystemPrompt
+  const systemPrompt = [baseSystemPrompt, BLACK_HAT_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'strategy',
@@ -98,9 +99,9 @@ IMPORTANT: CUI//OPSEC data.`
     'You are a senior GovCon capture strategist conducting a multi-competitor Black Hat review. Analyze the competitive field holistically. Focus on exploitable gaps and realistic counter-strategies. All output is CUI//OPSEC.'
 
   const multiFeedbackCtx = await buildFeedbackContext('blackhat')
-  const multiSystemPrompt = multiFeedbackCtx
-    ? `${multiBasePrompt}\n\n${multiFeedbackCtx.instructions}`
-    : multiBasePrompt
+  const multiSystemPrompt = [multiBasePrompt, BLACK_HAT_AGENT_HEALTH_IT_INJECTION, multiFeedbackCtx?.instructions]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'strategy',

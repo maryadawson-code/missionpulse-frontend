@@ -171,7 +171,7 @@ export default function NewOpportunityForm() {
             <Field label="Phase" name="phase" type="select" options={PHASE_OPTIONS} />
             <Field label="Status" name="status" type="select" options={STATUS_OPTIONS} />
             <Field label="Set-Aside" name="set_aside" type="select" options={SET_ASIDE_OPTIONS} />
-            <Field label="Contract Vehicle" name="contract_vehicle" placeholder="e.g., STARS III, CIO-SP4" />
+            <Field label="Contract Vehicle" name="contract_vehicle" placeholder="e.g., STARS III, CIO-SP3, OASIS+" />
           </div>
         </section>
 

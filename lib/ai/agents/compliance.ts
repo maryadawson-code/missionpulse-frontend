@@ -3,6 +3,7 @@
 import { aiRequest } from '@/lib/ai/pipeline'
 import type { AIResponse } from '@/lib/ai/types'
 import { buildFeedbackContext } from '@/lib/ai/feedback-context'
+import { COMPLIANCE_AGENT_HEALTH_IT_INJECTION } from '@/lib/agents/health-it-domain-config'
 
 export async function runComplianceExtraction(context: {
   sourceText: string
@@ -34,9 +35,9 @@ Format as a numbered list with clear delimiters for each field.`
     'You are an expert GovCon compliance analyst. Extract every compliance requirement from RFP text. Be thorough — missing a requirement can be grounds for elimination. Err on the side of including marginal requirements with lower confidence.'
 
   const feedbackCtx = await buildFeedbackContext('compliance')
-  const systemPrompt = feedbackCtx
-    ? `${baseSystemPrompt}\n\n${feedbackCtx.instructions}`
-    : baseSystemPrompt
+  const systemPrompt = [baseSystemPrompt, COMPLIANCE_AGENT_HEALTH_IT_INJECTION, feedbackCtx?.instructions]
+    .filter(Boolean)
+    .join('\n\n')
 
   return aiRequest({
     taskType: 'compliance',
