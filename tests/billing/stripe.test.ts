@@ -1,9 +1,13 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock Stripe
+// Set env before any imports
+process.env.STRIPE_SECRET_KEY = 'sk_test_fake'
+process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_fake'
+
+// Mock the stripe package with a class-like constructor
 vi.mock('stripe', () => {
-  return {
-    default: vi.fn().mockImplementation(() => ({
+  function MockStripe() {
+    return {
       customers: {
         create: vi.fn().mockResolvedValue({ id: 'cus_test123' }),
       },
@@ -18,11 +22,17 @@ vi.mock('stripe', () => {
       webhooks: {
         constructEvent: vi.fn().mockReturnValue({ type: 'test', data: {} }),
       },
-    })),
+    }
   }
+  MockStripe.prototype = {}
+  return { default: MockStripe, __esModule: true }
 })
 
 describe('Stripe Module', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
   it('module can be imported', async () => {
     const mod = await import('@/lib/billing/stripe')
     expect(mod.getOrCreateCustomer).toBeDefined()
