@@ -24,7 +24,7 @@ export async function isProviderAvailable(
 ): Promise<boolean> {
   switch (provider) {
     case 'm365':
-      return !!(process.env.M365_CLIENT_ID && process.env.M365_CLIENT_SECRET)
+      return !!((process.env.MICROSOFT_CLIENT_ID || process.env.M365_CLIENT_ID) && (process.env.MICROSOFT_CLIENT_SECRET || process.env.M365_CLIENT_SECRET))
     case 'hubspot':
       return !!(process.env.HUBSPOT_CLIENT_ID && process.env.HUBSPOT_CLIENT_SECRET)
     case 'salesforce':
@@ -49,7 +49,7 @@ export async function getIntegrationAvailability(): Promise<
   Record<IntegrationProvider, boolean>
 > {
   return {
-    m365: !!(process.env.M365_CLIENT_ID && process.env.M365_CLIENT_SECRET),
+    m365: !!((process.env.MICROSOFT_CLIENT_ID || process.env.M365_CLIENT_ID) && (process.env.MICROSOFT_CLIENT_SECRET || process.env.M365_CLIENT_SECRET)),
     hubspot: !!(process.env.HUBSPOT_CLIENT_ID && process.env.HUBSPOT_CLIENT_SECRET),
     salesforce: !!(process.env.SALESFORCE_CLIENT_ID && process.env.SALESFORCE_CLIENT_SECRET),
     slack: !!(process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET),

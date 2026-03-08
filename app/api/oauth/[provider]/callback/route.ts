@@ -77,16 +77,25 @@ export async function GET(
     // Fetch provider user info
     const userInfo = await fetchProviderUserInfo(typedProvider, tokens.accessToken)
 
-    // For Slack, email might be in the raw response
+    // For Slack, identity info is in the authed_user block of the token response
     let providerEmail = userInfo.email
-    if (typedProvider === 'slack' && !providerEmail) {
+    let providerUserId = userInfo.userId
+    if (typedProvider === 'slack') {
       const authedUser = tokens.rawResponse.authed_user as Record<string, unknown> | undefined
-      providerEmail = (authedUser?.email as string) ?? null
+      if (!providerEmail) {
+        providerEmail = (authedUser?.email as string) ?? null
+      }
+      if (!providerUserId) {
+        providerUserId = (authedUser?.id as string) ?? null
+      }
     }
 
     const expiresAt = tokens.expiresIn
       ? new Date(Date.now() + tokens.expiresIn * 1000).toISOString()
       : null
+
+    // Strip secrets from raw response before storing as metadata
+    const { access_token: _a, refresh_token: _r, ...safeMetadata } = tokens.rawResponse
 
     await upsertUserToken({
       userId: storedState.userId,
@@ -95,8 +104,9 @@ export async function GET(
       refreshToken: tokens.refreshToken,
       expiresAt,
       scope: tokens.scope,
-      providerUserId: userInfo.userId,
+      providerUserId,
       providerEmail,
+      metadata: safeMetadata,
     })
 
     integrationsUrl.searchParams.set('connected', provider)

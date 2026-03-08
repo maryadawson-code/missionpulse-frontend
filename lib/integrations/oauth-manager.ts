@@ -33,6 +33,10 @@ interface OAuthConfig {
   scopes: string
   scopeSeparator: ' ' | ','
   extraAuthParams?: Record<string, string>
+  /** Slack-specific: bot-level scopes sent as `scope` param */
+  botScopes?: string
+  /** Slack-specific: user-level scopes sent as `user_scope` param */
+  userScopes?: string
 }
 
 export interface UserConnection {
@@ -46,13 +50,13 @@ export interface UserConnection {
 function getOAuthConfig(provider: OAuthProvider): OAuthConfig {
   switch (provider) {
     case 'microsoft365': {
-      const tenantId = process.env.M365_TENANT_ID ?? 'common'
+      const tenantId = process.env.MICROSOFT_TENANT_ID ?? process.env.M365_TENANT_ID ?? 'common'
       return {
-        clientId: process.env.M365_CLIENT_ID ?? '',
-        clientSecret: process.env.M365_CLIENT_SECRET ?? '',
+        clientId: process.env.MICROSOFT_CLIENT_ID ?? process.env.M365_CLIENT_ID ?? '',
+        clientSecret: process.env.MICROSOFT_CLIENT_SECRET ?? process.env.M365_CLIENT_SECRET ?? '',
         authUrl: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
         tokenUrl: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
-        scopes: 'Files.ReadWrite Calendars.ReadWrite offline_access openid profile email',
+        scopes: 'openid email profile offline_access User.Read Files.ReadWrite Calendars.ReadWrite Mail.ReadWrite Sites.ReadWrite.All Contacts.Read Tasks.ReadWrite',
         scopeSeparator: ' ',
       }
     }
@@ -62,7 +66,7 @@ function getOAuthConfig(provider: OAuthProvider): OAuthConfig {
         clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
-        scopes: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.send openid profile email',
+        scopes: 'openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar',
         scopeSeparator: ' ',
         extraAuthParams: { access_type: 'offline', prompt: 'consent' },
       }
@@ -72,8 +76,10 @@ function getOAuthConfig(provider: OAuthProvider): OAuthConfig {
         clientSecret: process.env.SLACK_CLIENT_SECRET ?? '',
         authUrl: 'https://slack.com/oauth/v2/authorize',
         tokenUrl: 'https://slack.com/api/oauth.v2.access',
-        scopes: 'channels:read,chat:write,users:read',
+        scopes: 'channels:read,chat:write,users:read,users:read.email,team:read',
         scopeSeparator: ',',
+        botScopes: 'channels:read,chat:write,users:read,users:read.email,team:read',
+        userScopes: 'identity.basic,identity.email',
       }
     case 'hubspot':
       return {
@@ -122,9 +128,12 @@ export async function buildAuthorizationUrl(
     state,
   }
 
-  // Slack uses user_scope instead of scope for user tokens
+  // Slack uses separate `scope` (bot) and `user_scope` (user) params
   if (provider === 'slack') {
-    params.user_scope = config.scopes
+    params.scope = config.botScopes ?? config.scopes
+    if (config.userScopes) {
+      params.user_scope = config.userScopes
+    }
   } else {
     params.scope = config.scopes
   }
@@ -225,14 +234,14 @@ export async function fetchProviderUserInfo(
         return { email: user.email ?? null, userId: user.id ?? null }
       }
       case 'slack': {
-        // For Slack, email may have been in the token response
-        // Use users.identity or auth.test
+        // Use auth.test with bot token to get user_id and team info
         const res = await fetch('https://slack.com/api/auth.test', {
           headers: { Authorization: `Bearer ${accessToken}` },
           signal: AbortSignal.timeout(10000),
         })
         if (!res.ok) return { email: null, userId: null }
-        const data = (await res.json()) as { ok: boolean; user_id?: string; user?: string }
+        const data = (await res.json()) as { ok: boolean; user_id?: string; user?: string; team?: string }
+        // Email comes from the authed_user in the token response (handled in callback)
         return { email: null, userId: data.user_id ?? null }
       }
       case 'hubspot': {
@@ -279,6 +288,7 @@ export async function upsertUserToken(params: {
   scope: string | null
   providerUserId: string | null
   providerEmail: string | null
+  metadata?: Record<string, unknown> | null
 }): Promise<void> {
   const supabase = await createClient()
 
@@ -292,6 +302,7 @@ export async function upsertUserToken(params: {
       scope: params.scope,
       provider_user_id: params.providerUserId,
       provider_email: params.providerEmail,
+      metadata: params.metadata ? JSON.parse(JSON.stringify(params.metadata)) : null,
       connected_at: new Date().toISOString(),
     },
     { onConflict: 'user_id,provider' }
