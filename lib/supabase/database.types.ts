@@ -1809,6 +1809,47 @@ export type Database = {
           },
         ]
       }
+      company_voice_profiles: {
+        Row: {
+          company_id: string
+          created_at: string
+          fingerprint: Json | null
+          id: string
+          sample_content: string | null
+          style_keywords: string[] | null
+          tone: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          fingerprint?: Json | null
+          id?: string
+          sample_content?: string | null
+          style_keywords?: string[] | null
+          tone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          fingerprint?: Json | null
+          id?: string
+          sample_content?: string | null
+          style_keywords?: string[] | null
+          tone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_voice_profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitive_matrix: {
         Row: {
           company_id: string | null
@@ -4134,6 +4175,62 @@ export type Database = {
           },
         ]
       }
+      fine_tune_jobs: {
+        Row: {
+          base_model: string
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          result_model_id: string | null
+          started_at: string | null
+          status: string
+          training_file: string | null
+          updated_at: string
+        }
+        Insert: {
+          base_model: string
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          result_model_id?: string | null
+          started_at?: string | null
+          status?: string
+          training_file?: string | null
+          updated_at?: string
+        }
+        Update: {
+          base_model?: string
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          result_model_id?: string | null
+          started_at?: string | null
+          status?: string
+          training_file?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fine_tune_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       frenemy_entities: {
         Row: {
           cage_code: string | null
@@ -4639,33 +4736,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      hubspot_field_mapping: {
-        Row: {
-          hubspot_field: string
-          hubspot_type: string | null
-          id: string
-          missionpulse_field: string
-          notes: string | null
-          sync_direction: string | null
-        }
-        Insert: {
-          hubspot_field: string
-          hubspot_type?: string | null
-          id?: string
-          missionpulse_field: string
-          notes?: string | null
-          sync_direction?: string | null
-        }
-        Update: {
-          hubspot_field?: string
-          hubspot_type?: string | null
-          id?: string
-          missionpulse_field?: string
-          notes?: string | null
-          sync_direction?: string | null
-        }
-        Relationships: []
       }
       hubspot_field_mappings: {
         Row: {
@@ -12262,6 +12332,33 @@ export type Database = {
       }
     }
     Views: {
+      hubspot_field_mapping: {
+        Row: {
+          hubspot_field: string | null
+          hubspot_type: string | null
+          id: string | null
+          missionpulse_field: string | null
+          notes: string | null
+          sync_direction: string | null
+        }
+        Insert: {
+          hubspot_field?: string | null
+          hubspot_type?: never
+          id?: string | null
+          missionpulse_field?: string | null
+          notes?: never
+          sync_direction?: string | null
+        }
+        Update: {
+          hubspot_field?: string | null
+          hubspot_type?: never
+          id?: string | null
+          missionpulse_field?: string | null
+          notes?: never
+          sync_direction?: string | null
+        }
+        Relationships: []
+      }
       v_chat_analytics: {
         Row: {
           agent_type: string | null
