@@ -2,6 +2,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getOrCreateCustomer, createSubscriptionCheckout } from '@/lib/billing/stripe'
 
 export interface PilotCreateParams {
   companyId: string
@@ -120,6 +121,69 @@ export async function convertPilotToAnnual(companyId: string): Promise<{ success
   })
 
   return { success: true }
+}
+
+/**
+ * Build a Stripe Checkout URL for pilot → annual conversion.
+ * Applies pilot credit as a line-item discount via metadata (Stripe coupon applied at checkout).
+ */
+export async function getPilotCheckoutUrl(
+  companyId: string
+): Promise<{ url: string | null; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { url: null, error: 'Unauthenticated' }
+
+  const { data: sub } = await supabase
+    .from('company_subscriptions')
+    .select('status, pilot_amount_cents, plan_id, stripe_customer_id')
+    .eq('company_id', companyId)
+    .single()
+
+  if (!sub || !['pilot', 'pilot_expired'].includes(sub.status ?? '')) {
+    return { url: null, error: 'No active pilot found' }
+  }
+
+  // Find the plan's annual Stripe price ID
+  const { data: plan } = await supabase
+    .from('subscription_plans')
+    .select('slug, name, stripe_annual_price_id')
+    .eq('id', sub.plan_id)
+    .single()
+
+  const annualPriceId = (plan?.stripe_annual_price_id as string) ?? null
+  if (!annualPriceId) {
+    return { url: null, error: 'No annual price configured for this plan' }
+  }
+
+  // Get company info for Stripe customer
+  const { data: company } = await supabase
+    .from('companies')
+    .select('name')
+    .eq('id', companyId)
+    .single()
+
+  const customerId = await getOrCreateCustomer({
+    company_id: companyId,
+    company_name: (company?.name as string) ?? 'Unknown',
+    email: user.email ?? '',
+    existing_customer_id: (sub.stripe_customer_id as string) ?? null,
+  })
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    'http://localhost:3000'
+
+  const { url } = await createSubscriptionCheckout({
+    customer_id: customerId,
+    price_id: annualPriceId,
+    company_id: companyId,
+    success_url: `${baseUrl}/settings/billing?session_id={CHECKOUT_SESSION_ID}&pilot_conversion=true`,
+    cancel_url: `${baseUrl}/settings/billing`,
+  })
+
+  return { url }
 }
 
 export async function expirePilot(companyId: string): Promise<void> {

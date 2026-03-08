@@ -3,7 +3,7 @@
  */
 'use server'
 
-import { createPilot, convertPilotToAnnual } from '@/lib/billing/pilots'
+import { createPilot, convertPilotToAnnual, getPilotCheckoutUrl } from '@/lib/billing/pilots'
 
 export async function createPilotAction(
   companyId: string,
@@ -17,6 +17,15 @@ export async function createPilotAction(
   })
 }
 
+/**
+ * Convert pilot via Stripe Checkout (preferred path — applies pilot credit).
+ * Returns { url } for redirect, or falls back to direct DB conversion if Stripe isn't configured.
+ */
 export async function convertPilotAction(companyId: string) {
+  const checkout = await getPilotCheckoutUrl(companyId)
+  if (checkout.url) {
+    return { success: true, redirectUrl: checkout.url }
+  }
+  // Fallback: direct conversion if Stripe annual price not configured
   return convertPilotToAnnual(companyId)
 }
