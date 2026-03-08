@@ -1,6 +1,7 @@
 // filepath: app/(dashboard)/layout.tsx
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import {
   getRolePermissions,
@@ -49,6 +50,52 @@ export default async function DashboardLayout({
 
   // Default to 'partner' (most restrictive) if no profile or role found
   const userRole = profile?.role ?? 'partner'
+
+  // ─── Onboarding Redirect ──────────────────────────────────────
+  const headersList = await headers()
+  const pathname = headersList.get('x-next-pathname') ?? headersList.get('x-invoke-path') ?? ''
+
+  if (profile) {
+    const prefs = (profile as Record<string, unknown>).preferences as Record<string, unknown> | undefined
+    const onboardingDone = prefs?.onboarding_complete === true
+
+    if (
+      !onboardingDone &&
+      !pathname.startsWith('/onboarding') &&
+      !pathname.startsWith('/admin') &&
+      !pathname.startsWith('/settings') &&
+      !pathname.startsWith('/api')
+    ) {
+      // Check if preferences column was fetched
+      const { data: prefProfile } = await supabase
+        .from('profiles')
+        .select('preferences')
+        .eq('id', user.id)
+        .single()
+      const prefData = (prefProfile?.preferences as Record<string, unknown>) ?? {}
+      if (prefData.onboarding_complete !== true) {
+        redirect('/onboarding')
+      }
+    }
+  }
+
+  // ─── Pilot Expired Redirect ───────────────────────────────────
+  if (
+    profile?.company_id &&
+    !pathname.startsWith('/pilot-expired') &&
+    !pathname.startsWith('/pilot-review') &&
+    !pathname.startsWith('/settings') &&
+    !pathname.startsWith('/api')
+  ) {
+    const { data: subCheck } = await supabase
+      .from('company_subscriptions')
+      .select('status')
+      .eq('company_id', profile.company_id)
+      .single()
+    if (subCheck?.status === 'pilot_expired') {
+      redirect('/pilot-expired')
+    }
+  }
 
   // ─── RBAC Permission Resolution ─────────────────────────────
   let permissions: Record<string, ModulePermission> = {}
