@@ -142,3 +142,51 @@ middleware.ts          # Session refresh + auth redirect
 - Error boundaries: one per route segment
 - Loading states: `loading.tsx` files per route (Suspense boundaries)
 - Empty states: follow `emptyStateConfig` from roles_permissions_config.json
+
+## Session Gotchas — 2026-03-08
+
+### Stripe SDK v20+ (API 2026-02-25.clover) Breaking Changes
+- `Subscription.current_period_start/end` removed — period info now on subscription items
+- `Invoice.subscription` replaced by `Invoice.parent.subscription_details.subscription`
+- `lib/billing/stripe.ts` has 'use server' — all exports must be async functions
+- `subscription_plans` table stores `stripe_monthly_price_id` and `stripe_annual_price_id` — prefer DB lookup over env vars for price IDs
+
+### OAuth env var naming
+- Netlify uses MICROSOFT_CLIENT_ID/SECRET/TENANT_ID
+- Existing code used M365_CLIENT_ID/SECRET/TENANT_ID
+- Fix: code now reads MICROSOFT_* first, falls back to M365_* (both work)
+- Same pattern applied in lib/integrations/m365/auth.ts and lib/integrations/availability.ts
+
+### Slack OAuth v2 token structure
+- Bot token: `data.access_token` (for sending messages)
+- User token: `data.authed_user.access_token`
+- User email: `data.authed_user.email` (requires identity.email user scope)
+- We store bot token; extract user identity from authed_user block
+
+### Google OAuth
+- Requires `access_type=offline` + `prompt=consent` params to receive refresh_token on first auth
+- Scopes: use full drive + calendar (not drive.file — too restrictive for our use case)
+
+### HubSpot table naming
+- Canonical table: `hubspot_field_mappings` (plural) — 11 rows
+- Legacy table `hubspot_field_mapping` (singular) now a compat view pointing to plural
+- All new code uses plural form
+
+### Missing tables (now created via migration 20260308000001)
+- `fine_tune_jobs` — forward-looking; referenced in lib/ai/fine-tune/job-manager.ts as JSONB not direct query
+- `company_voice_profiles` — ready for playbook voice profile feature; no direct .from() queries yet
+
+### user_oauth_tokens
+- Per-user OAuth tokens (not company-level)
+- RLS: users own their own tokens (user_id = auth.uid())
+- Unique constraint on (user_id, provider)
+- metadata JSONB stores raw token response minus access_token/refresh_token (for debugging)
+
+### Pilot to Stripe Checkout conversion
+- getPilotCheckoutUrl() in lib/billing/pilots.ts looks up stripe_annual_price_id from subscription_plans table
+- Falls back to direct DB conversion if annual price not configured
+- PilotAdminClient.tsx redirects to Stripe URL if returned, otherwise does direct conversion
+
+### TypeScript downlevelIteration
+- tsconfig target does not support spread on Set/Map iterators
+- Use `Array.from(set)` instead of `[...set]` for Set/Map iteration

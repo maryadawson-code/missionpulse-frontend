@@ -8188,6 +8188,7 @@ export type Database = {
           full_name: string | null
           id: string
           last_login: string | null
+          mfa_enabled: boolean
           phone: string | null
           preferences: Json | null
           role: string | null
@@ -8203,6 +8204,7 @@ export type Database = {
           full_name?: string | null
           id: string
           last_login?: string | null
+          mfa_enabled?: boolean
           phone?: string | null
           preferences?: Json | null
           role?: string | null
@@ -8218,6 +8220,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           last_login?: string | null
+          mfa_enabled?: boolean
           phone?: string | null
           preferences?: Json | null
           role?: string | null
