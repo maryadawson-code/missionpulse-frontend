@@ -5,14 +5,30 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 export async function joinWorkspace(formData: FormData) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const fullName = formData.get('full_name') as string
   const invitationId = formData.get('invitation_id') as string
-  const companyId = formData.get('company_id') as string
-  const role = formData.get('role') as string
+
+  // Verify invitation exists and extract trusted company_id + role from DB
+  const { data: invitation, error: invError } = await supabase
+    .from('user_invitations')
+    .select('id, company_id, role, status')
+    .eq('id', invitationId)
+    .single()
+
+  if (invError || !invitation) {
+    return { error: 'Invalid invitation' }
+  }
+
+  if (invitation.status !== 'pending') {
+    return { error: 'This invitation has already been used' }
+  }
+
+  const companyId = invitation.company_id
+  const role = invitation.role
 
   const { data, error } = await supabase.auth.signUp({
     email,

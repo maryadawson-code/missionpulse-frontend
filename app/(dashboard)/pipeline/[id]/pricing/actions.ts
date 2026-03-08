@@ -61,6 +61,28 @@ export async function addLaborCategory(formData: FormData) {
   const annualHours = Number(formData.get('annualHours') ?? 1880)
   const opportunityId = formData.get('opportunityId') as string
 
+  if (isNaN(headcount) || isNaN(hourlyRate) || isNaN(annualHours)) {
+    return { success: false, error: 'Invalid numeric values' }
+  }
+
+  // Verify cost volume belongs to user's company
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.company_id) {
+    const { data: volume } = await supabase
+      .from('cost_volumes')
+      .select('id')
+      .eq('id', costVolumeId)
+      .eq('company_id', profile.company_id)
+      .single()
+
+    if (!volume) return { success: false, error: 'Not found' }
+  }
+
   const lcatId = crypto.randomUUID()
   const { error } = await supabase.from('cost_labor_categories').insert({
     id: lcatId,

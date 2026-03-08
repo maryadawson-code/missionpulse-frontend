@@ -82,6 +82,7 @@ export async function middleware(request: NextRequest) {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    "frame-ancestors 'none'",
   ].join('; ')
 
   const requestHeaders = new Headers(request.headers)

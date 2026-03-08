@@ -151,6 +151,18 @@ export async function createProposalOutline(
     .eq('id', user.id)
     .single()
 
+  // Verify opportunity belongs to user's company
+  if (profile?.company_id) {
+    const { data: opp } = await supabase
+      .from('opportunities')
+      .select('id')
+      .eq('id', opportunityId)
+      .eq('company_id', profile.company_id)
+      .single()
+
+    if (!opp) return { success: false, error: 'Not found' }
+  }
+
   const id = crypto.randomUUID()
   const { error } = await supabase.from('proposal_outlines').insert({
     id,
@@ -185,10 +197,20 @@ export async function deleteProposalOutline(outlineId: string): Promise<ActionRe
   } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
+  // Scope delete to user's company
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.company_id) return { success: false, error: 'No company' }
+
   const { error } = await supabase
     .from('proposal_outlines')
     .delete()
     .eq('id', outlineId)
+    .eq('company_id', profile.company_id)
 
   if (error) return { success: false, error: error.message }
 
