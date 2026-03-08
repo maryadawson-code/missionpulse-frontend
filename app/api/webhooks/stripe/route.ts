@@ -9,6 +9,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyWebhookEvent } from '@/lib/billing/stripe'
 import { handleConversionSuccess } from '@/lib/billing/pilot-conversion'
+import { createLogger } from '@/lib/logging/logger'
+
+const log = createLogger('stripe-webhook')
 
 // Use admin client for webhook processing (no user session)
 function getAdminClient() {
@@ -166,7 +169,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Processing error'
-    console.error('[stripe-webhook] Error:', message)
+    log.error('Webhook processing failed', { error: message, eventType: event?.type })
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

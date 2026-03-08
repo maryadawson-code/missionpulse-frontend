@@ -7,6 +7,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { IntegrationProvider } from '@/lib/integrations/availability'
+import { deleteUserToken, type OAuthProvider } from '@/lib/integrations/oauth-manager'
 
 import { getM365AuthUrl, disconnectM365 } from '@/lib/integrations/m365/auth'
 import { getHubSpotAuthUrl, disconnectHubSpot } from '@/lib/integrations/hubspot/auth'
@@ -171,4 +172,20 @@ async function getUserContext(): Promise<{
 
   if (!profile?.company_id) return null
   return { userId: user.id, companyId: profile.company_id }
+}
+
+/**
+ * Disconnect a per-user OAuth integration.
+ * Deletes the token from user_oauth_tokens.
+ */
+export async function disconnectUserOAuth(
+  provider: OAuthProvider
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  await deleteUserToken(user.id, provider)
+  revalidatePath('/integrations')
+  return {}
 }

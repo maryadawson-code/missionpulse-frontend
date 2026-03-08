@@ -209,7 +209,7 @@ export function PricingCards() {
             </ul>
 
             <Link
-              href={plan.slug === 'enterprise' ? '/signup?plan=enterprise' : `/signup?plan=${plan.slug}`}
+              href={plan.slug === 'enterprise' ? 'mailto:hello@missionpulse.ai?subject=Enterprise%20Plan%20Inquiry' : `/signup?plan=${plan.slug}`}
               onClick={() =>
                 trackEvent('signup_click', {
                   plan_tier: plan.slug,

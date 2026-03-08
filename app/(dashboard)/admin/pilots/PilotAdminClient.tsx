@@ -117,6 +117,12 @@ export default function PilotAdminClient({
     startTransition(async () => {
       const result = await convertPilotAction(companyId)
       if (result.success) {
+        // If Stripe checkout URL returned, redirect to Stripe
+        if ('redirectUrl' in result && result.redirectUrl) {
+          window.location.href = result.redirectUrl as string
+          return
+        }
+        // Direct conversion fallback
         setPilots((prev) =>
           prev.map((p) =>
             p.companyId === companyId ? { ...p, status: 'active' } : p

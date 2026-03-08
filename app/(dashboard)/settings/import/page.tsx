@@ -35,7 +35,7 @@ export default async function ImportPage() {
         <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-6 text-center">
           <p className="text-red-600 dark:text-red-400">You do not have permission to import data.</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Contact your administrator to request import access.
+            Data import requires an executive or operations role.
           </p>
         </div>
       </div>

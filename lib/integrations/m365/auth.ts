@@ -15,11 +15,11 @@ import { createClient } from '@/lib/supabase/server'
 
 // ─── Config ──────────────────────────────────────────────────
 
-const M365_CLIENT_ID = process.env.M365_CLIENT_ID ?? ''
-const M365_CLIENT_SECRET = process.env.M365_CLIENT_SECRET ?? ''
+const M365_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID ?? process.env.M365_CLIENT_ID ?? ''
+const M365_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET ?? process.env.M365_CLIENT_SECRET ?? ''
 const M365_REDIRECT_URI =
   process.env.M365_REDIRECT_URI ?? 'https://missionpulse.ai/api/integrations/m365/callback'
-const M365_TENANT_ID = process.env.M365_TENANT_ID ?? 'common'
+const M365_TENANT_ID = process.env.MICROSOFT_TENANT_ID ?? process.env.M365_TENANT_ID ?? 'common'
 const M365_AUTH_URL = `https://login.microsoftonline.com/${M365_TENANT_ID}/oauth2/v2.0`
 
 const SCOPES = [
